@@ -58,11 +58,6 @@ astrolol/
 └── persistence/    # SQLAlchemy models (future)
 ```
 
-## What does not exist yet (MVP backlog)
+## Deferred work
 
-- INDI adapters (separate `astrolol-indi` package)
-- Sequencer / state machine
-- Autofocus module
-- Watchdog
-- Auth / security
-- Persistence layer
+See `TODO.md` for the full backlog with priorities.
