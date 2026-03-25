@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Plug, PlugZap, RefreshCw } from 'lucide-react'
 import { api } from '@/api/client'
-import type { ConnectedDevice, DeviceConfig, DeviceKind } from '@/api/types'
+import type { ConnectedDevice, DeviceConfig, DeviceKind, DriverEntry } from '@/api/types'
 import { useStore } from '@/store'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -12,8 +12,7 @@ interface ConnectFormState {
   kind: DeviceKind
   adapter_key: string
   indi_device_name: string
-  indi_host: string
-  indi_port: string
+  indi_executable: string
 }
 
 const DEFAULT_FORM: ConnectFormState = {
@@ -21,26 +20,52 @@ const DEFAULT_FORM: ConnectFormState = {
   kind: 'camera',
   adapter_key: '',
   indi_device_name: '',
-  indi_host: 'localhost',
-  indi_port: '7624',
+  indi_executable: '',
+}
+
+const KIND_ADAPTER: Record<DeviceKind, string> = {
+  camera: 'indi_camera',
+  mount: 'indi_mount',
+  focuser: 'indi_focuser',
 }
 
 export function Equipment() {
   const connectedDevices = useStore((s) => s.connectedDevices)
   const setConnectedDevices = useStore((s) => s.setConnectedDevices)
-  const [available, setAvailable] = useState<Record<string, string[]>>({})
   const [form, setForm] = useState<ConnectFormState>(DEFAULT_FORM)
+  const [drivers, setDrivers] = useState<DriverEntry[]>([])
   const [error, setError] = useState<string | null>(null)
   const [connecting, setConnecting] = useState(false)
 
   const refresh = () => {
     api.devices.connected().then(setConnectedDevices).catch(console.error)
-    api.devices.available().then(setAvailable).catch(console.error)
   }
 
   useEffect(() => { refresh() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const adapterOptions = available[`${form.kind}s`] ?? []
+  // Fetch INDI driver catalog whenever the kind changes
+  useEffect(() => {
+    setDrivers([])
+    api.indi.drivers(form.kind).then(setDrivers).catch(() => setDrivers([]))
+  }, [form.kind])
+
+  const handleKindChange = (kind: DeviceKind) => {
+    setForm({
+      ...DEFAULT_FORM,
+      kind,
+      adapter_key: KIND_ADAPTER[kind],
+    })
+  }
+
+  const handleDriverSelect = (executable: string) => {
+    const entry = drivers.find((d) => d.executable === executable)
+    setForm((f) => ({
+      ...f,
+      indi_executable: executable,
+      indi_device_name: entry?.device_name ?? f.indi_device_name,
+      adapter_key: KIND_ADAPTER[f.kind],
+    }))
+  }
 
   const handleConnect = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -52,14 +77,13 @@ export function Equipment() {
       adapter_key: form.adapter_key,
       params: {
         device_name: form.indi_device_name,
-        host: form.indi_host,
-        port: parseInt(form.indi_port, 10),
+        executable: form.indi_executable,
       },
     }
     try {
       await api.devices.connect(config)
       refresh()
-      setForm(DEFAULT_FORM)
+      setForm({ ...DEFAULT_FORM, kind: form.kind, adapter_key: KIND_ADAPTER[form.kind] })
     } catch (err) {
       setError((err as Error).message)
     } finally {
@@ -71,6 +95,9 @@ export function Equipment() {
     await api.devices.disconnect(deviceId).catch(console.error)
     refresh()
   }
+
+  const selectClass =
+    'rounded bg-surface-overlay border border-surface-border px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-40 w-full'
 
   return (
     <div className="p-6 max-w-3xl">
@@ -125,72 +152,66 @@ export function Equipment() {
           onSubmit={handleConnect}
           className="bg-surface-raised border border-surface-border rounded p-4 flex flex-col gap-3"
         >
-          <div className="grid grid-cols-2 gap-3">
-            {/* Kind */}
-            <div className="flex flex-col gap-1">
-              <label className="text-xs text-slate-400">Type</label>
-              <select
-                className="rounded bg-surface-overlay border border-surface-border px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-accent"
-                value={form.kind}
-                onChange={(e) => setForm({ ...form, kind: e.target.value as DeviceKind, adapter_key: '' })}
-              >
-                <option value="camera">Camera</option>
-                <option value="mount">Mount</option>
-                <option value="focuser">Focuser</option>
-              </select>
-            </div>
+          {/* Kind */}
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-slate-400">Type</label>
+            <select
+              className={selectClass}
+              value={form.kind}
+              onChange={(e) => handleKindChange(e.target.value as DeviceKind)}
+            >
+              <option value="camera">Camera</option>
+              <option value="mount">Mount</option>
+              <option value="focuser">Focuser</option>
+            </select>
+          </div>
 
-            {/* Adapter */}
-            <div className="flex flex-col gap-1">
-              <label className="text-xs text-slate-400">Adapter</label>
-              <select
-                className="rounded bg-surface-overlay border border-surface-border px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-40"
-                value={form.adapter_key}
-                onChange={(e) => setForm({ ...form, adapter_key: e.target.value })}
-                disabled={adapterOptions.length === 0}
-              >
-                <option value="">— select —</option>
-                {adapterOptions.map((a) => (
-                  <option key={a} value={a}>{a}</option>
-                ))}
-              </select>
-            </div>
+          {/* Driver from catalog */}
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-slate-400">
+              Driver
+              {drivers.length === 0 && (
+                <span className="ml-2 text-slate-600">(INDI catalog not available)</span>
+              )}
+            </label>
+            <select
+              className={selectClass}
+              value={form.indi_executable}
+              onChange={(e) => handleDriverSelect(e.target.value)}
+              disabled={drivers.length === 0}
+            >
+              <option value="">— select driver —</option>
+              {drivers.map((d) => (
+                <option key={d.executable} value={d.executable}>
+                  {d.label}{d.manufacturer ? ` (${d.manufacturer})` : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* INDI device name — auto-filled but editable */}
+          <div className="flex flex-col gap-1">
+            <label className="text-xs text-slate-400">
+              INDI device name
+              <span className="ml-2 text-slate-600">auto-filled, edit if needed</span>
+            </label>
+            <Input
+              placeholder="e.g. ZWO CCD ASI294MC Pro"
+              value={form.indi_device_name}
+              onChange={(e) => setForm({ ...form, indi_device_name: e.target.value })}
+            />
           </div>
 
           {/* Device ID */}
           <div className="flex flex-col gap-1">
-            <label className="text-xs text-slate-400">Device ID <span className="text-slate-600">(optional, auto-generated if blank)</span></label>
+            <label className="text-xs text-slate-400">
+              Device ID <span className="text-slate-600">(optional, auto-generated if blank)</span>
+            </label>
             <Input
               placeholder="e.g. main_camera"
               value={form.device_id}
               onChange={(e) => setForm({ ...form, device_id: e.target.value })}
             />
-          </div>
-
-          {/* INDI params */}
-          <div className="grid grid-cols-3 gap-3">
-            <div className="col-span-3 flex flex-col gap-1">
-              <label className="text-xs text-slate-400">INDI device name</label>
-              <Input
-                placeholder="e.g. ZWO CCD ASI294MC Pro"
-                value={form.indi_device_name}
-                onChange={(e) => setForm({ ...form, indi_device_name: e.target.value })}
-              />
-            </div>
-            <div className="col-span-2 flex flex-col gap-1">
-              <label className="text-xs text-slate-400">INDI host</label>
-              <Input
-                value={form.indi_host}
-                onChange={(e) => setForm({ ...form, indi_host: e.target.value })}
-              />
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-xs text-slate-400">Port</label>
-              <Input
-                value={form.indi_port}
-                onChange={(e) => setForm({ ...form, indi_port: e.target.value })}
-              />
-            </div>
           </div>
 
           {error && (
@@ -199,7 +220,7 @@ export function Equipment() {
 
           <Button
             type="submit"
-            disabled={!form.adapter_key || connecting}
+            disabled={!form.indi_device_name || connecting}
             className="self-start"
           >
             <Plug size={14} className="mr-2" />

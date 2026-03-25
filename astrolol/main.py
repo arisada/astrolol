@@ -6,6 +6,7 @@ from astrolol.api.static import mount_ui
 from astrolol.api.devices import router as devices_router
 from astrolol.api.focuser import router as focuser_router
 from astrolol.api.imager import router as imager_router
+from astrolol.api.indi import router as indi_router
 from astrolol.api.mount import router as mount_router
 from astrolol.app import build_plugin_manager, build_registry
 from astrolol.core.events import EventBus
@@ -40,6 +41,7 @@ def create_app() -> FastAPI:
     app.include_router(imager_router)
     app.include_router(mount_router)
     app.include_router(focuser_router)
+    app.include_router(indi_router)
 
     @app.get("/health")
     async def health() -> dict[str, str]:

@@ -1,6 +1,7 @@
 import type {
   ConnectedDevice,
   DeviceConfig,
+  DriverEntry,
   ExposureRequest,
   ExposureResult,
   FocuserStatus,
@@ -74,6 +75,11 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ enabled }),
       }),
+  },
+
+  indi: {
+    drivers: (kind?: string) =>
+      request<DriverEntry[]>(kind ? `/indi/drivers/${kind}` : '/indi/drivers'),
   },
 
   focuser: {

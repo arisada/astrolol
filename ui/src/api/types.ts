@@ -11,6 +11,15 @@ export interface DeviceConfig {
   params?: Record<string, unknown>
 }
 
+export interface DriverEntry {
+  label: string
+  executable: string
+  device_name: string
+  group: string
+  kind: string
+  manufacturer: string
+}
+
 export interface ConnectedDevice {
   device_id: string
   kind: DeviceKind
