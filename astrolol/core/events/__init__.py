@@ -16,6 +16,9 @@ from astrolol.core.events.models import (
     MountParked,
     MountSynced,
     MountTrackingChanged,
+    FocuserMoveStarted,
+    FocuserMoveCompleted,
+    FocuserHalted,
     Event,
 )
 
@@ -37,5 +40,8 @@ __all__ = [
     "MountParked",
     "MountSynced",
     "MountTrackingChanged",
+    "FocuserMoveStarted",
+    "FocuserMoveCompleted",
+    "FocuserHalted",
     "Event",
 ]

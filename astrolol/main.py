@@ -3,11 +3,13 @@ import structlog
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 
 from astrolol.api.devices import router as devices_router
+from astrolol.api.focuser import router as focuser_router
 from astrolol.api.imager import router as imager_router
 from astrolol.api.mount import router as mount_router
 from astrolol.app import build_plugin_manager, build_registry
 from astrolol.core.events import EventBus
 from astrolol.devices.manager import DeviceManager
+from astrolol.focuser import FocuserManager
 from astrolol.imaging import ImagerManager
 from astrolol.mount import MountManager
 
@@ -23,6 +25,7 @@ def create_app() -> FastAPI:
     device_manager = DeviceManager(registry=registry, event_bus=event_bus)
     imager_manager = ImagerManager(device_manager=device_manager, event_bus=event_bus)
     mount_manager = MountManager(device_manager=device_manager, event_bus=event_bus)
+    focuser_manager = FocuserManager(device_manager=device_manager, event_bus=event_bus)
 
     app.state.registry = registry
     app.state.plugin_manager = pm
@@ -30,10 +33,12 @@ def create_app() -> FastAPI:
     app.state.device_manager = device_manager
     app.state.imager_manager = imager_manager
     app.state.mount_manager = mount_manager
+    app.state.focuser_manager = focuser_manager
 
     app.include_router(devices_router)
     app.include_router(imager_router)
     app.include_router(mount_router)
+    app.include_router(focuser_router)
 
     @app.get("/health")
     async def health() -> dict[str, str]:

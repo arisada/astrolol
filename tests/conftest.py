@@ -10,6 +10,7 @@ from astrolol.core.events import EventBus
 from astrolol.devices.base.models import CameraStatus, DeviceState, ExposureParams, FocuserStatus, Image, MountStatus, SlewTarget
 from astrolol.devices.manager import DeviceManager
 from astrolol.devices.registry import DeviceRegistry
+from astrolol.focuser import FocuserManager
 from astrolol.imaging import ImagerManager
 from astrolol.mount import MountManager
 
@@ -138,12 +139,45 @@ class FakeMount:
         return self.connected
 
 
+class FakeFocuser:
+    """Minimal IFocuser implementation. Moves complete after a brief delay."""
+
+    def __init__(self, **kwargs: object) -> None:
+        self.connected = False
+        self._position: int = 5000
+
+    async def connect(self) -> None:
+        self.connected = True
+
+    async def disconnect(self) -> None:
+        self.connected = False
+
+    async def move_to(self, position: int) -> None:
+        await asyncio.sleep(0.05)
+        self._position = position
+
+    async def move_by(self, steps: int) -> None:
+        await asyncio.sleep(0.05)
+        self._position = max(0, self._position + steps)
+
+    async def halt(self) -> None:
+        pass
+
+    async def get_status(self) -> FocuserStatus:
+        state = DeviceState.CONNECTED if self.connected else DeviceState.DISCONNECTED
+        return FocuserStatus(state=state, position=self._position)
+
+    async def ping(self) -> bool:
+        return self.connected
+
+
 @pytest.fixture
 def registry() -> DeviceRegistry:
     r = DeviceRegistry()
     r.register_camera("fake_camera", FakeCamera)  # type: ignore[arg-type]
     r.register_camera("failing_camera", FailingCamera)  # type: ignore[arg-type]
     r.register_mount("fake_mount", FakeMount)  # type: ignore[arg-type]
+    r.register_focuser("fake_focuser", FakeFocuser)  # type: ignore[arg-type]
     return r
 
 
@@ -165,3 +199,8 @@ def imager_manager(manager: DeviceManager, event_bus: EventBus, tmp_path: Path) 
 @pytest.fixture
 def mount_manager(manager: DeviceManager, event_bus: EventBus) -> MountManager:
     return MountManager(device_manager=manager, event_bus=event_bus)
+
+
+@pytest.fixture
+def focuser_manager(manager: DeviceManager, event_bus: EventBus) -> FocuserManager:
+    return FocuserManager(device_manager=manager, event_bus=event_bus)

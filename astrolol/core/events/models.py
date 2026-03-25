@@ -127,6 +127,26 @@ class MountTrackingChanged(BaseEvent):
     tracking: bool
 
 
+# --- Focuser events ---
+
+class FocuserMoveStarted(BaseEvent):
+    type: Literal["focuser.move_started"] = "focuser.move_started"
+    device_id: str
+    target_position: int
+
+
+class FocuserMoveCompleted(BaseEvent):
+    type: Literal["focuser.move_completed"] = "focuser.move_completed"
+    device_id: str
+    position: int
+
+
+class FocuserHalted(BaseEvent):
+    type: Literal["focuser.halted"] = "focuser.halted"
+    device_id: str
+    position: int | None = None
+
+
 # Discriminated union — add new event types here as they are introduced
 Event = Annotated[
     Union[
@@ -134,6 +154,7 @@ Event = Annotated[
         ExposureStarted, ExposureCompleted, ExposureFailed, LoopStarted, LoopStopped,
         MountSlewStarted, MountSlewCompleted, MountSlewAborted,
         MountParked, MountSynced, MountTrackingChanged,
+        FocuserMoveStarted, FocuserMoveCompleted, FocuserHalted,
     ],
     Field(discriminator="type"),
 ]
