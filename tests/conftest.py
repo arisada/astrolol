@@ -1,4 +1,5 @@
 """Shared fixtures and fake adapters for unit tests."""
+import asyncio
 from pathlib import Path
 
 import numpy as np
@@ -6,10 +7,11 @@ import pytest
 from astropy.io import fits
 
 from astrolol.core.events import EventBus
-from astrolol.devices.base.models import CameraStatus, DeviceState, ExposureParams, Image
+from astrolol.devices.base.models import CameraStatus, DeviceState, ExposureParams, FocuserStatus, Image, MountStatus, SlewTarget
 from astrolol.devices.manager import DeviceManager
 from astrolol.devices.registry import DeviceRegistry
 from astrolol.imaging import ImagerManager
+from astrolol.mount import MountManager
 
 
 def make_fake_fits(path: Path, width: int = 64, height: int = 64) -> Path:
@@ -82,11 +84,66 @@ class FailingCamera:
         return False
 
 
+class FakeMount:
+    """Minimal IMount implementation. Slew and park complete after a brief delay."""
+
+    def __init__(self, **kwargs: object) -> None:
+        self.connected = False
+        self._ra: float = 0.0
+        self._dec: float = 0.0
+        self._tracking = False
+        self._parked = False
+
+    async def connect(self) -> None:
+        self.connected = True
+
+    async def disconnect(self) -> None:
+        self.connected = False
+
+    async def slew(self, target: SlewTarget) -> None:
+        await asyncio.sleep(0.05)
+        self._ra = target.ra
+        self._dec = target.dec
+        self._parked = False
+
+    async def stop(self) -> None:
+        pass
+
+    async def park(self) -> None:
+        await asyncio.sleep(0.05)
+        self._parked = True
+        self._tracking = False
+
+    async def unpark(self) -> None:
+        self._parked = False
+
+    async def sync(self, target: SlewTarget) -> None:
+        self._ra = target.ra
+        self._dec = target.dec
+
+    async def set_tracking(self, enabled: bool) -> None:
+        self._tracking = enabled
+
+    async def get_status(self) -> MountStatus:
+        state = DeviceState.CONNECTED if self.connected else DeviceState.DISCONNECTED
+        return MountStatus(
+            state=state,
+            ra=self._ra,
+            dec=self._dec,
+            is_tracking=self._tracking,
+            is_parked=self._parked,
+        )
+
+    async def ping(self) -> bool:
+        return self.connected
+
+
 @pytest.fixture
 def registry() -> DeviceRegistry:
     r = DeviceRegistry()
     r.register_camera("fake_camera", FakeCamera)  # type: ignore[arg-type]
     r.register_camera("failing_camera", FailingCamera)  # type: ignore[arg-type]
+    r.register_mount("fake_mount", FakeMount)  # type: ignore[arg-type]
     return r
 
 
@@ -103,3 +160,8 @@ def manager(registry: DeviceRegistry, event_bus: EventBus) -> DeviceManager:
 @pytest.fixture
 def imager_manager(manager: DeviceManager, event_bus: EventBus, tmp_path: Path) -> ImagerManager:
     return ImagerManager(device_manager=manager, event_bus=event_bus, images_dir=tmp_path)
+
+
+@pytest.fixture
+def mount_manager(manager: DeviceManager, event_bus: EventBus) -> MountManager:
+    return MountManager(device_manager=manager, event_bus=event_bus)

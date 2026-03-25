@@ -10,6 +10,12 @@ from astrolol.core.events.models import (
     ExposureFailed,
     LoopStarted,
     LoopStopped,
+    MountSlewStarted,
+    MountSlewCompleted,
+    MountSlewAborted,
+    MountParked,
+    MountSynced,
+    MountTrackingChanged,
     Event,
 )
 
@@ -25,5 +31,11 @@ __all__ = [
     "ExposureFailed",
     "LoopStarted",
     "LoopStopped",
+    "MountSlewStarted",
+    "MountSlewCompleted",
+    "MountSlewAborted",
+    "MountParked",
+    "MountSynced",
+    "MountTrackingChanged",
     "Event",
 ]

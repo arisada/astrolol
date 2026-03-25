@@ -88,11 +88,52 @@ class LoopStopped(BaseEvent):
     device_id: str
 
 
+# --- Mount events ---
+
+class MountSlewStarted(BaseEvent):
+    type: Literal["mount.slew_started"] = "mount.slew_started"
+    device_id: str
+    ra: float
+    dec: float
+
+
+class MountSlewCompleted(BaseEvent):
+    type: Literal["mount.slew_completed"] = "mount.slew_completed"
+    device_id: str
+    ra: float
+    dec: float
+
+
+class MountSlewAborted(BaseEvent):
+    type: Literal["mount.slew_aborted"] = "mount.slew_aborted"
+    device_id: str
+
+
+class MountParked(BaseEvent):
+    type: Literal["mount.parked"] = "mount.parked"
+    device_id: str
+
+
+class MountSynced(BaseEvent):
+    type: Literal["mount.synced"] = "mount.synced"
+    device_id: str
+    ra: float
+    dec: float
+
+
+class MountTrackingChanged(BaseEvent):
+    type: Literal["mount.tracking_changed"] = "mount.tracking_changed"
+    device_id: str
+    tracking: bool
+
+
 # Discriminated union — add new event types here as they are introduced
 Event = Annotated[
     Union[
         DeviceConnected, DeviceDisconnected, DeviceStateChanged, LogEvent,
         ExposureStarted, ExposureCompleted, ExposureFailed, LoopStarted, LoopStopped,
+        MountSlewStarted, MountSlewCompleted, MountSlewAborted,
+        MountParked, MountSynced, MountTrackingChanged,
     ],
     Field(discriminator="type"),
 ]
