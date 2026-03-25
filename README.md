@@ -14,7 +14,7 @@ Headless, modular, open-source astronomy platform. Runs on the machine attached 
 ```bash
 git clone https://github.com/you/astrolol
 cd astrolol
-pip install -e ".[dev]"
+pip install -e ".[dev]"   # [dev] is required — it includes pytest, pytest-asyncio, etc.
 ```
 
 ## Run
