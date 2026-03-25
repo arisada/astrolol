@@ -5,6 +5,11 @@ from astrolol.core.events.models import (
     DeviceDisconnected,
     DeviceStateChanged,
     LogEvent,
+    ExposureStarted,
+    ExposureCompleted,
+    ExposureFailed,
+    LoopStarted,
+    LoopStopped,
     Event,
 )
 
@@ -15,5 +20,10 @@ __all__ = [
     "DeviceDisconnected",
     "DeviceStateChanged",
     "LogEvent",
+    "ExposureStarted",
+    "ExposureCompleted",
+    "ExposureFailed",
+    "LoopStarted",
+    "LoopStopped",
     "Event",
 ]

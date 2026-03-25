@@ -45,10 +45,6 @@ class DeviceStateChanged(BaseEvent):
 
 # --- Log event (for live log streaming to clients) ---
 
-class LogLevel(str):
-    pass
-
-
 class LogEvent(BaseEvent):
     type: Literal["log"] = "log"
     level: str  # "debug" | "info" | "warning" | "error"
@@ -56,8 +52,47 @@ class LogEvent(BaseEvent):
     message: str
 
 
+# --- Imager events ---
+
+class ExposureStarted(BaseEvent):
+    type: Literal["imager.exposure_started"] = "imager.exposure_started"
+    device_id: str
+    duration: float
+    gain: int
+    binning: int
+
+
+class ExposureCompleted(BaseEvent):
+    type: Literal["imager.exposure_completed"] = "imager.exposure_completed"
+    device_id: str
+    fits_path: str
+    preview_path: str
+    duration: float
+    width: int
+    height: int
+
+
+class ExposureFailed(BaseEvent):
+    type: Literal["imager.exposure_failed"] = "imager.exposure_failed"
+    device_id: str
+    reason: str
+
+
+class LoopStarted(BaseEvent):
+    type: Literal["imager.loop_started"] = "imager.loop_started"
+    device_id: str
+
+
+class LoopStopped(BaseEvent):
+    type: Literal["imager.loop_stopped"] = "imager.loop_stopped"
+    device_id: str
+
+
 # Discriminated union — add new event types here as they are introduced
 Event = Annotated[
-    Union[DeviceConnected, DeviceDisconnected, DeviceStateChanged, LogEvent],
+    Union[
+        DeviceConnected, DeviceDisconnected, DeviceStateChanged, LogEvent,
+        ExposureStarted, ExposureCompleted, ExposureFailed, LoopStarted, LoopStopped,
+    ],
     Field(discriminator="type"),
 ]

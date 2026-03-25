@@ -14,6 +14,9 @@ dependencies = [
     "pydantic-settings>=2.0",
     "pluggy>=1.4",
     "structlog>=24.0",
+    "astropy>=6.0",
+    "numpy>=1.26",
+    "Pillow>=10.0",
 ]
 
 [project.scripts]
