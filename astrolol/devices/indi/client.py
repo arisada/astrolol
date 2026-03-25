@@ -21,16 +21,18 @@ logger = structlog.get_logger()
 try:
     import PyIndi  # type: ignore[import]
     _PYINDI_AVAILABLE = True
+    _BaseIndiClient: type = PyIndi.BaseClient
 except ImportError:
     _PYINDI_AVAILABLE = False
     PyIndi = None  # type: ignore[assignment]
+    _BaseIndiClient = object
 
 
 # ---------------------------------------------------------------------------
 # Low-level synchronous INDI client (runs in a dedicated thread)
 # ---------------------------------------------------------------------------
 
-class _SyncIndiClient:
+class _SyncIndiClient(_BaseIndiClient):  # type: ignore[misc,valid-type]
     """
     Thin subclass of PyIndi.BaseClient that receives property updates and
     stores them in thread-safe dicts.
@@ -44,7 +46,7 @@ class _SyncIndiClient:
                 "pyindi-client is not installed.  "
                 "Install it with: pip install pyindi-client"
             )
-        super().__init__()  # type: ignore[call-arg]
+        super().__init__()
         self._lock = threading.Lock()
         # device_name → property_name → IProperty
         self._properties: dict[str, dict[str, Any]] = {}

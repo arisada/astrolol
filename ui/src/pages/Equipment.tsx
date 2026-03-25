@@ -166,41 +166,51 @@ export function Equipment() {
             </select>
           </div>
 
-          {/* Driver from catalog */}
-          <div className="flex flex-col gap-1">
-            <label className="text-xs text-slate-400">
-              Driver
-              {drivers.length === 0 && (
-                <span className="ml-2 text-slate-600">(INDI catalog not available)</span>
-              )}
-            </label>
-            <select
-              className={selectClass}
-              value={form.indi_executable}
-              onChange={(e) => handleDriverSelect(e.target.value)}
-              disabled={drivers.length === 0}
-            >
-              <option value="">— select driver —</option>
-              {drivers.map((d) => (
-                <option key={d.executable} value={d.executable}>
-                  {d.label}{d.manufacturer ? ` (${d.manufacturer})` : ''}
-                </option>
-              ))}
-            </select>
-          </div>
+          {/* Driver from catalog — optional, auto-fills device name */}
+          {drivers.length > 0 && (
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-slate-400">Driver (from catalog)</label>
+              <select
+                className={selectClass}
+                value={form.indi_executable}
+                onChange={(e) => handleDriverSelect(e.target.value)}
+              >
+                <option value="">— select to auto-fill —</option>
+                {drivers.map((d) => (
+                  <option key={d.executable} value={d.executable}>
+                    {d.label}{d.manufacturer ? ` (${d.manufacturer})` : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
-          {/* INDI device name — auto-filled but editable */}
+          {/* INDI device name — always required, auto-filled when catalog available */}
           <div className="flex flex-col gap-1">
             <label className="text-xs text-slate-400">
-              INDI device name
-              <span className="ml-2 text-slate-600">auto-filled, edit if needed</span>
+              INDI device name <span className="text-status-error">*</span>
             </label>
             <Input
-              placeholder="e.g. ZWO CCD ASI294MC Pro"
+              placeholder="e.g. EQMod Mount"
               value={form.indi_device_name}
               onChange={(e) => setForm({ ...form, indi_device_name: e.target.value })}
             />
           </div>
+
+          {/* Driver executable — shown when typed manually (catalog not available) */}
+          {drivers.length === 0 && (
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-slate-400">
+                Driver executable
+                <span className="ml-2 text-slate-600">(optional, e.g. indi_eqmod_telescope)</span>
+              </label>
+              <Input
+                placeholder="indi_eqmod_telescope"
+                value={form.indi_executable}
+                onChange={(e) => setForm({ ...form, indi_executable: e.target.value })}
+              />
+            </div>
+          )}
 
           {/* Device ID */}
           <div className="flex flex-col gap-1">
