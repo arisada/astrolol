@@ -1,0 +1,16 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Force dark background; prevent any flash of white */
+html, body, #root {
+  background-color: #0f1117;
+  color: #e2e8f0;
+  height: 100%;
+}
+
+/* Scrollbar styling */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #2e3347 transparent;
+}

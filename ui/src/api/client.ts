@@ -1,0 +1,94 @@
+import type {
+  ConnectedDevice,
+  DeviceConfig,
+  ExposureRequest,
+  ExposureResult,
+  FocuserStatus,
+  ImagerStatus,
+  MountStatus,
+} from './types'
+
+async function request<T>(path: string, options?: RequestInit): Promise<T> {
+  const res = await fetch(path, {
+    headers: { 'Content-Type': 'application/json' },
+    ...options,
+  })
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}))
+    throw new Error(body.detail ?? `HTTP ${res.status}`)
+  }
+  if (res.status === 204) return undefined as T
+  return res.json()
+}
+
+// --- Devices ---
+
+export const api = {
+  devices: {
+    available: () => request<Record<string, string[]>>('/devices/available'),
+    connected: () => request<ConnectedDevice[]>('/devices/connected'),
+    connect: (config: DeviceConfig) =>
+      request<{ device_id: string }>('/devices/connect', {
+        method: 'POST',
+        body: JSON.stringify(config),
+      }),
+    disconnect: (deviceId: string) =>
+      request<void>(`/devices/connected/${deviceId}`, { method: 'DELETE' }),
+  },
+
+  imager: {
+    status: (deviceId: string) => request<ImagerStatus>(`/imager/${deviceId}/status`),
+    expose: (deviceId: string, body: ExposureRequest) =>
+      request<ExposureResult>(`/imager/${deviceId}/expose`, {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+    startLoop: (deviceId: string, body: ExposureRequest) =>
+      request<void>(`/imager/${deviceId}/loop`, {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
+    stopLoop: (deviceId: string) =>
+      request<void>(`/imager/${deviceId}/loop`, { method: 'DELETE' }),
+    previewUrl: (previewPath: string) => {
+      const filename = previewPath.split('/').pop()!
+      return `/imager/images/${filename}`
+    },
+  },
+
+  mount: {
+    status: (deviceId: string) => request<MountStatus>(`/mount/${deviceId}/status`),
+    slew: (deviceId: string, ra: number, dec: number) =>
+      request<void>(`/mount/${deviceId}/slew`, {
+        method: 'POST',
+        body: JSON.stringify({ ra, dec }),
+      }),
+    stop: (deviceId: string) =>
+      request<void>(`/mount/${deviceId}/stop`, { method: 'POST' }),
+    park: (deviceId: string) =>
+      request<void>(`/mount/${deviceId}/park`, { method: 'POST' }),
+    unpark: (deviceId: string) =>
+      request<void>(`/mount/${deviceId}/unpark`, { method: 'POST' }),
+    setTracking: (deviceId: string, enabled: boolean) =>
+      request<void>(`/mount/${deviceId}/tracking`, {
+        method: 'POST',
+        body: JSON.stringify({ enabled }),
+      }),
+  },
+
+  focuser: {
+    status: (deviceId: string) => request<FocuserStatus>(`/focuser/${deviceId}/status`),
+    moveTo: (deviceId: string, position: number) =>
+      request<void>(`/focuser/${deviceId}/move_to`, {
+        method: 'POST',
+        body: JSON.stringify({ position }),
+      }),
+    moveBy: (deviceId: string, steps: number) =>
+      request<void>(`/focuser/${deviceId}/move_by`, {
+        method: 'POST',
+        body: JSON.stringify({ steps }),
+      }),
+    halt: (deviceId: string) =>
+      request<void>(`/focuser/${deviceId}/halt`, { method: 'POST' }),
+  },
+}

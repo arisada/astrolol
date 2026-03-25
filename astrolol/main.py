@@ -2,6 +2,7 @@ import uvicorn
 import structlog
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 
+from astrolol.api.static import mount_ui
 from astrolol.api.devices import router as devices_router
 from astrolol.api.focuser import router as focuser_router
 from astrolol.api.imager import router as imager_router
@@ -43,6 +44,9 @@ def create_app() -> FastAPI:
     @app.get("/health")
     async def health() -> dict[str, str]:
         return {"status": "ok"}
+
+    # Serve built UI — must be last so API routes take priority
+    mount_ui(app)
 
     @app.websocket("/ws/events")
     async def events_ws(websocket: WebSocket) -> None:
