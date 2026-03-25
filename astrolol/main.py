@@ -2,29 +2,32 @@ import uvicorn
 import structlog
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 
+from astrolol.api.devices import router as devices_router
 from astrolol.app import build_plugin_manager, build_registry
 from astrolol.core.events import EventBus
+from astrolol.devices.manager import DeviceManager
 
 logger = structlog.get_logger()
 
 
 def create_app() -> FastAPI:
     app = FastAPI(title="astrolol", version="0.1.0")
+
     pm = build_plugin_manager()
     registry = build_registry(pm)
     event_bus = EventBus()
+    device_manager = DeviceManager(registry=registry, event_bus=event_bus)
 
     app.state.registry = registry
     app.state.plugin_manager = pm
     app.state.event_bus = event_bus
+    app.state.device_manager = device_manager
+
+    app.include_router(devices_router)
 
     @app.get("/health")
     async def health() -> dict[str, str]:
         return {"status": "ok"}
-
-    @app.get("/devices")
-    async def list_devices() -> dict[str, list[str]]:
-        return app.state.registry.all_keys()
 
     @app.websocket("/ws/events")
     async def events_ws(websocket: WebSocket) -> None:

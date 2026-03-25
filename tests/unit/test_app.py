@@ -17,9 +17,9 @@ async def test_health(app):
 
 
 @pytest.mark.asyncio
-async def test_list_devices_empty(app):
+async def test_list_available_empty(app):
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
-        response = await client.get("/devices")
+        response = await client.get("/devices/available")
     assert response.status_code == 200
     data = response.json()
     assert "cameras" in data
