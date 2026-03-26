@@ -3,8 +3,6 @@
 Headless, modular, open-source astronomy platform. Runs on the machine attached to your
 telescope. Connect from any web browser, mobile app, or native client.
 
-> Built out of frustration with Windows-only and buggy alternatives. Named honestly.
-
 ## What works today
 
 - **Device management** — connect cameras, mounts, and focusers via a plugin interface.
