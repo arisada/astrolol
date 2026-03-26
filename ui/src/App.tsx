@@ -3,6 +3,7 @@ import { Layout } from './components/Layout'
 import { Equipment } from './pages/Equipment'
 import { Imaging } from './pages/Imaging'
 import { Options } from './pages/Options'
+import { Profiles } from './pages/Profiles'
 
 export function App() {
   return (
@@ -11,6 +12,7 @@ export function App() {
         <Route element={<Layout />}>
           <Route index element={<Navigate to="/imaging" replace />} />
           <Route path="/equipment" element={<Equipment />} />
+          <Route path="/profiles" element={<Profiles />} />
           <Route path="/imaging" element={<Imaging />} />
           <Route path="/options" element={<Options />} />
         </Route>

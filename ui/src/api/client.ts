@@ -1,12 +1,16 @@
 import type {
+  ActivationResult,
   ConnectedDevice,
   DeviceConfig,
+  DeviceProperty,
   DriverEntry,
   ExposureRequest,
   ExposureResult,
   FocuserStatus,
   ImagerStatus,
   MountStatus,
+  Profile,
+  SetPropertyRequest,
 } from './types'
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
@@ -35,6 +39,13 @@ export const api = {
       }),
     disconnect: (deviceId: string) =>
       request<void>(`/devices/connected/${deviceId}`, { method: 'DELETE' }),
+    properties: (deviceId: string) =>
+      request<DeviceProperty[]>(`/devices/${deviceId}/properties`),
+    setProperty: (deviceId: string, propName: string, body: SetPropertyRequest) =>
+      request<void>(`/devices/${deviceId}/properties/${propName}`, {
+        method: 'POST',
+        body: JSON.stringify(body),
+      }),
   },
 
   imager: {
@@ -75,6 +86,17 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ enabled }),
       }),
+  },
+
+  profiles: {
+    list: () => request<Profile[]>('/profiles'),
+    get: (id: string) => request<Profile>(`/profiles/${id}`),
+    active: () => request<Profile | null>('/profiles/active'),
+    create: (p: Omit<Profile, 'id'>) => request<Profile>('/profiles', { method: 'POST', body: JSON.stringify(p) }),
+    update: (p: Profile) => request<Profile>(`/profiles/${p.id}`, { method: 'PUT', body: JSON.stringify(p) }),
+    delete: (id: string) => request<void>(`/profiles/${id}`, { method: 'DELETE' }),
+    activate: (id: string) => request<ActivationResult>(`/profiles/${id}/activate`, { method: 'POST' }),
+    deactivate: () => request<void>('/profiles/active', { method: 'DELETE' }),
   },
 
   indi: {

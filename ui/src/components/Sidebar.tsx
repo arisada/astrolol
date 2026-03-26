@@ -1,9 +1,10 @@
 import { NavLink } from 'react-router-dom'
-import { Cpu, Camera, Settings, Wifi, WifiOff } from 'lucide-react'
+import { BookOpen, Camera, Cpu, Settings, Wifi, WifiOff } from 'lucide-react'
 import { useStore } from '@/store'
 
 const navItems = [
   { to: '/equipment', icon: Cpu,      label: 'Equipment' },
+  { to: '/profiles',  icon: BookOpen, label: 'Profiles'  },
   { to: '/imaging',   icon: Camera,   label: 'Imaging'   },
   { to: '/options',   icon: Settings, label: 'Options'   },
 ]

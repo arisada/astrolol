@@ -1,6 +1,11 @@
+import traceback
+
 import uvicorn
 import structlog
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
+from fastapi.exception_handlers import http_exception_handler as _default_http_exc_handler
+from fastapi.exceptions import HTTPException
+from fastapi.responses import JSONResponse
 
 from astrolol.api.static import mount_ui
 from astrolol.api.devices import router as devices_router
@@ -8,6 +13,9 @@ from astrolol.api.focuser import router as focuser_router
 from astrolol.api.imager import router as imager_router
 from astrolol.api.indi import router as indi_router
 from astrolol.api.mount import router as mount_router
+from astrolol.api.profiles import router as profiles_router
+from astrolol.api.properties import router as properties_router
+from astrolol.profiles.store import ProfileStore
 from astrolol.app import build_plugin_manager, build_registry
 from astrolol.core.events import EventBus
 from astrolol.devices.manager import DeviceManager
@@ -29,6 +37,8 @@ def create_app() -> FastAPI:
     mount_manager = MountManager(device_manager=device_manager, event_bus=event_bus)
     focuser_manager = FocuserManager(device_manager=device_manager, event_bus=event_bus)
 
+    from astrolol.config.settings import settings as _settings
+
     app.state.registry = registry
     app.state.plugin_manager = pm
     app.state.event_bus = event_bus
@@ -36,12 +46,41 @@ def create_app() -> FastAPI:
     app.state.imager_manager = imager_manager
     app.state.mount_manager = mount_manager
     app.state.focuser_manager = focuser_manager
+    app.state.profile_store = ProfileStore(_settings.profiles_file)
+    app.state.active_profile = None
 
     app.include_router(devices_router)
+    app.include_router(properties_router)
+    app.include_router(profiles_router)
     app.include_router(imager_router)
     app.include_router(mount_router)
     app.include_router(focuser_router)
     app.include_router(indi_router)
+
+    @app.exception_handler(HTTPException)
+    async def _http_exc(request: Request, exc: HTTPException):
+        if exc.status_code >= 500:
+            cause = exc.__cause__
+            logger.error(
+                "api.error",
+                method=request.method,
+                path=request.url.path,
+                status=exc.status_code,
+                detail=exc.detail,
+                cause=traceback.format_exception(type(cause), cause, cause.__traceback__)
+                if cause is not None
+                else None,
+            )
+        return await _default_http_exc_handler(request, exc)
+
+    @app.exception_handler(Exception)
+    async def _unhandled_exc(request: Request, exc: Exception):
+        logger.exception(
+            "api.unhandled_exception",
+            method=request.method,
+            path=request.url.path,
+        )
+        return JSONResponse(status_code=500, content={"detail": "Internal server error"})
 
     @app.get("/health")
     async def health() -> dict[str, str]:

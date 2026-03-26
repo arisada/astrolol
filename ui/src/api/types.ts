@@ -66,6 +66,81 @@ export interface ImagerStatus {
   state: 'idle' | 'exposing' | 'looping' | 'error'
 }
 
+// --- Equipment profiles ---
+
+export interface ObserverLocation {
+  name: string
+  latitude: number
+  longitude: number
+  altitude: number
+}
+
+export interface Telescope {
+  name: string
+  focal_length: number
+  aperture: number
+}
+
+export type DeviceRole = 'camera' | 'mount' | 'focuser'
+
+export interface ProfileDevice {
+  role: DeviceRole
+  config: DeviceConfig
+}
+
+export interface Profile {
+  id: string
+  name: string
+  location?: ObserverLocation
+  telescope?: Telescope
+  devices: ProfileDevice[]
+}
+
+export interface DeviceResult {
+  device_id: string
+  role: string
+  error?: string
+}
+
+export interface ActivationResult {
+  profile_id: string
+  connected: DeviceResult[]
+  failed: DeviceResult[]
+}
+
+// --- Device properties (INDI) ---
+
+export type PropertyType = 'number' | 'switch' | 'text' | 'light' | 'blob'
+export type PropertyState = 'idle' | 'ok' | 'busy' | 'alert'
+export type PropertyPermission = 'ro' | 'rw' | 'wo'
+export type SwitchRule = '1ofmany' | 'atmost1' | 'nofmany'
+
+export interface PropertyWidget {
+  name: string
+  label: string
+  value?: number | string | boolean
+  min?: number
+  max?: number
+  step?: number
+  state?: PropertyState  // for light widgets
+}
+
+export interface DeviceProperty {
+  name: string
+  label: string
+  group: string
+  type: PropertyType
+  state: PropertyState
+  permission: PropertyPermission
+  switch_rule?: SwitchRule
+  widgets: PropertyWidget[]
+}
+
+export interface SetPropertyRequest {
+  values?: Record<string, number | string>
+  on_elements?: string[]
+}
+
 // --- WebSocket events (discriminated union) ---
 
 interface BaseEvent {

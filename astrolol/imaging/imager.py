@@ -2,6 +2,7 @@ import asyncio
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import TYPE_CHECKING, Any
 
 import structlog
 
@@ -20,6 +21,9 @@ from astrolol.devices.manager import DeviceManager
 from astrolol.imaging.models import ExposureRequest, ExposureResult, ImagerState, ImagerStatus
 from astrolol.imaging.preview import fits_to_jpeg
 
+if TYPE_CHECKING:
+    from astrolol.profiles.models import Profile
+
 logger = structlog.get_logger()
 
 
@@ -29,6 +33,35 @@ class CameraImager:
     device_id: str
     state: ImagerState = ImagerState.IDLE
     _loop_task: asyncio.Task | None = field(default=None, repr=False)
+
+
+def _patch_fits_headers(fits_path: Path, profile: "Profile", ra: float | None, dec: float | None) -> None:
+    """Inject observatory and telescope metadata into an existing FITS file."""
+    try:
+        from astropy.io import fits as astrofits
+        with astrofits.open(str(fits_path), mode="update") as hdul:
+            hdr = hdul[0].header
+            if profile.telescope:
+                hdr["TELESCOP"] = (profile.telescope.name, "Telescope name")
+                hdr["FOCALLEN"] = (profile.telescope.focal_length, "[mm] Focal length")
+                hdr["APTDIA"] = (profile.telescope.aperture, "[mm] Aperture diameter")
+                hdr["APTAREA"] = (
+                    3.14159265 * (profile.telescope.aperture / 2) ** 2,
+                    "[mm^2] Aperture area",
+                )
+            if profile.location:
+                hdr["SITELAT"] = (profile.location.latitude, "[deg] Observer latitude")
+                hdr["SITELONG"] = (profile.location.longitude, "[deg] Observer longitude")
+                hdr["SITEELEV"] = (profile.location.altitude, "[m] Observer altitude")
+                if profile.location.name:
+                    hdr["SITENAME"] = (profile.location.name, "Observer location name")
+            if ra is not None:
+                hdr["RA"] = (ra * 15.0, "[deg] Right ascension (J2000)")
+            if dec is not None:
+                hdr["DEC"] = (dec, "[deg] Declination (J2000)")
+            hdul.flush()
+    except Exception:
+        logger.warning("imager.fits_header_patch_failed", fits=str(fits_path))
 
 
 class ImagerManager:
@@ -42,6 +75,11 @@ class ImagerManager:
         self._event_bus = event_bus
         self._images_dir = images_dir or settings.images_dir
         self._imagers: dict[str, CameraImager] = {}
+        self._active_profile: "Profile | None" = None
+
+    def set_context(self, profile: "Profile | None") -> None:
+        """Called when a profile is activated or cleared."""
+        self._active_profile = profile
 
     # --- Public API ---
 
@@ -66,7 +104,7 @@ class ImagerManager:
     async def stop_loop(self, device_id: str) -> None:
         """Stop a running loop after the current exposure finishes."""
         imager = self._get_or_create(device_id)
-        if imager.state != ImagerState.LOOPING or imager._loop_task is None:
+        if imager._loop_task is None or imager._loop_task.done():
             raise ValueError(f"Camera '{device_id}' is not looping.")
         imager._loop_task.cancel()
         try:
@@ -108,6 +146,23 @@ class ImagerManager:
         camera = self._device_manager.get_camera(device_id)
         params = ExposureParams(duration=request.duration, gain=request.gain, binning=request.binning)
 
+        # Snapshot mount RA/DEC before the shutter opens (best represents pointing)
+        ra: float | None = None
+        dec: float | None = None
+        profile = self._active_profile
+        if profile is not None:
+            mount_role = next(
+                (pd for pd in profile.devices if pd.role == "mount"), None
+            )
+            if mount_role is not None:
+                try:
+                    mount = self._device_manager.get_mount(mount_role.config.device_id)
+                    status = await mount.status()
+                    ra = status.ra
+                    dec = status.dec
+                except Exception:
+                    pass  # mount not connected or query failed — skip RA/DEC
+
         imager.state = ImagerState.EXPOSING
         await self._event_bus.publish(
             ExposureStarted(
@@ -131,6 +186,10 @@ class ImagerManager:
         fits_path = Path(image.fits_path)
         preview_path = self._preview_path(fits_path)
         self._images_dir.mkdir(parents=True, exist_ok=True)
+
+        if profile is not None:
+            await asyncio.to_thread(_patch_fits_headers, fits_path, profile, ra, dec)
+
         fits_to_jpeg(fits_path, preview_path, quality=settings.jpeg_quality)
 
         result = ExposureResult(
@@ -151,6 +210,7 @@ class ImagerManager:
                 height=result.height,
             )
         )
+        imager.state = ImagerState.IDLE
         log.info("imager.exposure_completed", fits=result.fits_path)
         return result
 
