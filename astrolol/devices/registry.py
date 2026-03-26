@@ -1,5 +1,5 @@
 from dataclasses import dataclass, field
-from typing import Type
+from typing import Any, Type
 
 from astrolol.devices.base import ICamera, IMount, IFocuser
 
@@ -9,6 +9,8 @@ class DeviceRegistry:
     cameras: dict[str, Type[ICamera]] = field(default_factory=dict)
     mounts: dict[str, Type[IMount]] = field(default_factory=dict)
     focusers: dict[str, Type[IFocuser]] = field(default_factory=dict)
+    # Set by the INDI plugin so properties endpoints can query live device state
+    indi_client: Any = None
 
     def register_camera(self, key: str, adapter: Type[ICamera]) -> None:
         self.cameras[key] = adapter

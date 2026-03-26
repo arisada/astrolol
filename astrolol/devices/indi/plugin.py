@@ -92,6 +92,12 @@ def _make_camera_class(manager: IndiConnectionManager):
             self._executable = executable
 
         async def connect(self) -> None:
+            if self._manager._server.manage and not self._executable:
+                raise ValueError(
+                    "INDI driver executable is required when astrolol manages indiserver. "
+                    "Select a driver from the catalog or enter an executable name "
+                    "(e.g. indi_asi_ccd)."
+                )
             await self._manager.acquire()
             if self._executable:
                 await self._manager.load_driver(self._executable)
@@ -121,6 +127,12 @@ def _make_mount_class(manager: IndiConnectionManager):
             self._executable = executable
 
         async def connect(self) -> None:
+            if self._manager._server.manage and not self._executable:
+                raise ValueError(
+                    "INDI driver executable is required when astrolol manages indiserver. "
+                    "Select a driver from the catalog or enter an executable name "
+                    "(e.g. indi_eqmod_telescope)."
+                )
             await self._manager.acquire()
             if self._executable:
                 await self._manager.load_driver(self._executable)
@@ -150,6 +162,12 @@ def _make_focuser_class(manager: IndiConnectionManager):
             self._executable = executable
 
         async def connect(self) -> None:
+            if self._manager._server.manage and not self._executable:
+                raise ValueError(
+                    "INDI driver executable is required when astrolol manages indiserver. "
+                    "Select a driver from the catalog or enter an executable name "
+                    "(e.g. indi_focus_focuser)."
+                )
             await self._manager.acquire()
             if self._executable:
                 await self._manager.load_driver(self._executable)
@@ -182,4 +200,5 @@ class IndiPlugin:
         registry.register_camera("indi_camera", _make_camera_class(manager))
         registry.register_mount("indi_mount", _make_mount_class(manager))
         registry.register_focuser("indi_focuser", _make_focuser_class(manager))
+        registry.indi_client = manager.client
         logger.info("indi.adapters_registered")
