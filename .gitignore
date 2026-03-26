@@ -12,6 +12,10 @@ build/
 *.jpg
 *.png
 
+# Runtime data
+profiles.json
+images/
+
 # UI
 ui/node_modules/
 ui/dist/
