@@ -35,7 +35,7 @@ async def expose(device_id: str, body: ExposureRequest, request: Request) -> Exp
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc))
     except Exception as exc:
-        raise HTTPException(status_code=502, detail=str(exc))
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
 
 
 @router.post("/{device_id}/loop", status_code=202)

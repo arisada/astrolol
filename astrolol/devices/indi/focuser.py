@@ -10,9 +10,6 @@ INDI focuser properties used:
 """
 from __future__ import annotations
 
-import asyncio
-import time
-
 import structlog
 
 from astrolol.devices.base.models import DeviceState, FocuserStatus
@@ -20,7 +17,6 @@ from astrolol.devices.indi.client import IndiClient
 
 logger = structlog.get_logger()
 
-_MOVE_POLL_INTERVAL = 0.3   # seconds between position polls
 _MOVE_TIMEOUT = 60.0        # maximum time for any move
 
 
@@ -135,17 +131,7 @@ class IndiFocuser:
     # ------------------------------------------------------------------
 
     async def _wait_move_done(self) -> None:
-        """Poll ABS_FOCUS_POSITION state until it leaves BUSY."""
-        deadline = time.monotonic() + _MOVE_TIMEOUT
-        while True:
-            try:
-                prop = await self._client.wait_for_property(
-                    self._device_name, "ABS_FOCUS_POSITION", timeout=3.0
-                )
-                if prop.getState() != 1:  # not IPS_BUSY
-                    return
-            except Exception:
-                pass
-            if time.monotonic() >= deadline:
-                raise TimeoutError("Focuser move did not complete within timeout")
-            await asyncio.sleep(_MOVE_POLL_INTERVAL)
+        """Wait until ABS_FOCUS_POSITION leaves IPS_BUSY."""
+        await self._client.wait_prop_not_busy(
+            self._device_name, "ABS_FOCUS_POSITION", timeout=_MOVE_TIMEOUT
+        )

@@ -152,21 +152,8 @@ class IndiMount:
     # Internal
     # ------------------------------------------------------------------
 
-    async def _wait_slew_done(self, poll_interval: float = 0.5, timeout: float = 120.0) -> None:
-        """Poll EQUATORIAL_EOD_COORD state until it transitions out of BUSY."""
-        import asyncio
-        import time
-        deadline = time.monotonic() + timeout
-        while True:
-            try:
-                prop = await self._client.wait_for_property(
-                    self._device_name, "EQUATORIAL_EOD_COORD", timeout=3.0
-                )
-                # IPS_BUSY == 1 in PyIndi
-                if prop.getState() != 1:  # not BUSY
-                    return
-            except Exception:
-                pass
-            if time.monotonic() >= deadline:
-                raise TimeoutError("Mount slew did not complete within timeout")
-            await asyncio.sleep(poll_interval)
+    async def _wait_slew_done(self, timeout: float = 120.0) -> None:
+        """Wait until EQUATORIAL_EOD_COORD leaves IPS_BUSY."""
+        await self._client.wait_prop_not_busy(
+            self._device_name, "EQUATORIAL_EOD_COORD", timeout=timeout
+        )

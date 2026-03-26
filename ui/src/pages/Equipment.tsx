@@ -1,26 +1,23 @@
 import { useEffect, useState } from 'react'
-import { Plug, PlugZap, RefreshCw } from 'lucide-react'
+import { Camera, ChevronLeft, Crosshair, Plug, PlugZap, RefreshCw, Telescope } from 'lucide-react'
 import { api } from '@/api/client'
-import type { ConnectedDevice, DeviceConfig, DeviceKind, DriverEntry } from '@/api/types'
+import type { ConnectedDevice, DeviceKind, DriverEntry } from '@/api/types'
 import { useStore } from '@/store'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { StateBadge } from '@/components/ui/badge'
+import { DevicePropertiesPanel } from '@/components/DevicePropertiesPanel'
 
-interface ConnectFormState {
-  device_id: string
-  kind: DeviceKind
-  adapter_key: string
-  indi_device_name: string
-  indi_executable: string
-}
+// ---------------------------------------------------------------------------
+// Types & constants
+// ---------------------------------------------------------------------------
 
-const DEFAULT_FORM: ConnectFormState = {
-  device_id: '',
-  kind: 'camera',
-  adapter_key: '',
-  indi_device_name: '',
-  indi_executable: '',
+type WizardStep = 'type' | 'manufacturer' | 'model' | 'confirm'
+
+const KIND_LABELS: Record<DeviceKind, string> = {
+  camera: 'Camera',
+  mount: 'Mount',
+  focuser: 'Focuser',
 }
 
 const KIND_ADAPTER: Record<DeviceKind, string> = {
@@ -29,13 +26,241 @@ const KIND_ADAPTER: Record<DeviceKind, string> = {
   focuser: 'indi_focuser',
 }
 
+function KindIcon({ kind, size = 28 }: { kind: DeviceKind; size?: number }) {
+  if (kind === 'camera') return <Camera size={size} />
+  if (kind === 'mount') return <Telescope size={size} />
+  return <Crosshair size={size} />
+}
+
+// ---------------------------------------------------------------------------
+// Sub-components
+// ---------------------------------------------------------------------------
+
+function StepBack({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-300 mb-4 transition-colors"
+    >
+      <ChevronLeft size={14} /> Back
+    </button>
+  )
+}
+
+// Step 1 — choose device type
+function TypeStep({ onSelect }: { onSelect: (kind: DeviceKind) => void }) {
+  const kinds: DeviceKind[] = ['camera', 'mount', 'focuser']
+  return (
+    <div>
+      <p className="text-xs text-slate-500 mb-4">What do you want to connect?</p>
+      <div className="grid grid-cols-3 gap-3">
+        {kinds.map((kind) => (
+          <button
+            key={kind}
+            onClick={() => onSelect(kind)}
+            className="flex flex-col items-center gap-3 rounded-lg border border-surface-border bg-surface-raised px-4 py-6 text-slate-400 transition-all hover:border-accent hover:text-slate-100 hover:bg-surface-overlay"
+          >
+            <KindIcon kind={kind} size={32} />
+            <span className="text-sm font-medium">{KIND_LABELS[kind]}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// Step 2 — choose manufacturer
+function ManufacturerStep({
+  kind,
+  drivers,
+  onSelect,
+  onBack,
+}: {
+  kind: DeviceKind
+  drivers: DriverEntry[]
+  onSelect: (manufacturer: string | null) => void
+  onBack: () => void
+}) {
+  const manufacturers = [...new Set(drivers.map((d) => d.manufacturer))].sort()
+
+  return (
+    <div>
+      <StepBack onClick={onBack} />
+      <p className="text-xs text-slate-500 mb-4">
+        <span className="text-slate-300 font-medium">{KIND_LABELS[kind]}</span>
+        {' · '}Select manufacturer
+      </p>
+      <div className="flex flex-col gap-1.5 max-h-72 overflow-y-auto pr-1">
+        {manufacturers.map((m) => (
+          <button
+            key={m}
+            onClick={() => onSelect(m)}
+            className="text-left rounded px-3 py-2 text-sm text-slate-300 border border-transparent hover:border-surface-border hover:bg-surface-raised transition-colors"
+          >
+            {m}
+          </button>
+        ))}
+        {/* Always offer a manual path */}
+        <button
+          onClick={() => onSelect(null)}
+          className="text-left rounded px-3 py-2 text-xs text-slate-500 hover:text-slate-400 transition-colors mt-1 border-t border-surface-border pt-3"
+        >
+          Enter manually…
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// Step 3 — choose model
+function ModelStep({
+  kind,
+  manufacturer,
+  drivers,
+  onSelect,
+  onBack,
+}: {
+  kind: DeviceKind
+  manufacturer: string
+  drivers: DriverEntry[]
+  onSelect: (driver: DriverEntry) => void
+  onBack: () => void
+}) {
+  const models = drivers.filter((d) => d.manufacturer === manufacturer)
+
+  return (
+    <div>
+      <StepBack onClick={onBack} />
+      <p className="text-xs text-slate-500 mb-4">
+        <span className="text-slate-300 font-medium">{KIND_LABELS[kind]}</span>
+        {' · '}
+        <span className="text-slate-300">{manufacturer}</span>
+        {' · '}Select model
+      </p>
+      <div className="flex flex-col gap-1.5 max-h-72 overflow-y-auto pr-1">
+        {models.map((d) => (
+          <button
+            key={d.executable}
+            onClick={() => onSelect(d)}
+            className="text-left rounded px-3 py-2 border border-transparent hover:border-surface-border hover:bg-surface-raised transition-colors"
+          >
+            <span className="text-sm text-slate-200">{d.label}</span>
+            <span className="block text-xs text-slate-500 mt-0.5">{d.executable}</span>
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// Step 4 — confirm and connect
+function ConfirmStep({
+  kind,
+  driver,
+  onBack,
+  onConnect,
+  connecting,
+  error,
+}: {
+  kind: DeviceKind
+  driver: DriverEntry | null  // null = manual entry
+  onBack: () => void
+  onConnect: (deviceName: string, executable: string, deviceId: string) => void
+  connecting: boolean
+  error: string | null
+}) {
+  const [deviceName, setDeviceName] = useState(driver?.device_name ?? '')
+  const [executable, setExecutable] = useState(driver?.executable ?? '')
+  const [deviceId, setDeviceId] = useState('')
+
+  return (
+    <div>
+      <StepBack onClick={onBack} />
+      <p className="text-xs text-slate-500 mb-4">
+        <span className="text-slate-300 font-medium">{KIND_LABELS[kind]}</span>
+        {driver && (
+          <>
+            {' · '}
+            <span className="text-slate-300">{driver.manufacturer}</span>
+            {' · '}
+            <span className="text-slate-300">{driver.label}</span>
+          </>
+        )}
+      </p>
+
+      <div className="flex flex-col gap-3">
+        {/* INDI device name — pre-filled from catalog, editable */}
+        <div className="flex flex-col gap-1">
+          <label className="text-xs text-slate-400">
+            INDI device name <span className="text-status-error">*</span>
+          </label>
+          <Input
+            placeholder="e.g. ZWO CCD ASI294MC Pro"
+            value={deviceName}
+            onChange={(e) => setDeviceName(e.target.value)}
+          />
+        </div>
+
+        {/* Driver executable — pre-filled from catalog, always editable */}
+        <div className="flex flex-col gap-1">
+          <label className="text-xs text-slate-400">
+            Driver executable
+            {driver && <span className="ml-2 text-slate-600">(auto-filled from catalog)</span>}
+          </label>
+          <Input
+            placeholder="e.g. indi_asi_ccd"
+            value={executable}
+            onChange={(e) => setExecutable(e.target.value)}
+          />
+        </div>
+
+        {/* Optional device ID */}
+        <div className="flex flex-col gap-1">
+          <label className="text-xs text-slate-400">
+            Device ID
+            <span className="ml-2 text-slate-600">(optional, auto-generated if blank)</span>
+          </label>
+          <Input
+            placeholder="e.g. main_camera"
+            value={deviceId}
+            onChange={(e) => setDeviceId(e.target.value)}
+          />
+        </div>
+
+        {error && (
+          <p className="text-xs text-status-error bg-status-error/10 rounded px-3 py-2">{error}</p>
+        )}
+
+        <Button
+          type="button"
+          disabled={!deviceName || connecting}
+          className="self-start"
+          onClick={() => onConnect(deviceName, executable, deviceId)}
+        >
+          <Plug size={14} className="mr-2" />
+          {connecting ? 'Connecting…' : 'Connect'}
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Main component
+// ---------------------------------------------------------------------------
+
 export function Equipment() {
   const connectedDevices = useStore((s) => s.connectedDevices)
   const setConnectedDevices = useStore((s) => s.setConnectedDevices)
-  const [form, setForm] = useState<ConnectFormState>(DEFAULT_FORM)
+
+  const [step, setStep] = useState<WizardStep>('type')
+  const [selectedKind, setSelectedKind] = useState<DeviceKind>('camera')
+  const [selectedManufacturer, setSelectedManufacturer] = useState<string | null>(null)
+  const [selectedDriver, setSelectedDriver] = useState<DriverEntry | null>(null)
   const [drivers, setDrivers] = useState<DriverEntry[]>([])
   const [error, setError] = useState<string | null>(null)
   const [connecting, setConnecting] = useState(false)
+  const [propertiesDeviceId, setPropertiesDeviceId] = useState<string | null>(null)
 
   const refresh = () => {
     api.devices.connected().then(setConnectedDevices).catch(console.error)
@@ -43,47 +268,64 @@ export function Equipment() {
 
   useEffect(() => { refresh() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Fetch INDI driver catalog whenever the kind changes
+  // Load catalog whenever kind changes
   useEffect(() => {
+    if (step === 'type') return
     setDrivers([])
-    api.indi.drivers(form.kind).then(setDrivers).catch(() => setDrivers([]))
-  }, [form.kind])
+    api.indi.drivers(selectedKind).then(setDrivers).catch(() => setDrivers([]))
+  }, [selectedKind, step])
 
-  const handleKindChange = (kind: DeviceKind) => {
-    setForm({
-      ...DEFAULT_FORM,
-      kind,
-      adapter_key: KIND_ADAPTER[kind],
-    })
+  const handleSelectKind = (kind: DeviceKind) => {
+    setSelectedKind(kind)
+    setSelectedManufacturer(null)
+    setSelectedDriver(null)
+    setError(null)
+    setStep('manufacturer')
   }
 
-  const handleDriverSelect = (executable: string) => {
-    const entry = drivers.find((d) => d.executable === executable)
-    setForm((f) => ({
-      ...f,
-      indi_executable: executable,
-      indi_device_name: entry?.device_name ?? f.indi_device_name,
-      adapter_key: KIND_ADAPTER[f.kind],
-    }))
+  const handleSelectManufacturer = (manufacturer: string | null) => {
+    setSelectedManufacturer(manufacturer)
+    setSelectedDriver(null)
+    setError(null)
+    if (manufacturer === null) {
+      // Manual entry — skip model step
+      setStep('confirm')
+    } else {
+      setStep('model')
+    }
   }
 
-  const handleConnect = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const handleSelectModel = (driver: DriverEntry) => {
+    setSelectedDriver(driver)
+    setError(null)
+    setStep('confirm')
+  }
+
+  const handleBack = () => {
+    setError(null)
+    if (step === 'confirm' && selectedManufacturer === null) {
+      setStep('manufacturer')
+    } else if (step === 'confirm') {
+      setStep('model')
+    } else if (step === 'model') {
+      setStep('manufacturer')
+    } else {
+      setStep('type')
+    }
+  }
+
+  const handleConnect = async (deviceName: string, executable: string, deviceId: string) => {
     setError(null)
     setConnecting(true)
-    const config: DeviceConfig = {
-      device_id: form.device_id || undefined,
-      kind: form.kind,
-      adapter_key: form.adapter_key,
-      params: {
-        device_name: form.indi_device_name,
-        executable: form.indi_executable,
-      },
-    }
     try {
-      await api.devices.connect(config)
+      await api.devices.connect({
+        device_id: deviceId || undefined,
+        kind: selectedKind,
+        adapter_key: KIND_ADAPTER[selectedKind],
+        params: { device_name: deviceName, executable },
+      })
       refresh()
-      setForm({ ...DEFAULT_FORM, kind: form.kind, adapter_key: KIND_ADAPTER[form.kind] })
+      setStep('type')
     } catch (err) {
       setError((err as Error).message)
     } finally {
@@ -96,10 +338,8 @@ export function Equipment() {
     refresh()
   }
 
-  const selectClass =
-    'rounded bg-surface-overlay border border-surface-border px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-40 w-full'
-
   return (
+    <>
     <div className="p-6 max-w-3xl">
       <div className="flex items-center justify-between mb-6">
         <h1 className="text-lg font-semibold text-slate-100">Equipment</h1>
@@ -120,18 +360,33 @@ export function Equipment() {
             {connectedDevices.map((d: ConnectedDevice) => (
               <div
                 key={d.device_id}
-                className="flex items-center justify-between bg-surface-raised border border-surface-border rounded px-4 py-3"
+                className={[
+                  'flex items-center justify-between bg-surface-raised border rounded px-4 py-3 cursor-pointer transition-colors',
+                  propertiesDeviceId === d.device_id
+                    ? 'border-accent'
+                    : 'border-surface-border hover:border-slate-600',
+                ].join(' ')}
+                onClick={() =>
+                  setPropertiesDeviceId(
+                    propertiesDeviceId === d.device_id ? null : d.device_id
+                  )
+                }
               >
-                <div className="flex flex-col gap-1">
-                  <span className="text-sm font-medium text-slate-200">{d.device_id}</span>
-                  <span className="text-xs text-slate-500">{d.kind} · {d.adapter_key}</span>
+                <div className="flex items-center gap-3">
+                  <span className="text-slate-500">
+                    <KindIcon kind={d.kind} size={16} />
+                  </span>
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-sm font-medium text-slate-200">{d.device_id}</span>
+                    <span className="text-xs text-slate-500">{d.adapter_key}</span>
+                  </div>
                 </div>
                 <div className="flex items-center gap-3">
                   <StateBadge state={d.state} />
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={() => handleDisconnect(d.device_id)}
+                    onClick={(e) => { e.stopPropagation(); handleDisconnect(d.device_id) }}
                     title="Disconnect"
                   >
                     <PlugZap size={14} className="text-slate-400" />
@@ -143,101 +398,51 @@ export function Equipment() {
         )}
       </section>
 
-      {/* Connect form */}
+      {/* Connect wizard */}
       <section>
         <h2 className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-3">
           Connect device
         </h2>
-        <form
-          onSubmit={handleConnect}
-          className="bg-surface-raised border border-surface-border rounded p-4 flex flex-col gap-3"
-        >
-          {/* Kind */}
-          <div className="flex flex-col gap-1">
-            <label className="text-xs text-slate-400">Type</label>
-            <select
-              className={selectClass}
-              value={form.kind}
-              onChange={(e) => handleKindChange(e.target.value as DeviceKind)}
-            >
-              <option value="camera">Camera</option>
-              <option value="mount">Mount</option>
-              <option value="focuser">Focuser</option>
-            </select>
-          </div>
-
-          {/* Driver from catalog — optional, auto-fills device name */}
-          {drivers.length > 0 && (
-            <div className="flex flex-col gap-1">
-              <label className="text-xs text-slate-400">Driver (from catalog)</label>
-              <select
-                className={selectClass}
-                value={form.indi_executable}
-                onChange={(e) => handleDriverSelect(e.target.value)}
-              >
-                <option value="">— select to auto-fill —</option>
-                {drivers.map((d) => (
-                  <option key={d.executable} value={d.executable}>
-                    {d.label}{d.manufacturer ? ` (${d.manufacturer})` : ''}
-                  </option>
-                ))}
-              </select>
-            </div>
+        <div className="bg-surface-raised border border-surface-border rounded p-4">
+          {step === 'type' && (
+            <TypeStep onSelect={handleSelectKind} />
           )}
-
-          {/* INDI device name — always required, auto-filled when catalog available */}
-          <div className="flex flex-col gap-1">
-            <label className="text-xs text-slate-400">
-              INDI device name <span className="text-status-error">*</span>
-            </label>
-            <Input
-              placeholder="e.g. EQMod Mount"
-              value={form.indi_device_name}
-              onChange={(e) => setForm({ ...form, indi_device_name: e.target.value })}
+          {step === 'manufacturer' && (
+            <ManufacturerStep
+              kind={selectedKind}
+              drivers={drivers}
+              onSelect={handleSelectManufacturer}
+              onBack={handleBack}
             />
-          </div>
-
-          {/* Driver executable — shown when typed manually (catalog not available) */}
-          {drivers.length === 0 && (
-            <div className="flex flex-col gap-1">
-              <label className="text-xs text-slate-400">
-                Driver executable
-                <span className="ml-2 text-slate-600">(optional, e.g. indi_eqmod_telescope)</span>
-              </label>
-              <Input
-                placeholder="indi_eqmod_telescope"
-                value={form.indi_executable}
-                onChange={(e) => setForm({ ...form, indi_executable: e.target.value })}
-              />
-            </div>
           )}
-
-          {/* Device ID */}
-          <div className="flex flex-col gap-1">
-            <label className="text-xs text-slate-400">
-              Device ID <span className="text-slate-600">(optional, auto-generated if blank)</span>
-            </label>
-            <Input
-              placeholder="e.g. main_camera"
-              value={form.device_id}
-              onChange={(e) => setForm({ ...form, device_id: e.target.value })}
+          {step === 'model' && selectedManufacturer !== null && (
+            <ModelStep
+              kind={selectedKind}
+              manufacturer={selectedManufacturer}
+              drivers={drivers}
+              onSelect={handleSelectModel}
+              onBack={handleBack}
             />
-          </div>
-
-          {error && (
-            <p className="text-xs text-status-error bg-status-error/10 rounded px-3 py-2">{error}</p>
           )}
-
-          <Button
-            type="submit"
-            disabled={!form.indi_device_name || connecting}
-            className="self-start"
-          >
-            <Plug size={14} className="mr-2" />
-            {connecting ? 'Connecting…' : 'Connect'}
-          </Button>
-        </form>
+          {step === 'confirm' && (
+            <ConfirmStep
+              kind={selectedKind}
+              driver={selectedDriver}
+              onBack={handleBack}
+              onConnect={handleConnect}
+              connecting={connecting}
+              error={error}
+            />
+          )}
+        </div>
       </section>
     </div>
+    {propertiesDeviceId && (
+      <DevicePropertiesPanel
+        deviceId={propertiesDeviceId}
+        onClose={() => setPropertiesDeviceId(null)}
+      />
+    )}
+    </>
   )
 }

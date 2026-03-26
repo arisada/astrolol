@@ -109,9 +109,9 @@ class IndiCamera:
             {"CCD_EXPOSURE_VALUE": params.duration},
         )
 
-        # Wait for BLOB (image data)
+        # Wait for BLOB (image data) — arrives on the CCD1 property
         timeout = params.duration + self._exposure_timeout_extra
-        blob = await self._client.wait_for_blob(self._device_name, timeout=timeout)
+        blob = await self._client.wait_for_blob(self._device_name, "CCD1", timeout=timeout)
 
         # Save to FITS
         self._images_dir.mkdir(parents=True, exist_ok=True)

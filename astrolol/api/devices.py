@@ -44,7 +44,7 @@ async def connect_device(config: DeviceConfig, request: Request) -> ConnectRespo
     except DeviceAlreadyConnectedError as exc:
         raise HTTPException(status_code=409, detail=str(exc))
     except DeviceConnectionError as exc:
-        raise HTTPException(status_code=502, detail=str(exc))
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
 
 
 @router.delete("/connected/{device_id}", status_code=204)
