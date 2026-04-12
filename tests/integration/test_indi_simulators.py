@@ -116,18 +116,39 @@ async def test_client_connect_fails_without_server():
 
 
 # ---------------------------------------------------------------------------
+# Shared indiserver — one instance for all module-scoped device fixtures.
+#
+# indiserver binds a system-wide abstract Unix socket (@/tmp/indiserver)
+# in addition to its TCP port, so only one indiserver can run per process
+# at a time.  All three simulators are loaded into a single server so the
+# module-scoped client fixtures can coexist.
+# ---------------------------------------------------------------------------
+
+_SHARED_PORT = _BASE_PORT + 10
+
+
+@pytest.fixture(scope="module")
+def _shared_server():
+    proc = _start_indiserver(
+        _SHARED_PORT,
+        "indi_simulator_telescope",
+        "indi_simulator_focus",
+        "indi_simulator_ccd",
+    )
+    yield proc
+    _stop(proc)
+
+
+# ---------------------------------------------------------------------------
 # Mount (Telescope Simulator)
 # ---------------------------------------------------------------------------
 
 @pytest.fixture(scope="module")
-def _mount_client():
-    port = _BASE_PORT + 10
-    proc = _start_indiserver(port, "indi_simulator_telescope")
-    sync = _make_sync_connected_client("localhost", port)
-    client = _wrap_sync_client(sync, "localhost", port)
+def _mount_client(_shared_server):
+    sync = _make_sync_connected_client("localhost", _SHARED_PORT)
+    client = _wrap_sync_client(sync, "localhost", _SHARED_PORT)
     yield client
     sync._active = False
-    _stop(proc)  # kill server; C++ client GCs naturally
 
 
 @pytest.fixture
@@ -184,14 +205,11 @@ async def test_mount_ping(mount):
 # ---------------------------------------------------------------------------
 
 @pytest.fixture(scope="module")
-def _focuser_client():
-    port = _BASE_PORT + 20
-    proc = _start_indiserver(port, "indi_simulator_focus")
-    sync = _make_sync_connected_client("localhost", port)
-    client = _wrap_sync_client(sync, "localhost", port)
+def _focuser_client(_shared_server):
+    sync = _make_sync_connected_client("localhost", _SHARED_PORT)
+    client = _wrap_sync_client(sync, "localhost", _SHARED_PORT)
     yield client
     sync._active = False
-    _stop(proc)
 
 
 @pytest.fixture
@@ -239,14 +257,11 @@ async def test_focuser_ping(focuser):
 # ---------------------------------------------------------------------------
 
 @pytest.fixture(scope="module")
-def _camera_client():
-    port = _BASE_PORT + 30
-    proc = _start_indiserver(port, "indi_simulator_ccd")
-    sync = _make_sync_connected_client("localhost", port)
-    client = _wrap_sync_client(sync, "localhost", port)
+def _camera_client(_shared_server):
+    sync = _make_sync_connected_client("localhost", _SHARED_PORT)
+    client = _wrap_sync_client(sync, "localhost", _SHARED_PORT)
     yield client
     sync._active = False
-    _stop(proc)
 
 
 @pytest.fixture

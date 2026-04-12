@@ -57,6 +57,16 @@ class IndiMount:
 
     async def slew(self, target: SlewTarget) -> None:
         """Slew to target and block until motion stops."""
+        # Unpark first — INDI telescope simulators (and most real drivers) ignore
+        # slew commands when the mount is in a parked state.
+        try:
+            is_parked = await self._client.get_switch_state(
+                self._device_name, "TELESCOPE_PARK", "PARK"
+            )
+            if is_parked:
+                await self.unpark()
+        except Exception:
+            pass
         # Set ON_COORD_SET to TRACK (slew then start tracking)
         await self._client.set_switch(
             self._device_name, "ON_COORD_SET", ["TRACK"]
@@ -80,11 +90,19 @@ class IndiMount:
 
     async def park(self) -> None:
         await self._client.set_switch(self._device_name, "TELESCOPE_PARK", ["PARK"])
+        # Wait for TELESCOPE_PARK to go BUSY then return to OK.
+        # busy_timeout=5s gives the driver time to acknowledge the command.
+        await self._client.wait_prop_busy_then_done(
+            self._device_name, "TELESCOPE_PARK", busy_timeout=5.0, done_timeout=120.0
+        )
         self._is_parked = True
         self._is_tracking = False
 
     async def unpark(self) -> None:
         await self._client.set_switch(self._device_name, "TELESCOPE_PARK", ["UNPARK"])
+        await self._client.wait_prop_busy_then_done(
+            self._device_name, "TELESCOPE_PARK", busy_timeout=5.0, done_timeout=120.0
+        )
         self._is_parked = False
 
     async def sync(self, target: SlewTarget) -> None:
@@ -153,7 +171,7 @@ class IndiMount:
     # ------------------------------------------------------------------
 
     async def _wait_slew_done(self, timeout: float = 120.0) -> None:
-        """Wait until EQUATORIAL_EOD_COORD leaves IPS_BUSY."""
-        await self._client.wait_prop_not_busy(
-            self._device_name, "EQUATORIAL_EOD_COORD", timeout=timeout
+        """Wait for EQUATORIAL_EOD_COORD to go BUSY then return to idle."""
+        await self._client.wait_prop_busy_then_done(
+            self._device_name, "EQUATORIAL_EOD_COORD", done_timeout=timeout
         )

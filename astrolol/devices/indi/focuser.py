@@ -3,10 +3,8 @@ INDI focuser adapter — implements IFocuser using IndiClient.
 
 INDI focuser properties used:
   ABS_FOCUS_POSITION  NUMBER  FOCUS_ABSOLUTE_POSITION  — absolute move / current position
-  REL_FOCUS_POSITION  NUMBER  FOCUS_RELATIVE_POSITION  — relative move
-  FOCUS_MOTION        SWITCH  FOCUS_INWARD / FOCUS_OUTWARD — direction for relative move
-  FOCUS_ABORT_MOTION  SWITCH  ABORT                        — halt
-  FOCUS_TEMPERATURE   NUMBER  TEMPERATURE                  — optional
+  FOCUS_ABORT_MOTION  SWITCH  ABORT                    — halt
+  FOCUS_TEMPERATURE   NUMBER  TEMPERATURE              — optional
 """
 from __future__ import annotations
 
@@ -63,17 +61,21 @@ class IndiFocuser:
             self._state = DeviceState.CONNECTED
 
     async def move_by(self, steps: int) -> None:
-        """Move focuser by relative steps (positive = outward, negative = inward)."""
+        """Move focuser by relative steps (positive = outward, negative = inward).
+
+        Implemented via an absolute move to avoid a bug in the INDI focuser
+        simulator where INWARD relative moves go BUSY and never complete.
+        """
         self._state = DeviceState.BUSY
         try:
-            direction = "FOCUS_OUTWARD" if steps >= 0 else "FOCUS_INWARD"
-            await self._client.set_switch(
-                self._device_name, "FOCUS_MOTION", [direction]
+            current = await self._client.get_number(
+                self._device_name, "ABS_FOCUS_POSITION", "FOCUS_ABSOLUTE_POSITION"
             )
+            target = max(0, int(current) + steps)
             await self._client.set_number(
                 self._device_name,
-                "REL_FOCUS_POSITION",
-                {"FOCUS_RELATIVE_POSITION": float(abs(steps))},
+                "ABS_FOCUS_POSITION",
+                {"FOCUS_ABSOLUTE_POSITION": float(target)},
             )
             await self._wait_move_done()
         finally:
@@ -130,8 +132,11 @@ class IndiFocuser:
     # Internal
     # ------------------------------------------------------------------
 
-    async def _wait_move_done(self) -> None:
-        """Wait until ABS_FOCUS_POSITION leaves IPS_BUSY."""
-        await self._client.wait_prop_not_busy(
-            self._device_name, "ABS_FOCUS_POSITION", timeout=_MOVE_TIMEOUT
+    async def _wait_move_done(self, busy_timeout: float = 2.0) -> None:
+        """Wait for ABS_FOCUS_POSITION to go BUSY then return to idle."""
+        await self._client.wait_prop_busy_then_done(
+            self._device_name,
+            "ABS_FOCUS_POSITION",
+            busy_timeout=busy_timeout,
+            done_timeout=_MOVE_TIMEOUT,
         )

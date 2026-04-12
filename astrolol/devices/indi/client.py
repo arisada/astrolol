@@ -247,11 +247,51 @@ class _SyncIndiClient(_BaseIndiClient):  # type: ignore[misc,valid-type]
                     )
                 self._updated.wait(timeout=min(remaining, 0.5))
 
+    def wait_prop_busy_then_done(
+        self,
+        device_name: str,
+        prop_name: str,
+        busy_timeout: float = 2.0,
+        done_timeout: float = 120.0,
+    ) -> None:
+        """Wait for a property to go BUSY, then wait for it to leave BUSY.
+
+        This avoids the race condition in wait_prop_not_busy where the property
+        is still IDLE when first checked (command not yet processed by server)
+        and returns immediately before the operation actually starts.
+        """
+        # Phase 1: wait for BUSY to start (up to busy_timeout)
+        deadline = time.monotonic() + busy_timeout
+        with self._updated:
+            while True:
+                p = self._properties.get(device_name, {}).get(prop_name)
+                if p is not None and p.getState() == PyIndi.IPS_BUSY:
+                    break
+                if time.monotonic() >= deadline:
+                    return  # never went BUSY — command was instantaneous
+                self._updated.wait(timeout=min(deadline - time.monotonic(), 0.1))
+
+        # Phase 2: wait for BUSY to end
+        self.wait_prop_not_busy(device_name, prop_name, timeout=done_timeout)
+
     def wait_for_connection_on(
         self, device_name: str, timeout: float = 10.0
     ) -> None:
-        """Block until CONNECTION/CONNECT switch is ISS_ON (device fully connected)."""
+        """Block until CONNECTION/CONNECT is ISS_ON and the initial property dump settles.
+
+        After CONNECTION=ON the INDI server may still be sending defXxxVector
+        messages for device-specific properties.  If we send a command before
+        that flood finishes, a late property definition arriving with state=OK
+        will overwrite the BUSY state we are waiting for and cause the wait to
+        return prematurely.
+
+        Phase 2 therefore waits until no property update arrives for
+        _SETTLE_MS milliseconds, indicating the dump is complete.
+        """
+        _SETTLE_MS = 0.15  # 150 ms of silence = dump complete
+
         deadline = time.monotonic() + timeout
+        # Phase 1: wait for CONNECTION/CONNECT=ON
         with self._updated:
             while True:
                 p = self._properties.get(device_name, {}).get("CONNECTION")
@@ -259,7 +299,7 @@ class _SyncIndiClient(_BaseIndiClient):  # type: ignore[misc,valid-type]
                     ps = p.getSwitch()
                     w = ps.findWidgetByName("CONNECT")
                     if w is not None and w.s == PyIndi.ISS_ON:
-                        return
+                        break
                 remaining = deadline - time.monotonic()
                 if remaining <= 0:
                     raise TimeoutError(
@@ -267,6 +307,17 @@ class _SyncIndiClient(_BaseIndiClient):  # type: ignore[misc,valid-type]
                         f"within {timeout}s"
                     )
                 self._updated.wait(timeout=min(remaining, 0.5))
+
+        # Phase 2: wait for property dump to stabilise (no updates for _SETTLE_MS)
+        settle_deadline = time.monotonic() + _SETTLE_MS
+        with self._updated:
+            while True:
+                remaining = settle_deadline - time.monotonic()
+                if remaining <= 0:
+                    return  # silent for long enough
+                notified = self._updated.wait(timeout=remaining)
+                if notified:
+                    settle_deadline = time.monotonic() + _SETTLE_MS  # reset
 
 
 # ---------------------------------------------------------------------------
@@ -369,6 +420,71 @@ class IndiClient:
     ) -> None:
         await asyncio.to_thread(
             self._sync.wait_prop_not_busy, device_name, prop_name, timeout
+        )
+
+    async def wait_prop_busy_then_done(
+        self,
+        device_name: str,
+        prop_name: str,
+        busy_timeout: float = 2.0,
+        done_timeout: float = 120.0,
+    ) -> None:
+        await asyncio.to_thread(
+            self._sync.wait_prop_busy_then_done,
+            device_name,
+            prop_name,
+            busy_timeout,
+            done_timeout,
+        )
+
+    async def wait_for_switch_on(
+        self,
+        device_name: str,
+        prop_name: str,
+        element: str,
+        timeout: float = 120.0,
+        interval: float = 0.5,
+    ) -> None:
+        """Poll until a switch element becomes ISS_ON.
+
+        More robust than wait_prop_busy_then_done for operations where the
+        BUSY→OK transition can be overwritten by INDI polling updates.
+        """
+        deadline = asyncio.get_event_loop().time() + timeout
+        while asyncio.get_event_loop().time() < deadline:
+            await asyncio.sleep(interval)
+            try:
+                if await asyncio.to_thread(
+                    self._sync.get_switch_state, device_name, prop_name, element
+                ):
+                    return
+            except Exception:
+                pass
+        raise TimeoutError(
+            f"Switch {device_name}/{prop_name}/{element} did not turn ON within {timeout}s"
+        )
+
+    async def wait_for_switch_off(
+        self,
+        device_name: str,
+        prop_name: str,
+        element: str,
+        timeout: float = 120.0,
+        interval: float = 0.5,
+    ) -> None:
+        """Poll until a switch element becomes ISS_OFF."""
+        deadline = asyncio.get_event_loop().time() + timeout
+        while asyncio.get_event_loop().time() < deadline:
+            await asyncio.sleep(interval)
+            try:
+                if not await asyncio.to_thread(
+                    self._sync.get_switch_state, device_name, prop_name, element
+                ):
+                    return
+            except Exception:
+                pass
+        raise TimeoutError(
+            f"Switch {device_name}/{prop_name}/{element} did not turn OFF within {timeout}s"
         )
 
     async def connect_device(self, device_name: str, timeout: float = 10.0) -> None:
