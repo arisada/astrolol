@@ -1,0 +1,33 @@
+services:
+
+  # ── FastAPI backend ─────────────────────────────────────────────────────────
+  backend:
+    build: .
+    volumes:
+      - .:/app
+    ports:
+      - "8000:8000"
+    command: python -m astrolol.main
+
+  # ── Vite dev server (hot-reload UI) ────────────────────────────────────────
+  frontend:
+    build: .
+    volumes:
+      - .:/app
+      # Preserve the node_modules baked into the image — without this the
+      # source bind-mount would shadow /app/ui/node_modules with the (likely
+      # absent) host directory.  Docker seeds this named volume from the image
+      # on first run.
+      - ui_node_modules:/app/ui/node_modules
+    ports:
+      - "80:5173"
+    environment:
+      # Vite proxy target: use the Docker Compose service name, not localhost.
+      - BACKEND_URL=http://backend:8000
+    # --host binds Vite to 0.0.0.0 so it is reachable outside the container.
+    command: npm --prefix /app/ui run dev -- --host
+    depends_on:
+      - backend
+
+volumes:
+  ui_node_modules:

@@ -2,6 +2,11 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
 
+// Backend URL for the dev-server proxy.  In Docker Compose the BACKEND_URL
+// env var is set to the service name; locally it defaults to localhost.
+const backendHttp = process.env.BACKEND_URL ?? 'http://localhost:8000'
+const backendWs   = backendHttp.replace(/^http/, 'ws')
+
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [react()],
@@ -10,15 +15,15 @@ export default defineConfig({
   },
   server: {
     proxy: {
-      '/api': { target: 'http://localhost:8000', changeOrigin: true },
-      '/devices': { target: 'http://localhost:8000', changeOrigin: true },
-      '/profiles': { target: 'http://localhost:8000', changeOrigin: true },
-      '/imager': { target: 'http://localhost:8000', changeOrigin: true },
-      '/mount': { target: 'http://localhost:8000', changeOrigin: true },
-      '/focuser': { target: 'http://localhost:8000', changeOrigin: true },
-      '/indi': { target: 'http://localhost:8000', changeOrigin: true },
-      '/health': { target: 'http://localhost:8000', changeOrigin: true },
-      '/ws': { target: 'ws://localhost:8000', ws: true, changeOrigin: true },
+      '/api':      { target: backendHttp, changeOrigin: true },
+      '/devices':  { target: backendHttp, changeOrigin: true },
+      '/profiles': { target: backendHttp, changeOrigin: true },
+      '/imager':   { target: backendHttp, changeOrigin: true },
+      '/mount':    { target: backendHttp, changeOrigin: true },
+      '/focuser':  { target: backendHttp, changeOrigin: true },
+      '/indi':     { target: backendHttp, changeOrigin: true },
+      '/health':   { target: backendHttp, changeOrigin: true },
+      '/ws':       { target: backendWs,   ws: true, changeOrigin: true },
     },
   },
   build: {

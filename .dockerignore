@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# UI
+ui/node_modules/
+ui/dist/
+
+# Runtime data
+profiles.json
+images/
+
+# Dev tooling
+.env
+.git/
