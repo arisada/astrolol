@@ -120,7 +120,7 @@ class IndiCamera:
 
         def _save() -> None:
             with open(fits_path, "wb") as f:
-                f.write(bytes(blob.getblobdata()))
+                f.write(blob.data)
 
         await asyncio.to_thread(_save)
 

@@ -32,7 +32,7 @@ dev = [
     "ruff>=0.4",
 ]
 indi = [
-    "pyindi-client>=2.0",
+    "indipyclient>=0.9",
 ]
 
 [tool.ruff]

@@ -1,425 +1,250 @@
 """
-Async wrapper around the synchronous pyindi-client C extension (PyIndi 2.x).
+Async INDI client built on indipyclient (pure Python, asyncio-native).
 
-All blocking calls are dispatched via asyncio.to_thread() so a stuck or
-slow INDI device cannot block the event loop.
-
-PyIndi 2.x API notes:
-  - newProperty(p) / updateProperty(p) receive a generic Property object.
-  - p.getNumber() → PropertyViewNumber, p.getSwitch() → PropertyViewSwitch,
-    p.getBLOB()   → PropertyViewBlob  (each with count(), findWidgetByName())
-  - WidgetViewNumber: .getValue(), .setValue(), .getName()
-  - WidgetViewSwitch: .s (ISS_ON/ISS_OFF), .getName()
-  - WidgetViewBlob:   .getblobdata(), .getBlobLen(), .getFormat()
-  - IPS_IDLE=0, IPS_OK=1, IPS_BUSY=2, IPS_ALERT=3
-  - BLOBs arrive via updateProperty (no separate newBLOB in 2.x).
-  - setBLOBMode uses B_ALSO (enables BLOBs while keeping regular property updates).
-  - BaseClient.connectDevice(name) / disconnectDevice(name) are built-in.
+indipyclient API notes:
+  - IPyClient is a UserDict of devicename → device object.
+  - device is a UserDict of vectorname → vector object.
+  - vector.state       → 'Idle' | 'Ok' | 'Busy' | 'Alert'
+  - vector[membername] → membervalue string (via PropertyVector.__getitem__)
+  - SwitchVector: membervalue is 'On' or 'Off'
+  - NumberVector: membervalue is a formatted string; use getfloatvalue(name) for float
+  - BLOBVector:   membervalue is bytes
+  - send_newVector(device, vector, members={name: value})
+  - asyncrun() must be running (as a Task) for any I/O to happen.
 """
 from __future__ import annotations
 
 import asyncio
-import threading
-import time
+from dataclasses import dataclass
 from typing import Any
 
 import structlog
+from indipyclient import IPyClient
+from indipyclient import events as indi_events
 
 logger = structlog.get_logger()
 
-try:
-    import PyIndi  # type: ignore[import]
-    _PYINDI_AVAILABLE = True
-    _BaseIndiClient: type = PyIndi.BaseClient
-except ImportError:
-    _PYINDI_AVAILABLE = False
-    PyIndi = None  # type: ignore[assignment]
-    _BaseIndiClient = object
+
+@dataclass
+class BlobData:
+    """Received BLOB payload."""
+    data: bytes
+    format: str   # file extension, e.g. '.fits'
 
 
-# ---------------------------------------------------------------------------
-# Low-level synchronous INDI client (runs in a dedicated thread)
-# ---------------------------------------------------------------------------
-
-class _SyncIndiClient(_BaseIndiClient):  # type: ignore[misc,valid-type]
+class IndiClient(IPyClient):
     """
-    Thin subclass of PyIndi.BaseClient that receives property updates and
-    stores them in thread-safe dicts.
-    """
+    Async INDI client for astrolol device adapters.
 
-    def __init__(self) -> None:
-        if not _PYINDI_AVAILABLE:
-            raise RuntimeError(
-                "pyindi-client is not installed.  "
-                "Install it with: pip install pyindi-client"
-            )
-        super().__init__()
-        self._lock = threading.Lock()
-        # device_name → property_name → Property
-        self._properties: dict[str, dict[str, Any]] = {}
-        # Condition var signalled whenever any property changes
-        self._updated = threading.Condition(self._lock)
-        # Set to True during/after disconnect so C callbacks become no-ops
-        self._active = True
-        # Monotonically increasing counter per BLOB property so wait_for_blob
-        # can detect a new delivery even when the payload size is identical.
-        self._blob_versions: dict[tuple[str, str], int] = {}
+    Subclasses IPyClient and adds higher-level wait primitives used by
+    mount.py, focuser.py, and camera.py.
 
-    # ---- PyIndi 2.x callbacks -------------------------------------------
+    Usage::
 
-    def newDevice(self, d: Any) -> None:  # noqa: N802
-        if not self._active:
-            return
-        with self._lock:
-            self._properties.setdefault(d.getDeviceName(), {})
-
-    def removeDevice(self, d: Any) -> None:  # noqa: N802
-        if not self._active:
-            return
-        with self._lock:
-            self._properties.pop(d.getDeviceName(), None)
-
-    def newProperty(self, p: Any) -> None:  # noqa: N802
-        if not self._active:
-            return
-        with self._updated:
-            self._properties.setdefault(p.getDeviceName(), {})[p.getName()] = p
-            self._updated.notify_all()
-
-    def removeProperty(self, p: Any) -> None:  # noqa: N802
-        if not self._active:
-            return
-        with self._lock:
-            self._properties.get(p.getDeviceName(), {}).pop(p.getName(), None)
-
-    def updateProperty(self, p: Any) -> None:  # noqa: N802
-        if not self._active:
-            return
-        with self._updated:
-            dev, name = p.getDeviceName(), p.getName()
-            self._properties.setdefault(dev, {})[name] = p
-            if p.getType() == PyIndi.INDI_BLOB:
-                key = (dev, name)
-                self._blob_versions[key] = self._blob_versions.get(key, 0) + 1
-            self._updated.notify_all()
-
-    # PyIndi 2.x still has these as overridable hooks
-    def newMessage(self, d: Any, m: int) -> None: ...  # noqa: N802
-    def serverConnected(self) -> None: ...  # noqa: N802
-    def serverDisconnected(self, code: int) -> None: ...  # noqa: N802
-
-    # ---- Synchronous helpers --------------------------------------------
-
-    def wait_for_property(
-        self, device_name: str, prop_name: str, timeout: float = 10.0
-    ) -> Any:
-        """Block until Property(device_name, prop_name) exists and is non-empty."""
-        deadline = time.monotonic() + timeout
-        with self._updated:
-            while True:
-                p = self._properties.get(device_name, {}).get(prop_name)
-                if p is not None and not p.isEmpty():
-                    return p
-                remaining = deadline - time.monotonic()
-                if remaining <= 0:
-                    raise TimeoutError(
-                        f"INDI property {device_name}/{prop_name} not available "
-                        f"after {timeout}s"
-                    )
-                self._updated.wait(timeout=min(remaining, 0.5))
-
-    def wait_for_blob(
-        self, device_name: str, prop_name: str, timeout: float = 60.0
-    ) -> Any:
-        """
-        Block until a BLOB property update with non-zero data arrives for
-        (device_name, prop_name).  Returns the first WidgetViewBlob.
-
-        Uses a version counter (incremented by updateProperty on each BLOB
-        delivery) so that consecutive exposures of the same size are detected
-        correctly — the old length-comparison heuristic failed for simulators
-        that always produce identically-sized frames.
-        """
-        deadline = time.monotonic() + timeout
-        key = (device_name, prop_name)
-
-        # Snapshot the version counter before the exposure was triggered
-        with self._lock:
-            seen_version = self._blob_versions.get(key, 0)
-
-        with self._updated:
-            while True:
-                if self._blob_versions.get(key, 0) > seen_version:
-                    p = self._properties.get(device_name, {}).get(prop_name)
-                    if p is not None and p.getType() == PyIndi.INDI_BLOB:
-                        pb = p.getBLOB()
-                        if pb.count() > 0 and pb[0].getBlobLen() > 0:
-                            return pb[0]
-                remaining = deadline - time.monotonic()
-                if remaining <= 0:
-                    raise TimeoutError(
-                        f"INDI BLOB {device_name}/{prop_name} not received after {timeout}s"
-                    )
-                self._updated.wait(timeout=min(remaining, 0.5))
-
-    def get_number(self, device_name: str, prop_name: str, element: str) -> float:
-        # Wait briefly in case the property hasn't populated yet
-        p = self.wait_for_property(device_name, prop_name, timeout=5.0)
-        pn = p.getNumber()
-        w = pn.findWidgetByName(element)
-        if w is None:
-            raise KeyError(f"Element {element} not found in {device_name}/{prop_name}")
-        return float(w.getValue())
-
-    def get_switch_state(
-        self, device_name: str, prop_name: str, element: str
-    ) -> bool:
-        p = self.wait_for_property(device_name, prop_name, timeout=5.0)
-        ps = p.getSwitch()
-        w = ps.findWidgetByName(element)
-        if w is None:
-            raise KeyError(f"Element {element} not found in {device_name}/{prop_name}")
-        return bool(w.s == PyIndi.ISS_ON)
-
-    def get_property_state(self, device_name: str, prop_name: str) -> int:
-        """Return the IPS_* state of a property (IPS_IDLE=0, IPS_OK=1, IPS_BUSY=2, IPS_ALERT=3)."""
-        p = self._properties.get(device_name, {}).get(prop_name)
-        if p is None:
-            raise KeyError(f"Property {device_name}/{prop_name} not found")
-        return int(p.getState())
-
-    def set_number(
-        self, device_name: str, prop_name: str, values: dict[str, float]
-    ) -> None:
-        p = self.wait_for_property(device_name, prop_name)
-        pn = p.getNumber()
-        for name, val in values.items():
-            w = pn.findWidgetByName(name)
-            if w is not None:
-                w.setValue(val)
-        self.sendNewNumber(pn)  # type: ignore[attr-defined]
-
-    def set_switch(
-        self, device_name: str, prop_name: str, on_elements: list[str]
-    ) -> None:
-        p = self.wait_for_property(device_name, prop_name)
-        ps = p.getSwitch()
-        for i in range(ps.count()):
-            w = ps[i]
-            w.s = PyIndi.ISS_ON if w.getName() in on_elements else PyIndi.ISS_OFF
-        self.sendNewSwitch(ps)  # type: ignore[attr-defined]
-
-    def get_properties_snapshot(self, device_name: str) -> dict[str, Any]:
-        """Return a shallow copy of all cached properties for device_name."""
-        with self._lock:
-            return dict(self._properties.get(device_name, {}))
-
-    def set_text(
-        self, device_name: str, prop_name: str, values: dict[str, str]
-    ) -> None:
-        p = self.wait_for_property(device_name, prop_name)
-        pt = p.getText()
-        for name, val in values.items():
-            w = pt.findWidgetByName(name)
-            if w is not None:
-                w.setText(val)
-        self.sendNewText(pt)  # type: ignore[attr-defined]
-
-    def enable_blob(self, device_name: str) -> None:
-        # B_ALSO = receive BLOBs in addition to regular property updates.
-        # B_ONLY would suppress all non-BLOB properties for this device.
-        self.setBLOBMode(PyIndi.B_ALSO, device_name, None)  # type: ignore[attr-defined]
-
-    def wait_prop_not_busy(
-        self, device_name: str, prop_name: str, timeout: float = 120.0
-    ) -> None:
-        """Block until property state leaves IPS_BUSY (2)."""
-        deadline = time.monotonic() + timeout
-        with self._updated:
-            while True:
-                p = self._properties.get(device_name, {}).get(prop_name)
-                if p is not None and p.getState() != PyIndi.IPS_BUSY:
-                    return
-                remaining = deadline - time.monotonic()
-                if remaining <= 0:
-                    raise TimeoutError(
-                        f"{device_name}/{prop_name} still BUSY after {timeout}s"
-                    )
-                self._updated.wait(timeout=min(remaining, 0.5))
-
-    def wait_prop_busy_then_done(
-        self,
-        device_name: str,
-        prop_name: str,
-        busy_timeout: float = 2.0,
-        done_timeout: float = 120.0,
-    ) -> None:
-        """Wait for a property to go BUSY, then wait for it to leave BUSY.
-
-        This avoids the race condition in wait_prop_not_busy where the property
-        is still IDLE when first checked (command not yet processed by server)
-        and returns immediately before the operation actually starts.
-        """
-        # Phase 1: wait for BUSY to start (up to busy_timeout)
-        deadline = time.monotonic() + busy_timeout
-        with self._updated:
-            while True:
-                p = self._properties.get(device_name, {}).get(prop_name)
-                if p is not None and p.getState() == PyIndi.IPS_BUSY:
-                    break
-                if time.monotonic() >= deadline:
-                    return  # never went BUSY — command was instantaneous
-                self._updated.wait(timeout=min(deadline - time.monotonic(), 0.1))
-
-        # Phase 2: wait for BUSY to end
-        self.wait_prop_not_busy(device_name, prop_name, timeout=done_timeout)
-
-    def wait_for_connection_on(
-        self, device_name: str, timeout: float = 10.0
-    ) -> None:
-        """Block until CONNECTION/CONNECT is ISS_ON and the initial property dump settles.
-
-        After CONNECTION=ON the INDI server may still be sending defXxxVector
-        messages for device-specific properties.  If we send a command before
-        that flood finishes, a late property definition arriving with state=OK
-        will overwrite the BUSY state we are waiting for and cause the wait to
-        return prematurely.
-
-        Phase 2 therefore waits until no property update arrives for
-        _SETTLE_MS milliseconds, indicating the dump is complete.
-        """
-        _SETTLE_MS = 0.15  # 150 ms of silence = dump complete
-
-        deadline = time.monotonic() + timeout
-        # Phase 1: wait for CONNECTION/CONNECT=ON
-        with self._updated:
-            while True:
-                p = self._properties.get(device_name, {}).get("CONNECTION")
-                if p is not None:
-                    ps = p.getSwitch()
-                    w = ps.findWidgetByName("CONNECT")
-                    if w is not None and w.s == PyIndi.ISS_ON:
-                        break
-                remaining = deadline - time.monotonic()
-                if remaining <= 0:
-                    raise TimeoutError(
-                        f"Device {device_name} did not reach CONNECTION=ON "
-                        f"within {timeout}s"
-                    )
-                self._updated.wait(timeout=min(remaining, 0.5))
-
-        # Phase 2: wait for property dump to stabilise (no updates for _SETTLE_MS)
-        settle_deadline = time.monotonic() + _SETTLE_MS
-        with self._updated:
-            while True:
-                remaining = settle_deadline - time.monotonic()
-                if remaining <= 0:
-                    return  # silent for long enough
-                notified = self._updated.wait(timeout=remaining)
-                if notified:
-                    settle_deadline = time.monotonic() + _SETTLE_MS  # reset
-
-
-# ---------------------------------------------------------------------------
-# Public async wrapper
-# ---------------------------------------------------------------------------
-
-class IndiClient:
-    """
-    Async façade over _SyncIndiClient.
-
-    Each blocking operation runs in asyncio.to_thread() so a stuck device
-    only blocks that thread, not the event loop.
+        client = IndiClient(host="localhost", port=7624)
+        await client.connect()
+        await client.connect_device("Telescope Simulator")
+        # … use client …
+        await client.disconnect()
     """
 
     def __init__(self, host: str = "localhost", port: int = 7624) -> None:
-        if not _PYINDI_AVAILABLE:
-            raise RuntimeError(
-                "pyindi-client is not installed.  "
-                "Install it with: pip install pyindi-client"
-            )
+        super().__init__(indihost=host, indiport=port)
         self.host = host
         self.port = port
-        self._sync = _SyncIndiClient()
+        # Condition notified on every rxevent — used by all _wait_* helpers.
+        self._cond: asyncio.Condition = asyncio.Condition()
+        # Set when the TCP connection to indiserver is established.
+        self._connected: asyncio.Event = asyncio.Event()
+        self._task: asyncio.Task[None] | None = None
+        # Monotonic version counter per BLOB property so wait_for_blob can
+        # detect a new delivery even when the payload size is identical.
+        self._blob_versions: dict[tuple[str, str], int] = {}
+
+    # ------------------------------------------------------------------
+    # Lifecycle
+    # ------------------------------------------------------------------
 
     async def connect(self) -> None:
-        # setServer + connectServer must be called from the same thread
-        # (not via asyncio.to_thread) because PyIndi internally starts a
-        # receiver thread that inherits the calling thread's context.
-        self._sync.setServer(self.host, self.port)  # type: ignore[attr-defined]
-        ok = await asyncio.to_thread(self._sync.connectServer)  # type: ignore[attr-defined]
-        if not ok:
+        """Start asyncrun() and wait for the TCP connection to be established."""
+        self._task = asyncio.create_task(self.asyncrun())
+        try:
+            await asyncio.wait_for(self._connected.wait(), timeout=10.0)
+        except asyncio.TimeoutError:
+            self.shutdown()
             raise ConnectionError(
                 f"Could not connect to indiserver at {self.host}:{self.port}"
             )
         logger.info("indi.client_connected", host=self.host, port=self.port)
 
     async def disconnect(self) -> None:
-        # Mark as inactive first so any in-flight C callbacks become no-ops.
-        # We intentionally do NOT call disconnectServer() here: in PyIndi 2.x
-        # the C++ receiver thread can segfault when torn down while callbacks
-        # are still in flight.  Killing the indiserver process (or the OS at
-        # process exit) causes a clean TCP EOF that naturally terminates the
-        # receiver thread.
-        self._sync._active = False
-        await asyncio.sleep(0.05)  # brief drain for any in-flight callbacks
+        """Shut down asyncrun() and wait for it to finish."""
+        self.shutdown()
+        if self._task is not None:
+            try:
+                await asyncio.wait_for(self._task, timeout=5.0)
+            except (asyncio.TimeoutError, asyncio.CancelledError, Exception):
+                pass
+
+    # ------------------------------------------------------------------
+    # IPyClient overrides
+    # ------------------------------------------------------------------
+
+    async def rxevent(self, event: Any) -> None:  # noqa: ANN401
+        if isinstance(event, indi_events.ConnectionMade):
+            self._connected.set()
+        elif isinstance(event, indi_events.ConnectionLost):
+            self._connected.clear()
+
+        if isinstance(event, indi_events.setBLOBVector):
+            key = (event.devicename, event.vectorname)
+            self._blob_versions[key] = self._blob_versions.get(key, 0) + 1
+
+        async with self._cond:
+            self._cond.notify_all()
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+
+    def _get_vector(self, device_name: str, prop_name: str) -> Any | None:
+        device = self.data.get(device_name)
+        if device is None:
+            return None
+        return device.data.get(prop_name)
+
+    def _vector_state(self, device_name: str, prop_name: str) -> str | None:
+        v = self._get_vector(device_name, prop_name)
+        return v.state if v is not None else None
+
+    async def _wait_cond(self, predicate: Any, timeout: float) -> None:
+        """Wait until predicate() is True, or raise TimeoutError."""
+        deadline = asyncio.get_event_loop().time() + timeout
+        async with self._cond:
+            while not predicate():
+                remaining = deadline - asyncio.get_event_loop().time()
+                if remaining <= 0:
+                    raise TimeoutError(f"Condition not met within {timeout}s")
+                try:
+                    await asyncio.wait_for(self._cond.wait(), timeout=remaining)
+                except asyncio.TimeoutError:
+                    pass  # loop will re-check deadline
+
+    # ------------------------------------------------------------------
+    # Device lifecycle
+    # ------------------------------------------------------------------
+
+    async def connect_device(self, device_name: str, timeout: float = 10.0) -> None:
+        """Connect an INDI device and wait for its full property set to appear."""
+        # Step 1: wait for the device and its CONNECTION property to be announced.
+        await self.wait_for_property(device_name, "CONNECTION", timeout=timeout)
+        # Step 2: send CONNECTION=CONNECT.
+        await self.set_switch(device_name, "CONNECTION", ["CONNECT"])
+        # Step 3: wait for CONNECTION to reach Ok with CONNECT=On.
+        await self._wait_cond(
+            lambda: (
+                self._vector_state(device_name, "CONNECTION") == "Ok"
+                and self._get_vector(device_name, "CONNECTION") is not None
+                and self._get_vector(device_name, "CONNECTION")["CONNECT"] == "On"
+            ),
+            timeout=timeout,
+        )
+        # Step 4: let the initial defXxxVector flood drain.  In asyncio the
+        # event loop processes pending data during the sleep, so 150 ms of
+        # silence is enough to guarantee all properties are known before we
+        # send the first command.
+        await asyncio.sleep(0.15)
+        logger.info("indi.device_connected", device=device_name)
+
+    async def disconnect_device(self, device_name: str) -> None:
+        await self.set_switch(device_name, "CONNECTION", ["DISCONNECT"])
+        logger.info("indi.device_disconnected", device=device_name)
+
+    # ------------------------------------------------------------------
+    # Property access
+    # ------------------------------------------------------------------
 
     async def wait_for_property(
         self, device_name: str, prop_name: str, timeout: float = 10.0
     ) -> Any:
-        return await asyncio.to_thread(
-            self._sync.wait_for_property, device_name, prop_name, timeout
+        """Wait until a property vector is known and return it."""
+        await self._wait_cond(
+            lambda: self._get_vector(device_name, prop_name) is not None,
+            timeout=timeout,
         )
-
-    async def wait_for_blob(
-        self, device_name: str, prop_name: str, timeout: float = 60.0
-    ) -> Any:
-        return await asyncio.to_thread(
-            self._sync.wait_for_blob, device_name, prop_name, timeout
-        )
+        return self._get_vector(device_name, prop_name)
 
     async def get_number(
         self, device_name: str, prop_name: str, element: str
     ) -> float:
-        return await asyncio.to_thread(
-            self._sync.get_number, device_name, prop_name, element
-        )
+        v = await self.wait_for_property(device_name, prop_name)
+        return v.getfloatvalue(element)
 
     async def get_switch_state(
         self, device_name: str, prop_name: str, element: str
     ) -> bool:
-        return await asyncio.to_thread(
-            self._sync.get_switch_state, device_name, prop_name, element
-        )
+        v = await self.wait_for_property(device_name, prop_name)
+        val = v.data.get(element)
+        if val is None:
+            raise KeyError(f"Element {element} not found in {device_name}/{prop_name}")
+        return val.membervalue == "On"
+
+    async def get_properties_snapshot(self, device_name: str) -> dict[str, Any]:
+        device = self.data.get(device_name)
+        if device is None:
+            return {}
+        return dict(device.data)
+
+    # ------------------------------------------------------------------
+    # Sending commands
+    # ------------------------------------------------------------------
 
     async def set_number(
         self, device_name: str, prop_name: str, values: dict[str, float]
     ) -> None:
-        await asyncio.to_thread(self._sync.set_number, device_name, prop_name, values)
+        await self.send_newVector(device_name, prop_name, members=values)
 
     async def set_switch(
         self, device_name: str, prop_name: str, on_elements: list[str]
     ) -> None:
-        await asyncio.to_thread(
-            self._sync.set_switch, device_name, prop_name, on_elements
-        )
-
-    async def get_properties_snapshot(self, device_name: str) -> dict[str, Any]:
-        return await asyncio.to_thread(self._sync.get_properties_snapshot, device_name)
+        v = await self.wait_for_property(device_name, prop_name)
+        members = {name: ("On" if name in on_elements else "Off") for name in v.data}
+        await self.send_newVector(device_name, prop_name, members=members)
 
     async def set_text(
         self, device_name: str, prop_name: str, values: dict[str, str]
     ) -> None:
-        await asyncio.to_thread(self._sync.set_text, device_name, prop_name, values)
+        await self.send_newVector(device_name, prop_name, members=values)
 
     async def enable_blob(self, device_name: str) -> None:
-        await asyncio.to_thread(self._sync.enable_blob, device_name)
+        await self.send_enableBLOB("Also", device_name)
+
+    # ------------------------------------------------------------------
+    # Waiting for state transitions
+    # ------------------------------------------------------------------
+
+    async def wait_for_blob(
+        self, device_name: str, prop_name: str, timeout: float = 60.0
+    ) -> BlobData:
+        """Wait for a new BLOB to arrive and return its data and format."""
+        key = (device_name, prop_name)
+        seen = self._blob_versions.get(key, 0)
+        await self._wait_cond(
+            lambda: self._blob_versions.get(key, 0) > seen,
+            timeout=timeout,
+        )
+        v = self._get_vector(device_name, prop_name)
+        if v is None:
+            raise RuntimeError(f"BLOB vector {device_name}/{prop_name} not found")
+        first = next(iter(v.data.values()))
+        return BlobData(data=first.membervalue, format=first.blobformat)
 
     async def wait_prop_not_busy(
         self, device_name: str, prop_name: str, timeout: float = 120.0
     ) -> None:
-        await asyncio.to_thread(
-            self._sync.wait_prop_not_busy, device_name, prop_name, timeout
+        await self._wait_cond(
+            lambda: self._vector_state(device_name, prop_name) not in (None, "Busy"),
+            timeout=timeout,
         )
 
     async def wait_prop_busy_then_done(
@@ -429,13 +254,26 @@ class IndiClient:
         busy_timeout: float = 2.0,
         done_timeout: float = 120.0,
     ) -> None:
-        await asyncio.to_thread(
-            self._sync.wait_prop_busy_then_done,
-            device_name,
-            prop_name,
-            busy_timeout,
-            done_timeout,
-        )
+        """Wait for a property to enter Busy, then wait for it to leave Busy."""
+        # Phase 1: wait for Busy (up to busy_timeout; skip if instantaneous)
+        went_busy = False
+        deadline = asyncio.get_event_loop().time() + busy_timeout
+        async with self._cond:
+            while True:
+                if self._vector_state(device_name, prop_name) == "Busy":
+                    went_busy = True
+                    break
+                remaining = deadline - asyncio.get_event_loop().time()
+                if remaining <= 0:
+                    break
+                try:
+                    await asyncio.wait_for(self._cond.wait(), timeout=remaining)
+                except asyncio.TimeoutError:
+                    break
+        if not went_busy:
+            return
+        # Phase 2: wait for Busy to end
+        await self.wait_prop_not_busy(device_name, prop_name, timeout=done_timeout)
 
     async def wait_for_switch_on(
         self,
@@ -445,23 +283,17 @@ class IndiClient:
         timeout: float = 120.0,
         interval: float = 0.5,
     ) -> None:
-        """Poll until a switch element becomes ISS_ON.
-
-        More robust than wait_prop_busy_then_done for operations where the
-        BUSY→OK transition can be overwritten by INDI polling updates.
-        """
+        """Poll until a switch element becomes On."""
         deadline = asyncio.get_event_loop().time() + timeout
         while asyncio.get_event_loop().time() < deadline:
             await asyncio.sleep(interval)
             try:
-                if await asyncio.to_thread(
-                    self._sync.get_switch_state, device_name, prop_name, element
-                ):
+                if await self.get_switch_state(device_name, prop_name, element):
                     return
             except Exception:
                 pass
         raise TimeoutError(
-            f"Switch {device_name}/{prop_name}/{element} did not turn ON within {timeout}s"
+            f"Switch {device_name}/{prop_name}/{element} did not turn On within {timeout}s"
         )
 
     async def wait_for_switch_off(
@@ -472,42 +304,15 @@ class IndiClient:
         timeout: float = 120.0,
         interval: float = 0.5,
     ) -> None:
-        """Poll until a switch element becomes ISS_OFF."""
+        """Poll until a switch element becomes Off."""
         deadline = asyncio.get_event_loop().time() + timeout
         while asyncio.get_event_loop().time() < deadline:
             await asyncio.sleep(interval)
             try:
-                if not await asyncio.to_thread(
-                    self._sync.get_switch_state, device_name, prop_name, element
-                ):
+                if not await self.get_switch_state(device_name, prop_name, element):
                     return
             except Exception:
                 pass
         raise TimeoutError(
-            f"Switch {device_name}/{prop_name}/{element} did not turn OFF within {timeout}s"
+            f"Switch {device_name}/{prop_name}/{element} did not turn Off within {timeout}s"
         )
-
-    async def connect_device(self, device_name: str, timeout: float = 10.0) -> None:
-        """Connect an INDI device and wait for its full property set to appear.
-
-        Sequence
-        --------
-        1. Wait for the INDI bus to announce the device + CONNECTION property.
-           (Calling connectDevice before this gives "Unable to find driver".)
-        2. Send CONNECTION=CONNECT via BaseClient.connectDevice.
-        3. Wait until CONNECTION/CONNECT becomes ISS_ON — at this point the
-           driver has finished its internal connect and sent all its properties.
-        """
-        # Step 1 — device must be known before we can connect it
-        await self.wait_for_property(device_name, "CONNECTION", timeout=timeout)
-        # Step 2 — send the CONNECT command
-        await asyncio.to_thread(self._sync.connectDevice, device_name)  # type: ignore[attr-defined]
-        # Step 3 — wait for the driver to finish and emit its full property set
-        await asyncio.to_thread(
-            self._sync.wait_for_connection_on, device_name, timeout
-        )
-        logger.info("indi.device_connected", device=device_name)
-
-    async def disconnect_device(self, device_name: str) -> None:
-        await asyncio.to_thread(self._sync.disconnectDevice, device_name)  # type: ignore[attr-defined]
-        logger.info("indi.device_disconnected", device=device_name)

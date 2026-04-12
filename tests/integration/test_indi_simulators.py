@@ -3,12 +3,8 @@ Integration tests against INDI simulator drivers.
 
 Skipped automatically when indiserver is not installed.
 Tests are async def — pytest-asyncio (asyncio_mode=auto) manages the loop.
-
-Module-scoped fixtures connect the IndiClient SYNCHRONOUSLY (setServer +
-connectServer) so they can run from the main thread during pytest setup —
-asyncio.run() fails inside asyncio_mode=auto because a loop is already running.
-Function-scoped fixtures create device objects and connect/disconnect them via
-the test's async event loop.
+All fixtures are async; the indipyclient backend is pure asyncio so no
+synchronous workaround is needed.
 """
 from __future__ import annotations
 
@@ -70,26 +66,6 @@ def _stop(proc: subprocess.Popen) -> None:
         proc.wait()
 
 
-def _make_sync_connected_client(host: str, port: int):
-    """Create and connect a _SyncIndiClient synchronously (no event loop needed)."""
-    from astrolol.devices.indi.client import _SyncIndiClient
-    sync = _SyncIndiClient()
-    sync.setServer(host, port)
-    if not sync.connectServer():
-        raise ConnectionError(f"Could not connect to indiserver at {host}:{port}")
-    return sync
-
-
-def _wrap_sync_client(sync, host: str, port: int):
-    """Wrap a connected _SyncIndiClient in an IndiClient shell."""
-    from astrolol.devices.indi.client import IndiClient
-    client = object.__new__(IndiClient)
-    client.host = host
-    client.port = port
-    client._sync = sync
-    return client
-
-
 # ---------------------------------------------------------------------------
 # IndiClient connectivity
 # ---------------------------------------------------------------------------
@@ -143,21 +119,17 @@ def _shared_server():
 # Mount (Telescope Simulator)
 # ---------------------------------------------------------------------------
 
-@pytest.fixture(scope="module")
-def _mount_client(_shared_server):
-    sync = _make_sync_connected_client("localhost", _SHARED_PORT)
-    client = _wrap_sync_client(sync, "localhost", _SHARED_PORT)
-    yield client
-    sync._active = False
-
-
 @pytest.fixture
-async def mount(_mount_client):
+async def mount(_shared_server):
+    from astrolol.devices.indi.client import IndiClient
     from astrolol.devices.indi.mount import IndiMount
-    m = IndiMount(device_name="Telescope Simulator", client=_mount_client)
+    client = IndiClient(host="localhost", port=_SHARED_PORT)
+    await client.connect()
+    m = IndiMount(device_name="Telescope Simulator", client=client)
     await m.connect()
     yield m
     await m.disconnect()
+    await client.disconnect()
 
 
 async def test_mount_connect_state(mount):
@@ -204,21 +176,17 @@ async def test_mount_ping(mount):
 # Focuser (Focuser Simulator)
 # ---------------------------------------------------------------------------
 
-@pytest.fixture(scope="module")
-def _focuser_client(_shared_server):
-    sync = _make_sync_connected_client("localhost", _SHARED_PORT)
-    client = _wrap_sync_client(sync, "localhost", _SHARED_PORT)
-    yield client
-    sync._active = False
-
-
 @pytest.fixture
-async def focuser(_focuser_client):
+async def focuser(_shared_server):
+    from astrolol.devices.indi.client import IndiClient
     from astrolol.devices.indi.focuser import IndiFocuser
-    f = IndiFocuser(device_name="Focuser Simulator", client=_focuser_client)
+    client = IndiClient(host="localhost", port=_SHARED_PORT)
+    await client.connect()
+    f = IndiFocuser(device_name="Focuser Simulator", client=client)
     await f.connect()
     yield f
     await f.disconnect()
+    await client.disconnect()
 
 
 async def test_focuser_connect_state(focuser):
@@ -256,25 +224,21 @@ async def test_focuser_ping(focuser):
 # Camera (CCD Simulator)
 # ---------------------------------------------------------------------------
 
-@pytest.fixture(scope="module")
-def _camera_client(_shared_server):
-    sync = _make_sync_connected_client("localhost", _SHARED_PORT)
-    client = _wrap_sync_client(sync, "localhost", _SHARED_PORT)
-    yield client
-    sync._active = False
-
-
 @pytest.fixture
-async def camera(_camera_client, tmp_path):
+async def camera(_shared_server, tmp_path):
+    from astrolol.devices.indi.client import IndiClient
     from astrolol.devices.indi.camera import IndiCamera
+    client = IndiClient(host="localhost", port=_SHARED_PORT)
+    await client.connect()
     cam = IndiCamera(
         device_name="CCD Simulator",
-        client=_camera_client,
+        client=client,
         images_dir=tmp_path / "images",
     )
     await cam.connect()
     yield cam
     await cam.disconnect()
+    await client.disconnect()
 
 
 async def test_camera_connect_state(camera):
