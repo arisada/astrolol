@@ -14,6 +14,16 @@ import { DevicePropertiesPanel } from '@/components/DevicePropertiesPanel'
 
 type WizardStep = 'type' | 'manufacturer' | 'model' | 'confirm'
 
+const DEVICE_ID_RE = /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/
+
+function suggestDeviceId(kind: DeviceKind, driver: DriverEntry | null): string {
+  if (!driver) return ''
+  // Prefer executable stem (strip indi_ prefix) as it's always URL-safe
+  const raw = driver.executable.replace(/^indi_/, '') || driver.manufacturer
+  const slug = raw.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/, '').slice(0, 40)
+  return slug ? `${kind}_${slug}` : ''
+}
+
 const KIND_LABELS: Record<DeviceKind, string> = {
   camera: 'Camera',
   mount: 'Mount',
@@ -171,7 +181,9 @@ function ConfirmStep({
 }) {
   const [deviceName, setDeviceName] = useState(driver?.device_name ?? '')
   const [executable, setExecutable] = useState(driver?.executable ?? '')
-  const [deviceId, setDeviceId] = useState('')
+  const [deviceId, setDeviceId] = useState(() => suggestDeviceId(kind, driver))
+
+  const deviceIdInvalid = deviceId !== '' && !DEVICE_ID_RE.test(deviceId)
 
   return (
     <div>
@@ -214,17 +226,23 @@ function ConfirmStep({
           />
         </div>
 
-        {/* Optional device ID */}
+        {/* Device ID — suggested from driver, editable, validated */}
         <div className="flex flex-col gap-1">
           <label className="text-xs text-slate-400">
             Device ID
-            <span className="ml-2 text-slate-600">(optional, auto-generated if blank)</span>
+            <span className="ml-2 text-slate-600">(leave blank to use suggestion)</span>
           </label>
           <Input
-            placeholder="e.g. main_camera"
+            placeholder={suggestDeviceId(kind, driver) || 'auto-generated'}
             value={deviceId}
             onChange={(e) => setDeviceId(e.target.value)}
+            className={deviceIdInvalid ? 'border-status-error focus-visible:ring-status-error' : ''}
           />
+          {deviceIdInvalid && (
+            <p className="text-xs text-status-error">
+              Only letters, digits, hyphens, and underscores. Must start with a letter or digit (max 64 chars).
+            </p>
+          )}
         </div>
 
         {error && (
@@ -233,7 +251,7 @@ function ConfirmStep({
 
         <Button
           type="button"
-          disabled={!deviceName || connecting}
+          disabled={!deviceName || connecting || deviceIdInvalid}
           className="self-start"
           onClick={() => onConnect(deviceName, executable, deviceId)}
         >
