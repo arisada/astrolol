@@ -91,3 +91,28 @@ async def test_disconnect_unknown_404(client: AsyncClient) -> None:
     async with client as c:
         r = await c.delete("/devices/connected/ghost")
     assert r.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_get_config_returns_full_config(client: AsyncClient) -> None:
+    async with client as c:
+        await c.post("/devices/connect", json={
+            "device_id": "cam1",
+            "kind": "camera",
+            "adapter_key": "fake_camera",
+            "params": {"device_name": "Test CCD"},
+        })
+        r = await c.get("/devices/connected/cam1/config")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["device_id"] == "cam1"
+    assert body["kind"] == "camera"
+    assert body["adapter_key"] == "fake_camera"
+    assert body["params"]["device_name"] == "Test CCD"
+
+
+@pytest.mark.asyncio
+async def test_get_config_unknown_404(client: AsyncClient) -> None:
+    async with client as c:
+        r = await c.get("/devices/connected/ghost/config")
+    assert r.status_code == 404

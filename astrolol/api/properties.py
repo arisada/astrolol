@@ -56,83 +56,73 @@ class SetPropertyRequest(BaseModel):
 # Helpers
 # ---------------------------------------------------------------------------
 
-_IPS = {0: "idle", 1: "ok", 2: "busy", 3: "alert"}
-_IPERM = {0: "ro", 1: "wo", 2: "rw"}
-_ISR = {0: "1ofmany", 1: "atmost1", 2: "nofmany"}
+_STATE = {"Idle": "idle", "Ok": "ok", "Busy": "busy", "Alert": "alert"}
+_ISR = {"OneOfMany": "1ofmany", "AtMostOne": "atmost1", "AnyOfMany": "nofmany"}
 
 
 def _prop_to_out(p: Any) -> PropertyOut | None:
-    """Convert a PyIndi Property to PropertyOut. Returns None for BLOBs."""
-    try:
-        import PyIndi  # type: ignore[import]
-    except ImportError:
-        return None
+    """Convert an indipyclient PropertyVector to PropertyOut. Returns None for BLOBs."""
+    vtype = p.vectortype  # 'SwitchVector' | 'NumberVector' | 'TextVector' | 'LightVector' | 'BLOBVector'
+    name = p.name
+    label = p.label or name
+    group = p.group or ""
+    state = _STATE.get(p.state, "idle")
+    perm = p.perm or "ro"
 
-    ptype = p.getType()
-    name = p.getName()
-    label = p.getLabel() or name
-    group = p.getGroupName() or ""
-    state = _IPS.get(int(p.getState()), "idle")
-    perm = _IPERM.get(int(p.getPermission()), "ro")
-
-    if ptype == PyIndi.INDI_NUMBER:
-        pn = p.getNumber()
+    if vtype == "NumberVector":
         widgets = [
             PropertyWidget(
-                name=pn[i].getName(),
-                label=pn[i].getLabel() or pn[i].getName(),
-                value=float(pn[i].getValue()),
-                min=float(pn[i].getMin()),
-                max=float(pn[i].getMax()),
-                step=float(pn[i].getStep()),
+                name=m.name,
+                label=m.label or m.name,
+                value=m.getfloatvalue(),
+                min=float(m.min),
+                max=float(m.max),
+                step=float(m.step),
             )
-            for i in range(pn.count())
+            for m in p.data.values()
         ]
         return PropertyOut(name=name, label=label, group=group, type="number",
                            state=state, permission=perm, widgets=widgets)
 
-    if ptype == PyIndi.INDI_SWITCH:
-        ps = p.getSwitch()
-        rule = _ISR.get(int(ps.getRule()), "1ofmany")
+    if vtype == "SwitchVector":
+        rule = _ISR.get(p.rule or "", "1ofmany")
         widgets = [
             PropertyWidget(
-                name=ps[i].getName(),
-                label=ps[i].getLabel() or ps[i].getName(),
-                value=(ps[i].s == PyIndi.ISS_ON),
+                name=m.name,
+                label=m.label or m.name,
+                value=(m.membervalue == "On"),
             )
-            for i in range(ps.count())
+            for m in p.data.values()
         ]
         return PropertyOut(name=name, label=label, group=group, type="switch",
                            state=state, permission=perm, switch_rule=rule,
                            widgets=widgets)
 
-    if ptype == PyIndi.INDI_TEXT:
-        pt = p.getText()
+    if vtype == "TextVector":
         widgets = [
             PropertyWidget(
-                name=pt[i].getName(),
-                label=pt[i].getLabel() or pt[i].getName(),
-                value=pt[i].getText() or "",
+                name=m.name,
+                label=m.label or m.name,
+                value=m.membervalue or "",
             )
-            for i in range(pt.count())
+            for m in p.data.values()
         ]
         return PropertyOut(name=name, label=label, group=group, type="text",
                            state=state, permission=perm, widgets=widgets)
 
-    if ptype == PyIndi.INDI_LIGHT:
-        pl = p.getLight()
+    if vtype == "LightVector":
         widgets = [
             PropertyWidget(
-                name=pl[i].getName(),
-                label=pl[i].getLabel() or pl[i].getName(),
-                state=_IPS.get(int(pl[i].s), "idle"),
+                name=m.name,
+                label=m.label or m.name,
+                state=_STATE.get(m.membervalue, "idle"),
             )
-            for i in range(pl.count())
+            for m in p.data.values()
         ]
         return PropertyOut(name=name, label=label, group=group, type="light",
                            state=state, permission="ro", widgets=widgets)
 
-    return None  # BLOB or unknown
+    return None  # BLOBVector or unknown
 
 
 def _resolve_indi_name(device_id: str, request: Request) -> str:
