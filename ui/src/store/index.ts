@@ -79,12 +79,16 @@ export const useStore = create<AppState>((set, get) => ({
   applyEvent: (event) => {
     const state = get()
 
+    const eventId = (event as { id: string }).id
+    // Dedup: history replay and brief dual-connection windows can send the same event twice
+    if (state.log.some((e) => e.id === eventId)) return
+
     const isError = ERROR_TYPES.has(event.type)
     const entry: LogEntry = {
-      id: (event as { id: string }).id,
+      id: eventId,
       timestamp: (event as { timestamp: string }).timestamp,
       level: isError ? 'error' : (event.type === 'log' ? event.level : 'info'),
-      component: event.type === 'log' ? event.component : event.type.split('.')[0],
+      component: event.type === 'log' ? (event.component || 'app') : event.type.split('.')[0],
       message: eventSummary(event),
       eventType: event.type,
     }

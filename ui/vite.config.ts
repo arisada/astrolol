@@ -23,6 +23,7 @@ export default defineConfig({
       '/focuser':  { target: backendHttp, changeOrigin: true },
       '/indi':     { target: backendHttp, changeOrigin: true },
       '/settings': { target: backendHttp, changeOrigin: true },
+      '/events':   { target: backendHttp, changeOrigin: true },
       '/health':   { target: backendHttp, changeOrigin: true },
       '/ws':       { target: backendWs,   ws: true, changeOrigin: true },
     },

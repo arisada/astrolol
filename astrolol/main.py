@@ -5,7 +5,7 @@ import uvicorn
 import structlog
 
 from astrolol.config.settings import settings as _boot_settings
-from astrolol.config.logging_setup import setup_logging
+from astrolol.config.logging_setup import setup_logging, event_bus_forwarder
 
 # Configure logging as early as possible so every module sees the right setup
 setup_logging(_boot_settings.log_file)
@@ -66,6 +66,7 @@ def create_app() -> FastAPI:
     pm = build_plugin_manager()
     registry = build_registry(pm)
     event_bus = EventBus()
+    event_bus_forwarder.set_bus(event_bus)  # bridge structlog → EventBus
     device_manager = DeviceManager(registry=registry, event_bus=event_bus)
     profile_store = ProfileStore(_settings.profiles_file)
     imager_manager = ImagerManager(device_manager=device_manager, event_bus=event_bus, profile_store=profile_store)
@@ -119,6 +120,12 @@ def create_app() -> FastAPI:
     @app.get("/health")
     async def health() -> dict[str, str]:
         return {"status": "ok"}
+
+    @app.get("/events/history")
+    async def events_history(request: Request) -> list[dict]:
+        """Return the ring buffer of recent events for reconnecting clients."""
+        bus: EventBus = request.app.state.event_bus
+        return [e.model_dump(mode="json") for e in bus.get_history()]
 
     # Serve built UI — must be last so API routes take priority
     mount_ui(app)

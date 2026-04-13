@@ -13,22 +13,33 @@ export function useEvents() {
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => {
+    // `active` prevents a stale closure (e.g. React 18 StrictMode double-mount)
+    // from processing events or scheduling reconnects after cleanup.
+    let active = true
+
     function connect() {
+      if (!active) return
       const protocol = window.location.protocol === 'https:' ? 'wss' : 'ws'
       const ws = new WebSocket(`${protocol}://${window.location.host}/ws/events`)
       wsRef.current = ws
 
       ws.onopen = () => {
+        if (!active) { ws.close(); return }
         setWsConnected(true)
-        // Sync device list on reconnect
+        // Replay server-side ring buffer so the log survives page reloads
+        fetch('/events/history')
+          .then((r) => r.json())
+          .then((events: AstrolollEvent[]) => { if (active) events.forEach(applyEvent) })
+          .catch(console.error)
+        // Sync device list
         api.devices.connected().then(setConnectedDevices).catch(console.error)
       }
 
       ws.onmessage = (msg: MessageEvent<string>) => {
+        if (!active) return
         try {
           const event = JSON.parse(msg.data) as AstrolollEvent
           applyEvent(event)
-          // Re-fetch connected devices when something connects
           if (event.type === 'device.connected') {
             api.devices.connected().then(setConnectedDevices).catch(console.error)
           }
@@ -39,17 +50,18 @@ export function useEvents() {
 
       ws.onclose = () => {
         setWsConnected(false)
-        reconnectTimer.current = setTimeout(connect, RECONNECT_DELAY_MS)
+        if (active) {
+          reconnectTimer.current = setTimeout(connect, RECONNECT_DELAY_MS)
+        }
       }
 
-      ws.onerror = () => {
-        ws.close()
-      }
+      ws.onerror = () => { ws.close() }
     }
 
     connect()
 
     return () => {
+      active = false
       reconnectTimer.current && clearTimeout(reconnectTimer.current)
       wsRef.current?.close()
     }
