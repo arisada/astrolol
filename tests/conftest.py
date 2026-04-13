@@ -122,7 +122,7 @@ class FakeMount:
         self._ra = target.ra
         self._dec = target.dec
 
-    async def set_tracking(self, enabled: bool) -> None:
+    async def set_tracking(self, enabled: bool, mode=None) -> None:
         self._tracking = enabled
 
     async def get_status(self) -> MountStatus:

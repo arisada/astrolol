@@ -1,19 +1,19 @@
 import { NavLink } from 'react-router-dom'
-import { BookOpen, Camera, Cpu, Settings, Telescope, Wifi, WifiOff } from 'lucide-react'
+import { BookOpen, Camera, Cpu, ScrollText, Settings, Telescope, Wifi, WifiOff } from 'lucide-react'
 import { useStore } from '@/store'
-
-const optionsItem = { to: '/options', icon: Settings, label: 'Options' }
 
 export function Sidebar() {
   const wsConnected = useStore((s) => s.wsConnected)
   const hasMounts   = useStore((s) => s.connectedDevices.some((d) => d.kind === 'mount'))
+  const hasError    = useStore((s) => s.lastError !== null)
 
   const navItems = [
-    { to: '/equipment', icon: Cpu,      label: 'Equipment' },
-    { to: '/profiles',  icon: BookOpen, label: 'Profiles'  },
+    { to: '/equipment', icon: Cpu,        label: 'Equipment' },
+    { to: '/profiles',  icon: BookOpen,   label: 'Profiles'  },
     ...(hasMounts ? [{ to: '/mount', icon: Telescope, label: 'Mount' }] : []),
-    { to: '/imaging',   icon: Camera,   label: 'Imaging'   },
-    optionsItem,
+    { to: '/imaging',   icon: Camera,     label: 'Imaging'   },
+    { to: '/logs',      icon: ScrollText, label: 'Logs', badge: hasError },
+    { to: '/options',   icon: Settings,   label: 'Options'   },
   ]
 
   return (
@@ -26,7 +26,7 @@ export function Sidebar() {
 
       {/* Nav */}
       <nav className="flex flex-col gap-1 p-2 flex-1">
-        {navItems.map(({ to, icon: Icon, label }) => (
+        {navItems.map(({ to, icon: Icon, label, badge }) => (
           <NavLink
             key={to}
             to={to}
@@ -37,7 +37,12 @@ export function Sidebar() {
                 : 'text-slate-400 hover:bg-surface-overlay hover:text-slate-200'}`
             }
           >
-            <Icon size={18} className="shrink-0" />
+            <div className="relative shrink-0">
+              <Icon size={18} />
+              {badge && (
+                <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-status-error" />
+              )}
+            </div>
             <span className="hidden lg:block">{label}</span>
           </NavLink>
         ))}

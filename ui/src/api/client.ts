@@ -11,6 +11,7 @@ import type {
   MountStatus,
   Profile,
   SetPropertyRequest,
+  TrackingMode,
   UserSettings,
 } from './types'
 
@@ -84,10 +85,10 @@ export const api = {
       request<void>(`/mount/${deviceId}/park`, { method: 'POST' }),
     unpark: (deviceId: string) =>
       request<void>(`/mount/${deviceId}/unpark`, { method: 'POST' }),
-    setTracking: (deviceId: string, enabled: boolean) =>
+    setTracking: (deviceId: string, enabled: boolean, mode?: TrackingMode) =>
       request<void>(`/mount/${deviceId}/tracking`, {
         method: 'POST',
-        body: JSON.stringify({ enabled }),
+        body: JSON.stringify({ enabled, mode: mode ?? null }),
       }),
   },
 

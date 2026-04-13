@@ -1,7 +1,7 @@
 import { create } from 'zustand'
 import type { AstrolollEvent, ConnectedDevice, FocuserStatus, MountStatus } from '@/api/types'
 
-const MAX_LOG_ENTRIES = 200
+const MAX_LOG_ENTRIES = 1000
 
 export interface LogEntry {
   id: string
@@ -19,6 +19,12 @@ export interface LatestImage {
   width: number
   height: number
   duration: number
+}
+
+export interface LastError {
+  message: string
+  timestamp: string
+  eventType: string
 }
 
 interface AppState {
@@ -39,11 +45,21 @@ interface AppState {
   // Event log
   log: LogEntry[]
 
+  // Last error (shown as global toast)
+  lastError: LastError | null
+
   // Actions
   setWsConnected: (v: boolean) => void
   setConnectedDevices: (devices: ConnectedDevice[]) => void
   applyEvent: (event: AstrolollEvent) => void
+  clearLastError: () => void
 }
+
+// Event types that represent errors and should set lastError
+const ERROR_TYPES = new Set([
+  'imager.exposure_failed',
+  'mount.operation_failed',
+])
 
 export const useStore = create<AppState>((set, get) => ({
   wsConnected: false,
@@ -53,40 +69,44 @@ export const useStore = create<AppState>((set, get) => ({
   latestImage: null,
   imagerBusy: {},
   log: [],
+  lastError: null,
 
   setWsConnected: (v) => set({ wsConnected: v }),
+  clearLastError: () => set({ lastError: null }),
 
   setConnectedDevices: (devices) => set({ connectedDevices: devices }),
 
   applyEvent: (event) => {
     const state = get()
 
-    // Append to log
+    const isError = ERROR_TYPES.has(event.type)
     const entry: LogEntry = {
       id: (event as { id: string }).id,
       timestamp: (event as { timestamp: string }).timestamp,
-      level: event.type === 'log' ? event.level : 'info',
+      level: isError ? 'error' : (event.type === 'log' ? event.level : 'info'),
       component: event.type === 'log' ? event.component : event.type.split('.')[0],
       message: eventSummary(event),
       eventType: event.type,
     }
     const log = [entry, ...state.log].slice(0, MAX_LOG_ENTRIES)
+    const lastError = isError
+      ? { message: entry.message, timestamp: entry.timestamp, eventType: event.type }
+      : state.lastError
 
     switch (event.type) {
       case 'device.connected': {
-        // Optimistically add to connected list; Equipment page will re-fetch for full data
-        set({ log })
+        set({ log, lastError })
         break
       }
       case 'device.disconnected': {
         const connectedDevices = state.connectedDevices.filter(
           (d) => d.device_id !== event.device_key,
         )
-        set({ connectedDevices, log })
+        set({ connectedDevices, log, lastError })
         break
       }
       case 'imager.exposure_started': {
-        set({ imagerBusy: { ...state.imagerBusy, [event.device_id]: true }, log })
+        set({ imagerBusy: { ...state.imagerBusy, [event.device_id]: true }, log, lastError })
         break
       }
       case 'imager.exposure_completed': {
@@ -101,19 +121,21 @@ export const useStore = create<AppState>((set, get) => ({
             height: event.height,
             duration: event.duration,
           },
-          log,
+          log, lastError,
         })
         break
       }
       case 'imager.loop_stopped':
       case 'imager.exposure_failed': {
-        set({ imagerBusy: { ...state.imagerBusy, [event.device_id]: false }, log })
+        set({ imagerBusy: { ...state.imagerBusy, [event.device_id]: false }, log, lastError })
         break
       }
       case 'mount.slew_completed':
       case 'mount.slew_aborted':
-      case 'mount.parked': {
-        set({ log })
+      case 'mount.parked':
+      case 'mount.unparked':
+      case 'mount.operation_failed': {
+        set({ log, lastError })
         break
       }
       case 'focuser.move_completed':
@@ -132,16 +154,16 @@ export const useStore = create<AppState>((set, get) => ({
                   temperature: null,
                 },
               },
-              log,
+              log, lastError,
             })
             break
           }
         }
-        set({ log })
+        set({ log, lastError })
         break
       }
       default:
-        set({ log })
+        set({ log, lastError })
     }
   },
 }))
@@ -161,7 +183,9 @@ function eventSummary(event: AstrolollEvent): string {
     case 'mount.slew_completed': return `Slew complete`
     case 'mount.slew_aborted': return `Slew aborted`
     case 'mount.parked': return `Mount parked`
-    case 'mount.tracking_changed': return `Tracking ${event.tracking ? 'on' : 'off'}`
+    case 'mount.unparked': return `Mount unparked`
+    case 'mount.operation_failed': return `${event.operation} failed: ${event.reason}`
+    case 'mount.tracking_changed': return `Tracking ${event.tracking ? 'on' : 'off'}${event.mode ? ` (${event.mode})` : ''}`
     case 'focuser.move_started': return `Focuser → ${event.target_position}`
     case 'focuser.move_completed': return `Focuser at ${event.position}`
     case 'focuser.halted': return `Focuser halted at ${event.position ?? '?'}`

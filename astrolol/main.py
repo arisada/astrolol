@@ -3,6 +3,12 @@ from contextlib import asynccontextmanager
 
 import uvicorn
 import structlog
+
+from astrolol.config.settings import settings as _boot_settings
+from astrolol.config.logging_setup import setup_logging
+
+# Configure logging as early as possible so every module sees the right setup
+setup_logging(_boot_settings.log_file)
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
 from fastapi.exception_handlers import http_exception_handler as _default_http_exc_handler
 from fastapi.exceptions import HTTPException

@@ -23,8 +23,8 @@ Items designed for but not yet built. Ordered roughly by priority.
 
 ## Mount — deferred
 
-- **Background task error events** — park timeout (`mount.park_timeout`) and slew errors are currently only logged server-side. Add a typed `mount.operation_failed` (or similar) event published from `_park_worker` / `_slew_worker` on timeout/error so the UI event log and Mount page can surface them to the user.
-- **Tracking rate backend** — `set_tracking` only accepts `enabled: bool`. Extend `TrackingRequest` with an optional `mode: sidereal | lunar | solar` field, implement in the INDI mount adapter via `TELESCOPE_TRACK_RATE` property.
+- ~~**Background task error events**~~ — Done. `mount.operation_failed` published on slew/park timeout or error; `mount.unparked` event also added.
+- ~~**Tracking rate backend**~~ — Done. `TrackingRequest` now accepts `mode: sidereal | lunar | solar`; INDI adapter sets `TELESCOPE_TRACK_RATE` before toggling tracking.
 
 ## Post-MVP
 

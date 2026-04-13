@@ -5,15 +5,17 @@ import structlog
 
 from astrolol.core.events import (
     EventBus,
+    MountOperationFailed,
     MountParked,
     MountSlewAborted,
     MountSlewCompleted,
     MountSlewStarted,
     MountSynced,
     MountTrackingChanged,
+    MountUnparked,
 )
 from astrolol.core.errors import DeviceNotFoundError, DeviceKindError
-from astrolol.devices.base.models import MountStatus, SlewTarget
+from astrolol.devices.base.models import MountStatus, SlewTarget, TrackingMode
 from astrolol.devices.manager import DeviceManager
 
 logger = structlog.get_logger()
@@ -98,6 +100,7 @@ class MountManager:
     async def unpark(self, device_id: str) -> None:
         mount = self._device_manager.get_mount(device_id)
         await mount.unpark()
+        await self._event_bus.publish(MountUnparked(device_id=device_id))
         logger.info("mount.unparked", device_id=device_id)
 
     async def sync(self, device_id: str, target: SlewTarget) -> None:
@@ -109,13 +112,13 @@ class MountManager:
         )
         logger.info("mount.synced", device_id=device_id, ra=target.ra, dec=target.dec)
 
-    async def set_tracking(self, device_id: str, enabled: bool) -> None:
+    async def set_tracking(self, device_id: str, enabled: bool, mode: TrackingMode | None = None) -> None:
         mount = self._device_manager.get_mount(device_id)
-        await mount.set_tracking(enabled)
+        await mount.set_tracking(enabled, mode)
         await self._event_bus.publish(
-            MountTrackingChanged(device_id=device_id, tracking=enabled)
+            MountTrackingChanged(device_id=device_id, tracking=enabled, mode=mode)
         )
-        logger.info("mount.tracking_changed", device_id=device_id, tracking=enabled)
+        logger.info("mount.tracking_changed", device_id=device_id, tracking=enabled, mode=mode)
 
     async def get_status(self, device_id: str) -> MountStatus:
         mount = self._device_manager.get_mount(device_id)
@@ -148,9 +151,15 @@ class MountManager:
             raise
         except asyncio.TimeoutError:
             await self._event_bus.publish(MountSlewAborted(device_id=device_id))
+            await self._event_bus.publish(
+                MountOperationFailed(device_id=device_id, operation="slew", reason="Slew timed out")
+            )
             logger.error("mount.slew_timeout", device_id=device_id)
         except Exception as exc:
             await self._event_bus.publish(MountSlewAborted(device_id=device_id))
+            await self._event_bus.publish(
+                MountOperationFailed(device_id=device_id, operation="slew", reason=str(exc))
+            )
             logger.error("mount.slew_error", device_id=device_id, error=str(exc))
         finally:
             ctrl._active_task = None
@@ -166,8 +175,14 @@ class MountManager:
             logger.info("mount.park_cancelled", device_id=device_id)
             raise
         except asyncio.TimeoutError:
+            await self._event_bus.publish(
+                MountOperationFailed(device_id=device_id, operation="park", reason="Park timed out")
+            )
             logger.error("mount.park_timeout", device_id=device_id)
         except Exception as exc:
+            await self._event_bus.publish(
+                MountOperationFailed(device_id=device_id, operation="park", reason=str(exc))
+            )
             logger.error("mount.park_error", device_id=device_id, error=str(exc))
         finally:
             ctrl._active_task = None

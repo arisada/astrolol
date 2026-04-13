@@ -125,6 +125,19 @@ class MountTrackingChanged(BaseEvent):
     type: Literal["mount.tracking_changed"] = "mount.tracking_changed"
     device_id: str
     tracking: bool
+    mode: str | None = None
+
+
+class MountUnparked(BaseEvent):
+    type: Literal["mount.unparked"] = "mount.unparked"
+    device_id: str
+
+
+class MountOperationFailed(BaseEvent):
+    type: Literal["mount.operation_failed"] = "mount.operation_failed"
+    device_id: str
+    operation: str  # "slew" | "park"
+    reason: str
 
 
 # --- Focuser events ---
@@ -153,7 +166,7 @@ Event = Annotated[
         DeviceConnected, DeviceDisconnected, DeviceStateChanged, LogEvent,
         ExposureStarted, ExposureCompleted, ExposureFailed, LoopStarted, LoopStopped,
         MountSlewStarted, MountSlewCompleted, MountSlewAborted,
-        MountParked, MountSynced, MountTrackingChanged,
+        MountParked, MountUnparked, MountSynced, MountTrackingChanged, MountOperationFailed,
         FocuserMoveStarted, FocuserMoveCompleted, FocuserHalted,
     ],
     Field(discriminator="type"),

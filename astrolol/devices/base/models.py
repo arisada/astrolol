@@ -10,6 +10,12 @@ class DeviceState(StrEnum):
     ERROR = "error"
 
 
+class TrackingMode(StrEnum):
+    SIDEREAL = "sidereal"
+    LUNAR = "lunar"
+    SOLAR = "solar"
+
+
 # --- Camera ---
 
 class ExposureParams(BaseModel):

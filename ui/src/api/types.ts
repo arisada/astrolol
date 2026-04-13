@@ -219,7 +219,11 @@ export interface MountSlewCompletedEvent extends BaseEvent {
 
 export interface MountSlewAbortedEvent extends BaseEvent { type: 'mount.slew_aborted'; device_id: string }
 export interface MountParkedEvent extends BaseEvent { type: 'mount.parked'; device_id: string }
-export interface MountTrackingChangedEvent extends BaseEvent { type: 'mount.tracking_changed'; device_id: string; tracking: boolean }
+export type TrackingMode = 'sidereal' | 'lunar' | 'solar'
+
+export interface MountTrackingChangedEvent extends BaseEvent { type: 'mount.tracking_changed'; device_id: string; tracking: boolean; mode: TrackingMode | null }
+export interface MountUnparkedEvent extends BaseEvent { type: 'mount.unparked'; device_id: string }
+export interface MountOperationFailedEvent extends BaseEvent { type: 'mount.operation_failed'; device_id: string; operation: string; reason: string }
 
 export interface FocuserMoveStartedEvent extends BaseEvent { type: 'focuser.move_started'; device_id: string; target_position: number }
 export interface FocuserMoveCompletedEvent extends BaseEvent { type: 'focuser.move_completed'; device_id: string; position: number }
@@ -232,6 +236,6 @@ export type AstrolollEvent =
   | ExposureStartedEvent | ExposureCompletedEvent | ExposureFailedEvent
   | LoopStartedEvent | LoopStoppedEvent
   | MountSlewStartedEvent | MountSlewCompletedEvent | MountSlewAbortedEvent
-  | MountParkedEvent | MountTrackingChangedEvent
+  | MountParkedEvent | MountUnparkedEvent | MountTrackingChangedEvent | MountOperationFailedEvent
   | FocuserMoveStartedEvent | FocuserMoveCompletedEvent | FocuserHaltedEvent
   | LogEvent

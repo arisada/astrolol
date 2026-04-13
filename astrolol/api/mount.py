@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 from astrolol.core.errors import DeviceKindError, DeviceNotFoundError
-from astrolol.devices.base.models import MountStatus, SlewTarget
+from astrolol.devices.base.models import MountStatus, SlewTarget, TrackingMode
 from astrolol.mount.manager import MountManager
 
 router = APIRouter(prefix="/mount", tags=["mount"])
@@ -14,6 +14,7 @@ def _manager(request: Request) -> MountManager:
 
 class TrackingRequest(BaseModel):
     enabled: bool
+    mode: TrackingMode | None = None
 
 
 @router.get("/{device_id}/status", response_model=MountStatus)
@@ -76,6 +77,6 @@ async def sync(device_id: str, target: SlewTarget, request: Request) -> None:
 @router.post("/{device_id}/tracking", status_code=204)
 async def set_tracking(device_id: str, body: TrackingRequest, request: Request) -> None:
     try:
-        await _manager(request).set_tracking(device_id, body.enabled)
+        await _manager(request).set_tracking(device_id, body.enabled, body.mode)
     except (DeviceNotFoundError, DeviceKindError) as exc:
         raise HTTPException(status_code=404, detail=str(exc))

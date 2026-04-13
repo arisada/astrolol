@@ -6,6 +6,7 @@ class Settings(BaseSettings):
     images_dir: Path = Path("./images")
     jpeg_quality: int = 85
     profiles_file: Path = Path("./profiles.json")
+    log_file: Path = Path("./astrolol.log")
 
     # INDI server settings (advanced — normally hidden in UI)
     indi_manage_server: bool = True   # False = connect to already-running server

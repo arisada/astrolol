@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Crosshair, StopCircle } from 'lucide-react'
 import { api } from '@/api/client'
 import { useStore } from '@/store'
-import type { MountStatus } from '@/api/types'
+import type { MountStatus, TrackingMode } from '@/api/types'
 import { Button } from '@/components/ui/button'
 import { DmsInput } from '@/components/ui/dms-input'
 import { StateBadge } from '@/components/ui/badge'
@@ -20,8 +20,11 @@ const SPEEDS = [
   { label: '32×',  deg: 0.5    },  // ≈ 30 arcmin
 ] as const
 
-const TRACKING_MODES = ['Sidereal', 'Lunar', 'Solar'] as const
-type TrackingMode = (typeof TRACKING_MODES)[number]
+const TRACKING_MODES: { label: string; mode: TrackingMode }[] = [
+  { label: 'Sidereal', mode: 'sidereal' },
+  { label: 'Lunar',    mode: 'lunar'    },
+  { label: 'Solar',    mode: 'solar'    },
+]
 
 // ---------------------------------------------------------------------------
 // Pure formatting helpers
@@ -97,7 +100,7 @@ function MountControls({ deviceId }: { deviceId: string }) {
   const slewEdited = useRef(false)
 
   const [speedIdx, setSpeedIdx] = useState(1)
-  const [trackingMode, setTrackingMode] = useState<TrackingMode>('Sidereal')
+  const [trackingMode, setTrackingMode] = useState<TrackingMode>('sidereal')
   const [error, setError] = useState<string | null>(null)
 
   // Poll mount status every 2 s
@@ -200,7 +203,7 @@ function MountControls({ deviceId }: { deviceId: string }) {
               checked={isTracking}
               label="Toggle tracking"
               disabled={isParked}
-              onChange={() => act(() => api.mount.setTracking(deviceId, !isTracking))}
+              onChange={() => act(() => api.mount.setTracking(deviceId, !isTracking, isTracking ? undefined : trackingMode))}
             />
             <span className="text-sm text-slate-300 w-6">{isTracking ? 'On' : 'Off'}</span>
             <select
@@ -208,12 +211,13 @@ function MountControls({ deviceId }: { deviceId: string }) {
               className="ml-auto rounded bg-surface-overlay border border-surface-border px-2 py-1 text-xs text-slate-200 focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed"
               value={trackingMode}
               onChange={(e) => {
-                setTrackingMode(e.target.value as TrackingMode)
-                // Selecting a mode implies tracking should be on
-                if (!isTracking) act(() => api.mount.setTracking(deviceId, true))
+                const m = e.target.value as TrackingMode
+                setTrackingMode(m)
+                // Selecting a mode always applies it (enables tracking if not already on)
+                act(() => api.mount.setTracking(deviceId, true, m))
               }}
             >
-              {TRACKING_MODES.map((m) => <option key={m}>{m}</option>)}
+              {TRACKING_MODES.map(({ label, mode }) => <option key={mode} value={mode}>{label}</option>)}
             </select>
           </div>
           {isParked

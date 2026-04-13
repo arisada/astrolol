@@ -18,6 +18,7 @@ from astrolol.devices.base.models import (
     DeviceState,
     MountStatus,
     SlewTarget,
+    TrackingMode,
 )
 from astrolol.devices.indi.client import IndiClient
 
@@ -113,7 +114,28 @@ class IndiMount:
             {"RA": target.ra, "DEC": target.dec},
         )
 
-    async def set_tracking(self, enabled: bool) -> None:
+    _TRACK_RATE_ELEMENTS = {
+        TrackingMode.SIDEREAL: "TRACK_SIDEREAL",
+        TrackingMode.LUNAR:    "TRACK_LUNAR",
+        TrackingMode.SOLAR:    "TRACK_SOLAR",
+    }
+
+    async def set_tracking(self, enabled: bool, mode: TrackingMode | None = None) -> None:
+        # Set rate first so the driver has the right mode when tracking is enabled
+        if enabled and mode is not None:
+            rate_element = self._TRACK_RATE_ELEMENTS.get(mode)
+            if rate_element:
+                try:
+                    await self._client.set_switch(
+                        self._device_name, "TELESCOPE_TRACK_RATE", [rate_element]
+                    )
+                except Exception as exc:
+                    logger.debug(
+                        "indi.mount_track_rate_skipped",
+                        device=self._device_name,
+                        mode=mode,
+                        error=str(exc),
+                    )
         element = "TRACK_ON" if enabled else "TRACK_OFF"
         await self._client.set_switch(
             self._device_name, "TELESCOPE_TRACK_STATE", [element]
