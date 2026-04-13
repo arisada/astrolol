@@ -815,3 +815,437 @@
 {"device_id": "cam1", "kind": "camera", "event": "device.disconnected", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:49:54.490641Z"}
 {"event": "HTTP Request: DELETE http://test/profiles/active \"HTTP/1.1 204 No Content\"", "level": "info", "logger": "httpx", "timestamp": "2026-04-13T20:49:54.491119Z"}
 {"event": "HTTP Request: GET http://test/devices/connected \"HTTP/1.1 200 OK\"", "level": "info", "logger": "httpx", "timestamp": "2026-04-13T20:49:54.491622Z"}
+{"plugins": ["<astrolol.devices.indi.plugin.IndiPlugin object at 0x73ecd987ee40>"], "event": "plugins.loaded", "level": "info", "logger": "astrolol.app", "timestamp": "2026-04-13T20:57:25.583088Z"}
+{"event": "indi.adapters_registered", "level": "info", "logger": "astrolol.devices.indi.plugin", "timestamp": "2026-04-13T20:57:25.587131Z"}
+{"available": {"cameras": ["indi_camera"], "mounts": ["indi_mount"], "focusers": ["indi_focuser"]}, "event": "devices.registered", "level": "info", "logger": "astrolol.app", "timestamp": "2026-04-13T20:57:25.587307Z"}
+{"event": "HTTP Request: GET http://test/devices/available \"HTTP/1.1 200 OK\"", "level": "info", "logger": "httpx", "timestamp": "2026-04-13T20:57:25.607014Z"}
+{"plugins": ["<astrolol.devices.indi.plugin.IndiPlugin object at 0x73ecd9756600>"], "event": "plugins.loaded", "level": "info", "logger": "astrolol.app", "timestamp": "2026-04-13T20:57:25.611489Z"}
+{"event": "indi.adapters_registered", "level": "info", "logger": "astrolol.devices.indi.plugin", "timestamp": "2026-04-13T20:57:25.611728Z"}
+{"available": {"cameras": ["indi_camera"], "mounts": ["indi_mount"], "focusers": ["indi_focuser"]}, "event": "devices.registered", "level": "info", "logger": "astrolol.app", "timestamp": "2026-04-13T20:57:25.611864Z"}
+{"device_id": "cam1", "kind": "camera", "adapter": "fake_camera", "event": "device.connecting", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:25.630449Z"}
+{"device_id": "cam1", "kind": "camera", "adapter": "fake_camera", "event": "device.connected", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:25.630696Z"}
+{"event": "HTTP Request: POST http://test/devices/connect \"HTTP/1.1 201 Created\"", "level": "info", "logger": "httpx", "timestamp": "2026-04-13T20:57:25.631081Z"}
+{"event": "HTTP Request: GET http://test/devices/connected \"HTTP/1.1 200 OK\"", "level": "info", "logger": "httpx", "timestamp": "2026-04-13T20:57:25.631701Z"}
+{"plugins": ["<astrolol.devices.indi.plugin.IndiPlugin object at 0x73ecd97d8980>"], "event": "plugins.loaded", "level": "info", "logger": "astrolol.app", "timestamp": "2026-04-13T20:57:25.635866Z"}
+{"event": "indi.adapters_registered", "level": "info", "logger": "astrolol.devices.indi.plugin", "timestamp": "2026-04-13T20:57:25.636094Z"}
+{"available": {"cameras": ["indi_camera"], "mounts": ["indi_mount"], "focusers": ["indi_focuser"]}, "event": "devices.registered", "level": "info", "logger": "astrolol.app", "timestamp": "2026-04-13T20:57:25.636226Z"}
+{"event": "HTTP Request: POST http://test/devices/connect \"HTTP/1.1 404 Not Found\"", "level": "info", "logger": "httpx", "timestamp": "2026-04-13T20:57:25.654806Z"}
+{"plugins": ["<astrolol.devices.indi.plugin.IndiPlugin object at 0x73ecd981cdd0>"], "event": "plugins.loaded", "level": "info", "logger": "astrolol.app", "timestamp": "2026-04-13T20:57:25.659235Z"}
+{"event": "indi.adapters_registered", "level": "info", "logger": "astrolol.devices.indi.plugin", "timestamp": "2026-04-13T20:57:25.659484Z"}
+{"available": {"cameras": ["indi_camera"], "mounts": ["indi_mount"], "focusers": ["indi_focuser"]}, "event": "devices.registered", "level": "info", "logger": "astrolol.app", "timestamp": "2026-04-13T20:57:25.659617Z"}
+{"device_id": "cam1", "kind": "camera", "adapter": "fake_camera", "event": "device.connecting", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:25.678524Z"}
+{"device_id": "cam1", "kind": "camera", "adapter": "fake_camera", "event": "device.connected", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:25.678789Z"}
+{"event": "HTTP Request: POST http://test/devices/connect \"HTTP/1.1 201 Created\"", "level": "info", "logger": "httpx", "timestamp": "2026-04-13T20:57:25.679154Z"}
+{"event": "HTTP Request: POST http://test/devices/connect \"HTTP/1.1 409 Conflict\"", "level": "info", "logger": "httpx", "timestamp": "2026-04-13T20:57:25.679750Z"}
+{"plugins": ["<astrolol.devices.indi.plugin.IndiPlugin object at 0x73ecd981c560>"], "event": "plugins.loaded", "level": "info", "logger": "astrolol.app", "timestamp": "2026-04-13T20:57:25.684103Z"}
+{"event": "indi.adapters_registered", "level": "info", "logger": "astrolol.devices.indi.plugin", "timestamp": "2026-04-13T20:57:25.684336Z"}
+{"available": {"cameras": ["indi_camera"], "mounts": ["indi_mount"], "focusers": ["indi_focuser"]}, "event": "devices.registered", "level": "info", "logger": "astrolol.app", "timestamp": "2026-04-13T20:57:25.684467Z"}
+{"device_id": "2a28cf03-8d71-4e0d-b8f0-6080f14c2e24", "kind": "camera", "adapter": "failing_camera", "event": "device.connecting", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:25.701793Z"}
+{"method": "POST", "path": "/devices/connect", "status": 502, "detail": "Device '2a28cf03-8d71-4e0d-b8f0-6080f14c2e24' failed to connect: Simulated hardware failure", "cause": ["Traceback (most recent call last):\n", "  File \"/workspace/astrolol/astrolol/devices/manager.py\", line 67, in connect\n    await asyncio.wait_for(instance.connect(), timeout=CONNECT_TIMEOUT)\n", "  File \"/usr/lib/python3.12/asyncio/tasks.py\", line 520, in wait_for\n    return await fut\n           ^^^^^^^^^\n", "  File \"/workspace/astrolol/tests/conftest.py\", line 70, in connect\n    raise RuntimeError(\"Simulated hardware failure\")\n", "RuntimeError: Simulated hardware failure\n", "\nThe above exception was the direct cause of the following exception:\n\n", "Traceback (most recent call last):\n", "  File \"/workspace/astrolol/astrolol/api/devices.py\", line 49, in connect_device\n    device_id = await _manager(request).connect(config)\n                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n", "  File \"/workspace/astrolol/astrolol/devices/manager.py\", line 79, in connect\n    raise DeviceConnectionError(\n", "astrolol.core.errors.DeviceConnectionError: Device '2a28cf03-8d71-4e0d-b8f0-6080f14c2e24' failed to connect: Simulated hardware failure\n"], "event": "api.error", "level": "error", "logger": "astrolol.main", "timestamp": "2026-04-13T20:57:25.702815Z"}
+{"event": "HTTP Request: POST http://test/devices/connect \"HTTP/1.1 502 Bad Gateway\"", "level": "info", "logger": "httpx", "timestamp": "2026-04-13T20:57:25.703207Z"}
+{"plugins": ["<astrolol.devices.indi.plugin.IndiPlugin object at 0x73ecd96d7950>"], "event": "plugins.loaded", "level": "info", "logger": "astrolol.app", "timestamp": "2026-04-13T20:57:25.707392Z"}
+{"event": "indi.adapters_registered", "level": "info", "logger": "astrolol.devices.indi.plugin", "timestamp": "2026-04-13T20:57:25.707613Z"}
+{"available": {"cameras": ["indi_camera"], "mounts": ["indi_mount"], "focusers": ["indi_focuser"]}, "event": "devices.registered", "level": "info", "logger": "astrolol.app", "timestamp": "2026-04-13T20:57:25.707745Z"}
+{"device_id": "cam1", "kind": "camera", "adapter": "fake_camera", "event": "device.connecting", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:25.726344Z"}
+{"device_id": "cam1", "kind": "camera", "adapter": "fake_camera", "event": "device.connected", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:25.726607Z"}
+{"event": "HTTP Request: POST http://test/devices/connect \"HTTP/1.1 201 Created\"", "level": "info", "logger": "httpx", "timestamp": "2026-04-13T20:57:25.726977Z"}
+{"device_id": "cam1", "kind": "camera", "event": "device.disconnecting", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:25.727525Z"}
+{"device_id": "cam1", "kind": "camera", "event": "device.disconnected", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:25.727710Z"}
+{"event": "HTTP Request: DELETE http://test/devices/connected/cam1 \"HTTP/1.1 204 No Content\"", "level": "info", "logger": "httpx", "timestamp": "2026-04-13T20:57:25.728032Z"}
+{"event": "HTTP Request: GET http://test/devices/connected \"HTTP/1.1 200 OK\"", "level": "info", "logger": "httpx", "timestamp": "2026-04-13T20:57:25.728552Z"}
+{"plugins": ["<astrolol.devices.indi.plugin.IndiPlugin object at 0x73ecd9773950>"], "event": "plugins.loaded", "level": "info", "logger": "astrolol.app", "timestamp": "2026-04-13T20:57:25.763585Z"}
+{"event": "indi.adapters_registered", "level": "info", "logger": "astrolol.devices.indi.plugin", "timestamp": "2026-04-13T20:57:25.763926Z"}
+{"available": {"cameras": ["indi_camera"], "mounts": ["indi_mount"], "focusers": ["indi_focuser"]}, "event": "devices.registered", "level": "info", "logger": "astrolol.app", "timestamp": "2026-04-13T20:57:25.764068Z"}
+{"event": "HTTP Request: DELETE http://test/devices/connected/ghost \"HTTP/1.1 404 Not Found\"", "level": "info", "logger": "httpx", "timestamp": "2026-04-13T20:57:25.781948Z"}
+{"plugins": ["<astrolol.devices.indi.plugin.IndiPlugin object at 0x73ecd969dac0>"], "event": "plugins.loaded", "level": "info", "logger": "astrolol.app", "timestamp": "2026-04-13T20:57:25.786192Z"}
+{"event": "indi.adapters_registered", "level": "info", "logger": "astrolol.devices.indi.plugin", "timestamp": "2026-04-13T20:57:25.786414Z"}
+{"available": {"cameras": ["indi_camera"], "mounts": ["indi_mount"], "focusers": ["indi_focuser"]}, "event": "devices.registered", "level": "info", "logger": "astrolol.app", "timestamp": "2026-04-13T20:57:25.786547Z"}
+{"device_id": "cam1", "kind": "camera", "adapter": "fake_camera", "event": "device.connecting", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:25.804541Z"}
+{"device_id": "cam1", "kind": "camera", "adapter": "fake_camera", "event": "device.connected", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:25.804814Z"}
+{"event": "HTTP Request: POST http://test/devices/connect \"HTTP/1.1 201 Created\"", "level": "info", "logger": "httpx", "timestamp": "2026-04-13T20:57:25.805184Z"}
+{"event": "HTTP Request: GET http://test/devices/connected/cam1/config \"HTTP/1.1 200 OK\"", "level": "info", "logger": "httpx", "timestamp": "2026-04-13T20:57:25.805859Z"}
+{"plugins": ["<astrolol.devices.indi.plugin.IndiPlugin object at 0x73ecd97cb920>"], "event": "plugins.loaded", "level": "info", "logger": "astrolol.app", "timestamp": "2026-04-13T20:57:25.810318Z"}
+{"event": "indi.adapters_registered", "level": "info", "logger": "astrolol.devices.indi.plugin", "timestamp": "2026-04-13T20:57:25.810555Z"}
+{"available": {"cameras": ["indi_camera"], "mounts": ["indi_mount"], "focusers": ["indi_focuser"]}, "event": "devices.registered", "level": "info", "logger": "astrolol.app", "timestamp": "2026-04-13T20:57:25.810686Z"}
+{"event": "HTTP Request: GET http://test/devices/connected/ghost/config \"HTTP/1.1 404 Not Found\"", "level": "info", "logger": "httpx", "timestamp": "2026-04-13T20:57:25.829102Z"}
+{"plugins": ["<astrolol.devices.indi.plugin.IndiPlugin object at 0x73ecd9d8d730>"], "event": "plugins.loaded", "level": "info", "logger": "astrolol.app", "timestamp": "2026-04-13T20:57:25.833382Z"}
+{"event": "indi.adapters_registered", "level": "info", "logger": "astrolol.devices.indi.plugin", "timestamp": "2026-04-13T20:57:25.833628Z"}
+{"available": {"cameras": ["indi_camera"], "mounts": ["indi_mount"], "focusers": ["indi_focuser"]}, "event": "devices.registered", "level": "info", "logger": "astrolol.app", "timestamp": "2026-04-13T20:57:25.833766Z"}
+{"event": "HTTP Request: GET http://test/indi/drivers \"HTTP/1.1 200 OK\"", "level": "info", "logger": "httpx", "timestamp": "2026-04-13T20:57:25.852554Z"}
+{"plugins": ["<astrolol.devices.indi.plugin.IndiPlugin object at 0x73ecd991fe90>"], "event": "plugins.loaded", "level": "info", "logger": "astrolol.app", "timestamp": "2026-04-13T20:57:25.857474Z"}
+{"event": "indi.adapters_registered", "level": "info", "logger": "astrolol.devices.indi.plugin", "timestamp": "2026-04-13T20:57:25.857733Z"}
+{"available": {"cameras": ["indi_camera"], "mounts": ["indi_mount"], "focusers": ["indi_focuser"]}, "event": "devices.registered", "level": "info", "logger": "astrolol.app", "timestamp": "2026-04-13T20:57:25.857877Z"}
+{"event": "HTTP Request: GET http://test/indi/drivers \"HTTP/1.1 200 OK\"", "level": "info", "logger": "httpx", "timestamp": "2026-04-13T20:57:25.881030Z"}
+{"plugins": ["<astrolol.devices.indi.plugin.IndiPlugin object at 0x73ecd97afe90>"], "event": "plugins.loaded", "level": "info", "logger": "astrolol.app", "timestamp": "2026-04-13T20:57:25.887275Z"}
+{"event": "indi.adapters_registered", "level": "info", "logger": "astrolol.devices.indi.plugin", "timestamp": "2026-04-13T20:57:25.887511Z"}
+{"available": {"cameras": ["indi_camera"], "mounts": ["indi_mount"], "focusers": ["indi_focuser"]}, "event": "devices.registered", "level": "info", "logger": "astrolol.app", "timestamp": "2026-04-13T20:57:25.887647Z"}
+{"event": "HTTP Request: GET http://test/indi/drivers/camera \"HTTP/1.1 200 OK\"", "level": "info", "logger": "httpx", "timestamp": "2026-04-13T20:57:25.906533Z"}
+{"plugins": ["<astrolol.devices.indi.plugin.IndiPlugin object at 0x73ecd96c3950>"], "event": "plugins.loaded", "level": "info", "logger": "astrolol.app", "timestamp": "2026-04-13T20:57:25.913265Z"}
+{"event": "indi.adapters_registered", "level": "info", "logger": "astrolol.devices.indi.plugin", "timestamp": "2026-04-13T20:57:25.913530Z"}
+{"available": {"cameras": ["indi_camera"], "mounts": ["indi_mount"], "focusers": ["indi_focuser"]}, "event": "devices.registered", "level": "info", "logger": "astrolol.app", "timestamp": "2026-04-13T20:57:25.913671Z"}
+{"event": "HTTP Request: GET http://test/indi/drivers/rotator \"HTTP/1.1 200 OK\"", "level": "info", "logger": "httpx", "timestamp": "2026-04-13T20:57:25.934885Z"}
+{"plugins": ["<astrolol.devices.indi.plugin.IndiPlugin object at 0x73ecd96d52e0>"], "event": "plugins.loaded", "level": "info", "logger": "astrolol.app", "timestamp": "2026-04-13T20:57:25.941283Z"}
+{"event": "indi.adapters_registered", "level": "info", "logger": "astrolol.devices.indi.plugin", "timestamp": "2026-04-13T20:57:25.941534Z"}
+{"available": {"cameras": ["indi_camera"], "mounts": ["indi_mount"], "focusers": ["indi_focuser"]}, "event": "devices.registered", "level": "info", "logger": "astrolol.app", "timestamp": "2026-04-13T20:57:25.941670Z"}
+{"event": "HTTP Request: GET http://test/indi/drivers \"HTTP/1.1 200 OK\"", "level": "info", "logger": "httpx", "timestamp": "2026-04-13T20:57:25.961088Z"}
+{"event": "HTTP Request: GET http://test/indi/drivers/camera \"HTTP/1.1 200 OK\"", "level": "info", "logger": "httpx", "timestamp": "2026-04-13T20:57:25.962423Z"}
+{"plugins": ["<astrolol.devices.indi.plugin.IndiPlugin object at 0x73ecd9658f50>"], "event": "plugins.loaded", "level": "info", "logger": "astrolol.app", "timestamp": "2026-04-13T20:57:25.967502Z"}
+{"event": "indi.adapters_registered", "level": "info", "logger": "astrolol.devices.indi.plugin", "timestamp": "2026-04-13T20:57:25.967776Z"}
+{"available": {"cameras": ["indi_camera"], "mounts": ["indi_mount"], "focusers": ["indi_focuser"]}, "event": "devices.registered", "level": "info", "logger": "astrolol.app", "timestamp": "2026-04-13T20:57:25.967929Z"}
+{"device_id": "cam1", "kind": "camera", "adapter": "fake_camera", "event": "device.connecting", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:25.988863Z"}
+{"device_id": "cam1", "kind": "camera", "adapter": "fake_camera", "event": "device.connected", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:25.989150Z"}
+{"event": "HTTP Request: POST http://test/devices/connect \"HTTP/1.1 201 Created\"", "level": "info", "logger": "httpx", "timestamp": "2026-04-13T20:57:25.989502Z"}
+{"event": "HTTP Request: GET http://test/devices/cam1/properties \"HTTP/1.1 200 OK\"", "level": "info", "logger": "httpx", "timestamp": "2026-04-13T20:57:25.990451Z"}
+{"plugins": ["<astrolol.devices.indi.plugin.IndiPlugin object at 0x73ecd9596390>"], "event": "plugins.loaded", "level": "info", "logger": "astrolol.app", "timestamp": "2026-04-13T20:57:25.995013Z"}
+{"event": "indi.adapters_registered", "level": "info", "logger": "astrolol.devices.indi.plugin", "timestamp": "2026-04-13T20:57:25.995251Z"}
+{"available": {"cameras": ["indi_camera"], "mounts": ["indi_mount"], "focusers": ["indi_focuser"]}, "event": "devices.registered", "level": "info", "logger": "astrolol.app", "timestamp": "2026-04-13T20:57:25.995386Z"}
+{"device_id": "cam1", "kind": "camera", "adapter": "fake_camera", "event": "device.connecting", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.014110Z"}
+{"device_id": "cam1", "kind": "camera", "adapter": "fake_camera", "event": "device.connected", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.014371Z"}
+{"event": "HTTP Request: POST http://test/devices/connect \"HTTP/1.1 201 Created\"", "level": "info", "logger": "httpx", "timestamp": "2026-04-13T20:57:26.014714Z"}
+{"event": "HTTP Request: GET http://test/devices/cam1/properties \"HTTP/1.1 200 OK\"", "level": "info", "logger": "httpx", "timestamp": "2026-04-13T20:57:26.015344Z"}
+{"plugins": ["<astrolol.devices.indi.plugin.IndiPlugin object at 0x73ecd96d5bb0>"], "event": "plugins.loaded", "level": "info", "logger": "astrolol.app", "timestamp": "2026-04-13T20:57:26.019663Z"}
+{"event": "indi.adapters_registered", "level": "info", "logger": "astrolol.devices.indi.plugin", "timestamp": "2026-04-13T20:57:26.019905Z"}
+{"available": {"cameras": ["indi_camera"], "mounts": ["indi_mount"], "focusers": ["indi_focuser"]}, "event": "devices.registered", "level": "info", "logger": "astrolol.app", "timestamp": "2026-04-13T20:57:26.020043Z"}
+{"device_id": "cam1", "kind": "camera", "adapter": "fake_camera", "event": "device.connecting", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.037914Z"}
+{"device_id": "cam1", "kind": "camera", "adapter": "fake_camera", "event": "device.connected", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.038136Z"}
+{"event": "HTTP Request: POST http://test/devices/connect \"HTTP/1.1 201 Created\"", "level": "info", "logger": "httpx", "timestamp": "2026-04-13T20:57:26.038457Z"}
+{"event": "HTTP Request: GET http://test/devices/cam1/properties \"HTTP/1.1 200 OK\"", "level": "info", "logger": "httpx", "timestamp": "2026-04-13T20:57:26.039062Z"}
+{"plugins": ["<astrolol.devices.indi.plugin.IndiPlugin object at 0x73ecd8c75100>"], "event": "plugins.loaded", "level": "info", "logger": "astrolol.app", "timestamp": "2026-04-13T20:57:26.043691Z"}
+{"event": "indi.adapters_registered", "level": "info", "logger": "astrolol.devices.indi.plugin", "timestamp": "2026-04-13T20:57:26.043927Z"}
+{"available": {"cameras": ["indi_camera"], "mounts": ["indi_mount"], "focusers": ["indi_focuser"]}, "event": "devices.registered", "level": "info", "logger": "astrolol.app", "timestamp": "2026-04-13T20:57:26.044064Z"}
+{"device_id": "cam1", "kind": "camera", "adapter": "fake_camera", "event": "device.connecting", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.062857Z"}
+{"device_id": "cam1", "kind": "camera", "adapter": "fake_camera", "event": "device.connected", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.063100Z"}
+{"event": "HTTP Request: POST http://test/devices/connect \"HTTP/1.1 201 Created\"", "level": "info", "logger": "httpx", "timestamp": "2026-04-13T20:57:26.063432Z"}
+{"event": "HTTP Request: GET http://test/devices/cam1/properties \"HTTP/1.1 200 OK\"", "level": "info", "logger": "httpx", "timestamp": "2026-04-13T20:57:26.064051Z"}
+{"plugins": ["<astrolol.devices.indi.plugin.IndiPlugin object at 0x73ecd981db20>"], "event": "plugins.loaded", "level": "info", "logger": "astrolol.app", "timestamp": "2026-04-13T20:57:26.068342Z"}
+{"event": "indi.adapters_registered", "level": "info", "logger": "astrolol.devices.indi.plugin", "timestamp": "2026-04-13T20:57:26.068569Z"}
+{"available": {"cameras": ["indi_camera"], "mounts": ["indi_mount"], "focusers": ["indi_focuser"]}, "event": "devices.registered", "level": "info", "logger": "astrolol.app", "timestamp": "2026-04-13T20:57:26.068703Z"}
+{"device_id": "cam1", "kind": "camera", "adapter": "fake_camera", "event": "device.connecting", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.086327Z"}
+{"device_id": "cam1", "kind": "camera", "adapter": "fake_camera", "event": "device.connected", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.086560Z"}
+{"event": "HTTP Request: POST http://test/devices/connect \"HTTP/1.1 201 Created\"", "level": "info", "logger": "httpx", "timestamp": "2026-04-13T20:57:26.086902Z"}
+{"event": "HTTP Request: GET http://test/devices/cam1/properties \"HTTP/1.1 200 OK\"", "level": "info", "logger": "httpx", "timestamp": "2026-04-13T20:57:26.087513Z"}
+{"plugins": ["<astrolol.devices.indi.plugin.IndiPlugin object at 0x73ecd9605400>"], "event": "plugins.loaded", "level": "info", "logger": "astrolol.app", "timestamp": "2026-04-13T20:57:26.091851Z"}
+{"event": "indi.adapters_registered", "level": "info", "logger": "astrolol.devices.indi.plugin", "timestamp": "2026-04-13T20:57:26.092096Z"}
+{"available": {"cameras": ["indi_camera"], "mounts": ["indi_mount"], "focusers": ["indi_focuser"]}, "event": "devices.registered", "level": "info", "logger": "astrolol.app", "timestamp": "2026-04-13T20:57:26.092231Z"}
+{"device_id": "cam1", "kind": "camera", "adapter": "fake_camera", "event": "device.connecting", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.111053Z"}
+{"device_id": "cam1", "kind": "camera", "adapter": "fake_camera", "event": "device.connected", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.111282Z"}
+{"event": "HTTP Request: POST http://test/devices/connect \"HTTP/1.1 201 Created\"", "level": "info", "logger": "httpx", "timestamp": "2026-04-13T20:57:26.111604Z"}
+{"event": "HTTP Request: GET http://test/devices/cam1/properties \"HTTP/1.1 200 OK\"", "level": "info", "logger": "httpx", "timestamp": "2026-04-13T20:57:26.112204Z"}
+{"plugins": ["<astrolol.devices.indi.plugin.IndiPlugin object at 0x73ecd8cae690>"], "event": "plugins.loaded", "level": "info", "logger": "astrolol.app", "timestamp": "2026-04-13T20:57:26.116483Z"}
+{"event": "indi.adapters_registered", "level": "info", "logger": "astrolol.devices.indi.plugin", "timestamp": "2026-04-13T20:57:26.116705Z"}
+{"available": {"cameras": ["indi_camera"], "mounts": ["indi_mount"], "focusers": ["indi_focuser"]}, "event": "devices.registered", "level": "info", "logger": "astrolol.app", "timestamp": "2026-04-13T20:57:26.116836Z"}
+{"event": "HTTP Request: GET http://test/devices/ghost/properties \"HTTP/1.1 404 Not Found\"", "level": "info", "logger": "httpx", "timestamp": "2026-04-13T20:57:26.134430Z"}
+{"plugins": ["<astrolol.devices.indi.plugin.IndiPlugin object at 0x73ecd8c51850>"], "event": "plugins.loaded", "level": "info", "logger": "astrolol.app", "timestamp": "2026-04-13T20:57:26.138735Z"}
+{"event": "indi.adapters_registered", "level": "info", "logger": "astrolol.devices.indi.plugin", "timestamp": "2026-04-13T20:57:26.138962Z"}
+{"available": {"cameras": ["indi_camera"], "mounts": ["indi_mount"], "focusers": ["indi_focuser"]}, "event": "devices.registered", "level": "info", "logger": "astrolol.app", "timestamp": "2026-04-13T20:57:26.139100Z"}
+{"device_id": "cam1", "kind": "camera", "adapter": "fake_camera", "event": "device.connecting", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.156954Z"}
+{"device_id": "cam1", "kind": "camera", "adapter": "fake_camera", "event": "device.connected", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.157189Z"}
+{"event": "HTTP Request: POST http://test/devices/connect \"HTTP/1.1 201 Created\"", "level": "info", "logger": "httpx", "timestamp": "2026-04-13T20:57:26.157513Z"}
+{"method": "GET", "path": "/devices/cam1/properties", "status": 503, "detail": "INDI client not connected.", "cause": null, "event": "api.error", "level": "error", "logger": "astrolol.main", "timestamp": "2026-04-13T20:57:26.157923Z"}
+{"event": "HTTP Request: GET http://test/devices/cam1/properties \"HTTP/1.1 503 Service Unavailable\"", "level": "info", "logger": "httpx", "timestamp": "2026-04-13T20:57:26.158250Z"}
+{"plugins": ["<astrolol.devices.indi.plugin.IndiPlugin object at 0x73ecd9729610>"], "event": "plugins.loaded", "level": "info", "logger": "astrolol.app", "timestamp": "2026-04-13T20:57:26.162555Z"}
+{"event": "indi.adapters_registered", "level": "info", "logger": "astrolol.devices.indi.plugin", "timestamp": "2026-04-13T20:57:26.162780Z"}
+{"available": {"cameras": ["indi_camera"], "mounts": ["indi_mount"], "focusers": ["indi_focuser"]}, "event": "devices.registered", "level": "info", "logger": "astrolol.app", "timestamp": "2026-04-13T20:57:26.162921Z"}
+{"device_id": "cam2", "kind": "camera", "adapter": "fake_camera", "event": "device.connecting", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.181320Z"}
+{"device_id": "cam2", "kind": "camera", "adapter": "fake_camera", "event": "device.connected", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.181544Z"}
+{"event": "HTTP Request: POST http://test/devices/connect \"HTTP/1.1 201 Created\"", "level": "info", "logger": "httpx", "timestamp": "2026-04-13T20:57:26.181862Z"}
+{"event": "HTTP Request: GET http://test/devices/cam2/properties \"HTTP/1.1 400 Bad Request\"", "level": "info", "logger": "httpx", "timestamp": "2026-04-13T20:57:26.182416Z"}
+{"plugins": ["<astrolol.devices.indi.plugin.IndiPlugin object at 0x73ecd8d1fe90>"], "event": "plugins.loaded", "level": "info", "logger": "astrolol.app", "timestamp": "2026-04-13T20:57:26.186729Z"}
+{"event": "indi.adapters_registered", "level": "info", "logger": "astrolol.devices.indi.plugin", "timestamp": "2026-04-13T20:57:26.186956Z"}
+{"available": {"cameras": ["indi_camera"], "mounts": ["indi_mount"], "focusers": ["indi_focuser"]}, "event": "devices.registered", "level": "info", "logger": "astrolol.app", "timestamp": "2026-04-13T20:57:26.187095Z"}
+{"device_id": "cam1", "kind": "camera", "adapter": "fake_camera", "event": "device.connecting", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.204398Z"}
+{"device_id": "cam1", "kind": "camera", "adapter": "fake_camera", "event": "device.connected", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.204619Z"}
+{"event": "HTTP Request: POST http://test/devices/connect \"HTTP/1.1 201 Created\"", "level": "info", "logger": "httpx", "timestamp": "2026-04-13T20:57:26.204942Z"}
+{"event": "HTTP Request: POST http://test/devices/cam1/properties/CCD_EXPOSURE \"HTTP/1.1 204 No Content\"", "level": "info", "logger": "httpx", "timestamp": "2026-04-13T20:57:26.205845Z"}
+{"plugins": ["<astrolol.devices.indi.plugin.IndiPlugin object at 0x73ecd9833ce0>"], "event": "plugins.loaded", "level": "info", "logger": "astrolol.app", "timestamp": "2026-04-13T20:57:26.210097Z"}
+{"event": "indi.adapters_registered", "level": "info", "logger": "astrolol.devices.indi.plugin", "timestamp": "2026-04-13T20:57:26.210319Z"}
+{"available": {"cameras": ["indi_camera"], "mounts": ["indi_mount"], "focusers": ["indi_focuser"]}, "event": "devices.registered", "level": "info", "logger": "astrolol.app", "timestamp": "2026-04-13T20:57:26.210452Z"}
+{"device_id": "cam1", "kind": "camera", "adapter": "fake_camera", "event": "device.connecting", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.228938Z"}
+{"device_id": "cam1", "kind": "camera", "adapter": "fake_camera", "event": "device.connected", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.229168Z"}
+{"event": "HTTP Request: POST http://test/devices/connect \"HTTP/1.1 201 Created\"", "level": "info", "logger": "httpx", "timestamp": "2026-04-13T20:57:26.229487Z"}
+{"event": "HTTP Request: POST http://test/devices/cam1/properties/CONNECTION \"HTTP/1.1 204 No Content\"", "level": "info", "logger": "httpx", "timestamp": "2026-04-13T20:57:26.230096Z"}
+{"plugins": ["<astrolol.devices.indi.plugin.IndiPlugin object at 0x73ecd8ba4dd0>"], "event": "plugins.loaded", "level": "info", "logger": "astrolol.app", "timestamp": "2026-04-13T20:57:26.234285Z"}
+{"event": "indi.adapters_registered", "level": "info", "logger": "astrolol.devices.indi.plugin", "timestamp": "2026-04-13T20:57:26.234508Z"}
+{"available": {"cameras": ["indi_camera"], "mounts": ["indi_mount"], "focusers": ["indi_focuser"]}, "event": "devices.registered", "level": "info", "logger": "astrolol.app", "timestamp": "2026-04-13T20:57:26.234641Z"}
+{"device_id": "cam1", "kind": "camera", "adapter": "fake_camera", "event": "device.connecting", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.252204Z"}
+{"device_id": "cam1", "kind": "camera", "adapter": "fake_camera", "event": "device.connected", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.252434Z"}
+{"event": "HTTP Request: POST http://test/devices/connect \"HTTP/1.1 201 Created\"", "level": "info", "logger": "httpx", "timestamp": "2026-04-13T20:57:26.252751Z"}
+{"event": "HTTP Request: POST http://test/devices/cam1/properties/SITE_INFO \"HTTP/1.1 204 No Content\"", "level": "info", "logger": "httpx", "timestamp": "2026-04-13T20:57:26.253383Z"}
+{"plugins": ["<astrolol.devices.indi.plugin.IndiPlugin object at 0x73ecd9581f10>"], "event": "plugins.loaded", "level": "info", "logger": "astrolol.app", "timestamp": "2026-04-13T20:57:26.257720Z"}
+{"event": "indi.adapters_registered", "level": "info", "logger": "astrolol.devices.indi.plugin", "timestamp": "2026-04-13T20:57:26.257947Z"}
+{"available": {"cameras": ["indi_camera"], "mounts": ["indi_mount"], "focusers": ["indi_focuser"]}, "event": "devices.registered", "level": "info", "logger": "astrolol.app", "timestamp": "2026-04-13T20:57:26.258085Z"}
+{"event": "HTTP Request: GET http://test/health \"HTTP/1.1 200 OK\"", "level": "info", "logger": "httpx", "timestamp": "2026-04-13T20:57:26.276216Z"}
+{"plugins": ["<astrolol.devices.indi.plugin.IndiPlugin object at 0x73ecd97f8110>"], "event": "plugins.loaded", "level": "info", "logger": "astrolol.app", "timestamp": "2026-04-13T20:57:26.280510Z"}
+{"event": "indi.adapters_registered", "level": "info", "logger": "astrolol.devices.indi.plugin", "timestamp": "2026-04-13T20:57:26.280738Z"}
+{"available": {"cameras": ["indi_camera"], "mounts": ["indi_mount"], "focusers": ["indi_focuser"]}, "event": "devices.registered", "level": "info", "logger": "astrolol.app", "timestamp": "2026-04-13T20:57:26.280876Z"}
+{"event": "HTTP Request: GET http://test/devices/available \"HTTP/1.1 200 OK\"", "level": "info", "logger": "httpx", "timestamp": "2026-04-13T20:57:26.299342Z"}
+{"device_id": "cam1", "kind": "camera", "adapter": "fake_camera", "event": "device.connecting", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.300528Z"}
+{"device_id": "cam1", "kind": "camera", "adapter": "fake_camera", "event": "device.connected", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.300744Z"}
+{"device_id": "cam1", "kind": "camera", "adapter": "fake_camera", "event": "device.connecting", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.301857Z"}
+{"device_id": "cam1", "kind": "camera", "adapter": "fake_camera", "event": "device.connected", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.302073Z"}
+{"device_id": "cam1", "kind": "camera", "adapter": "fake_camera", "event": "device.connecting", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.304257Z"}
+{"device_id": "cam1", "kind": "camera", "adapter": "fake_camera", "event": "device.connected", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.304462Z"}
+{"device_id": "bad_cam", "kind": "camera", "adapter": "failing_camera", "event": "device.connecting", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.305605Z"}
+{"device_id": "bad_cam", "kind": "camera", "adapter": "failing_camera", "event": "device.connecting", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.306769Z"}
+{"device_id": "cam1", "kind": "camera", "adapter": "fake_camera", "event": "device.connecting", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.307911Z"}
+{"device_id": "cam1", "kind": "camera", "adapter": "fake_camera", "event": "device.connected", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.308113Z"}
+{"device_id": "cam1", "kind": "camera", "event": "device.disconnecting", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.308243Z"}
+{"device_id": "cam1", "kind": "camera", "event": "device.disconnected", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.308408Z"}
+{"device_id": "cam1", "kind": "camera", "adapter": "fake_camera", "event": "device.connecting", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.309485Z"}
+{"device_id": "cam1", "kind": "camera", "adapter": "fake_camera", "event": "device.connected", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.309684Z"}
+{"device_id": "cam1", "kind": "camera", "event": "device.disconnecting", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.309814Z"}
+{"device_id": "cam1", "kind": "camera", "event": "device.disconnected", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.309973Z"}
+{"device_id": "cam1", "kind": "camera", "adapter": "fake_camera", "event": "device.connecting", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.311919Z"}
+{"device_id": "cam1", "kind": "camera", "adapter": "fake_camera", "event": "device.connected", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.312121Z"}
+{"device_id": "cam1", "kind": "camera", "adapter": "fake_camera", "event": "device.connecting", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.313199Z"}
+{"device_id": "cam1", "kind": "camera", "adapter": "fake_camera", "event": "device.connected", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.313397Z"}
+{"device_id": "cam1", "kind": "camera", "adapter": "fake_camera", "event": "device.connecting", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.314464Z"}
+{"device_id": "cam1", "kind": "camera", "adapter": "fake_camera", "event": "device.connected", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.314661Z"}
+{"device_id": "cam2", "kind": "camera", "adapter": "fake_camera", "event": "device.connecting", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.314812Z"}
+{"device_id": "cam2", "kind": "camera", "adapter": "fake_camera", "event": "device.connected", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.314988Z"}
+{"device_id": "foc1", "kind": "focuser", "adapter": "fake_focuser", "event": "device.connecting", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.320981Z"}
+{"device_id": "foc1", "kind": "focuser", "adapter": "fake_focuser", "event": "device.connected", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.321183Z"}
+{"device_id": "foc1", "target": 7000, "event": "focuser.move_started", "level": "info", "logger": "astrolol.focuser.manager", "timestamp": "2026-04-13T20:57:26.321367Z"}
+{"device_id": "foc1", "event": "focuser.move_cancelled", "level": "info", "logger": "astrolol.focuser.manager", "timestamp": "2026-04-13T20:57:26.321735Z"}
+{"device_id": "foc1", "kind": "focuser", "adapter": "fake_focuser", "event": "device.connecting", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.322692Z"}
+{"device_id": "foc1", "kind": "focuser", "adapter": "fake_focuser", "event": "device.connected", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.322895Z"}
+{"device_id": "foc1", "target": 7000, "event": "focuser.move_started", "level": "info", "logger": "astrolol.focuser.manager", "timestamp": "2026-04-13T20:57:26.323055Z"}
+{"device_id": "foc1", "position": 7000, "event": "focuser.move_completed", "level": "info", "logger": "astrolol.focuser.manager", "timestamp": "2026-04-13T20:57:26.373383Z"}
+{"device_id": "foc1", "kind": "focuser", "adapter": "fake_focuser", "event": "device.connecting", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.375357Z"}
+{"device_id": "foc1", "kind": "focuser", "adapter": "fake_focuser", "event": "device.connected", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.375702Z"}
+{"device_id": "foc1", "target": 6000, "event": "focuser.move_started", "level": "info", "logger": "astrolol.focuser.manager", "timestamp": "2026-04-13T20:57:26.376000Z"}
+{"device_id": "foc1", "position": 6000, "event": "focuser.move_completed", "level": "info", "logger": "astrolol.focuser.manager", "timestamp": "2026-04-13T20:57:26.426436Z"}
+{"device_id": "foc1", "kind": "focuser", "adapter": "fake_focuser", "event": "device.connecting", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.428395Z"}
+{"device_id": "foc1", "kind": "focuser", "adapter": "fake_focuser", "event": "device.connected", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.428729Z"}
+{"device_id": "foc1", "target": 7000, "event": "focuser.move_started", "level": "info", "logger": "astrolol.focuser.manager", "timestamp": "2026-04-13T20:57:26.429194Z"}
+{"device_id": "foc1", "position": 5000, "event": "focuser.halted", "level": "info", "logger": "astrolol.focuser.manager", "timestamp": "2026-04-13T20:57:26.429601Z"}
+{"device_id": "foc1", "kind": "focuser", "adapter": "fake_focuser", "event": "device.connecting", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.431064Z"}
+{"device_id": "foc1", "kind": "focuser", "adapter": "fake_focuser", "event": "device.connected", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.431260Z"}
+{"device_id": "foc1", "target": 5500, "steps": 500, "event": "focuser.move_started", "level": "info", "logger": "astrolol.focuser.manager", "timestamp": "2026-04-13T20:57:26.431419Z"}
+{"device_id": "foc1", "position": 5500, "event": "focuser.move_completed", "level": "info", "logger": "astrolol.focuser.manager", "timestamp": "2026-04-13T20:57:26.481736Z"}
+{"device_id": "foc1", "kind": "focuser", "adapter": "fake_focuser", "event": "device.connecting", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.483729Z"}
+{"device_id": "foc1", "kind": "focuser", "adapter": "fake_focuser", "event": "device.connected", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.484079Z"}
+{"device_id": "foc1", "target": 5000, "event": "focuser.move_started", "level": "info", "logger": "astrolol.focuser.manager", "timestamp": "2026-04-13T20:57:26.484344Z"}
+{"device_id": "foc1", "position": 5000, "event": "focuser.move_completed", "level": "info", "logger": "astrolol.focuser.manager", "timestamp": "2026-04-13T20:57:26.534743Z"}
+{"device_id": "foc1", "target": 4800, "steps": -200, "event": "focuser.move_started", "level": "info", "logger": "astrolol.focuser.manager", "timestamp": "2026-04-13T20:57:26.535093Z"}
+{"device_id": "foc1", "position": 4800, "event": "focuser.move_completed", "level": "info", "logger": "astrolol.focuser.manager", "timestamp": "2026-04-13T20:57:26.585509Z"}
+{"device_id": "foc1", "kind": "focuser", "adapter": "fake_focuser", "event": "device.connecting", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.587609Z"}
+{"device_id": "foc1", "kind": "focuser", "adapter": "fake_focuser", "event": "device.connected", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.587960Z"}
+{"device_id": "foc1", "target": 100, "event": "focuser.move_started", "level": "info", "logger": "astrolol.focuser.manager", "timestamp": "2026-04-13T20:57:26.588230Z"}
+{"device_id": "foc1", "position": 100, "event": "focuser.move_completed", "level": "info", "logger": "astrolol.focuser.manager", "timestamp": "2026-04-13T20:57:26.638633Z"}
+{"device_id": "foc1", "target": 0, "steps": -9999, "event": "focuser.move_started", "level": "info", "logger": "astrolol.focuser.manager", "timestamp": "2026-04-13T20:57:26.638975Z"}
+{"device_id": "foc1", "position": 0, "event": "focuser.move_completed", "level": "info", "logger": "astrolol.focuser.manager", "timestamp": "2026-04-13T20:57:26.689417Z"}
+{"device_id": "foc1", "kind": "focuser", "adapter": "fake_focuser", "event": "device.connecting", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.691423Z"}
+{"device_id": "foc1", "kind": "focuser", "adapter": "fake_focuser", "event": "device.connected", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.691758Z"}
+{"device_id": "foc1", "target": 9000, "event": "focuser.move_started", "level": "info", "logger": "astrolol.focuser.manager", "timestamp": "2026-04-13T20:57:26.692033Z"}
+{"device_id": "foc1", "position": 5000, "event": "focuser.halted", "level": "info", "logger": "astrolol.focuser.manager", "timestamp": "2026-04-13T20:57:26.692332Z"}
+{"device_id": "foc1", "kind": "focuser", "adapter": "fake_focuser", "event": "device.connecting", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.694240Z"}
+{"device_id": "foc1", "kind": "focuser", "adapter": "fake_focuser", "event": "device.connected", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.694574Z"}
+{"device_id": "foc1", "target": 9000, "event": "focuser.move_started", "level": "info", "logger": "astrolol.focuser.manager", "timestamp": "2026-04-13T20:57:26.694861Z"}
+{"device_id": "foc1", "position": 5000, "event": "focuser.halted", "level": "info", "logger": "astrolol.focuser.manager", "timestamp": "2026-04-13T20:57:26.695175Z"}
+{"device_id": "foc1", "kind": "focuser", "adapter": "fake_focuser", "event": "device.connecting", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.696802Z"}
+{"device_id": "foc1", "kind": "focuser", "adapter": "fake_focuser", "event": "device.connected", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.697012Z"}
+{"device_id": "foc1", "position": 5000, "event": "focuser.halted", "level": "info", "logger": "astrolol.focuser.manager", "timestamp": "2026-04-13T20:57:26.697171Z"}
+{"device_id": "foc1", "kind": "focuser", "adapter": "fake_focuser", "event": "device.connecting", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.698256Z"}
+{"device_id": "foc1", "kind": "focuser", "adapter": "fake_focuser", "event": "device.connected", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.698449Z"}
+{"device_id": "cam1", "kind": "camera", "adapter": "fake_camera", "event": "device.connecting", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.701259Z"}
+{"device_id": "cam1", "kind": "camera", "adapter": "fake_camera", "event": "device.connected", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.701461Z"}
+{"device_id": "cam1", "duration": 1.0, "event": "imager.exposing", "level": "info", "logger": "astrolol.imaging.imager", "timestamp": "2026-04-13T20:57:26.701656Z"}
+{"device_id": "cam1", "duration": 1.0, "fits": "/tmp/astrolol_test/fake_0001.fits", "event": "imager.exposure_completed", "level": "info", "logger": "astrolol.imaging.imager", "timestamp": "2026-04-13T20:57:26.730458Z"}
+{"device_id": "cam1", "kind": "camera", "adapter": "fake_camera", "event": "device.connecting", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.732361Z"}
+{"device_id": "cam1", "kind": "camera", "adapter": "fake_camera", "event": "device.connected", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.732588Z"}
+{"device_id": "cam1", "duration": 0.5, "event": "imager.exposing", "level": "info", "logger": "astrolol.imaging.imager", "timestamp": "2026-04-13T20:57:26.732781Z"}
+{"device_id": "cam1", "duration": 0.5, "fits": "/tmp/astrolol_test/fake_0001.fits", "event": "imager.exposure_completed", "level": "info", "logger": "astrolol.imaging.imager", "timestamp": "2026-04-13T20:57:26.736498Z"}
+{"device_id": "cam1", "kind": "camera", "adapter": "fake_camera", "event": "device.connecting", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.738048Z"}
+{"device_id": "cam1", "kind": "camera", "adapter": "fake_camera", "event": "device.connected", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.738257Z"}
+{"device_id": "cam1", "event": "imager.loop_started", "level": "info", "logger": "astrolol.imaging.imager", "timestamp": "2026-04-13T20:57:26.738422Z"}
+{"device_id": "cam1", "event": "imager.loop_stopped", "level": "info", "logger": "astrolol.imaging.imager", "timestamp": "2026-04-13T20:57:26.738650Z"}
+{"device_id": "cam1", "kind": "camera", "adapter": "fake_camera", "event": "device.connecting", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.740152Z"}
+{"device_id": "cam1", "kind": "camera", "adapter": "fake_camera", "event": "device.connected", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.740353Z"}
+{"device_id": "cam1", "event": "imager.loop_started", "level": "info", "logger": "astrolol.imaging.imager", "timestamp": "2026-04-13T20:57:26.740526Z"}
+{"device_id": "cam1", "duration": 0.01, "event": "imager.exposing", "level": "info", "logger": "astrolol.imaging.imager", "timestamp": "2026-04-13T20:57:26.740693Z"}
+{"device_id": "cam1", "duration": 0.01, "fits": "/tmp/astrolol_test/fake_0001.fits", "event": "imager.exposure_completed", "level": "info", "logger": "astrolol.imaging.imager", "timestamp": "2026-04-13T20:57:26.744082Z"}
+{"device_id": "cam1", "duration": 0.01, "event": "imager.exposing", "level": "info", "logger": "astrolol.imaging.imager", "timestamp": "2026-04-13T20:57:26.744285Z"}
+{"device_id": "cam1", "duration": 0.01, "fits": "/tmp/astrolol_test/fake_0002.fits", "event": "imager.exposure_completed", "level": "info", "logger": "astrolol.imaging.imager", "timestamp": "2026-04-13T20:57:26.747636Z"}
+{"device_id": "cam1", "duration": 0.01, "event": "imager.exposing", "level": "info", "logger": "astrolol.imaging.imager", "timestamp": "2026-04-13T20:57:26.747835Z"}
+{"device_id": "cam1", "duration": 0.01, "fits": "/tmp/astrolol_test/fake_0003.fits", "event": "imager.exposure_completed", "level": "info", "logger": "astrolol.imaging.imager", "timestamp": "2026-04-13T20:57:26.751196Z"}
+{"device_id": "cam1", "kind": "camera", "adapter": "fake_camera", "event": "device.connecting", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.752748Z"}
+{"device_id": "cam1", "kind": "camera", "adapter": "fake_camera", "event": "device.connected", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.752955Z"}
+{"device_id": "cam1", "event": "imager.loop_started", "level": "info", "logger": "astrolol.imaging.imager", "timestamp": "2026-04-13T20:57:26.753118Z"}
+{"device_id": "cam1", "event": "imager.loop_stopped", "level": "info", "logger": "astrolol.imaging.imager", "timestamp": "2026-04-13T20:57:26.753285Z"}
+{"device_id": "cam1", "kind": "camera", "adapter": "fake_camera", "event": "device.connecting", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.754748Z"}
+{"device_id": "cam1", "kind": "camera", "adapter": "fake_camera", "event": "device.connected", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.754964Z"}
+{"device_id": "cam1", "event": "imager.loop_started", "level": "info", "logger": "astrolol.imaging.imager", "timestamp": "2026-04-13T20:57:26.755140Z"}
+{"device_id": "cam1", "event": "imager.loop_stopped", "level": "info", "logger": "astrolol.imaging.imager", "timestamp": "2026-04-13T20:57:26.755302Z"}
+{"device_id": "cam1", "kind": "camera", "adapter": "fake_camera", "event": "device.connecting", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.756760Z"}
+{"device_id": "cam1", "kind": "camera", "adapter": "fake_camera", "event": "device.connected", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.756963Z"}
+{"device_id": "cam1", "kind": "camera", "adapter": "fake_camera", "event": "device.connecting", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.758464Z"}
+{"device_id": "cam1", "kind": "camera", "adapter": "fake_camera", "event": "device.connected", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.758661Z"}
+{"device_id": "cam2", "kind": "camera", "adapter": "fake_camera", "event": "device.connecting", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.758813Z"}
+{"device_id": "cam2", "kind": "camera", "adapter": "fake_camera", "event": "device.connected", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.759014Z"}
+{"device_id": "cam1", "event": "imager.loop_started", "level": "info", "logger": "astrolol.imaging.imager", "timestamp": "2026-04-13T20:57:26.759170Z"}
+{"device_id": "cam2", "event": "imager.loop_started", "level": "info", "logger": "astrolol.imaging.imager", "timestamp": "2026-04-13T20:57:26.759315Z"}
+{"device_id": "cam2", "duration": 0.01, "event": "imager.exposing", "level": "info", "logger": "astrolol.imaging.imager", "timestamp": "2026-04-13T20:57:26.759478Z"}
+{"device_id": "cam2", "duration": 0.01, "fits": "/tmp/astrolol_test/fake_0001.fits", "event": "imager.exposure_completed", "level": "info", "logger": "astrolol.imaging.imager", "timestamp": "2026-04-13T20:57:26.764034Z"}
+{"device_id": "cam1", "event": "imager.loop_stopped", "level": "info", "logger": "astrolol.imaging.imager", "timestamp": "2026-04-13T20:57:26.764232Z"}
+{"device_id": "cam2", "exposures": 1, "event": "imager.loop_cancelled", "level": "info", "logger": "astrolol.imaging.imager", "timestamp": "2026-04-13T20:57:26.764373Z"}
+{"device_id": "cam2", "event": "imager.loop_stopped", "level": "info", "logger": "astrolol.imaging.imager", "timestamp": "2026-04-13T20:57:26.764529Z"}
+{"path": "/nonexistent/indi/path", "event": "indi.catalog_not_found", "level": "warning", "logger": "astrolol.devices.indi.catalog", "timestamp": "2026-04-13T20:57:26.773475Z"}
+{"drivers": 10, "event": "indi.catalog_loaded", "level": "info", "logger": "astrolol.devices.indi.catalog", "timestamp": "2026-04-13T20:57:26.774945Z"}
+{"drivers": 5, "event": "indi.catalog_loaded", "level": "info", "logger": "astrolol.devices.indi.catalog", "timestamp": "2026-04-13T20:57:26.776256Z"}
+{"file": "/tmp/pytest-of-aris/pytest-15/test_load_catalog_invalid_xml_0/bad.xml", "error": "syntax error: line 1, column 0", "event": "indi.catalog_parse_error", "level": "warning", "logger": "astrolol.devices.indi.catalog", "timestamp": "2026-04-13T20:57:26.777582Z"}
+{"drivers": 5, "event": "indi.catalog_loaded", "level": "info", "logger": "astrolol.devices.indi.catalog", "timestamp": "2026-04-13T20:57:26.777826Z"}
+{"drivers": 5, "event": "indi.catalog_loaded", "level": "info", "logger": "astrolol.devices.indi.catalog", "timestamp": "2026-04-13T20:57:26.779085Z"}
+{"device_id": "mount1", "kind": "mount", "adapter": "fake_mount", "event": "device.connecting", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.780673Z"}
+{"device_id": "mount1", "kind": "mount", "adapter": "fake_mount", "event": "device.connected", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.780881Z"}
+{"device_id": "mount1", "ra": 6.0, "dec": 45.0, "event": "mount.slew_started", "level": "info", "logger": "astrolol.mount.manager", "timestamp": "2026-04-13T20:57:26.781075Z"}
+{"device_id": "mount1", "event": "mount.slew_cancelled", "level": "info", "logger": "astrolol.mount.manager", "timestamp": "2026-04-13T20:57:26.781465Z"}
+{"device_id": "mount1", "kind": "mount", "adapter": "fake_mount", "event": "device.connecting", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.782437Z"}
+{"device_id": "mount1", "kind": "mount", "adapter": "fake_mount", "event": "device.connected", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.782639Z"}
+{"device_id": "mount1", "ra": 6.0, "dec": 45.0, "event": "mount.slew_started", "level": "info", "logger": "astrolol.mount.manager", "timestamp": "2026-04-13T20:57:26.782831Z"}
+{"device_id": "mount1", "event": "mount.slew_completed", "level": "info", "logger": "astrolol.mount.manager", "timestamp": "2026-04-13T20:57:26.833185Z"}
+{"device_id": "mount1", "kind": "mount", "adapter": "fake_mount", "event": "device.connecting", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.835185Z"}
+{"device_id": "mount1", "kind": "mount", "adapter": "fake_mount", "event": "device.connected", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.835527Z"}
+{"device_id": "mount1", "ra": 12.5, "dec": -30.0, "event": "mount.slew_started", "level": "info", "logger": "astrolol.mount.manager", "timestamp": "2026-04-13T20:57:26.835798Z"}
+{"device_id": "mount1", "event": "mount.slew_completed", "level": "info", "logger": "astrolol.mount.manager", "timestamp": "2026-04-13T20:57:26.886235Z"}
+{"device_id": "mount1", "kind": "mount", "adapter": "fake_mount", "event": "device.connecting", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.888739Z"}
+{"device_id": "mount1", "kind": "mount", "adapter": "fake_mount", "event": "device.connected", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.889125Z"}
+{"device_id": "mount1", "ra": 1.0, "dec": 0.0, "event": "mount.slew_started", "level": "info", "logger": "astrolol.mount.manager", "timestamp": "2026-04-13T20:57:26.889515Z"}
+{"device_id": "mount1", "event": "mount.stopped", "level": "info", "logger": "astrolol.mount.manager", "timestamp": "2026-04-13T20:57:26.889998Z"}
+{"device_id": "mount1", "kind": "mount", "adapter": "fake_mount", "event": "device.connecting", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.891938Z"}
+{"device_id": "mount1", "kind": "mount", "adapter": "fake_mount", "event": "device.connected", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.892283Z"}
+{"device_id": "mount1", "ra": 1.0, "dec": 0.0, "event": "mount.slew_started", "level": "info", "logger": "astrolol.mount.manager", "timestamp": "2026-04-13T20:57:26.892579Z"}
+{"device_id": "mount1", "event": "mount.stopped", "level": "info", "logger": "astrolol.mount.manager", "timestamp": "2026-04-13T20:57:26.892878Z"}
+{"device_id": "mount1", "kind": "mount", "adapter": "fake_mount", "event": "device.connecting", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.894611Z"}
+{"device_id": "mount1", "kind": "mount", "adapter": "fake_mount", "event": "device.connected", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.894811Z"}
+{"device_id": "mount1", "event": "mount.stopped", "level": "info", "logger": "astrolol.mount.manager", "timestamp": "2026-04-13T20:57:26.894979Z"}
+{"device_id": "mount1", "kind": "mount", "adapter": "fake_mount", "event": "device.connecting", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.896077Z"}
+{"device_id": "mount1", "kind": "mount", "adapter": "fake_mount", "event": "device.connected", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.896273Z"}
+{"device_id": "mount1", "event": "mount.parking", "level": "info", "logger": "astrolol.mount.manager", "timestamp": "2026-04-13T20:57:26.896415Z"}
+{"device_id": "mount1", "event": "mount.parked", "level": "info", "logger": "astrolol.mount.manager", "timestamp": "2026-04-13T20:57:26.946744Z"}
+{"device_id": "mount1", "kind": "mount", "adapter": "fake_mount", "event": "device.connecting", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.948712Z"}
+{"device_id": "mount1", "kind": "mount", "adapter": "fake_mount", "event": "device.connected", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:26.949063Z"}
+{"device_id": "mount1", "event": "mount.parking", "level": "info", "logger": "astrolol.mount.manager", "timestamp": "2026-04-13T20:57:26.949303Z"}
+{"device_id": "mount1", "event": "mount.parked", "level": "info", "logger": "astrolol.mount.manager", "timestamp": "2026-04-13T20:57:26.999712Z"}
+{"device_id": "mount1", "kind": "mount", "adapter": "fake_mount", "event": "device.connecting", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:27.001778Z"}
+{"device_id": "mount1", "kind": "mount", "adapter": "fake_mount", "event": "device.connected", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:27.002127Z"}
+{"device_id": "mount1", "event": "mount.parking", "level": "info", "logger": "astrolol.mount.manager", "timestamp": "2026-04-13T20:57:27.002353Z"}
+{"device_id": "mount1", "event": "mount.parked", "level": "info", "logger": "astrolol.mount.manager", "timestamp": "2026-04-13T20:57:27.052744Z"}
+{"device_id": "mount1", "event": "mount.unparked", "level": "info", "logger": "astrolol.mount.manager", "timestamp": "2026-04-13T20:57:27.053059Z"}
+{"device_id": "mount1", "kind": "mount", "adapter": "fake_mount", "event": "device.connecting", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:27.054982Z"}
+{"device_id": "mount1", "kind": "mount", "adapter": "fake_mount", "event": "device.connected", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:27.055322Z"}
+{"device_id": "mount1", "ra": 5.5, "dec": 22.0, "event": "mount.synced", "level": "info", "logger": "astrolol.mount.manager", "timestamp": "2026-04-13T20:57:27.055620Z"}
+{"device_id": "mount1", "kind": "mount", "adapter": "fake_mount", "event": "device.connecting", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:27.057084Z"}
+{"device_id": "mount1", "kind": "mount", "adapter": "fake_mount", "event": "device.connected", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:27.057284Z"}
+{"device_id": "mount1", "tracking": true, "mode": null, "event": "mount.tracking_changed", "level": "info", "logger": "astrolol.mount.manager", "timestamp": "2026-04-13T20:57:27.057448Z"}
+{"device_id": "mount1", "kind": "mount", "adapter": "fake_mount", "event": "device.connecting", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:27.058558Z"}
+{"device_id": "mount1", "kind": "mount", "adapter": "fake_mount", "event": "device.connected", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:27.058753Z"}
+{"device_id": "mount1", "tracking": true, "mode": null, "event": "mount.tracking_changed", "level": "info", "logger": "astrolol.mount.manager", "timestamp": "2026-04-13T20:57:27.058906Z"}
+{"device_id": "mount1", "tracking": false, "mode": null, "event": "mount.tracking_changed", "level": "info", "logger": "astrolol.mount.manager", "timestamp": "2026-04-13T20:57:27.059054Z"}
+{"device_id": "mount1", "kind": "mount", "adapter": "fake_mount", "event": "device.connecting", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:27.060136Z"}
+{"device_id": "mount1", "kind": "mount", "adapter": "fake_mount", "event": "device.connected", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:27.060330Z"}
+{"device_id": "mount1", "tracking": true, "mode": "lunar", "event": "mount.tracking_changed", "level": "info", "logger": "astrolol.mount.manager", "timestamp": "2026-04-13T20:57:27.060607Z"}
+{"device_id": "mount1", "kind": "mount", "adapter": "fake_mount", "event": "device.connecting", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:27.061725Z"}
+{"device_id": "mount1", "kind": "mount", "adapter": "fake_mount", "event": "device.connected", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:27.061927Z"}
+{"device_id": "mount1", "tracking": true, "mode": "solar", "event": "mount.tracking_changed", "level": "info", "logger": "astrolol.mount.manager", "timestamp": "2026-04-13T20:57:27.062089Z"}
+{"device_id": "mount1", "kind": "mount", "adapter": "fake_mount", "event": "device.connecting", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:27.063181Z"}
+{"device_id": "mount1", "kind": "mount", "adapter": "fake_mount", "event": "device.connected", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:27.063374Z"}
+{"device_id": "mount1", "tracking": true, "mode": null, "event": "mount.tracking_changed", "level": "info", "logger": "astrolol.mount.manager", "timestamp": "2026-04-13T20:57:27.063521Z"}
+{"device_id": "mount1", "kind": "mount", "adapter": "fake_mount", "event": "device.connecting", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:27.064597Z"}
+{"device_id": "mount1", "kind": "mount", "adapter": "fake_mount", "event": "device.connected", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:27.064790Z"}
+{"device_id": "mount1", "event": "mount.parking", "level": "info", "logger": "astrolol.mount.manager", "timestamp": "2026-04-13T20:57:27.064941Z"}
+{"device_id": "mount1", "event": "mount.parked", "level": "info", "logger": "astrolol.mount.manager", "timestamp": "2026-04-13T20:57:27.115244Z"}
+{"device_id": "mount1", "event": "mount.unparked", "level": "info", "logger": "astrolol.mount.manager", "timestamp": "2026-04-13T20:57:27.115574Z"}
+{"device_id": "mount1", "kind": "mount", "adapter": "fake_mount", "event": "device.connecting", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:27.117513Z"}
+{"device_id": "mount1", "kind": "mount", "adapter": "fake_mount", "event": "device.connected", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:27.117850Z"}
+{"device_id": "mount1", "ra": 1.0, "dec": 0.0, "event": "mount.slew_started", "level": "info", "logger": "astrolol.mount.manager", "timestamp": "2026-04-13T20:57:27.118518Z"}
+{"device_id": "mount1", "error": "motor fault", "event": "mount.slew_error", "level": "error", "logger": "astrolol.mount.manager", "timestamp": "2026-04-13T20:57:27.118961Z"}
+{"device_id": "mount1", "kind": "mount", "adapter": "fake_mount", "event": "device.connecting", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:27.120291Z"}
+{"device_id": "mount1", "kind": "mount", "adapter": "fake_mount", "event": "device.connected", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:27.120489Z"}
+{"device_id": "mount1", "ra": 1.0, "dec": 0.0, "event": "mount.slew_started", "level": "info", "logger": "astrolol.mount.manager", "timestamp": "2026-04-13T20:57:27.120817Z"}
+{"device_id": "mount1", "event": "mount.slew_timeout", "level": "error", "logger": "astrolol.mount.manager", "timestamp": "2026-04-13T20:57:27.121153Z"}
+{"device_id": "mount1", "kind": "mount", "adapter": "fake_mount", "event": "device.connecting", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:27.122305Z"}
+{"device_id": "mount1", "kind": "mount", "adapter": "fake_mount", "event": "device.connected", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:27.122500Z"}
+{"device_id": "mount1", "event": "mount.parking", "level": "info", "logger": "astrolol.mount.manager", "timestamp": "2026-04-13T20:57:27.122780Z"}
+{"device_id": "mount1", "error": "hardware fault", "event": "mount.park_error", "level": "error", "logger": "astrolol.mount.manager", "timestamp": "2026-04-13T20:57:27.122985Z"}
+{"plugins": ["<astrolol.devices.indi.plugin.IndiPlugin object at 0x73ecd86ea030>"], "event": "plugins.loaded", "level": "info", "logger": "astrolol.app", "timestamp": "2026-04-13T20:57:27.145036Z"}
+{"event": "indi.adapters_registered", "level": "info", "logger": "astrolol.devices.indi.plugin", "timestamp": "2026-04-13T20:57:27.145273Z"}
+{"available": {"cameras": ["indi_camera"], "mounts": ["indi_mount"], "focusers": ["indi_focuser"]}, "event": "devices.registered", "level": "info", "logger": "astrolol.app", "timestamp": "2026-04-13T20:57:27.145416Z"}
+{"event": "HTTP Request: POST http://test/profiles \"HTTP/1.1 201 Created\"", "level": "info", "logger": "httpx", "timestamp": "2026-04-13T20:57:27.165556Z"}
+{"plugins": ["<astrolol.devices.indi.plugin.IndiPlugin object at 0x73ecd9582330>"], "event": "plugins.loaded", "level": "info", "logger": "astrolol.app", "timestamp": "2026-04-13T20:57:27.170368Z"}
+{"event": "indi.adapters_registered", "level": "info", "logger": "astrolol.devices.indi.plugin", "timestamp": "2026-04-13T20:57:27.170605Z"}
+{"available": {"cameras": ["indi_camera"], "mounts": ["indi_mount"], "focusers": ["indi_focuser"]}, "event": "devices.registered", "level": "info", "logger": "astrolol.app", "timestamp": "2026-04-13T20:57:27.170738Z"}
+{"event": "HTTP Request: POST http://test/profiles \"HTTP/1.1 201 Created\"", "level": "info", "logger": "httpx", "timestamp": "2026-04-13T20:57:27.230170Z"}
+{"event": "HTTP Request: POST http://test/profiles \"HTTP/1.1 201 Created\"", "level": "info", "logger": "httpx", "timestamp": "2026-04-13T20:57:27.230946Z"}
+{"event": "HTTP Request: GET http://test/profiles \"HTTP/1.1 200 OK\"", "level": "info", "logger": "httpx", "timestamp": "2026-04-13T20:57:27.231559Z"}
+{"plugins": ["<astrolol.devices.indi.plugin.IndiPlugin object at 0x73ecd8c1cdd0>"], "event": "plugins.loaded", "level": "info", "logger": "astrolol.app", "timestamp": "2026-04-13T20:57:27.236284Z"}
+{"event": "indi.adapters_registered", "level": "info", "logger": "astrolol.devices.indi.plugin", "timestamp": "2026-04-13T20:57:27.236522Z"}
+{"available": {"cameras": ["indi_camera"], "mounts": ["indi_mount"], "focusers": ["indi_focuser"]}, "event": "devices.registered", "level": "info", "logger": "astrolol.app", "timestamp": "2026-04-13T20:57:27.236656Z"}
+{"event": "HTTP Request: POST http://test/profiles \"HTTP/1.1 201 Created\"", "level": "info", "logger": "httpx", "timestamp": "2026-04-13T20:57:27.254457Z"}
+{"event": "HTTP Request: GET http://test/profiles/5851cf39-33eb-4cee-8fc8-41991efecb86 \"HTTP/1.1 200 OK\"", "level": "info", "logger": "httpx", "timestamp": "2026-04-13T20:57:27.255148Z"}
+{"plugins": ["<astrolol.devices.indi.plugin.IndiPlugin object at 0x73ecd8cfc470>"], "event": "plugins.loaded", "level": "info", "logger": "astrolol.app", "timestamp": "2026-04-13T20:57:27.259763Z"}
+{"event": "indi.adapters_registered", "level": "info", "logger": "astrolol.devices.indi.plugin", "timestamp": "2026-04-13T20:57:27.260000Z"}
+{"available": {"cameras": ["indi_camera"], "mounts": ["indi_mount"], "focusers": ["indi_focuser"]}, "event": "devices.registered", "level": "info", "logger": "astrolol.app", "timestamp": "2026-04-13T20:57:27.260140Z"}
+{"event": "HTTP Request: GET http://test/profiles/nonexistent \"HTTP/1.1 404 Not Found\"", "level": "info", "logger": "httpx", "timestamp": "2026-04-13T20:57:27.278515Z"}
+{"plugins": ["<astrolol.devices.indi.plugin.IndiPlugin object at 0x73ecd8bb8c50>"], "event": "plugins.loaded", "level": "info", "logger": "astrolol.app", "timestamp": "2026-04-13T20:57:27.283141Z"}
+{"event": "indi.adapters_registered", "level": "info", "logger": "astrolol.devices.indi.plugin", "timestamp": "2026-04-13T20:57:27.283371Z"}
+{"available": {"cameras": ["indi_camera"], "mounts": ["indi_mount"], "focusers": ["indi_focuser"]}, "event": "devices.registered", "level": "info", "logger": "astrolol.app", "timestamp": "2026-04-13T20:57:27.283504Z"}
+{"event": "HTTP Request: POST http://test/profiles \"HTTP/1.1 201 Created\"", "level": "info", "logger": "httpx", "timestamp": "2026-04-13T20:57:27.301186Z"}
+{"event": "HTTP Request: PUT http://test/profiles/e06ed918-60a9-4d8c-9f43-1e82dcb53be3 \"HTTP/1.1 200 OK\"", "level": "info", "logger": "httpx", "timestamp": "2026-04-13T20:57:27.302141Z"}
+{"plugins": ["<astrolol.devices.indi.plugin.IndiPlugin object at 0x73ecd8ba51f0>"], "event": "plugins.loaded", "level": "info", "logger": "astrolol.app", "timestamp": "2026-04-13T20:57:27.306777Z"}
+{"event": "indi.adapters_registered", "level": "info", "logger": "astrolol.devices.indi.plugin", "timestamp": "2026-04-13T20:57:27.307025Z"}
+{"available": {"cameras": ["indi_camera"], "mounts": ["indi_mount"], "focusers": ["indi_focuser"]}, "event": "devices.registered", "level": "info", "logger": "astrolol.app", "timestamp": "2026-04-13T20:57:27.307164Z"}
+{"event": "HTTP Request: POST http://test/profiles \"HTTP/1.1 201 Created\"", "level": "info", "logger": "httpx", "timestamp": "2026-04-13T20:57:27.325387Z"}
+{"event": "HTTP Request: DELETE http://test/profiles/ed999f5d-6fee-4829-aba2-0cced0a2feec \"HTTP/1.1 204 No Content\"", "level": "info", "logger": "httpx", "timestamp": "2026-04-13T20:57:27.326275Z"}
+{"event": "HTTP Request: GET http://test/profiles \"HTTP/1.1 200 OK\"", "level": "info", "logger": "httpx", "timestamp": "2026-04-13T20:57:27.326783Z"}
+{"plugins": ["<astrolol.devices.indi.plugin.IndiPlugin object at 0x73ecd8bd57c0>"], "event": "plugins.loaded", "level": "info", "logger": "astrolol.app", "timestamp": "2026-04-13T20:57:27.331369Z"}
+{"event": "indi.adapters_registered", "level": "info", "logger": "astrolol.devices.indi.plugin", "timestamp": "2026-04-13T20:57:27.331594Z"}
+{"available": {"cameras": ["indi_camera"], "mounts": ["indi_mount"], "focusers": ["indi_focuser"]}, "event": "devices.registered", "level": "info", "logger": "astrolol.app", "timestamp": "2026-04-13T20:57:27.331726Z"}
+{"event": "HTTP Request: GET http://test/profiles/active \"HTTP/1.1 200 OK\"", "level": "info", "logger": "httpx", "timestamp": "2026-04-13T20:57:27.349453Z"}
+{"plugins": ["<astrolol.devices.indi.plugin.IndiPlugin object at 0x73ecd8d1c470>"], "event": "plugins.loaded", "level": "info", "logger": "astrolol.app", "timestamp": "2026-04-13T20:57:27.354053Z"}
+{"event": "indi.adapters_registered", "level": "info", "logger": "astrolol.devices.indi.plugin", "timestamp": "2026-04-13T20:57:27.354278Z"}
+{"available": {"cameras": ["indi_camera"], "mounts": ["indi_mount"], "focusers": ["indi_focuser"]}, "event": "devices.registered", "level": "info", "logger": "astrolol.app", "timestamp": "2026-04-13T20:57:27.354410Z"}
+{"event": "HTTP Request: POST http://test/profiles \"HTTP/1.1 201 Created\"", "level": "info", "logger": "httpx", "timestamp": "2026-04-13T20:57:27.371938Z"}
+{"event": "HTTP Request: POST http://test/profiles/e663d6c2-80f6-45f2-9cb7-fb6d60eff484/activate \"HTTP/1.1 200 OK\"", "level": "info", "logger": "httpx", "timestamp": "2026-04-13T20:57:27.373017Z"}
+{"event": "HTTP Request: GET http://test/profiles/active \"HTTP/1.1 200 OK\"", "level": "info", "logger": "httpx", "timestamp": "2026-04-13T20:57:27.373539Z"}
+{"plugins": ["<astrolol.devices.indi.plugin.IndiPlugin object at 0x73ecd95e5c10>"], "event": "plugins.loaded", "level": "info", "logger": "astrolol.app", "timestamp": "2026-04-13T20:57:27.378183Z"}
+{"event": "indi.adapters_registered", "level": "info", "logger": "astrolol.devices.indi.plugin", "timestamp": "2026-04-13T20:57:27.378414Z"}
+{"available": {"cameras": ["indi_camera"], "mounts": ["indi_mount"], "focusers": ["indi_focuser"]}, "event": "devices.registered", "level": "info", "logger": "astrolol.app", "timestamp": "2026-04-13T20:57:27.378548Z"}
+{"event": "HTTP Request: POST http://test/profiles \"HTTP/1.1 201 Created\"", "level": "info", "logger": "httpx", "timestamp": "2026-04-13T20:57:27.397702Z"}
+{"event": "HTTP Request: POST http://test/profiles/ee24e6bf-a5db-496e-a27f-e3af9d0832ab/activate \"HTTP/1.1 200 OK\"", "level": "info", "logger": "httpx", "timestamp": "2026-04-13T20:57:27.398450Z"}
+{"plugins": ["<astrolol.devices.indi.plugin.IndiPlugin object at 0x73ecd8a74440>"], "event": "plugins.loaded", "level": "info", "logger": "astrolol.app", "timestamp": "2026-04-13T20:57:27.403143Z"}
+{"event": "indi.adapters_registered", "level": "info", "logger": "astrolol.devices.indi.plugin", "timestamp": "2026-04-13T20:57:27.403371Z"}
+{"available": {"cameras": ["indi_camera"], "mounts": ["indi_mount"], "focusers": ["indi_focuser"]}, "event": "devices.registered", "level": "info", "logger": "astrolol.app", "timestamp": "2026-04-13T20:57:27.403506Z"}
+{"event": "HTTP Request: POST http://test/profiles \"HTTP/1.1 201 Created\"", "level": "info", "logger": "httpx", "timestamp": "2026-04-13T20:57:27.421053Z"}
+{"event": "HTTP Request: POST http://test/profiles/d70fd380-152b-4668-b224-5e47aaf32a94/activate \"HTTP/1.1 200 OK\"", "level": "info", "logger": "httpx", "timestamp": "2026-04-13T20:57:27.421765Z"}
+{"event": "HTTP Request: DELETE http://test/profiles/active \"HTTP/1.1 204 No Content\"", "level": "info", "logger": "httpx", "timestamp": "2026-04-13T20:57:27.422643Z"}
+{"event": "HTTP Request: GET http://test/profiles/active \"HTTP/1.1 200 OK\"", "level": "info", "logger": "httpx", "timestamp": "2026-04-13T20:57:27.423159Z"}
+{"plugins": ["<astrolol.devices.indi.plugin.IndiPlugin object at 0x73ecd8b87110>"], "event": "plugins.loaded", "level": "info", "logger": "astrolol.app", "timestamp": "2026-04-13T20:57:27.427872Z"}
+{"event": "indi.adapters_registered", "level": "info", "logger": "astrolol.devices.indi.plugin", "timestamp": "2026-04-13T20:57:27.428100Z"}
+{"available": {"cameras": ["indi_camera"], "mounts": ["indi_mount"], "focusers": ["indi_focuser"]}, "event": "devices.registered", "level": "info", "logger": "astrolol.app", "timestamp": "2026-04-13T20:57:27.428234Z"}
+{"event": "HTTP Request: POST http://test/profiles \"HTTP/1.1 201 Created\"", "level": "info", "logger": "httpx", "timestamp": "2026-04-13T20:57:27.446877Z"}
+{"event": "HTTP Request: POST http://test/profiles/4e8e4544-f7cf-41c4-835e-3b01b6c4a0dd/activate \"HTTP/1.1 200 OK\"", "level": "info", "logger": "httpx", "timestamp": "2026-04-13T20:57:27.447708Z"}
+{"event": "HTTP Request: DELETE http://test/profiles/active \"HTTP/1.1 204 No Content\"", "level": "info", "logger": "httpx", "timestamp": "2026-04-13T20:57:27.448381Z"}
+{"plugins": ["<astrolol.devices.indi.plugin.IndiPlugin object at 0x73ecd8a59040>"], "event": "plugins.loaded", "level": "info", "logger": "astrolol.app", "timestamp": "2026-04-13T20:57:27.453122Z"}
+{"event": "indi.adapters_registered", "level": "info", "logger": "astrolol.devices.indi.plugin", "timestamp": "2026-04-13T20:57:27.453352Z"}
+{"available": {"cameras": ["indi_camera"], "mounts": ["indi_mount"], "focusers": ["indi_focuser"]}, "event": "devices.registered", "level": "info", "logger": "astrolol.app", "timestamp": "2026-04-13T20:57:27.453484Z"}
+{"event": "HTTP Request: POST http://test/profiles/nonexistent/activate \"HTTP/1.1 404 Not Found\"", "level": "info", "logger": "httpx", "timestamp": "2026-04-13T20:57:27.470990Z"}
+{"plugins": ["<astrolol.devices.indi.plugin.IndiPlugin object at 0x73ecd95e7ef0>"], "event": "plugins.loaded", "level": "info", "logger": "astrolol.app", "timestamp": "2026-04-13T20:57:27.475689Z"}
+{"event": "indi.adapters_registered", "level": "info", "logger": "astrolol.devices.indi.plugin", "timestamp": "2026-04-13T20:57:27.475934Z"}
+{"available": {"cameras": ["indi_camera"], "mounts": ["indi_mount"], "focusers": ["indi_focuser"]}, "event": "devices.registered", "level": "info", "logger": "astrolol.app", "timestamp": "2026-04-13T20:57:27.476077Z"}
+{"event": "HTTP Request: POST http://test/profiles \"HTTP/1.1 201 Created\"", "level": "info", "logger": "httpx", "timestamp": "2026-04-13T20:57:27.494454Z"}
+{"device_id": "cam1", "kind": "camera", "adapter": "fake_camera", "event": "device.connecting", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:27.495054Z"}
+{"device_id": "cam1", "kind": "camera", "adapter": "fake_camera", "event": "device.connected", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:27.495272Z"}
+{"event": "HTTP Request: POST http://test/profiles/8dff5de9-7455-4ef8-81f1-1f6330ac96a0/activate \"HTTP/1.1 200 OK\"", "level": "info", "logger": "httpx", "timestamp": "2026-04-13T20:57:27.495598Z"}
+{"event": "HTTP Request: GET http://test/devices/connected \"HTTP/1.1 200 OK\"", "level": "info", "logger": "httpx", "timestamp": "2026-04-13T20:57:27.496137Z"}
+{"plugins": ["<astrolol.devices.indi.plugin.IndiPlugin object at 0x73ecd8c9adb0>"], "event": "plugins.loaded", "level": "info", "logger": "astrolol.app", "timestamp": "2026-04-13T20:57:27.500904Z"}
+{"event": "indi.adapters_registered", "level": "info", "logger": "astrolol.devices.indi.plugin", "timestamp": "2026-04-13T20:57:27.501131Z"}
+{"available": {"cameras": ["indi_camera"], "mounts": ["indi_mount"], "focusers": ["indi_focuser"]}, "event": "devices.registered", "level": "info", "logger": "astrolol.app", "timestamp": "2026-04-13T20:57:27.501263Z"}
+{"event": "HTTP Request: POST http://test/profiles \"HTTP/1.1 201 Created\"", "level": "info", "logger": "httpx", "timestamp": "2026-04-13T20:57:27.519523Z"}
+{"device_id": "cam1", "kind": "camera", "adapter": "fake_camera", "event": "device.connecting", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:27.520255Z"}
+{"device_id": "cam1", "kind": "camera", "adapter": "fake_camera", "event": "device.connected", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:27.520474Z"}
+{"event": "HTTP Request: POST http://test/profiles/57942af0-bdb8-47ae-9c86-04fd6fe3036c/activate \"HTTP/1.1 200 OK\"", "level": "info", "logger": "httpx", "timestamp": "2026-04-13T20:57:27.520796Z"}
+{"device_id": "cam1", "kind": "camera", "event": "device.disconnecting", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:27.521149Z"}
+{"device_id": "cam1", "kind": "camera", "event": "device.disconnected", "level": "info", "logger": "astrolol.devices.manager", "timestamp": "2026-04-13T20:57:27.521329Z"}
+{"event": "HTTP Request: DELETE http://test/profiles/active \"HTTP/1.1 204 No Content\"", "level": "info", "logger": "httpx", "timestamp": "2026-04-13T20:57:27.521781Z"}
+{"event": "HTTP Request: GET http://test/devices/connected \"HTTP/1.1 200 OK\"", "level": "info", "logger": "httpx", "timestamp": "2026-04-13T20:57:27.522289Z"}

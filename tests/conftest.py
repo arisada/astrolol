@@ -94,6 +94,7 @@ class FakeMount:
         self._dec: float = 0.0
         self._tracking = False
         self._parked = False
+        self.last_tracking_mode = None
 
     async def connect(self) -> None:
         self.connected = True
@@ -124,6 +125,7 @@ class FakeMount:
 
     async def set_tracking(self, enabled: bool, mode=None) -> None:
         self._tracking = enabled
+        self.last_tracking_mode = mode
 
     async def get_status(self) -> MountStatus:
         state = DeviceState.CONNECTED if self.connected else DeviceState.DISCONNECTED
