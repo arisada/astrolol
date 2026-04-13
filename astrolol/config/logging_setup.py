@@ -93,7 +93,7 @@ def _logger_to_component(logger_name: str) -> str:
     for part in parts:
         if part in _COMPONENT_MAP:
             return _COMPONENT_MAP[part]
-    return parts[-1] if parts else "app"
+    return parts[-1] or "app"
 
 
 class EventBusForwarder:
