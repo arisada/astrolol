@@ -52,13 +52,15 @@ class IndiClient(IPyClient):
         super().__init__(indihost=host, indiport=port)
         self.host = host
         self.port = port
-        # Condition notified on every rxevent — used by all _wait_* helpers.
-        self._cond: asyncio.Condition = asyncio.Condition()
-        # Set when the TCP connection to indiserver is established.
-        self._connected: asyncio.Event = asyncio.Event()
+        # Asyncio primitives are created in connect() so they bind to the
+        # event loop that is actually running at connection time.  Creating
+        # them here would bind them to whatever loop happens to be current
+        # (or None) when the object is instantiated — a problem when the
+        # same IndiClient is reused across different event loops (e.g. in
+        # tests where each function gets its own loop).
+        self._cond: asyncio.Condition | None = None
+        self._connected: asyncio.Event | None = None
         self._task: asyncio.Task[None] | None = None
-        # Monotonic version counter per BLOB property so wait_for_blob can
-        # detect a new delivery even when the payload size is identical.
         self._blob_versions: dict[tuple[str, str], int] = {}
 
     # ------------------------------------------------------------------
@@ -67,6 +69,10 @@ class IndiClient(IPyClient):
 
     async def connect(self) -> None:
         """Start asyncrun() and wait for the TCP connection to be established."""
+        # (Re-)create primitives bound to the current running loop.
+        self._cond = asyncio.Condition()
+        self._connected = asyncio.Event()
+        self._blob_versions.clear()
         self._task = asyncio.create_task(self.asyncrun())
         try:
             await asyncio.wait_for(self._connected.wait(), timeout=10.0)
@@ -91,17 +97,19 @@ class IndiClient(IPyClient):
     # ------------------------------------------------------------------
 
     async def rxevent(self, event: Any) -> None:  # noqa: ANN401
-        if isinstance(event, indi_events.ConnectionMade):
-            self._connected.set()
-        elif isinstance(event, indi_events.ConnectionLost):
-            self._connected.clear()
+        if self._connected is not None:
+            if isinstance(event, indi_events.ConnectionMade):
+                self._connected.set()
+            elif isinstance(event, indi_events.ConnectionLost):
+                self._connected.clear()
 
         if isinstance(event, indi_events.setBLOBVector):
             key = (event.devicename, event.vectorname)
             self._blob_versions[key] = self._blob_versions.get(key, 0) + 1
 
-        async with self._cond:
-            self._cond.notify_all()
+        if self._cond is not None:
+            async with self._cond:
+                self._cond.notify_all()
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -119,6 +127,7 @@ class IndiClient(IPyClient):
 
     async def _wait_cond(self, predicate: Any, timeout: float) -> None:
         """Wait until predicate() is True, or raise TimeoutError."""
+        assert self._cond is not None, "IndiClient.connect() must be called first"
         deadline = asyncio.get_event_loop().time() + timeout
         async with self._cond:
             while not predicate():

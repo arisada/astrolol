@@ -48,12 +48,24 @@ class IndiConnectionManager:
             host=settings.indi_host,
             port=settings.indi_port,
         )
-        self._lock = asyncio.Lock()
+        # Lock and loop reference are created lazily in acquire() so they bind
+        # to the correct running event loop.  This matters when the same
+        # IndiConnectionManager instance is used across multiple event loops
+        # (e.g. in tests where each test function gets its own loop).
+        self._lock: asyncio.Lock | None = None
+        self._loop: asyncio.AbstractEventLoop | None = None
         self._ref_count = 0
         self._started = False
 
     async def acquire(self) -> None:
         """Called by each INDI adapter on connect(). Starts services on first call."""
+        current_loop = asyncio.get_running_loop()
+        if self._lock is None or self._loop is not current_loop:
+            # First call, or the event loop changed (e.g. between test functions).
+            # Reset so we reconnect in the new loop with fresh asyncio primitives.
+            self._lock = asyncio.Lock()
+            self._loop = current_loop
+            self._started = False
         async with self._lock:
             if not self._started:
                 await self._server.start()
