@@ -4,9 +4,9 @@ Items designed for but not yet built. Ordered roughly by priority.
 
 ## Pre-release
 
-- **INDI adapter** — implement `ICamera`, `IMount`, `IFocuser` in `astrolol/devices/indi/`
-  using `pyindi-client`. Bundled in the main package; registers via entry point in
-  `pyproject.toml`. INDI simulator drivers replace hardware during development.
+- ~~**INDI adapter**~~ — **Done.** `ICamera`, `IMount`, `IFocuser` implemented in
+  `astrolol/devices/indi/` using `indipyclient` (pure Python asyncio). 108 tests pass
+  including 34 integration tests against real INDI simulators.
 - **Equipment profiles** — persist named `DeviceConfig` lists to SQLite so users configure
   their rig once. CRUD endpoints + load-profile-at-startup flow.
 - **Watchdog** — per-device async task that calls `ping()` periodically, transitions device

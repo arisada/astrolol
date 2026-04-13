@@ -34,8 +34,8 @@ and receive a live JSON stream. A React + TypeScript web UI is served as static 
 ## Running the app
 
 ```bash
-# Install (dev deps required for tests)
-pip install -e ".[dev]"
+# Install (dev deps required for tests; indi extra required for INDI adapters)
+pip install -e ".[dev,indi]"
 
 # Backend only
 python3 -m astrolol.main          # API at http://localhost:8000
@@ -55,8 +55,25 @@ python3 -m astrolol.main           # everything at http://localhost:8000
 python3 -m pytest tests/ -v
 ```
 
-60 tests, all green. Fake device adapters (`FakeCamera`, `FakeMount`, `FakeFocuser`) in
-`tests/conftest.py` — no hardware or INDI server required.
+108 tests total. Unit tests (74) use fake device adapters (`FakeCamera`, `FakeMount`,
+`FakeFocuser`) in `tests/conftest.py` — no hardware required. Integration tests (34) in
+`tests/integration/` require `indiserver` (`indi-bin` package) and are skipped
+automatically when it is not installed.
+
+## Docker development environment
+
+```bash
+# Build and start all services
+docker-compose up
+
+# Run tests inside the container
+docker-compose run --rm backend python3 -m pytest tests/ -v
+```
+
+Backend API at `http://localhost:8000`, UI dev server at `http://localhost:80`.
+Vite proxies `/devices`, `/imager`, `/mount`, `/focuser`, `/ws` to the backend container.
+Source is bind-mounted so code changes are reflected immediately without rebuilding.
+Rebuild is only needed when `pyproject.toml` or `ui/package.json` change.
 
 ## Project structure
 
@@ -76,7 +93,7 @@ astrolol/
 │   ├── config.py       # DeviceConfig (kind + adapter_key + params)
 │   ├── manager.py      # DeviceManager — connect/disconnect lifecycle + events
 │   ├── registry.py     # DeviceRegistry — adapter_key → class mapping
-│   └── indi/           # INDI adapters (to be implemented, bundled here)
+│   └── indi/           # INDI adapters (camera, mount, focuser + IndiClient)
 ├── focuser/
 │   └── manager.py      # FocuserManager — move tasks, halt, events
 ├── imaging/
@@ -103,7 +120,8 @@ ui/
 
 tests/
 ├── conftest.py         # FakeCamera (writes real FITS), FakeMount, FakeFocuser + fixtures
-└── unit/               # 60 tests — no hardware required
+├── unit/               # 74 tests — no hardware required
+└── integration/        # 34 tests — require indiserver (skipped if not installed)
 ```
 
 ## Deferred work

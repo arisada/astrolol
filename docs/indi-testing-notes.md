@@ -49,7 +49,7 @@ the operation at all.
    2 s). If it never goes BUSY, the command was instantaneous and we can return.
 2. **Phase 2** — wait for BUSY to end (the operation completed).
 
-This is `wait_prop_busy_then_done` in `_SyncIndiClient`.
+This is `wait_prop_busy_then_done` in `IndiClient`.
 
 ---
 
@@ -116,7 +116,7 @@ slewing and calls `unpark()` first if the mount is parked.
 
 ---
 
-## 7. PyIndi segfault at process exit
+## 7. PyIndi segfault at process exit *(historical — pyindi-client removed)*
 
 **Symptom:** After all tests pass, the process exits with `Fatal Python error:
 Segmentation fault` and a C++ backtrace inside PyIndi.
@@ -126,14 +126,31 @@ Calling `disconnectServer()` while callbacks are still in flight can cause a use
 At process exit, Python tears down objects in an unpredictable order which sometimes races
 with the receiver thread.
 
-**Workaround:** Do NOT call `disconnectServer()` in `IndiClient.disconnect()`. Instead,
-set `_active = False` (so all callbacks become no-ops) and let the TCP EOF from killing
-the indiserver process terminate the receiver thread naturally. The segfault is benign —
-it only occurs after all tests have completed and does not affect exit code or results.
+**Resolution:** The backend was migrated from `pyindi-client` (SWIG/C++ wrapper) to
+`indipyclient` (pure Python asyncio). `indipyclient` has no C++ threads and does not
+exhibit this crash.
 
 ---
 
-## 8. Only one indiserver per host (abstract Unix socket conflict)
+## 8. asyncio primitives bound to a stale event loop
+
+**Symptom:** Tests pass in isolation but fail when run together with:
+`RuntimeError: ... is bound to a different event loop`.
+
+**Root cause:** In Python 3.10+, `asyncio.Condition`, `asyncio.Lock`, and
+`asyncio.Event` bind to the running event loop at first use (via `_LoopBoundMixin`).
+With `pytest-asyncio` in `asyncio_mode=auto`, each test function gets its own event
+loop. If an `IndiClient` (or any object holding these primitives) is created outside a
+test — e.g. in a class `__init__` — the primitive binds to a loop that no longer exists
+when the next test runs.
+
+**Fix:** Do not create asyncio primitives in `__init__`. Initialise them to `None` and
+create them at connection time (`connect()`, `acquire()`, etc.), where the running loop
+is guaranteed to be the test's loop. Guard all usages with `if self._cond is not None`.
+
+---
+
+## 9. Only one indiserver per host (abstract Unix socket conflict)
 
 **Symptom:** Starting a second `indiserver` process fails or the first one crashes.
 
@@ -143,5 +160,25 @@ a time, regardless of which TCP port is used.
 
 **Fix:** Load all required simulator drivers into a single shared `indiserver` instance.
 Use a module-scoped pytest fixture (`_shared_server`) for the process, and separate
-module-scoped client fixtures (one per device type) so each device gets its own
-`_SyncIndiClient` connection.
+per-test fixtures (one per device type) that each create their own `IndiClient`
+connection to the shared server.
+
+---
+
+## 10. Polling for completion of fire-and-forget API endpoints (202 responses)
+
+**Symptom:** A test calls a fire-and-forget endpoint (slew, park, move_to), immediately
+polls `GET /status`, sees `state=connected` (not busy), and concludes the operation is
+done — but the device hasn't moved.
+
+**Root cause:** The manager creates an asyncio background task and returns 202 before the
+task has had a chance to run. On the very first poll the background task may not yet have
+set `state=busy`, so a simple "poll until not busy" loop exits on the first iteration with
+the device still at its starting position.
+
+**Fix:** Use a two-phase poll in tests:
+1. **Phase 1** — spin at short intervals (50 ms) until `state=busy` is seen, or a short
+   deadline (2 s) expires (handles instantaneous operations).
+2. **Phase 2** — poll at normal intervals until `state != busy`.
+
+See `_wait_move_done()` in `tests/integration/test_api_indi.py`.
