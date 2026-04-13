@@ -6,8 +6,9 @@
  *
  * mode "lat"  → latitude  ±90°,  direction toggle N / S
  * mode "lon"  → longitude ±180°, direction toggle E / W
+ * mode "ra"   → right ascension 0–24 h, H M S labels, no direction toggle
  *
- * Reusable wherever DMS entry is needed (profiles, future mount page, etc.).
+ * Reusable wherever DMS / HMS entry is needed (profiles, mount page, etc.).
  */
 import { useEffect, useRef, useState } from 'react'
 import { Input } from './input'
@@ -38,7 +39,7 @@ function dmsToDecimal(deg: number, min: number, sec: number, negative: boolean):
 export interface DmsInputProps {
   value: number
   onChange: (v: number) => void
-  mode: 'lat' | 'lon'
+  mode: 'lat' | 'lon' | 'ra'
 }
 
 export function DmsInput({ value, onChange, mode }: DmsInputProps) {
@@ -63,7 +64,8 @@ export function DmsInput({ value, onChange, mode }: DmsInputProps) {
     onChange(dmsToDecimal(d, m, s, n))
   }
 
-  const maxDeg = mode === 'lat' ? 90 : 180
+  const isRa = mode === 'ra'
+  const maxDeg = isRa ? 23 : mode === 'lat' ? 90 : 180
   const posLabel = mode === 'lat' ? 'N' : 'E'
   const negLabel = mode === 'lat' ? 'S' : 'W'
 
@@ -78,7 +80,7 @@ export function DmsInput({ value, onChange, mode }: DmsInputProps) {
           setDeg(v); emit(v, min, sec, negative)
         }}
       />
-      <span className="text-slate-500 text-xs select-none">°</span>
+      <span className="text-slate-500 text-xs select-none">{isRa ? 'h' : '°'}</span>
       <Input
         type="number" min={0} max={59} step={1}
         className="w-12 text-center px-1"
@@ -88,7 +90,7 @@ export function DmsInput({ value, onChange, mode }: DmsInputProps) {
           setMin(v); emit(deg, v, sec, negative)
         }}
       />
-      <span className="text-slate-500 text-xs select-none">'</span>
+      <span className="text-slate-500 text-xs select-none">{isRa ? 'm' : "'"}</span>
       <Input
         type="number" min={0} max={59.99} step={0.1}
         className="w-16 text-center px-1"
@@ -98,14 +100,16 @@ export function DmsInput({ value, onChange, mode }: DmsInputProps) {
           setSec(v); emit(deg, min, v, negative)
         }}
       />
-      <span className="text-slate-500 text-xs select-none">"</span>
-      <button
-        type="button"
-        onClick={() => { const n = !negative; setNegative(n); emit(deg, min, sec, n) }}
-        className="min-w-[2rem] px-1.5 py-1 rounded border border-surface-border bg-surface-overlay text-xs font-medium text-slate-300 hover:border-accent hover:text-accent transition-colors"
-      >
-        {negative ? negLabel : posLabel}
-      </button>
+      <span className="text-slate-500 text-xs select-none">{isRa ? 's' : '"'}</span>
+      {!isRa && (
+        <button
+          type="button"
+          onClick={() => { const n = !negative; setNegative(n); emit(deg, min, sec, n) }}
+          className="min-w-[2rem] px-1.5 py-1 rounded border border-surface-border bg-surface-overlay text-xs font-medium text-slate-300 hover:border-accent hover:text-accent transition-colors"
+        >
+          {negative ? negLabel : posLabel}
+        </button>
+      )}
     </div>
   )
 }
