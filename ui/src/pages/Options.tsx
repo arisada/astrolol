@@ -14,7 +14,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
       <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">
         {title}
       </h2>
-      <div className="bg-surface-1 rounded-lg p-4 space-y-4">
+      <div className="bg-surface-raised rounded-lg p-4 space-y-4">
         {children}
       </div>
     </div>
@@ -69,7 +69,7 @@ function TextInput({
       onChange={(e) => onChange(e.target.value)}
       onBlur={onBlur}
       disabled={disabled}
-      className={`bg-surface-0 border border-slate-600 rounded px-3 py-1.5 text-sm text-slate-200
+      className={`bg-surface border border-surface-border rounded px-3 py-1.5 text-sm text-slate-200
         focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-40 ${className}`}
     />
   )
@@ -123,7 +123,7 @@ export function Options() {
   const [showAdvanced, setShowAdvanced] = useState(false)
 
   // Image saving settings (persisted via backend)
-  const [saveDir, setSaveDir] = useState('~/Pictures/astrolol/%D')
+  const [saveDir, setSaveDir] = useState('~/astrolol_pictures/%D')
   const [saveFilename, setSaveFilename] = useState('%F_%C_%Es_%Gg')
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
 

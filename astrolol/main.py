@@ -17,7 +17,6 @@ from astrolol.api.mount import router as mount_router
 from astrolol.api.profiles import router as profiles_router
 from astrolol.api.properties import router as properties_router
 from astrolol.api.settings import router as settings_router
-from astrolol.config.user_settings import UserSettingsStore
 from astrolol.profiles.store import ProfileStore
 from astrolol.app import build_plugin_manager, build_registry
 from astrolol.core.events import EventBus
@@ -62,8 +61,8 @@ def create_app() -> FastAPI:
     registry = build_registry(pm)
     event_bus = EventBus()
     device_manager = DeviceManager(registry=registry, event_bus=event_bus)
-    user_settings_store = UserSettingsStore(_settings.profiles_file.parent / "user_settings.json")
-    imager_manager = ImagerManager(device_manager=device_manager, event_bus=event_bus, user_settings_store=user_settings_store)
+    profile_store = ProfileStore(_settings.profiles_file)
+    imager_manager = ImagerManager(device_manager=device_manager, event_bus=event_bus, profile_store=profile_store)
     mount_manager = MountManager(device_manager=device_manager, event_bus=event_bus)
     focuser_manager = FocuserManager(device_manager=device_manager, event_bus=event_bus)
 
@@ -74,8 +73,7 @@ def create_app() -> FastAPI:
     app.state.imager_manager = imager_manager
     app.state.mount_manager = mount_manager
     app.state.focuser_manager = focuser_manager
-    app.state.profile_store = ProfileStore(_settings.profiles_file)
-    app.state.user_settings_store = user_settings_store
+    app.state.profile_store = profile_store
     app.state.active_profile = None
 
     app.include_router(devices_router)

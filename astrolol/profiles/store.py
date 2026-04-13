@@ -4,7 +4,10 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from astrolol.config.user_settings import UserSettings
 from astrolol.profiles.models import Profile
+
+_DEFAULT_SETTINGS = UserSettings()
 
 
 class ProfileStore:
@@ -12,6 +15,7 @@ class ProfileStore:
         self._path = path
         self._profiles: dict[str, Profile] = {}
         self._last_active_id: str | None = None
+        self._user_settings: UserSettings = _DEFAULT_SETTINGS
         self._load()
 
     # --- Persistence ---
@@ -26,6 +30,14 @@ class ProfileStore:
                 for p in data.get("profiles", [])
             }
             self._last_active_id = data.get("last_active_profile_id")
+            self._user_settings = UserSettings(
+                save_dir_template=data.get(
+                    "save_dir_template", _DEFAULT_SETTINGS.save_dir_template
+                ),
+                save_filename_template=data.get(
+                    "save_filename_template", _DEFAULT_SETTINGS.save_filename_template
+                ),
+            )
         except Exception:
             pass  # corrupt file — start fresh
 
@@ -34,6 +46,8 @@ class ProfileStore:
         payload = {
             "profiles": [p.model_dump() for p in self._profiles.values()],
             "last_active_profile_id": self._last_active_id,
+            "save_dir_template": self._user_settings.save_dir_template,
+            "save_filename_template": self._user_settings.save_filename_template,
         }
         self._path.write_text(json.dumps(payload, indent=2))
 
@@ -74,3 +88,13 @@ class ProfileStore:
     def set_last_active_id(self, profile_id: str | None) -> None:
         self._last_active_id = profile_id
         self._save()
+
+    # --- User settings ---
+
+    def get_user_settings(self) -> UserSettings:
+        return self._user_settings
+
+    def update_user_settings(self, settings: UserSettings) -> UserSettings:
+        self._user_settings = settings
+        self._save()
+        return self._user_settings

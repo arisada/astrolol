@@ -11,7 +11,7 @@ logger = structlog.get_logger()
 
 
 class UserSettings(BaseModel):
-    save_dir_template: str = "~/Pictures/astrolol/%D"
+    save_dir_template: str = "~/astrolol_pictures/%D"
     save_filename_template: str = "%F_%C_%Es_%Gg"
 
 

@@ -7,9 +7,9 @@ router = APIRouter(prefix="/settings", tags=["settings"])
 
 @router.get("", response_model=UserSettings)
 async def get_settings(request: Request) -> UserSettings:
-    return request.app.state.user_settings_store.get()
+    return request.app.state.profile_store.get_user_settings()
 
 
 @router.put("", response_model=UserSettings)
 async def put_settings(request: Request, body: UserSettings) -> UserSettings:
-    return request.app.state.user_settings_store.update(body)
+    return request.app.state.profile_store.update_user_settings(body)

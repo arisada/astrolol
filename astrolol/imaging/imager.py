@@ -23,8 +23,8 @@ from astrolol.imaging.models import ExposureRequest, ExposureResult, ImagerState
 from astrolol.imaging.preview import fits_to_jpeg
 
 if TYPE_CHECKING:
-    from astrolol.config.user_settings import UserSettingsStore
     from astrolol.profiles.models import Profile
+    from astrolol.profiles.store import ProfileStore
 
 logger = structlog.get_logger()
 
@@ -113,14 +113,14 @@ class ImagerManager:
         device_manager: DeviceManager,
         event_bus: EventBus,
         images_dir: Path | None = None,
-        user_settings_store: "UserSettingsStore | None" = None,
+        profile_store: "ProfileStore | None" = None,
     ) -> None:
         self._device_manager = device_manager
         self._event_bus = event_bus
         self._images_dir = images_dir or settings.images_dir
         self._imagers: dict[str, CameraImager] = {}
         self._active_profile: "Profile | None" = None
-        self._user_settings_store = user_settings_store
+        self._profile_store = profile_store
         self._save_counters: dict[str, int] = {}
 
     def set_context(self, profile: "Profile | None") -> None:
@@ -242,8 +242,8 @@ class ImagerManager:
             await asyncio.to_thread(_patch_fits_headers, fits_path, profile, ra, dec)
 
         # Optionally move to save directory using the configured template
-        if request.save and self._user_settings_store is not None:
-            user_cfg = self._user_settings_store.get()
+        if request.save and self._profile_store is not None:
+            user_cfg = self._profile_store.get_user_settings()
             counter = self._save_counters.get(device_id, 0) + 1
             self._save_counters[device_id] = counter
             dir_part = _expand_template(
