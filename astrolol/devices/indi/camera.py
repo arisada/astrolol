@@ -70,8 +70,30 @@ class IndiCamera:
         finally:
             self._state = DeviceState.DISCONNECTED
 
+    # CCD_FRAME_TYPE switch element names used by INDI drivers
+    _FRAME_TYPE_ELEMENTS = {
+        "light": "FRAME_LIGHT",
+        "dark":  "FRAME_DARK",
+        "flat":  "FRAME_FLAT",
+        "bias":  "FRAME_BIAS",
+    }
+
     async def expose(self, params: ExposureParams) -> Image:
         self._state = DeviceState.BUSY
+
+        # Set frame type if supported (best-effort)
+        indi_frame = self._FRAME_TYPE_ELEMENTS.get(params.frame_type, "FRAME_LIGHT")
+        try:
+            await self._client.set_switch(
+                self._device_name, "CCD_FRAME_TYPE", [indi_frame]
+            )
+        except Exception as exc:
+            logger.debug(
+                "indi.camera_frame_type_skipped",
+                device=self._device_name,
+                frame_type=params.frame_type,
+                error=str(exc),
+            )
 
         # Set binning if supported (best-effort)
         try:

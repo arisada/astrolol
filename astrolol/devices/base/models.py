@@ -16,6 +16,7 @@ class ExposureParams(BaseModel):
     duration: float = Field(gt=0, description="Exposure duration in seconds")
     gain: int = Field(default=0, ge=0)
     binning: int = Field(default=1, ge=1, le=4)
+    frame_type: str = Field(default="light", description="light | dark | flat | bias")
 
 
 class Image(BaseModel):

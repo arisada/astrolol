@@ -35,6 +35,26 @@ class CameraImager:
     _loop_task: asyncio.Task | None = field(default=None, repr=False)
 
 
+_IMAGETYP = {
+    "light": "Light Frame",
+    "dark":  "Dark Frame",
+    "flat":  "Flat Frame",
+    "bias":  "Bias Frame",
+}
+
+
+def _write_imagetyp(fits_path: Path, frame_type: str) -> None:
+    """Write the standard IMAGETYP FITS keyword unconditionally."""
+    imagetyp = _IMAGETYP.get(frame_type, "Light Frame")
+    try:
+        from astropy.io import fits as astrofits
+        with astrofits.open(str(fits_path), mode="update") as hdul:
+            hdul[0].header["IMAGETYP"] = (imagetyp, "Frame type")
+            hdul.flush()
+    except Exception:
+        logger.warning("imager.fits_imagetyp_failed", fits=str(fits_path))
+
+
 def _patch_fits_headers(fits_path: Path, profile: "Profile", ra: float | None, dec: float | None) -> None:
     """Inject observatory and telescope metadata into an existing FITS file."""
     try:
@@ -144,7 +164,12 @@ class ImagerManager:
         log = logger.bind(device_id=device_id, duration=request.duration)
 
         camera = self._device_manager.get_camera(device_id)
-        params = ExposureParams(duration=request.duration, gain=request.gain, binning=request.binning)
+        params = ExposureParams(
+            duration=request.duration,
+            gain=request.gain,
+            binning=request.binning,
+            frame_type=request.frame_type,
+        )
 
         # Snapshot mount RA/DEC before the shutter opens (best represents pointing)
         ra: float | None = None
@@ -187,6 +212,7 @@ class ImagerManager:
         preview_path = self._preview_path(fits_path)
         self._images_dir.mkdir(parents=True, exist_ok=True)
 
+        _write_imagetyp(fits_path, request.frame_type)
         if profile is not None:
             await asyncio.to_thread(_patch_fits_headers, fits_path, profile, ra, dec)
 

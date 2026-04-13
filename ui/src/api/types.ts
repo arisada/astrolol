@@ -45,10 +45,13 @@ export interface FocuserStatus {
   temperature: number | null
 }
 
+export type FrameType = 'light' | 'dark' | 'flat' | 'bias'
+
 export interface ExposureRequest {
   duration: number
   gain?: number
   binning?: number
+  frame_type?: FrameType
   count?: number | null
 }
 

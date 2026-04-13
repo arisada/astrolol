@@ -1,10 +1,33 @@
-import { useState } from 'react'
-import { Square, Play, Camera, StopCircle, MoveRight, ChevronUp, ChevronDown } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Square, Play, Camera, StopCircle, ChevronUp, ChevronDown } from 'lucide-react'
 import { api } from '@/api/client'
 import { useStore } from '@/store'
+import type { FrameType } from '@/api/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { StateBadge } from '@/components/ui/badge'
+
+// ── Exposure duration steps ────────────────────────────────────────────────
+// Curated astrophotography exposure times. Sub-second values use common
+// fractions; longer values follow natural imaging increments.
+
+const EXPOSURE_STEPS = [
+  // Sub-second
+  0.001, 0.002, 0.003, 0.004, 0.005, 0.008,
+  0.01, 0.013, 0.015, 0.02, 0.025, 0.033, 0.04, 0.05,
+  0.067, 0.08, 0.1, 0.125, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5,
+  0.6, 0.8,
+  // Seconds
+  1, 1.5, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20, 25, 30,
+  45, 60, 90, 120, 180, 240, 300, 360, 480, 600, 900, 1200, 1800, 3600,
+]
+
+function fmtDuration(s: number): string {
+  if (s < 1) return `${Math.round(s * 1000)} ms`
+  if (s < 60) return `${s} s`
+  const m = Math.floor(s / 60)
+  const rem = s % 60
+  return rem === 0 ? `${m} m` : `${m} m ${rem} s`
+}
 
 // ── Image Viewer ──────────────────────────────────────────────────────────────
 
@@ -36,23 +59,117 @@ function ImageViewer() {
 
 // ── Camera Panel ──────────────────────────────────────────────────────────────
 
+const FRAME_TYPES: FrameType[] = ['light', 'dark', 'flat', 'bias']
+const BINNINGS = [1, 2, 3, 4]
+
+function PillGroup<T extends string>({
+  options, value, onChange, label,
+}: { options: T[]; value: T; onChange: (v: T) => void; label: string }) {
+  return (
+    <div className="flex flex-col gap-1">
+      <span className="text-xs text-slate-400">{label}</span>
+      <div className="flex gap-1 flex-wrap">
+        {options.map((o) => (
+          <button
+            key={o}
+            type="button"
+            onClick={() => onChange(o)}
+            className={`px-2 py-0.5 text-xs rounded border transition-colors capitalize
+              ${value === o
+                ? 'border-accent text-accent bg-accent/10'
+                : 'border-surface-border text-slate-400 hover:border-slate-500 hover:text-slate-300'
+              }`}
+          >
+            {o}
+          </button>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function DurationStepper({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+  // Find the index of the nearest step to the current value
+  const idx = EXPOSURE_STEPS.reduce(
+    (best, v, i) => Math.abs(v - value) < Math.abs(EXPOSURE_STEPS[best] - value) ? i : best,
+    0,
+  )
+
+  return (
+    <div className="flex flex-col gap-1">
+      <span className="text-xs text-slate-400">Duration</span>
+      <div className="flex items-center gap-1">
+        <Button
+          size="icon" variant="outline"
+          disabled={idx === 0}
+          onClick={() => onChange(EXPOSURE_STEPS[idx - 1])}
+          title="Shorter"
+        >
+          <ChevronDown size={14} />
+        </Button>
+        <span className="flex-1 text-center text-xs font-mono text-slate-200 bg-surface-overlay border border-surface-border rounded px-2 py-1.5 min-w-[5rem]">
+          {fmtDuration(value)}
+        </span>
+        <Button
+          size="icon" variant="outline"
+          disabled={idx === EXPOSURE_STEPS.length - 1}
+          onClick={() => onChange(EXPOSURE_STEPS[idx + 1])}
+          title="Longer"
+        >
+          <ChevronUp size={14} />
+        </Button>
+      </div>
+    </div>
+  )
+}
+
 function CameraPanel() {
   const devices = useStore((s) => s.connectedDevices.filter((d) => d.kind === 'camera'))
   const imagerBusy = useStore((s) => s.imagerBusy)
   const [deviceId, setDeviceId] = useState('')
-  const [duration, setDuration] = useState('5')
-  const [gain, setGain] = useState('0')
+
+  // Exposure settings
+  const [duration, setDuration] = useState(EXPOSURE_STEPS[EXPOSURE_STEPS.indexOf(5)])
+  const [gain, setGain] = useState(0)
+  const [gainMin, setGainMin] = useState(0)
+  const [gainMax, setGainMax] = useState(65535)
+  const [gainStep, setGainStep] = useState(1)
+  const [binning, setBinning] = useState(1)
+  const [frameType, setFrameType] = useState<FrameType>('light')
   const [looping, setLooping] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const activeId = deviceId || devices[0]?.device_id || ''
   const busy = imagerBusy[activeId] ?? false
 
+  // Fetch gain constraints from INDI properties whenever the active camera changes.
+  // Fails silently for non-INDI cameras (fake adapter, no INDI client, etc.).
+  useEffect(() => {
+    if (!activeId) return
+    api.devices.properties(activeId)
+      .then((props) => {
+        for (const p of props) {
+          if (p.type !== 'number') continue
+          const w = p.widgets.find(
+            (w) => w.name?.toLowerCase() === 'gain' || w.label?.toLowerCase() === 'gain',
+          )
+          if (w) {
+            if (w.min != null) setGainMin(w.min as number)
+            if (w.max != null) setGainMax(w.max as number)
+            if (w.step != null && (w.step as number) > 0) setGainStep(w.step as number)
+            if (typeof w.value === 'number') setGain(w.value)
+            break
+          }
+        }
+      })
+      .catch(() => { /* not an INDI device or client not running */ })
+  }, [activeId])
+
   const expose = async () => {
     if (!activeId) return
     setError(null)
     try {
-      await api.imager.expose(activeId, { duration: parseFloat(duration), gain: parseInt(gain) })
+      await api.imager.expose(activeId, { duration, gain, binning, frame_type: frameType })
     } catch (e) { setError((e as Error).message) }
   }
 
@@ -64,7 +181,7 @@ function CameraPanel() {
         await api.imager.stopLoop(activeId)
         setLooping(false)
       } else {
-        await api.imager.startLoop(activeId, { duration: parseFloat(duration), gain: parseInt(gain) })
+        await api.imager.startLoop(activeId, { duration, gain, binning, frame_type: frameType })
         setLooping(true)
       }
     } catch (e) { setError((e as Error).message) }
@@ -75,7 +192,7 @@ function CameraPanel() {
       {devices.length === 0 ? (
         <p className="text-xs text-slate-500">No camera connected.</p>
       ) : (
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-3">
           {devices.length > 1 && (
             <select
               className="rounded bg-surface-overlay border border-surface-border px-2 py-1 text-xs text-slate-200 focus:outline-none"
@@ -85,10 +202,56 @@ function CameraPanel() {
               {devices.map((d) => <option key={d.device_id} value={d.device_id}>{d.device_id}</option>)}
             </select>
           )}
-          <div className="grid grid-cols-2 gap-2">
-            <LabeledInput label="Duration (s)" value={duration} onChange={setDuration} type="number" min="0.001" step="0.5" />
-            <LabeledInput label="Gain" value={gain} onChange={setGain} type="number" min="0" />
+
+          {/* Frame type */}
+          <PillGroup
+            options={FRAME_TYPES}
+            value={frameType}
+            onChange={setFrameType}
+            label="Frame type"
+          />
+
+          {/* Duration stepper */}
+          <DurationStepper value={duration} onChange={setDuration} />
+
+          {/* Gain */}
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-slate-400">Gain</span>
+              <span className="text-xs text-slate-600">{gainMin}–{gainMax}</span>
+            </div>
+            <Input
+              type="number"
+              min={gainMin}
+              max={gainMax}
+              step={gainStep}
+              value={gain}
+              onChange={(e) => setGain(Math.max(gainMin, Math.min(gainMax, parseInt(e.target.value) || 0)))}
+            />
           </div>
+
+          {/* Binning */}
+          <div className="flex flex-col gap-1">
+            <span className="text-xs text-slate-400">Binning</span>
+            <div className="flex gap-1">
+              {BINNINGS.map((b) => (
+                <button
+                  key={b}
+                  type="button"
+                  onClick={() => setBinning(b)}
+                  className={`px-2 py-0.5 text-xs rounded border transition-colors
+                    ${binning === b
+                      ? 'border-accent text-accent bg-accent/10'
+                      : 'border-surface-border text-slate-400 hover:border-slate-500 hover:text-slate-300'
+                    }`}
+                >
+                  {b}×{b}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Actions */}
           <div className="flex gap-2">
             <Button size="sm" onClick={expose} disabled={busy}>
               <Camera size={12} className="mr-1" /> Expose
@@ -96,53 +259,6 @@ function CameraPanel() {
             <Button size="sm" variant={looping ? 'danger' : 'outline'} onClick={toggleLoop} disabled={busy && !looping}>
               {looping ? <><Square size={12} className="mr-1" /> Stop</> : <><Play size={12} className="mr-1" /> Loop</>}
             </Button>
-          </div>
-          {error && <p className="text-xs text-status-error">{error}</p>}
-        </div>
-      )}
-    </Panel>
-  )
-}
-
-// ── Mount Panel ───────────────────────────────────────────────────────────────
-
-function MountPanel() {
-  const devices = useStore((s) => s.connectedDevices.filter((d) => d.kind === 'mount'))
-  const [ra, setRa] = useState('')
-  const [dec, setDec] = useState('')
-  const [error, setError] = useState<string | null>(null)
-
-  const activeId = devices[0]?.device_id ?? ''
-
-  const act = async (fn: () => Promise<unknown>) => {
-    setError(null)
-    try { await fn() } catch (e) { setError((e as Error).message) }
-  }
-
-  return (
-    <Panel title="Mount">
-      {devices.length === 0 ? (
-        <p className="text-xs text-slate-500">No mount connected.</p>
-      ) : (
-        <div className="flex flex-col gap-2">
-          <StateBadge state={devices[0].state} />
-          <div className="grid grid-cols-2 gap-2">
-            <LabeledInput label="RA (h)" value={ra} onChange={setRa} type="number" min="0" max="24" step="0.001" placeholder="0–24" />
-            <LabeledInput label="Dec (°)" value={dec} onChange={setDec} type="number" min="-90" max="90" step="0.01" placeholder="−90–90" />
-          </div>
-          <div className="flex flex-wrap gap-2">
-            <Button size="sm" onClick={() => act(() => api.mount.slew(activeId, parseFloat(ra), parseFloat(dec)))} disabled={!ra || !dec}>
-              <MoveRight size={12} className="mr-1" /> Slew
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => act(() => api.mount.stop(activeId))}>
-              <StopCircle size={12} className="mr-1" /> Stop
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => act(() => api.mount.park(activeId))}>Park</Button>
-            <Button size="sm" variant="outline" onClick={() => act(() => api.mount.unpark(activeId))}>Unpark</Button>
-          </div>
-          <div className="flex gap-2">
-            <Button size="sm" variant="outline" onClick={() => act(() => api.mount.setTracking(activeId, true))}>Track on</Button>
-            <Button size="sm" variant="outline" onClick={() => act(() => api.mount.setTracking(activeId, false))}>Track off</Button>
           </div>
           {error && <p className="text-xs text-status-error">{error}</p>}
         </div>
@@ -248,17 +364,6 @@ function Panel({ title, children }: { title: string; children: React.ReactNode }
   )
 }
 
-function LabeledInput({
-  label, value, onChange, ...rest
-}: { label: string; value: string; onChange: (v: string) => void } & Omit<React.InputHTMLAttributes<HTMLInputElement>, 'value' | 'onChange'>) {
-  return (
-    <div className="flex flex-col gap-1">
-      <label className="text-xs text-slate-400">{label}</label>
-      <Input value={value} onChange={(e) => onChange(e.target.value)} {...rest} />
-    </div>
-  )
-}
-
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export function Imaging() {
@@ -273,7 +378,6 @@ export function Imaging() {
       {/* Right sidebar — device controls */}
       <aside className="w-64 shrink-0 border-l border-surface-border overflow-y-auto bg-surface-raised">
         <CameraPanel />
-        <MountPanel />
         <FocuserPanel />
       </aside>
     </div>
