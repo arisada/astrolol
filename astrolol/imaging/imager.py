@@ -261,7 +261,8 @@ class ImagerManager:
             except Exception:
                 logger.warning("imager.save_move_failed", src=str(fits_path), dst=str(final_fits))
 
-        preview_path = self._preview_path(fits_path)
+        # Preview always lives in images_dir so the serve endpoint can find it
+        preview_path = self._preview_path(fits_path.stem, self._images_dir)
         fits_to_jpeg(fits_path, preview_path, quality=settings.jpeg_quality)
 
         result = ExposureResult(
@@ -306,6 +307,6 @@ class ImagerManager:
                 imager.state = ImagerState.IDLE
 
     @staticmethod
-    def _preview_path(fits_path: Path) -> Path:
+    def _preview_path(stem: str, directory: Path) -> Path:
         ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%f")
-        return fits_path.parent / f"{fits_path.stem}_{ts}_preview.jpg"
+        return directory / f"{stem}_{ts}_preview.jpg"

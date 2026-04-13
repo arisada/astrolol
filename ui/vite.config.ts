@@ -22,6 +22,7 @@ export default defineConfig({
       '/mount':    { target: backendHttp, changeOrigin: true },
       '/focuser':  { target: backendHttp, changeOrigin: true },
       '/indi':     { target: backendHttp, changeOrigin: true },
+      '/settings': { target: backendHttp, changeOrigin: true },
       '/health':   { target: backendHttp, changeOrigin: true },
       '/ws':       { target: backendWs,   ws: true, changeOrigin: true },
     },

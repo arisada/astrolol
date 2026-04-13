@@ -63,18 +63,24 @@ async def stop_loop(device_id: str, request: Request) -> None:
 
 @router.get("/images/{filename}")
 async def serve_image(filename: str) -> FileResponse:
-    """Serve a FITS file or JPEG preview by filename."""
+    """Serve a JPEG preview by filename (basename only — no subdirectory traversal)."""
     from astrolol.config.settings import settings
 
-    path = settings.images_dir / filename
-    if not path.exists() or not path.is_file():
-        raise HTTPException(status_code=404, detail=f"Image '{filename}' not found.")
+    # Reject any path separators in the filename before touching the filesystem
+    if "/" in filename or "\\" in filename or filename.startswith("."):
+        raise HTTPException(status_code=400, detail="Invalid filename.")
 
-    # Prevent path traversal
+    images_root = settings.images_dir.resolve()
+    path = (images_root / filename).resolve()
+
+    # Verify the resolved path is still inside images_dir
     try:
-        path.resolve().relative_to(settings.images_dir.resolve())
+        path.relative_to(images_root)
     except ValueError:
         raise HTTPException(status_code=400, detail="Invalid filename.")
+
+    if not path.exists() or not path.is_file():
+        raise HTTPException(status_code=404, detail=f"Image '{filename}' not found.")
 
     media_type = "image/jpeg" if path.suffix.lower() in (".jpg", ".jpeg") else "application/octet-stream"
     return FileResponse(path, media_type=media_type)

@@ -178,7 +178,7 @@ export function Options() {
           </div>
           <TokenReference />
           {saveStatus === 'saving' && <p className="text-xs text-slate-500">Saving…</p>}
-          {saveStatus === 'saved' && <p className="text-xs text-status-ok">Saved.</p>}
+          {saveStatus === 'saved' && <p className="text-xs text-status-connected">Saved.</p>}
           {saveStatus === 'error' && <p className="text-xs text-status-error">Failed to save settings.</p>}
         </div>
       </Section>
