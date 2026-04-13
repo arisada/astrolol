@@ -15,6 +15,7 @@ build/
 # Runtime data
 profiles.json
 images/
+astrolog.log
 
 # UI
 ui/node_modules/
