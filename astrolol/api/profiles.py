@@ -56,8 +56,17 @@ async def update_profile(profile_id: str, profile: Profile, request: Request) ->
 
 @router.delete("/active", status_code=204)
 async def deactivate(request: Request) -> None:
+    outgoing: Profile | None = request.app.state.active_profile
+    if outgoing is not None:
+        device_manager = request.app.state.device_manager
+        for pd in outgoing.devices:
+            try:
+                await device_manager.disconnect(pd.config.device_id)
+            except Exception:
+                pass  # best-effort — device may already be disconnected
     request.app.state.active_profile = None
     request.app.state.imager_manager.set_context(None)
+    _store(request).set_last_active_id(None)
 
 
 # ---------------------------------------------------------------------------
@@ -106,6 +115,7 @@ async def activate_profile(profile_id: str, request: Request) -> ActivationResul
     # Store active profile and update observing context for FITS metadata
     request.app.state.active_profile = profile
     request.app.state.imager_manager.set_context(profile)
+    _store(request).set_last_active_id(profile_id)
 
     device_manager = request.app.state.device_manager
     connected: list[DeviceResult] = []

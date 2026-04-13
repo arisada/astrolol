@@ -39,6 +39,8 @@ export const api = {
       }),
     disconnect: (deviceId: string) =>
       request<void>(`/devices/connected/${deviceId}`, { method: 'DELETE' }),
+    getConfig: (deviceId: string) =>
+      request<DeviceConfig>(`/devices/connected/${deviceId}/config`),
     properties: (deviceId: string) =>
       request<DeviceProperty[]>(`/devices/${deviceId}/properties`),
     setProperty: (deviceId: string, propName: string, body: SetPropertyRequest) =>

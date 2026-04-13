@@ -33,6 +33,15 @@ async def list_connected(request: Request) -> list[dict[str, str]]:
     return _manager(request).list_connected()
 
 
+@router.get("/connected/{device_id}/config", response_model=DeviceConfig)
+async def get_connected_config(device_id: str, request: Request) -> DeviceConfig:
+    """Return the full DeviceConfig (including params) for a connected device."""
+    try:
+        return _manager(request).get_config(device_id)
+    except DeviceNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+
 @router.post("/connect", response_model=ConnectResponse, status_code=201)
 async def connect_device(config: DeviceConfig, request: Request) -> ConnectResponse:
     """Connect a device from a DeviceConfig. Returns the device_id."""

@@ -1,15 +1,27 @@
-import { useEffect, useState } from 'react'
-import { BookOpen, CheckCircle, ChevronDown, ChevronRight, Plus, Trash2, XCircle, Zap } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import {
+  BookOpen,
+  CheckCircle,
+  ChevronDown,
+  ChevronRight,
+  Plus,
+  Trash2,
+  XCircle,
+  Zap,
+} from 'lucide-react'
 import { api } from '@/api/client'
 import type {
   ActivationResult,
+  ConnectedDevice,
   DeviceRole,
+  DriverEntry,
   ObserverLocation,
   Profile,
   ProfileDevice,
   Telescope,
 } from '@/api/types'
 import { Button } from '@/components/ui/button'
+import { DmsInput } from '@/components/ui/dms-input'
 import { Input } from '@/components/ui/input'
 
 // ---------------------------------------------------------------------------
@@ -36,6 +48,85 @@ function emptyTelescope(): Telescope {
   return { name: '', focal_length: 0, aperture: 0 }
 }
 
+/** Format a decimal coordinate as a compact DMS string for display. */
+function fmtDms(decimal: number, mode: 'lat' | 'lon'): string {
+  const neg = decimal < 0
+  const abs = Math.abs(decimal)
+  const deg = Math.floor(abs)
+  const minFull = (abs - deg) * 60
+  const min = Math.floor(minFull)
+  const sec = Math.round((minFull - min) * 60)
+  const dir = mode === 'lat' ? (neg ? 'S' : 'N') : (neg ? 'W' : 'E')
+  return `${deg}°${String(min).padStart(2, '0')}'${String(sec).padStart(2, '0')}" ${dir}`
+}
+
+function fRatio(t: Telescope): string | null {
+  if (t.aperture <= 0) return null
+  return `f/${(t.focal_length / t.aperture).toFixed(1)}`
+}
+
+// ---------------------------------------------------------------------------
+// DriverCombobox — searchable INDI driver picker
+// ---------------------------------------------------------------------------
+
+interface DriverComboboxProps {
+  role: DeviceRole
+  onSelect: (d: DriverEntry) => void
+}
+
+function DriverCombobox({ role, onSelect }: DriverComboboxProps) {
+  const [query, setQuery] = useState('')
+  const [drivers, setDrivers] = useState<DriverEntry[]>([])
+  const [open, setOpen] = useState(false)
+  const containerRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    api.indi.drivers(role).then(setDrivers).catch(() => {})
+  }, [role])
+
+  const filtered = query.trim()
+    ? drivers.filter(
+        (d) =>
+          d.label.toLowerCase().includes(query.toLowerCase()) ||
+          d.manufacturer.toLowerCase().includes(query.toLowerCase()),
+      )
+    : drivers
+
+  return (
+    <div ref={containerRef} className="relative">
+      <Input
+        value={query}
+        onChange={(e) => { setQuery(e.target.value); setOpen(true) }}
+        onFocus={() => setOpen(true)}
+        onBlur={() => setOpen(false)}
+        placeholder="Search driver catalog…"
+      />
+      {open && filtered.length > 0 && (
+        <ul className="absolute z-20 w-full mt-0.5 max-h-48 overflow-auto bg-surface-raised border border-surface-border rounded shadow-lg">
+          {filtered.slice(0, 40).map((d) => (
+            <li key={`${d.executable}:${d.device_name}`}>
+              <button
+                type="button"
+                className="w-full text-left px-3 py-1.5 text-xs hover:bg-accent/10 flex items-baseline gap-2"
+                onMouseDown={(e) => {
+                  // prevent input blur before click fires
+                  e.preventDefault()
+                  onSelect(d)
+                  setQuery(d.label)
+                  setOpen(false)
+                }}
+              >
+                <span className="text-slate-200">{d.label}</span>
+                <span className="text-slate-500 text-[11px]">{d.manufacturer}</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
+
 // ---------------------------------------------------------------------------
 // ProfileForm — create / edit
 // ---------------------------------------------------------------------------
@@ -49,14 +140,19 @@ interface ProfileFormProps {
 function ProfileForm({ initial, onSave, onCancel }: ProfileFormProps) {
   const [name, setName] = useState(initial?.name ?? '')
   const [location, setLocation] = useState<ObserverLocation | undefined>(
-    initial?.location ?? undefined
+    initial?.location ?? undefined,
   )
   const [telescope, setTelescope] = useState<Telescope | undefined>(
-    initial?.telescope ?? undefined
+    initial?.telescope ?? undefined,
   )
   const [devices, setDevices] = useState<ProfileDevice[]>(initial?.devices ?? [])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [connected, setConnected] = useState<ConnectedDevice[]>([])
+
+  useEffect(() => {
+    api.devices.connected().then(setConnected).catch(() => {})
+  }, [])
 
   const handleSave = async () => {
     if (!name.trim()) { setError('Name is required.'); return }
@@ -71,53 +167,76 @@ function ProfileForm({ initial, onSave, onCancel }: ProfileFormProps) {
     }
   }
 
-  const updateDevice = (idx: number, patch: Partial<ProfileDevice>) => {
+  const updateDevice = (idx: number, patch: Partial<ProfileDevice>) =>
     setDevices((ds) => ds.map((d, i) => (i === idx ? { ...d, ...patch } : d)))
-  }
 
-  const addDevice = (role: DeviceRole) => {
+  const addDevice = (role: DeviceRole) =>
     setDevices((ds) => [
       ...ds,
       {
         role,
         config: {
-          id: crypto.randomUUID(),
+          device_id: role,
           kind: role,
           adapter_key: KIND_ADAPTER[role],
           params: { device_name: '', executable: '' },
-          device_id: role,
         },
       },
     ])
-  }
 
   const removeDevice = (idx: number) => setDevices((ds) => ds.filter((_, i) => i !== idx))
+
+  const importConnected = async (idx: number, c: ConnectedDevice) => {
+    try {
+      const cfg = await api.devices.getConfig(c.device_id)
+      updateDevice(idx, { config: cfg })
+    } catch {
+      // Fallback if endpoint not available: fill what we know
+      updateDevice(idx, {
+        config: { ...devices[idx].config, device_id: c.device_id, adapter_key: c.adapter_key },
+      })
+    }
+  }
 
   return (
     <div className="flex flex-col gap-6">
       {/* Name */}
       <div className="flex flex-col gap-1">
-        <label className="text-xs text-slate-400">Profile name <span className="text-status-error">*</span></label>
-        <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Backyard rig" />
+        <label className="text-xs text-slate-400">
+          Profile name <span className="text-status-error">*</span>
+        </label>
+        <Input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="e.g. Backyard rig"
+        />
       </div>
 
       {/* Location */}
       <section>
         <div className="flex items-center justify-between mb-2">
-          <h3 className="text-xs font-medium text-slate-400 uppercase tracking-wider">Observer location</h3>
+          <h3 className="text-xs font-medium text-slate-400 uppercase tracking-wider">
+            Observer location
+          </h3>
           {location ? (
-            <button className="text-xs text-slate-500 hover:text-slate-300" onClick={() => setLocation(undefined)}>
+            <button
+              className="text-xs text-slate-500 hover:text-slate-300"
+              onClick={() => setLocation(undefined)}
+            >
               Remove
             </button>
           ) : (
-            <Button size="sm" variant="ghost" className="h-6 text-xs" onClick={() => setLocation(emptyLocation())}>
+            <Button
+              size="sm" variant="ghost" className="h-6 text-xs"
+              onClick={() => setLocation(emptyLocation())}
+            >
               <Plus size={12} className="mr-1" /> Add
             </Button>
           )}
         </div>
         {location && (
-          <div className="grid grid-cols-2 gap-3 bg-surface border border-surface-border rounded p-3">
-            <div className="col-span-2 flex flex-col gap-1">
+          <div className="flex flex-col gap-3 bg-surface border border-surface-border rounded p-3">
+            <div className="flex flex-col gap-1">
               <label className="text-xs text-slate-500">Location name (optional)</label>
               <Input
                 value={location.name}
@@ -126,21 +245,19 @@ function ProfileForm({ initial, onSave, onCancel }: ProfileFormProps) {
               />
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-xs text-slate-500">Latitude (°)</label>
-              <Input
-                type="number" step="0.0001"
+              <label className="text-xs text-slate-500">Latitude</label>
+              <DmsInput
                 value={location.latitude}
-                onChange={(e) => setLocation({ ...location, latitude: parseFloat(e.target.value) || 0 })}
-                placeholder="e.g. 48.8566"
+                onChange={(v) => setLocation({ ...location, latitude: v })}
+                mode="lat"
               />
             </div>
             <div className="flex flex-col gap-1">
-              <label className="text-xs text-slate-500">Longitude (°)</label>
-              <Input
-                type="number" step="0.0001"
+              <label className="text-xs text-slate-500">Longitude</label>
+              <DmsInput
                 value={location.longitude}
-                onChange={(e) => setLocation({ ...location, longitude: parseFloat(e.target.value) || 0 })}
-                placeholder="e.g. 2.3522"
+                onChange={(v) => setLocation({ ...location, longitude: v })}
+                mode="lon"
               />
             </div>
             <div className="flex flex-col gap-1">
@@ -148,8 +265,11 @@ function ProfileForm({ initial, onSave, onCancel }: ProfileFormProps) {
               <Input
                 type="number"
                 value={location.altitude}
-                onChange={(e) => setLocation({ ...location, altitude: parseFloat(e.target.value) || 0 })}
+                onChange={(e) =>
+                  setLocation({ ...location, altitude: parseFloat(e.target.value) || 0 })
+                }
                 placeholder="e.g. 35"
+                className="w-32"
               />
             </div>
           </div>
@@ -159,13 +279,21 @@ function ProfileForm({ initial, onSave, onCancel }: ProfileFormProps) {
       {/* Telescope */}
       <section>
         <div className="flex items-center justify-between mb-2">
-          <h3 className="text-xs font-medium text-slate-400 uppercase tracking-wider">Telescope</h3>
+          <h3 className="text-xs font-medium text-slate-400 uppercase tracking-wider">
+            Telescope
+          </h3>
           {telescope ? (
-            <button className="text-xs text-slate-500 hover:text-slate-300" onClick={() => setTelescope(undefined)}>
+            <button
+              className="text-xs text-slate-500 hover:text-slate-300"
+              onClick={() => setTelescope(undefined)}
+            >
               Remove
             </button>
           ) : (
-            <Button size="sm" variant="ghost" className="h-6 text-xs" onClick={() => setTelescope(emptyTelescope())}>
+            <Button
+              size="sm" variant="ghost" className="h-6 text-xs"
+              onClick={() => setTelescope(emptyTelescope())}
+            >
               <Plus size={12} className="mr-1" /> Add
             </Button>
           )}
@@ -185,7 +313,9 @@ function ProfileForm({ initial, onSave, onCancel }: ProfileFormProps) {
               <Input
                 type="number"
                 value={telescope.focal_length}
-                onChange={(e) => setTelescope({ ...telescope, focal_length: parseFloat(e.target.value) || 0 })}
+                onChange={(e) =>
+                  setTelescope({ ...telescope, focal_length: parseFloat(e.target.value) || 0 })
+                }
                 placeholder="e.g. 2032"
               />
             </div>
@@ -194,10 +324,17 @@ function ProfileForm({ initial, onSave, onCancel }: ProfileFormProps) {
               <Input
                 type="number"
                 value={telescope.aperture}
-                onChange={(e) => setTelescope({ ...telescope, aperture: parseFloat(e.target.value) || 0 })}
+                onChange={(e) =>
+                  setTelescope({ ...telescope, aperture: parseFloat(e.target.value) || 0 })
+                }
                 placeholder="e.g. 203"
               />
             </div>
+            {telescope.aperture > 0 && (
+              <p className="col-span-2 text-xs text-slate-500">
+                f/{(telescope.focal_length / telescope.aperture).toFixed(1)}
+              </p>
+            )}
           </div>
         )}
       </section>
@@ -205,13 +342,14 @@ function ProfileForm({ initial, onSave, onCancel }: ProfileFormProps) {
       {/* Devices */}
       <section>
         <div className="flex items-center justify-between mb-2">
-          <h3 className="text-xs font-medium text-slate-400 uppercase tracking-wider">Devices</h3>
+          <h3 className="text-xs font-medium text-slate-400 uppercase tracking-wider">
+            Devices
+          </h3>
           <div className="flex gap-1">
             {(['camera', 'mount', 'focuser'] as DeviceRole[]).map((role) => (
               <Button
                 key={role}
-                size="sm" variant="ghost"
-                className="h-6 text-xs"
+                size="sm" variant="ghost" className="h-6 text-xs"
                 onClick={() => addDevice(role)}
               >
                 <Plus size={12} className="mr-1" /> {ROLE_LABELS[role]}
@@ -219,66 +357,123 @@ function ProfileForm({ initial, onSave, onCancel }: ProfileFormProps) {
             ))}
           </div>
         </div>
+
         {devices.length === 0 ? (
-          <p className="text-xs text-slate-600">No devices — add a camera, mount, or focuser above.</p>
+          <p className="text-xs text-slate-600">
+            No devices — add a camera, mount, or focuser above.
+          </p>
         ) : (
-          <div className="flex flex-col gap-2">
-            {devices.map((d, idx) => (
-              <div
-                key={idx}
-                className="grid grid-cols-[auto_1fr_1fr_auto] gap-3 items-end bg-surface border border-surface-border rounded p-3"
-              >
-                <span className="text-xs font-medium text-slate-400 self-center mt-4">{ROLE_LABELS[d.role]}</span>
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs text-slate-500">Device ID</label>
-                  <Input
-                    value={d.config.device_id}
-                    onChange={(e) =>
-                      updateDevice(idx, { config: { ...d.config, device_id: e.target.value } })
-                    }
-                    placeholder={`e.g. main_${d.role}`}
-                  />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs text-slate-500">INDI device name</label>
-                  <Input
-                    value={(d.config.params?.device_name as string) ?? ''}
-                    onChange={(e) =>
-                      updateDevice(idx, {
-                        config: { ...d.config, params: { ...d.config.params, device_name: e.target.value } },
-                      })
-                    }
-                    placeholder="e.g. ZWO CCD ASI294MC Pro"
-                  />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs text-slate-500">Driver executable</label>
-                  <div className="flex gap-1 items-center">
-                    <Input
-                      value={(d.config.params?.executable as string) ?? ''}
-                      onChange={(e) =>
-                        updateDevice(idx, {
-                          config: { ...d.config, params: { ...d.config.params, executable: e.target.value } },
-                        })
-                      }
-                      placeholder="e.g. indi_asi_ccd"
-                    />
+          <div className="flex flex-col gap-3">
+            {devices.map((d, idx) => {
+              const matchingConnected = connected.filter((c) => c.kind === d.role)
+              return (
+                <div
+                  key={idx}
+                  className="flex flex-col gap-2 bg-surface border border-surface-border rounded p-3"
+                >
+                  {/* Role + driver picker + delete */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs font-medium text-slate-400 w-14 shrink-0">
+                      {ROLE_LABELS[d.role]}
+                    </span>
+                    <div className="flex-1">
+                      <DriverCombobox
+                        role={d.role}
+                        onSelect={(driver) =>
+                          updateDevice(idx, {
+                            config: {
+                              ...d.config,
+                              params: {
+                                ...d.config.params,
+                                device_name: driver.device_name,
+                                executable: driver.executable,
+                              },
+                            },
+                          })
+                        }
+                      />
+                    </div>
                     <Button
                       size="icon" variant="ghost"
-                      className="h-8 w-8 text-slate-500 hover:text-status-error"
+                      className="h-8 w-8 text-slate-500 hover:text-status-error shrink-0"
                       onClick={() => removeDevice(idx)}
                     >
                       <Trash2 size={13} />
                     </Button>
                   </div>
+
+                  {/* Import from already-connected devices */}
+                  {matchingConnected.length > 0 && (
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="text-[11px] text-slate-600">From connected:</span>
+                      {matchingConnected.map((c) => (
+                        <button
+                          key={c.device_id}
+                          type="button"
+                          onClick={() => importConnected(idx, c)}
+                          className="text-[11px] px-2 py-0.5 rounded border border-surface-border hover:border-accent text-slate-400 hover:text-slate-200 transition-colors"
+                        >
+                          {c.device_id}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Editable fields */}
+                  <div className="grid grid-cols-3 gap-2">
+                    <div className="flex flex-col gap-1">
+                      <label className="text-xs text-slate-500">Device ID</label>
+                      <Input
+                        value={d.config.device_id ?? ''}
+                        onChange={(e) =>
+                          updateDevice(idx, {
+                            config: { ...d.config, device_id: e.target.value },
+                          })
+                        }
+                        placeholder={`e.g. main_${d.role}`}
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-xs text-slate-500">INDI device name</label>
+                      <Input
+                        value={(d.config.params?.device_name as string) ?? ''}
+                        onChange={(e) =>
+                          updateDevice(idx, {
+                            config: {
+                              ...d.config,
+                              params: { ...d.config.params, device_name: e.target.value },
+                            },
+                          })
+                        }
+                        placeholder="e.g. ZWO CCD ASI294MC Pro"
+                      />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                      <label className="text-xs text-slate-500">Driver executable</label>
+                      <Input
+                        value={(d.config.params?.executable as string) ?? ''}
+                        onChange={(e) =>
+                          updateDevice(idx, {
+                            config: {
+                              ...d.config,
+                              params: { ...d.config.params, executable: e.target.value },
+                            },
+                          })
+                        }
+                        placeholder="e.g. indi_asi_ccd"
+                      />
+                    </div>
+                  </div>
                 </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
         )}
       </section>
 
-      {error && <p className="text-xs text-status-error bg-status-error/10 rounded px-3 py-2">{error}</p>}
+      {error && (
+        <p className="text-xs text-status-error bg-status-error/10 rounded px-3 py-2">{error}</p>
+      )}
 
       <div className="flex gap-2">
         <Button onClick={handleSave} disabled={saving}>
@@ -294,16 +489,32 @@ function ProfileForm({ initial, onSave, onCancel }: ProfileFormProps) {
 // Activation result toast
 // ---------------------------------------------------------------------------
 
-function ActivationBanner({ result, onDismiss }: { result: ActivationResult; onDismiss: () => void }) {
+function ActivationBanner({
+  result,
+  onDismiss,
+}: {
+  result: ActivationResult
+  onDismiss: () => void
+}) {
   const allOk = result.failed.length === 0
   return (
-    <div className={`rounded border px-4 py-3 text-sm flex flex-col gap-2 ${allOk ? 'border-green-700 bg-green-900/20' : 'border-yellow-700 bg-yellow-900/20'}`}>
+    <div
+      className={`rounded border px-4 py-3 text-sm flex flex-col gap-2 ${
+        allOk ? 'border-green-700 bg-green-900/20' : 'border-yellow-700 bg-yellow-900/20'
+      }`}
+    >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2 font-medium text-slate-200">
-          {allOk ? <CheckCircle size={15} className="text-green-400" /> : <XCircle size={15} className="text-yellow-400" />}
+          {allOk ? (
+            <CheckCircle size={15} className="text-green-400" />
+          ) : (
+            <XCircle size={15} className="text-yellow-400" />
+          )}
           {allOk ? 'Profile activated' : 'Activated with errors'}
         </div>
-        <button onClick={onDismiss} className="text-slate-500 hover:text-slate-300 text-xs">Dismiss</button>
+        <button onClick={onDismiss} className="text-slate-500 hover:text-slate-300 text-xs">
+          Dismiss
+        </button>
       </div>
       {result.connected.length > 0 && (
         <div className="text-xs text-slate-400">
@@ -337,11 +548,32 @@ function ProfileCard({
   onDelete: () => void
 }) {
   const [expanded, setExpanded] = useState(false)
+  const ratio = profile.telescope ? fRatio(profile.telescope) : null
+
+  const summaryParts = [
+    profile.telescope?.name
+      ? `${profile.telescope.name}${ratio ? ` (${ratio})` : ''}`
+      : null,
+    profile.location?.name ||
+      (profile.location
+        ? `${fmtDms(profile.location.latitude, 'lat')}, ${fmtDms(profile.location.longitude, 'lon')}`
+        : null),
+    profile.devices.length > 0
+      ? `${profile.devices.length} device${profile.devices.length > 1 ? 's' : ''}`
+      : null,
+  ].filter(Boolean)
 
   return (
-    <div className={`rounded border ${isActive ? 'border-accent bg-accent/5' : 'border-surface-border bg-surface-raised'}`}>
+    <div
+      className={`rounded border ${
+        isActive ? 'border-accent bg-accent/5' : 'border-surface-border bg-surface-raised'
+      }`}
+    >
       <div className="flex items-center gap-3 px-4 py-3">
-        <button className="text-slate-500 hover:text-slate-300" onClick={() => setExpanded((x) => !x)}>
+        <button
+          className="text-slate-500 hover:text-slate-300"
+          onClick={() => setExpanded((x) => !x)}
+        >
           {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
         </button>
         <div className="flex-1 min-w-0">
@@ -353,23 +585,16 @@ function ProfileCard({
               </span>
             )}
           </div>
-          <p className="text-xs text-slate-500">
-            {[
-              profile.telescope?.name,
-              profile.location?.name || (profile.location ? `${profile.location.latitude.toFixed(2)}°, ${profile.location.longitude.toFixed(2)}°` : null),
-              profile.devices.length > 0 ? `${profile.devices.length} device${profile.devices.length > 1 ? 's' : ''}` : null,
-            ]
-              .filter(Boolean)
-              .join(' · ')}
-          </p>
+          {summaryParts.length > 0 && (
+            <p className="text-xs text-slate-500">{summaryParts.join(' · ')}</p>
+          )}
         </div>
         <div className="flex items-center gap-1">
           <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={onEdit}>
             Edit
           </Button>
           <Button
-            size="sm"
-            className="h-7 text-xs gap-1"
+            size="sm" className="h-7 text-xs gap-1"
             variant={isActive ? 'ghost' : 'default'}
             onClick={onActivate}
           >
@@ -392,15 +617,24 @@ function ProfileCard({
             <div>
               <p className="text-slate-500 uppercase tracking-wider mb-1">Telescope</p>
               <p className="text-slate-200">{profile.telescope.name}</p>
-              <p className="text-slate-400">f={profile.telescope.focal_length} mm · ⌀{profile.telescope.aperture} mm</p>
+              <p className="text-slate-400">
+                {profile.telescope.focal_length} mm · ⌀{profile.telescope.aperture} mm
+                {ratio && <> · {ratio}</>}
+              </p>
             </div>
           )}
           {profile.location && (
             <div>
               <p className="text-slate-500 uppercase tracking-wider mb-1">Location</p>
-              {profile.location.name && <p className="text-slate-200">{profile.location.name}</p>}
+              {profile.location.name && (
+                <p className="text-slate-200">{profile.location.name}</p>
+              )}
               <p className="text-slate-400">
-                {profile.location.latitude.toFixed(4)}°, {profile.location.longitude.toFixed(4)}° · {profile.location.altitude} m
+                {fmtDms(profile.location.latitude, 'lat')}
+                {', '}
+                {fmtDms(profile.location.longitude, 'lon')}
+                {' · '}
+                {profile.location.altitude} m
               </p>
             </div>
           )}
@@ -412,7 +646,9 @@ function ProfileCard({
                   <span key={i} className="text-slate-300">
                     <span className="text-slate-500">{ROLE_LABELS[d.role]}: </span>
                     {d.config.device_id}
-                    {d.config.params?.device_name ? ` (${d.config.params.device_name})` : ''}
+                    {d.config.params?.device_name
+                      ? ` (${d.config.params.device_name})`
+                      : ''}
                   </span>
                 ))}
               </div>
@@ -498,7 +734,8 @@ export function Profiles() {
         <div>
           <h1 className="text-lg font-semibold text-slate-100">Profiles</h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Save your equipment configuration — telescope, location, and devices — for quick re-use.
+            Save your equipment configuration — telescope, location, and devices — for quick
+            re-use.
           </p>
         </div>
         <Button onClick={() => setView('create')}>
@@ -508,7 +745,10 @@ export function Profiles() {
 
       {activationResult && (
         <div className="mb-4">
-          <ActivationBanner result={activationResult} onDismiss={() => setActivationResult(null)} />
+          <ActivationBanner
+            result={activationResult}
+            onDismiss={() => setActivationResult(null)}
+          />
         </div>
       )}
 
@@ -518,7 +758,9 @@ export function Profiles() {
         <div className="flex flex-col items-center gap-3 py-16 text-center">
           <BookOpen size={32} className="text-slate-600" />
           <p className="text-sm text-slate-400">No profiles yet.</p>
-          <p className="text-xs text-slate-600">Create a profile to save your equipment setup.</p>
+          <p className="text-xs text-slate-600">
+            Create a profile to save your equipment setup.
+          </p>
           <Button className="mt-2" onClick={() => setView('create')}>
             <Plus size={14} className="mr-2" /> Create first profile
           </Button>

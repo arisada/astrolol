@@ -15,6 +15,12 @@ Items designed for but not yet built. Ordered roughly by priority.
 - **PHD2 integration** — async JSON-RPC client for guiding start/stop/status/events.
 - **Plate solving** — async subprocess runner for ASTAP / astrometry.net with progress events.
 
+## Profiles — deferred
+
+- **Profile duplication** — Clone button on each ProfileCard that POSTs a copy with a new UUID and name suffix " (copy)".
+- **Import / export profiles** — download `profiles.json` as a file; upload to merge or replace. Useful for backup and sharing equipment configs between machines.
+- **Map picker for location** — embed a Leaflet or similar map in the location editor so users can click to set coordinates instead of typing them.
+
 ## Post-MVP
 
 - **Sequencer** — state machine (idle → slewing → focusing → guiding → imaging → dithering).

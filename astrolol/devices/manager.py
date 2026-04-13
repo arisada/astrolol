@@ -119,6 +119,10 @@ class DeviceManager:
     def get_focuser(self, device_id: str) -> IFocuser:
         return self._get_typed(device_id, "focuser")  # type: ignore[return-value]
 
+    def get_config(self, device_id: str) -> DeviceConfig:
+        """Return the full DeviceConfig (including params) for a connected device."""
+        return self._get_entry(device_id).config
+
     def list_connected(self) -> list[dict[str, str]]:
         return [
             {

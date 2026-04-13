@@ -1,4 +1,5 @@
 import traceback
+from contextlib import asynccontextmanager
 
 import uvicorn
 import structlog
@@ -27,7 +28,31 @@ logger = structlog.get_logger()
 
 
 def create_app() -> FastAPI:
-    app = FastAPI(title="astrolol", version="0.1.0")
+    @asynccontextmanager
+    async def lifespan(app: FastAPI):  # noqa: ANN202
+        # --- Startup ---
+        store: ProfileStore = app.state.profile_store
+        last_id = store.get_last_active_id()
+        if last_id is not None:
+            try:
+                profile = store.get(last_id)
+                app.state.active_profile = profile
+                app.state.imager_manager.set_context(profile)
+                for pd in profile.devices:
+                    try:
+                        await app.state.device_manager.connect(pd.config)
+                    except Exception as exc:
+                        logger.warning(
+                            "startup.device_connect_failed",
+                            device_id=pd.config.device_id,
+                            error=str(exc),
+                        )
+            except KeyError:
+                logger.warning("startup.last_profile_not_found", profile_id=last_id)
+        yield
+        # --- Shutdown (nothing needed yet) ---
+
+    app = FastAPI(title="astrolol", version="0.1.0", lifespan=lifespan)
 
     pm = build_plugin_manager()
     registry = build_registry(pm)
