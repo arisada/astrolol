@@ -2,12 +2,6 @@ import { NavLink } from 'react-router-dom'
 import { BookOpen, Camera, Cpu, Settings, Telescope, Wifi, WifiOff } from 'lucide-react'
 import { useStore } from '@/store'
 
-const baseNavItems = [
-  { to: '/equipment', icon: Cpu,      label: 'Equipment' },
-  { to: '/profiles',  icon: BookOpen, label: 'Profiles'  },
-  { to: '/imaging',   icon: Camera,   label: 'Imaging'   },
-]
-
 const optionsItem = { to: '/options', icon: Settings, label: 'Options' }
 
 export function Sidebar() {
@@ -15,8 +9,10 @@ export function Sidebar() {
   const hasMounts   = useStore((s) => s.connectedDevices.some((d) => d.kind === 'mount'))
 
   const navItems = [
-    ...baseNavItems,
+    { to: '/equipment', icon: Cpu,      label: 'Equipment' },
+    { to: '/profiles',  icon: BookOpen, label: 'Profiles'  },
     ...(hasMounts ? [{ to: '/mount', icon: Telescope, label: 'Mount' }] : []),
+    { to: '/imaging',   icon: Camera,   label: 'Imaging'   },
     optionsItem,
   ]
 

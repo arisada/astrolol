@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Crosshair, StopCircle } from 'lucide-react'
 import { api } from '@/api/client'
 import { useStore } from '@/store'
@@ -60,15 +60,19 @@ function Section({ title, children }: { title: string; children: React.ReactNode
   )
 }
 
-function ToggleSwitch({ checked, onChange, label }: { checked: boolean; onChange: () => void; label: string }) {
+function ToggleSwitch({ checked, onChange, label, disabled }: {
+  checked: boolean; onChange: () => void; label: string; disabled?: boolean
+}) {
   return (
     <button
       type="button"
       role="switch"
       aria-checked={checked}
-      onClick={onChange}
-      className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer items-center rounded-full transition-colors focus:outline-none
-        ${checked ? 'bg-accent' : 'bg-surface-border'}`}
+      onClick={disabled ? undefined : onChange}
+      disabled={disabled}
+      className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors focus:outline-none
+        disabled:opacity-40 disabled:cursor-not-allowed
+        ${checked ? 'bg-accent' : 'bg-surface-border'} ${!disabled ? 'cursor-pointer' : ''}`}
       aria-label={label}
     >
       <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform
@@ -85,9 +89,12 @@ function ToggleSwitch({ checked, onChange, label }: { checked: boolean; onChange
 function MountControls({ deviceId }: { deviceId: string }) {
   const [status, setStatus] = useState<MountStatus | null>(null)
 
-  // Slew target state (decimal hours for RA, decimal degrees for Dec)
+  // Slew target state (decimal hours for RA, decimal degrees for Dec).
+  // Tracks the live position until the user manually edits a field.
   const [slewRa, setSlewRa] = useState(0)
   const [slewDec, setSlewDec] = useState(0)
+  // Set to true on first user edit; cleared if the user explicitly resets to live position.
+  const slewEdited = useRef(false)
 
   const [speedIdx, setSpeedIdx] = useState(1)
   const [trackingMode, setTrackingMode] = useState<TrackingMode>('Sidereal')
@@ -99,7 +106,14 @@ function MountControls({ deviceId }: { deviceId: string }) {
     const poll = async () => {
       try {
         const s = await api.mount.status(deviceId)
-        if (alive) setStatus(s)
+        if (alive) {
+          setStatus(s)
+          // Keep slew fields in sync with live position until the user edits them
+          if (!slewEdited.current && s.ra != null && s.dec != null) {
+            setSlewRa(s.ra)
+            setSlewDec(s.dec)
+          }
+        }
       } catch { /* ignore poll errors */ }
     }
     poll()
@@ -153,20 +167,29 @@ function MountControls({ deviceId }: { deviceId: string }) {
           <div className="flex flex-col gap-2">
             <div className="flex items-center gap-2">
               <span className="text-xs text-slate-500 w-8 shrink-0">RA</span>
-              <DmsInput value={slewRa} onChange={setSlewRa} mode="ra" />
+              <DmsInput value={slewRa} onChange={(v) => { slewEdited.current = true; setSlewRa(v) }} mode="ra" />
             </div>
             <div className="flex items-center gap-2">
               <span className="text-xs text-slate-500 w-8 shrink-0">Dec</span>
-              <DmsInput value={slewDec} onChange={setSlewDec} mode="lat" />
+              <DmsInput value={slewDec} onChange={(v) => { slewEdited.current = true; setSlewDec(v) }} mode="lat" />
             </div>
           </div>
-          <div className="flex gap-2">
+          <div className="flex gap-2 items-center">
             <Button size="sm" onClick={() => act(() => api.mount.slew(deviceId, slewRa, slewDec))}>
               <Crosshair size={12} className="mr-1" /> Slew
             </Button>
             <Button size="sm" variant="outline" onClick={() => act(() => api.mount.stop(deviceId))}>
               <StopCircle size={12} className="mr-1" /> Stop
             </Button>
+            {slewEdited.current && (
+              <button
+                type="button"
+                className="ml-auto text-xs text-slate-500 hover:text-slate-300 transition-colors"
+                onClick={() => { slewEdited.current = false; if (status?.ra != null && status?.dec != null) { setSlewRa(status.ra); setSlewDec(status.dec) } }}
+              >
+                ↺ live
+              </button>
+            )}
           </div>
         </Section>
 
@@ -176,11 +199,13 @@ function MountControls({ deviceId }: { deviceId: string }) {
             <ToggleSwitch
               checked={isTracking}
               label="Toggle tracking"
+              disabled={isParked}
               onChange={() => act(() => api.mount.setTracking(deviceId, !isTracking))}
             />
             <span className="text-sm text-slate-300 w-6">{isTracking ? 'On' : 'Off'}</span>
             <select
-              className="ml-auto rounded bg-surface-overlay border border-surface-border px-2 py-1 text-xs text-slate-200 focus:outline-none"
+              disabled={isParked}
+              className="ml-auto rounded bg-surface-overlay border border-surface-border px-2 py-1 text-xs text-slate-200 focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed"
               value={trackingMode}
               onChange={(e) => {
                 setTrackingMode(e.target.value as TrackingMode)
@@ -191,7 +216,10 @@ function MountControls({ deviceId }: { deviceId: string }) {
               {TRACKING_MODES.map((m) => <option key={m}>{m}</option>)}
             </select>
           </div>
-          <p className="text-xs text-slate-600">Lunar / Solar rates require firmware support.</p>
+          {isParked
+            ? <p className="text-xs text-slate-500">Unpark the mount to enable tracking.</p>
+            : <p className="text-xs text-slate-600">Lunar / Solar rates require firmware support.</p>
+          }
         </Section>
 
         {/* Park */}
