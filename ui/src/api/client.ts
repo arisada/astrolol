@@ -11,6 +11,7 @@ import type {
   MountStatus,
   Profile,
   SetPropertyRequest,
+  UserSettings,
 } from './types'
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
@@ -104,6 +105,11 @@ export const api = {
   indi: {
     drivers: (kind?: string) =>
       request<DriverEntry[]>(kind ? `/indi/drivers/${kind}` : '/indi/drivers'),
+  },
+
+  settings: {
+    get: () => request<UserSettings>('/settings'),
+    put: (body: UserSettings) => request<UserSettings>('/settings', { method: 'PUT', body: JSON.stringify(body) }),
   },
 
   focuser: {

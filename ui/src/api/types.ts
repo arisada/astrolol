@@ -53,6 +53,12 @@ export interface ExposureRequest {
   binning?: number
   frame_type?: FrameType
   count?: number | null
+  save?: boolean
+}
+
+export interface UserSettings {
+  save_dir_template: string
+  save_filename_template: string
 }
 
 export interface ExposureResult {

@@ -1,4 +1,5 @@
 import asyncio
+import shutil
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -22,9 +23,31 @@ from astrolol.imaging.models import ExposureRequest, ExposureResult, ImagerState
 from astrolol.imaging.preview import fits_to_jpeg
 
 if TYPE_CHECKING:
+    from astrolol.config.user_settings import UserSettingsStore
     from astrolol.profiles.models import Profile
 
 logger = structlog.get_logger()
+
+
+def _expand_template(
+    template: str,
+    frame_type: str,
+    counter: int,
+    duration: float,
+    gain: int,
+) -> str:
+    """Expand % tokens in a save-path template."""
+    now = datetime.now(timezone.utc)
+    result = template
+    result = result.replace("%D", now.strftime("%Y-%m-%d"))
+    result = result.replace("%T", now.strftime("%H%M%S"))
+    result = result.replace("%U", str(Path.home()))
+    result = result.replace("%O", "unknown")
+    result = result.replace("%F", frame_type)
+    result = result.replace("%C", f"{counter:06d}")
+    result = result.replace("%E", f"{duration:.1f}")
+    result = result.replace("%G", str(gain))
+    return result
 
 
 @dataclass
@@ -90,12 +113,15 @@ class ImagerManager:
         device_manager: DeviceManager,
         event_bus: EventBus,
         images_dir: Path | None = None,
+        user_settings_store: "UserSettingsStore | None" = None,
     ) -> None:
         self._device_manager = device_manager
         self._event_bus = event_bus
         self._images_dir = images_dir or settings.images_dir
         self._imagers: dict[str, CameraImager] = {}
         self._active_profile: "Profile | None" = None
+        self._user_settings_store = user_settings_store
+        self._save_counters: dict[str, int] = {}
 
     def set_context(self, profile: "Profile | None") -> None:
         """Called when a profile is activated or cleared."""
@@ -209,13 +235,33 @@ class ImagerManager:
             raise
 
         fits_path = Path(image.fits_path)
-        preview_path = self._preview_path(fits_path)
         self._images_dir.mkdir(parents=True, exist_ok=True)
 
         _write_imagetyp(fits_path, request.frame_type)
         if profile is not None:
             await asyncio.to_thread(_patch_fits_headers, fits_path, profile, ra, dec)
 
+        # Optionally move to save directory using the configured template
+        if request.save and self._user_settings_store is not None:
+            user_cfg = self._user_settings_store.get()
+            counter = self._save_counters.get(device_id, 0) + 1
+            self._save_counters[device_id] = counter
+            dir_part = _expand_template(
+                user_cfg.save_dir_template, request.frame_type, counter, request.duration, request.gain
+            )
+            file_part = _expand_template(
+                user_cfg.save_filename_template, request.frame_type, counter, request.duration, request.gain
+            )
+            save_dir = Path(dir_part).expanduser()
+            save_dir.mkdir(parents=True, exist_ok=True)
+            final_fits = save_dir / f"{file_part}.fits"
+            try:
+                shutil.move(str(fits_path), final_fits)
+                fits_path = final_fits
+            except Exception:
+                logger.warning("imager.save_move_failed", src=str(fits_path), dst=str(final_fits))
+
+        preview_path = self._preview_path(fits_path)
         fits_to_jpeg(fits_path, preview_path, quality=settings.jpeg_quality)
 
         result = ExposureResult(

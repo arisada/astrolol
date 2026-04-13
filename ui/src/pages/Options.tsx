@@ -1,4 +1,6 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { api } from '@/api/client'
+import type { UserSettings } from '@/api/types'
 
 interface IndiSettings {
   manageServer: boolean
@@ -50,11 +52,13 @@ function Toggle({ value, onChange }: { value: boolean; onChange: (v: boolean) =>
 function TextInput({
   value,
   onChange,
+  onBlur,
   disabled,
   className = '',
 }: {
   value: string
   onChange: (v: string) => void
+  onBlur?: () => void
   disabled?: boolean
   className?: string
 }) {
@@ -63,10 +67,50 @@ function TextInput({
       type="text"
       value={value}
       onChange={(e) => onChange(e.target.value)}
+      onBlur={onBlur}
       disabled={disabled}
       className={`bg-surface-0 border border-slate-600 rounded px-3 py-1.5 text-sm text-slate-200
         focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-40 ${className}`}
     />
+  )
+}
+
+// Token reference for the save template fields
+const TOKEN_REFERENCE = [
+  { token: '%D', desc: 'ISO date (YYYY-MM-DD)' },
+  { token: '%T', desc: 'Time (HHMMSS)' },
+  { token: '%U', desc: 'Home directory' },
+  { token: '%O', desc: 'Object name' },
+  { token: '%F', desc: 'Frame type (light/dark/flat/bias)' },
+  { token: '%C', desc: 'Counter (6-digit, per camera)' },
+  { token: '%E', desc: 'Exposure time (seconds)' },
+  { token: '%G', desc: 'Gain' },
+]
+
+function TokenReference() {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="mt-1">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className="text-xs text-slate-500 hover:text-slate-300 underline underline-offset-2"
+      >
+        {open ? 'Hide token reference' : 'Show token reference'}
+      </button>
+      {open && (
+        <table className="mt-2 text-xs w-full border-collapse">
+          <tbody>
+            {TOKEN_REFERENCE.map(({ token, desc }) => (
+              <tr key={token} className="border-t border-slate-700">
+                <td className="py-1 pr-4 font-mono text-accent">{token}</td>
+                <td className="py-1 text-slate-400">{desc}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+    </div>
   )
 }
 
@@ -78,9 +122,66 @@ export function Options() {
   })
   const [showAdvanced, setShowAdvanced] = useState(false)
 
+  // Image saving settings (persisted via backend)
+  const [saveDir, setSaveDir] = useState('~/Pictures/astrolol/%D')
+  const [saveFilename, setSaveFilename] = useState('%F_%C_%Es_%Gg')
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+
+  useEffect(() => {
+    api.settings.get()
+      .then((s) => {
+        setSaveDir(s.save_dir_template)
+        setSaveFilename(s.save_filename_template)
+      })
+      .catch(() => { /* backend may not be running */ })
+  }, [])
+
+  const persistSaveSettings = async () => {
+    setSaveStatus('saving')
+    try {
+      await api.settings.put({ save_dir_template: saveDir, save_filename_template: saveFilename } as UserSettings)
+      setSaveStatus('saved')
+      setTimeout(() => setSaveStatus('idle'), 2000)
+    } catch {
+      setSaveStatus('error')
+    }
+  }
+
   return (
     <div className="p-6 max-w-xl">
       <h1 className="text-lg font-semibold text-slate-100 mb-6">Options</h1>
+
+      <Section title="Image Saving">
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-1">
+            <label className="text-sm text-slate-200">Save directory</label>
+            <p className="text-xs text-slate-500">Directory template for saved subs. Supports % tokens.</p>
+            <TextInput
+              value={saveDir}
+              onChange={setSaveDir}
+              onBlur={persistSaveSettings}
+              className="w-full font-mono text-xs"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-sm text-slate-200">Filename template</label>
+            <p className="text-xs text-slate-500">Without extension — <code className="text-slate-400">.fits</code> is appended automatically.</p>
+            <TextInput
+              value={saveFilename}
+              onChange={setSaveFilename}
+              onBlur={persistSaveSettings}
+              className="w-full font-mono text-xs"
+            />
+          </div>
+          <div className="text-xs text-slate-500 bg-surface-overlay border border-surface-border rounded p-2 font-mono break-all">
+            Example: <span className="text-slate-300">{saveDir.replace('%D', '2026-04-13').replace('%T', '210530').replace('%U', '~').replace('%O', 'M42').replace('%F', 'light').replace('%C', '000001').replace('%E', '60.0').replace('%G', '100')}/{saveFilename.replace('%D', '2026-04-13').replace('%T', '210530').replace('%U', '~').replace('%O', 'M42').replace('%F', 'light').replace('%C', '000001').replace('%E', '60.0').replace('%G', '100')}.fits</span>
+          </div>
+          <TokenReference />
+          {saveStatus === 'saving' && <p className="text-xs text-slate-500">Saving…</p>}
+          {saveStatus === 'saved' && <p className="text-xs text-status-ok">Saved.</p>}
+          {saveStatus === 'error' && <p className="text-xs text-status-error">Failed to save settings.</p>}
+        </div>
+      </Section>
 
       <Section title="INDI Server">
         <Row
@@ -136,9 +237,8 @@ export function Options() {
       </Section>
 
       <p className="text-xs text-slate-600 mt-4">
-        Note: settings shown here are UI previews only — a backend settings API is not yet
-        implemented. To configure the server, set <code className="text-slate-500">ASTROLOL_*</code> environment
-        variables before starting astrolol.
+        INDI server settings are UI previews only — set <code className="text-slate-500">ASTROLOL_*</code> environment
+        variables to configure the server before starting astrolol.
       </p>
     </div>
   )

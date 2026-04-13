@@ -19,6 +19,7 @@ class ExposureRequest(BaseModel):
         ge=1,
         description="Number of exposures for a loop. Omit (or null) for infinite loop.",
     )
+    save: bool = Field(default=True, description="Write to save directory; false = preview only")
 
 
 class ExposureResult(BaseModel):

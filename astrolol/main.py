@@ -16,6 +16,8 @@ from astrolol.api.indi import router as indi_router
 from astrolol.api.mount import router as mount_router
 from astrolol.api.profiles import router as profiles_router
 from astrolol.api.properties import router as properties_router
+from astrolol.api.settings import router as settings_router
+from astrolol.config.user_settings import UserSettingsStore
 from astrolol.profiles.store import ProfileStore
 from astrolol.app import build_plugin_manager, build_registry
 from astrolol.core.events import EventBus
@@ -54,15 +56,16 @@ def create_app() -> FastAPI:
 
     app = FastAPI(title="astrolol", version="0.1.0", lifespan=lifespan)
 
+    from astrolol.config.settings import settings as _settings
+
     pm = build_plugin_manager()
     registry = build_registry(pm)
     event_bus = EventBus()
     device_manager = DeviceManager(registry=registry, event_bus=event_bus)
-    imager_manager = ImagerManager(device_manager=device_manager, event_bus=event_bus)
+    user_settings_store = UserSettingsStore(_settings.profiles_file.parent / "user_settings.json")
+    imager_manager = ImagerManager(device_manager=device_manager, event_bus=event_bus, user_settings_store=user_settings_store)
     mount_manager = MountManager(device_manager=device_manager, event_bus=event_bus)
     focuser_manager = FocuserManager(device_manager=device_manager, event_bus=event_bus)
-
-    from astrolol.config.settings import settings as _settings
 
     app.state.registry = registry
     app.state.plugin_manager = pm
@@ -72,6 +75,7 @@ def create_app() -> FastAPI:
     app.state.mount_manager = mount_manager
     app.state.focuser_manager = focuser_manager
     app.state.profile_store = ProfileStore(_settings.profiles_file)
+    app.state.user_settings_store = user_settings_store
     app.state.active_profile = None
 
     app.include_router(devices_router)
@@ -81,6 +85,7 @@ def create_app() -> FastAPI:
     app.include_router(mount_router)
     app.include_router(focuser_router)
     app.include_router(indi_router)
+    app.include_router(settings_router)
 
     @app.exception_handler(HTTPException)
     async def _http_exc(request: Request, exc: HTTPException):

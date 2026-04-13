@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Square, Play, Camera, StopCircle, ChevronUp, ChevronDown } from 'lucide-react'
 import { api } from '@/api/client'
 import { useStore } from '@/store'
@@ -89,11 +89,28 @@ function PillGroup<T extends string>({
 }
 
 function DurationStepper({ value, onChange }: { value: number; onChange: (v: number) => void }) {
+  const [editing, setEditing] = useState(false)
+  const [raw, setRaw] = useState('')
+  const inputRef = useRef<HTMLInputElement>(null)
+
   // Find the index of the nearest step to the current value
   const idx = EXPOSURE_STEPS.reduce(
     (best, v, i) => Math.abs(v - value) < Math.abs(EXPOSURE_STEPS[best] - value) ? i : best,
     0,
   )
+
+  const startEdit = () => {
+    setRaw(String(value))
+    setEditing(true)
+    // focus after render
+    setTimeout(() => inputRef.current?.select(), 0)
+  }
+
+  const commitEdit = () => {
+    const n = parseFloat(raw)
+    if (!isNaN(n) && n > 0) onChange(n)
+    setEditing(false)
+  }
 
   return (
     <div className="flex flex-col gap-1">
@@ -102,18 +119,37 @@ function DurationStepper({ value, onChange }: { value: number; onChange: (v: num
         <Button
           size="icon" variant="outline"
           disabled={idx === 0}
-          onClick={() => onChange(EXPOSURE_STEPS[idx - 1])}
+          onClick={() => { setEditing(false); onChange(EXPOSURE_STEPS[idx - 1]) }}
           title="Shorter"
         >
           <ChevronDown size={14} />
         </Button>
-        <span className="flex-1 text-center text-xs font-mono text-slate-200 bg-surface-overlay border border-surface-border rounded px-2 py-1.5 min-w-[5rem]">
-          {fmtDuration(value)}
-        </span>
+        {editing ? (
+          <input
+            ref={inputRef}
+            type="number"
+            min="0.001"
+            step="any"
+            value={raw}
+            onChange={(e) => setRaw(e.target.value)}
+            onBlur={commitEdit}
+            onKeyDown={(e) => { if (e.key === 'Enter') commitEdit(); if (e.key === 'Escape') setEditing(false) }}
+            className="flex-1 text-center text-xs font-mono text-slate-200 bg-surface-overlay border border-accent rounded px-2 py-1.5 min-w-[5rem] focus:outline-none"
+          />
+        ) : (
+          <button
+            type="button"
+            onClick={startEdit}
+            title="Click to enter a custom value"
+            className="flex-1 text-center text-xs font-mono text-slate-200 bg-surface-overlay border border-surface-border rounded px-2 py-1.5 min-w-[5rem] hover:border-slate-500 transition-colors"
+          >
+            {fmtDuration(value)}
+          </button>
+        )}
         <Button
           size="icon" variant="outline"
           disabled={idx === EXPOSURE_STEPS.length - 1}
-          onClick={() => onChange(EXPOSURE_STEPS[idx + 1])}
+          onClick={() => { setEditing(false); onChange(EXPOSURE_STEPS[idx + 1]) }}
           title="Longer"
         >
           <ChevronUp size={14} />
@@ -137,6 +173,7 @@ function CameraPanel() {
   const [binning, setBinning] = useState(1)
   const [frameType, setFrameType] = useState<FrameType>('light')
   const [looping, setLooping] = useState(false)
+  const [saveSubs, setSaveSubs] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   const activeId = deviceId || devices[0]?.device_id || ''
@@ -169,7 +206,7 @@ function CameraPanel() {
     if (!activeId) return
     setError(null)
     try {
-      await api.imager.expose(activeId, { duration, gain, binning, frame_type: frameType })
+      await api.imager.expose(activeId, { duration, gain, binning, frame_type: frameType, save: saveSubs })
     } catch (e) { setError((e as Error).message) }
   }
 
@@ -181,7 +218,7 @@ function CameraPanel() {
         await api.imager.stopLoop(activeId)
         setLooping(false)
       } else {
-        await api.imager.startLoop(activeId, { duration, gain, binning, frame_type: frameType })
+        await api.imager.startLoop(activeId, { duration, gain, binning, frame_type: frameType, save: saveSubs })
         setLooping(true)
       }
     } catch (e) { setError((e as Error).message) }
@@ -250,6 +287,18 @@ function CameraPanel() {
               ))}
             </div>
           </div>
+
+          {/* Save subs */}
+          <label className="flex items-center gap-2 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={saveSubs}
+              onChange={(e) => setSaveSubs(e.target.checked)}
+              className="accent-accent"
+            />
+            <span className="text-xs text-slate-300">Save subs</span>
+            {!saveSubs && <span className="text-xs text-slate-500">(preview only)</span>}
+          </label>
 
           {/* Actions */}
           <div className="flex gap-2">
