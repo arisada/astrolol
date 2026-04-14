@@ -117,37 +117,39 @@ function NumberProperty({
   }
 
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className="flex flex-col gap-2">
       {prop.widgets.map((w) => (
-        <div key={w.name} className="flex items-center gap-2">
-          <span className="text-sm text-slate-400 w-36 flex-shrink-0 truncate" title={w.label}>
-            {w.label}
-          </span>
-          {isReadOnly ? (
-            <span className="text-sm text-slate-300 font-mono">
-              {w.value != null ? Number(w.value).toFixed(4).replace(/\.?0+$/, '') : '—'}
-            </span>
-          ) : (
-            <Input
-              className="h-7 text-sm py-0 px-2 w-40"
-              value={localValues[w.name] ?? ''}
-              onChange={(e) =>
-                setLocalValues((prev) => ({ ...prev, [w.name]: e.target.value }))
-              }
-              onFocus={() => { focusedRef.current = true }}
-              onBlur={() => { focusedRef.current = false }}
-              onKeyDown={(e) => { if (e.key === 'Enter') handleSet() }}
-            />
+        <div key={w.name}>
+          {prop.widgets.length > 1 && (
+            <span className="block text-xs text-slate-500 mb-0.5">{w.label}</span>
           )}
-          {w.min != null && w.max != null && (
-            <span className="text-xs text-slate-600 hidden sm:inline">
-              [{w.min}–{w.max}]
-            </span>
-          )}
+          <div className="flex items-center gap-2">
+            {isReadOnly ? (
+              <span className="text-sm text-slate-300 font-mono">
+                {w.value != null ? Number(w.value).toFixed(4).replace(/\.?0+$/, '') : '—'}
+              </span>
+            ) : (
+              <Input
+                className="h-7 text-sm py-0 px-2 w-40"
+                value={localValues[w.name] ?? ''}
+                onChange={(e) =>
+                  setLocalValues((prev) => ({ ...prev, [w.name]: e.target.value }))
+                }
+                onFocus={() => { focusedRef.current = true }}
+                onBlur={() => { focusedRef.current = false }}
+                onKeyDown={(e) => { if (e.key === 'Enter') handleSet() }}
+              />
+            )}
+            {w.min != null && w.max != null && (
+              <span className="text-xs text-slate-600">
+                [{w.min}–{w.max}]
+              </span>
+            )}
+          </div>
         </div>
       ))}
       {!isReadOnly && (
-        <Button size="sm" variant="outline" className="self-start h-6 text-xs px-2 mt-0.5" onClick={handleSet}>
+        <Button size="sm" variant="outline" className="self-start h-6 text-xs px-2" onClick={handleSet}>
           Set
         </Button>
       )}
@@ -184,19 +186,19 @@ function TextProperty({
   }
 
   return (
-    <div className="flex flex-col gap-1.5">
+    <div className="flex flex-col gap-2">
       {prop.widgets.map((w) => (
-        <div key={w.name} className="flex items-center gap-2">
-          <span className="text-sm text-slate-400 w-36 flex-shrink-0 truncate" title={w.label}>
-            {w.label}
-          </span>
+        <div key={w.name}>
+          {prop.widgets.length > 1 && (
+            <span className="block text-xs text-slate-500 mb-0.5">{w.label}</span>
+          )}
           {isReadOnly ? (
             <span className="text-sm text-slate-300 font-mono break-all">
               {w.value != null ? String(w.value) : '—'}
             </span>
           ) : (
             <Input
-              className="h-7 text-sm py-0 px-2 flex-1"
+              className="h-7 text-sm py-0 px-2 w-full"
               value={localValues[w.name] ?? ''}
               onChange={(e) =>
                 setLocalValues((prev) => ({ ...prev, [w.name]: e.target.value }))
@@ -209,7 +211,7 @@ function TextProperty({
         </div>
       ))}
       {!isReadOnly && (
-        <Button size="sm" variant="outline" className="self-start h-6 text-xs px-2 mt-0.5" onClick={handleSet}>
+        <Button size="sm" variant="outline" className="self-start h-6 text-xs px-2" onClick={handleSet}>
           Set
         </Button>
       )}
@@ -235,7 +237,7 @@ function LightProperty({ widgets }: { widgets: PropertyWidget[] }) {
 }
 
 // ---------------------------------------------------------------------------
-// Single property row
+// Single property row — stacked layout so widgets get the full panel width
 // ---------------------------------------------------------------------------
 
 function PropertyRow({
@@ -246,22 +248,20 @@ function PropertyRow({
   deviceId: string
 }) {
   return (
-    <div className="flex gap-3 py-2 border-b border-surface-border last:border-0">
-      {/* left column: label + state dot */}
-      <div className="w-48 flex-shrink-0">
-        <div className="flex items-center gap-1.5">
-          <StateDot state={prop.state} />
-          <span className="text-xs text-slate-300 truncate" title={prop.label}>
-            {prop.label}
-          </span>
-        </div>
-        <span className="text-xs text-slate-600 truncate block" title={prop.name}>
-          {prop.name}
+    <div className="py-2.5 border-b border-surface-border last:border-0">
+      {/* Header: state dot + human label + internal name */}
+      <div className="flex items-center gap-1.5 mb-1.5">
+        <StateDot state={prop.state} />
+        <span className="text-xs font-medium text-slate-300" title={prop.name}>
+          {prop.label || prop.name}
         </span>
+        {prop.label && prop.label !== prop.name && (
+          <span className="text-xs text-slate-600 font-mono">{prop.name}</span>
+        )}
       </div>
 
-      {/* right column: widgets */}
-      <div className="flex-1 min-w-0">
+      {/* Widgets — full width */}
+      <div className="pl-3.5">
         {prop.type === 'switch' && (
           <SwitchProperty prop={prop} deviceId={deviceId} />
         )}
