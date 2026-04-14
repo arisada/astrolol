@@ -251,6 +251,16 @@ class IndiClient(IPyClient):
             return {}
         return dict(device.data)
 
+    def get_messages(self, device_name: str) -> list[dict[str, str]]:
+        """Return device messages as a list of {timestamp, message} dicts, newest first."""
+        device = self.data.get(device_name)
+        if device is None:
+            return []
+        return [
+            {"timestamp": ts.isoformat(), "message": msg}
+            for ts, msg in device.messages
+        ]
+
     # ------------------------------------------------------------------
     # Sending commands
     # ------------------------------------------------------------------

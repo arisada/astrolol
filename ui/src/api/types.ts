@@ -171,6 +171,11 @@ export interface LoadDriverResponse {
   properties: DeviceProperty[]
 }
 
+export interface IndiDeviceMessage {
+  timestamp: string
+  message: string
+}
+
 // --- WebSocket events (discriminated union) ---
 
 interface BaseEvent {

@@ -8,6 +8,7 @@ import type {
   ExposureResult,
   FocuserStatus,
   ImagerStatus,
+  IndiDeviceMessage,
   LoadDriverResponse,
   MountStatus,
   PluginInfo,
@@ -129,6 +130,8 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ executable, device_name: deviceName }),
       }),
+    deviceMessages: (deviceName: string) =>
+      request<IndiDeviceMessage[]>(`/indi/messages/${encodeURIComponent(deviceName)}`),
   },
 
   settings: {

@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { X } from 'lucide-react'
 import { api } from '@/api/client'
-import type { DeviceProperty, PropertyWidget } from '@/api/types'
+import type { DeviceProperty, IndiDeviceMessage, PropertyWidget } from '@/api/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 
@@ -283,6 +283,63 @@ function PropertyRow({
 }
 
 // ---------------------------------------------------------------------------
+// Messages tab
+// ---------------------------------------------------------------------------
+
+function MessagesTab({ indiDeviceName }: { indiDeviceName: string | null }) {
+  const [messages, setMessages] = useState<IndiDeviceMessage[]>([])
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!indiDeviceName) return
+    let alive = true
+
+    const load = () => {
+      api.indi
+        .deviceMessages(indiDeviceName)
+        .then((msgs) => {
+          if (alive) {
+            setMessages(msgs)
+            setError(null)
+          }
+        })
+        .catch((e: Error) => {
+          if (alive) setError(e.message)
+        })
+    }
+
+    load()
+    const id = setInterval(load, 3000)
+    return () => {
+      alive = false
+      clearInterval(id)
+    }
+  }, [indiDeviceName])
+
+  if (!indiDeviceName) {
+    return <p className="text-xs text-slate-500 p-4">Not an INDI device.</p>
+  }
+  if (error) {
+    return <p className="text-xs text-status-error p-4">{error}</p>
+  }
+  if (messages.length === 0) {
+    return <p className="text-xs text-slate-500 p-4">No messages from driver.</p>
+  }
+  return (
+    <div className="flex flex-col gap-0">
+      {messages.map((m, i) => (
+        <div key={i} className="px-4 py-2 border-b border-surface-border last:border-0">
+          <p className="text-xs text-slate-500 font-mono mb-0.5">
+            {new Date(m.timestamp).toLocaleTimeString()}
+          </p>
+          <p className="text-xs text-slate-300 break-words">{m.message}</p>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Main panel
 // ---------------------------------------------------------------------------
 
@@ -291,9 +348,21 @@ interface Props {
   onClose: () => void
 }
 
+type Tab = 'properties' | 'messages'
+
 export function DevicePropertiesPanel({ deviceId, onClose }: Props) {
+  const [tab, setTab] = useState<Tab>('properties')
   const [properties, setProperties] = useState<DeviceProperty[]>([])
   const [error, setError] = useState<string | null>(null)
+  const [indiDeviceName, setIndiDeviceName] = useState<string | null>(null)
+
+  // Fetch device config once to get the INDI device name for the messages tab
+  useEffect(() => {
+    api.devices.getConfig(deviceId).then((cfg) => {
+      const name = cfg.params?.device_name
+      if (typeof name === 'string') setIndiDeviceName(name)
+    }).catch(() => {/* non-INDI device or endpoint unavailable */})
+  }, [deviceId])
 
   useEffect(() => {
     let alive = true
@@ -328,32 +397,56 @@ export function DevicePropertiesPanel({ deviceId, onClose }: Props) {
       <div className="flex items-center justify-between px-4 py-3 border-b border-surface-border flex-shrink-0">
         <div>
           <p className="text-sm font-semibold text-slate-100">{deviceId}</p>
-          <p className="text-xs text-slate-500">Device properties</p>
+          <p className="text-xs text-slate-500">
+            {indiDeviceName ?? 'Device properties'}
+          </p>
         </div>
         <Button variant="ghost" size="icon" onClick={onClose} title="Close panel">
           <X size={14} />
         </Button>
       </div>
 
+      {/* Tabs */}
+      <div className="flex border-b border-surface-border flex-shrink-0">
+        {(['properties', 'messages'] as Tab[]).map((t) => (
+          <button
+            key={t}
+            onClick={() => setTab(t)}
+            className={[
+              'px-4 py-2 text-xs font-medium capitalize transition-colors',
+              tab === t
+                ? 'text-slate-100 border-b-2 border-accent -mb-px'
+                : 'text-slate-500 hover:text-slate-300',
+            ].join(' ')}
+          >
+            {t}
+          </button>
+        ))}
+      </div>
+
       {/* Body */}
       <div className="flex-1 overflow-y-auto">
-        {error ? (
-          <p className="text-xs text-status-error p-4">{error}</p>
-        ) : properties.length === 0 ? (
-          <p className="text-xs text-slate-500 p-4">Loading properties…</p>
-        ) : (
-          groups.map(([group, props]) => (
-            <div key={group}>
-              <p className="text-xs font-medium text-slate-500 uppercase tracking-wider px-4 py-2 bg-surface sticky top-0">
-                {group}
-              </p>
-              <div className="px-4">
-                {props.map((p) => (
-                  <PropertyRow key={p.name} prop={p} deviceId={deviceId} />
-                ))}
+        {tab === 'properties' ? (
+          error ? (
+            <p className="text-xs text-status-error p-4">{error}</p>
+          ) : properties.length === 0 ? (
+            <p className="text-xs text-slate-500 p-4">Loading properties…</p>
+          ) : (
+            groups.map(([group, props]) => (
+              <div key={group}>
+                <p className="text-xs font-medium text-slate-500 uppercase tracking-wider px-4 py-2 bg-surface sticky top-0">
+                  {group}
+                </p>
+                <div className="px-4">
+                  {props.map((p) => (
+                    <PropertyRow key={p.name} prop={p} deviceId={deviceId} />
+                  ))}
+                </div>
               </div>
-            </div>
-          ))
+            ))
+          )
+        ) : (
+          <MessagesTab indiDeviceName={indiDeviceName} />
         )}
       </div>
     </div>

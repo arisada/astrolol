@@ -55,6 +55,29 @@ def list_drivers_by_kind(kind: str) -> list[DriverEntryOut]:
 # Two-phase connect: Phase 1 — load driver and return property snapshot
 # ---------------------------------------------------------------------------
 
+# ---------------------------------------------------------------------------
+# Device messages
+# ---------------------------------------------------------------------------
+
+class DeviceMessage(BaseModel):
+    timestamp: str
+    message: str
+
+
+@router.get("/messages/{device_name}", response_model=list[DeviceMessage])
+async def get_device_messages(device_name: str, request: Request) -> list[DeviceMessage]:
+    """Return the last 8 messages emitted by an INDI device driver."""
+    manager = getattr(request.app.state.registry, "indi_manager", None)
+    if manager is None:
+        raise HTTPException(status_code=503, detail="INDI plugin not available.")
+    raw = manager.client.get_messages(device_name)
+    return [DeviceMessage(**m) for m in raw]
+
+
+# ---------------------------------------------------------------------------
+# Two-phase connect: Phase 1 — load driver and return property snapshot
+# ---------------------------------------------------------------------------
+
 class LoadDriverRequest(BaseModel):
     executable: str
     device_name: str
