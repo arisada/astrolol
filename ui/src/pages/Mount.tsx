@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Crosshair, StopCircle } from 'lucide-react'
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Crosshair, RefreshCw, StopCircle } from 'lucide-react'
 import { api } from '@/api/client'
 import { useStore } from '@/store'
 import type { MountStatus, TrackingMode } from '@/api/types'
@@ -37,6 +37,26 @@ function fmtRA(h: number | null | undefined): string {
   const M = Math.floor(mf)
   const S = ((mf - M) * 60).toFixed(1)
   return `${String(H).padStart(2, '0')}h ${String(M).padStart(2, '0')}m ${S.padStart(4, '0')}s`
+}
+
+/** Format hour angle as e.g. "+0h 32m" or "−1h 05m". */
+function fmtHA(ha: number | null | undefined): string {
+  if (ha == null) return '—'
+  const sign = ha >= 0 ? '+' : '−'
+  const abs = Math.abs(ha)
+  const h = Math.floor(abs)
+  const m = Math.floor((abs - h) * 60)
+  if (h === 0) return `${sign}${m}m`
+  return `${sign}${h}h ${String(m).padStart(2, '0')}m`
+}
+
+/** Human-readable time to / since meridian crossing. */
+function fmtMeridianDistance(ha: number): string {
+  const abs = Math.abs(ha)
+  const h = Math.floor(abs)
+  const m = Math.floor((abs - h) * 60)
+  const parts = h > 0 ? `${h}h ${m}m` : `${m}m`
+  return ha < 0 ? `${parts} to meridian` : `${parts} past meridian`
 }
 
 function fmtDec(d: number | null | undefined): string {
@@ -140,6 +160,9 @@ function MountControls({ deviceId }: { deviceId: string }) {
 
   const isTracking = status?.is_tracking ?? false
   const isParked   = status?.is_parked   ?? false
+  const ha         = status?.hour_angle ?? null
+  // Flip is meaningful when within 1 hour of the meridian and mount is free
+  const canFlip    = ha != null && Math.abs(ha) <= 1.0 && !isParked && !(status?.is_slewing)
 
   return (
     <div className="h-full overflow-y-auto p-4">
@@ -224,6 +247,35 @@ function MountControls({ deviceId }: { deviceId: string }) {
             ? <p className="text-xs text-slate-500">Unpark the mount to enable tracking.</p>
             : <p className="text-xs text-slate-600">Lunar / Solar rates require firmware support.</p>
           }
+        </Section>
+
+        {/* Meridian */}
+        <Section title="Meridian">
+          <div className="grid grid-cols-2 gap-x-8 gap-y-1 font-mono text-sm">
+            <span className="text-slate-500 text-xs">Pier side</span>
+            <span className="text-slate-500 text-xs">Hour angle</span>
+            <span className="text-slate-200">{status?.pier_side ?? '—'}</span>
+            <span className="text-slate-200">{fmtHA(ha)}</span>
+          </div>
+          {ha != null && (
+            <p className="text-xs text-slate-500">{fmtMeridianDistance(ha)}</p>
+          )}
+          <div className="flex items-center gap-3">
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={!canFlip}
+              onClick={() => act(() => api.mount.meridianFlip(deviceId))}
+              title={canFlip ? 'Perform meridian flip' : ha == null ? 'Hour angle unknown' : 'Outside ±1 h window'}
+            >
+              <RefreshCw size={12} className="mr-1.5" /> Meridian Flip
+            </Button>
+            {ha != null && !canFlip && Math.abs(ha) > 1.0 && (
+              <span className="text-xs text-slate-600">
+                Available within 1 h of meridian
+              </span>
+            )}
+          </div>
         </Section>
 
         {/* Park */}

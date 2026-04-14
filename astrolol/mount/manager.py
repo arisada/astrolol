@@ -5,6 +5,8 @@ import structlog
 
 from astrolol.core.events import (
     EventBus,
+    MountMeridianFlipCompleted,
+    MountMeridianFlipStarted,
     MountOperationFailed,
     MountParked,
     MountSlewAborted,
@@ -120,6 +122,21 @@ class MountManager:
         )
         logger.info("mount.tracking_changed", device_id=device_id, tracking=enabled, mode=mode)
 
+    async def meridian_flip(self, device_id: str) -> None:
+        """
+        Perform a meridian flip: slew to the current position on the opposite pier side.
+        Returns immediately; subscribe to events for completion / failure.
+        """
+        ctrl = self._get_or_create(device_id)
+        self._require_idle(ctrl)
+
+        ctrl._active_task = asyncio.create_task(
+            self._flip_worker(ctrl),
+            name=f"mount_flip_{device_id}",
+        )
+        await self._event_bus.publish(MountMeridianFlipStarted(device_id=device_id))
+        logger.info("mount.meridian_flip_started", device_id=device_id)
+
     async def get_status(self, device_id: str) -> MountStatus:
         mount = self._device_manager.get_mount(device_id)
         return await mount.get_status()
@@ -161,6 +178,31 @@ class MountManager:
                 MountOperationFailed(device_id=device_id, operation="slew", reason=str(exc))
             )
             logger.error("mount.slew_error", device_id=device_id, error=str(exc))
+        finally:
+            ctrl._active_task = None
+
+    async def _flip_worker(self, ctrl: MountController) -> None:
+        device_id = ctrl.device_id
+        mount = self._device_manager.get_mount(device_id)
+        try:
+            await asyncio.wait_for(mount.meridian_flip(), timeout=SLEW_TIMEOUT)
+            await self._event_bus.publish(MountMeridianFlipCompleted(device_id=device_id))
+            logger.info("mount.meridian_flip_completed", device_id=device_id)
+        except asyncio.CancelledError:
+            logger.info("mount.meridian_flip_cancelled", device_id=device_id)
+            raise
+        except asyncio.TimeoutError:
+            await self._event_bus.publish(MountSlewAborted(device_id=device_id))
+            await self._event_bus.publish(
+                MountOperationFailed(device_id=device_id, operation="meridian_flip", reason="Flip timed out")
+            )
+            logger.error("mount.meridian_flip_timeout", device_id=device_id)
+        except Exception as exc:
+            await self._event_bus.publish(MountSlewAborted(device_id=device_id))
+            await self._event_bus.publish(
+                MountOperationFailed(device_id=device_id, operation="meridian_flip", reason=str(exc))
+            )
+            logger.error("mount.meridian_flip_error", device_id=device_id, error=str(exc))
         finally:
             ctrl._active_task = None
 

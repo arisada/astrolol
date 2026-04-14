@@ -80,3 +80,15 @@ async def set_tracking(device_id: str, body: TrackingRequest, request: Request) 
         await _manager(request).set_tracking(device_id, body.enabled, body.mode)
     except (DeviceNotFoundError, DeviceKindError) as exc:
         raise HTTPException(status_code=404, detail=str(exc))
+
+
+@router.post("/{device_id}/meridian_flip", status_code=202)
+async def meridian_flip(device_id: str, request: Request) -> dict[str, str]:
+    """Start a meridian flip. Returns immediately; subscribe to /ws/events for completion."""
+    try:
+        await _manager(request).meridian_flip(device_id)
+        return {"status": "flipping", "device_id": device_id}
+    except (DeviceNotFoundError, DeviceKindError) as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))

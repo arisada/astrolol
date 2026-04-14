@@ -36,6 +36,8 @@ export interface MountStatus {
   is_tracking: boolean
   is_parked: boolean
   is_slewing: boolean
+  pier_side: 'East' | 'West' | null
+  hour_angle: number | null  // decimal hours; negative = east of meridian (pre-flip), positive = west (post)
 }
 
 export interface FocuserStatus {
@@ -224,6 +226,8 @@ export type TrackingMode = 'sidereal' | 'lunar' | 'solar'
 export interface MountTrackingChangedEvent extends BaseEvent { type: 'mount.tracking_changed'; device_id: string; tracking: boolean; mode: TrackingMode | null }
 export interface MountUnparkedEvent extends BaseEvent { type: 'mount.unparked'; device_id: string }
 export interface MountOperationFailedEvent extends BaseEvent { type: 'mount.operation_failed'; device_id: string; operation: string; reason: string }
+export interface MountMeridianFlipStartedEvent extends BaseEvent { type: 'mount.meridian_flip_started'; device_id: string }
+export interface MountMeridianFlipCompletedEvent extends BaseEvent { type: 'mount.meridian_flip_completed'; device_id: string }
 
 export interface FocuserMoveStartedEvent extends BaseEvent { type: 'focuser.move_started'; device_id: string; target_position: number }
 export interface FocuserMoveCompletedEvent extends BaseEvent { type: 'focuser.move_completed'; device_id: string; position: number }
@@ -237,5 +241,6 @@ export type AstrolollEvent =
   | LoopStartedEvent | LoopStoppedEvent
   | MountSlewStartedEvent | MountSlewCompletedEvent | MountSlewAbortedEvent
   | MountParkedEvent | MountUnparkedEvent | MountTrackingChangedEvent | MountOperationFailedEvent
+  | MountMeridianFlipStartedEvent | MountMeridianFlipCompletedEvent
   | FocuserMoveStartedEvent | FocuserMoveCompletedEvent | FocuserHaltedEvent
   | LogEvent

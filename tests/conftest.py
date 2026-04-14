@@ -95,6 +95,8 @@ class FakeMount:
         self._tracking = False
         self._parked = False
         self.last_tracking_mode = None
+        self._pier_side: str | None = "West"
+        self._hour_angle: float | None = None
 
     async def connect(self) -> None:
         self.connected = True
@@ -127,6 +129,13 @@ class FakeMount:
         self._tracking = enabled
         self.last_tracking_mode = mode
 
+    async def meridian_flip(self) -> None:
+        await asyncio.sleep(0.05)
+        if self._pier_side == "East":
+            self._pier_side = "West"
+        elif self._pier_side == "West":
+            self._pier_side = "East"
+
     async def get_status(self) -> MountStatus:
         state = DeviceState.CONNECTED if self.connected else DeviceState.DISCONNECTED
         return MountStatus(
@@ -135,6 +144,8 @@ class FakeMount:
             dec=self._dec,
             is_tracking=self._tracking,
             is_parked=self._parked,
+            pier_side=self._pier_side,
+            hour_angle=self._hour_angle,
         )
 
     async def ping(self) -> bool:

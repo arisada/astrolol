@@ -90,6 +90,8 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ enabled, mode: mode ?? null }),
       }),
+    meridianFlip: (deviceId: string) =>
+      request<void>(`/mount/${deviceId}/meridian_flip`, { method: 'POST' }),
   },
 
   profiles: {

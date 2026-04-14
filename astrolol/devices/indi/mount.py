@@ -4,10 +4,12 @@ INDI mount adapter — implements IMount using IndiClient.
 INDI telescope properties used:
   EQUATORIAL_EOD_COORD  NUMBER  RA, DEC   — current position / slew target
   ON_COORD_SET          SWITCH  SLEW / TRACK / SYNC
-  TELESCOPE_MOTION_NS   SWITCH  (for abort — we set EQUATORIAL_EOD_COORD again)
   TELESCOPE_ABORT_MOTION SWITCH ABORT_MOTION
   TELESCOPE_PARK        SWITCH  PARK / UNPARK
   TELESCOPE_TRACK_STATE SWITCH  TRACK_ON / TRACK_OFF
+  TELESCOPE_TRACK_RATE  SWITCH  TRACK_SIDEREAL / TRACK_LUNAR / TRACK_SOLAR
+  TELESCOPE_PIER_SIDE   SWITCH  PIER_EAST / PIER_WEST  (read; write triggers flip on EQMod)
+  TIME_LST              NUMBER  LST  — used to derive hour angle when no direct HA property
   TELESCOPE_INFO        NUMBER  — info block (used for ping)
 """
 from __future__ import annotations
@@ -170,6 +172,31 @@ class IndiMount:
         except Exception:
             pass
 
+        pier_side: str | None = None
+        try:
+            pier_east = await self._client.get_switch_state(
+                self._device_name, "TELESCOPE_PIER_SIDE", "PIER_EAST"
+            )
+            pier_side = "East" if pier_east else "West"
+        except Exception:
+            pass
+
+        hour_angle: float | None = None
+        try:
+            lst = await self._client.get_number(
+                self._device_name, "TIME_LST", "LST"
+            )
+            if ra is not None and lst is not None:
+                ha = lst - ra
+                # Normalize to -12..+12
+                while ha > 12:
+                    ha -= 24
+                while ha < -12:
+                    ha += 24
+                hour_angle = ha
+        except Exception:
+            pass
+
         return MountStatus(
             state=self._state,
             ra=ra,
@@ -177,7 +204,45 @@ class IndiMount:
             is_tracking=self._is_tracking,
             is_parked=self._is_parked,
             is_slewing=False,  # derived from INDI state but we keep it simple
+            pier_side=pier_side,
+            hour_angle=hour_angle,
         )
+
+    async def meridian_flip(self) -> None:
+        """Slew to the current target on the opposite pier side (meridian flip).
+
+        Sets TELESCOPE_PIER_SIDE to the opposite before issuing the slew so that
+        EQMod (and other drivers that support writable pier side) will approach
+        from the correct direction.  On read-only drivers the set is a no-op and
+        the slew re-centres in place — harmless, just not a true flip.
+        """
+        ra = await self._client.get_number(
+            self._device_name, "EQUATORIAL_EOD_COORD", "RA"
+        )
+        dec = await self._client.get_number(
+            self._device_name, "EQUATORIAL_EOD_COORD", "DEC"
+        )
+
+        # Request opposite pier side (best-effort — ignored on read-only drivers)
+        try:
+            pier_east = await self._client.get_switch_state(
+                self._device_name, "TELESCOPE_PIER_SIDE", "PIER_EAST"
+            )
+            target_side = "PIER_WEST" if pier_east else "PIER_EAST"
+            await self._client.set_switch(
+                self._device_name, "TELESCOPE_PIER_SIDE", [target_side]
+            )
+        except Exception:
+            pass
+
+        await self._client.set_switch(self._device_name, "ON_COORD_SET", ["TRACK"])
+        await self._client.set_number(
+            self._device_name,
+            "EQUATORIAL_EOD_COORD",
+            {"RA": ra, "DEC": dec},
+        )
+        await self._wait_slew_done()
+        self._is_tracking = True
 
     async def ping(self) -> bool:
         try:

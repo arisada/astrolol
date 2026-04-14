@@ -136,8 +136,18 @@ class MountUnparked(BaseEvent):
 class MountOperationFailed(BaseEvent):
     type: Literal["mount.operation_failed"] = "mount.operation_failed"
     device_id: str
-    operation: str  # "slew" | "park"
+    operation: str  # "slew" | "park" | "meridian_flip"
     reason: str
+
+
+class MountMeridianFlipStarted(BaseEvent):
+    type: Literal["mount.meridian_flip_started"] = "mount.meridian_flip_started"
+    device_id: str
+
+
+class MountMeridianFlipCompleted(BaseEvent):
+    type: Literal["mount.meridian_flip_completed"] = "mount.meridian_flip_completed"
+    device_id: str
 
 
 # --- Focuser events ---
@@ -167,6 +177,7 @@ Event = Annotated[
         ExposureStarted, ExposureCompleted, ExposureFailed, LoopStarted, LoopStopped,
         MountSlewStarted, MountSlewCompleted, MountSlewAborted,
         MountParked, MountUnparked, MountSynced, MountTrackingChanged, MountOperationFailed,
+        MountMeridianFlipStarted, MountMeridianFlipCompleted,
         FocuserMoveStarted, FocuserMoveCompleted, FocuserHalted,
     ],
     Field(discriminator="type"),

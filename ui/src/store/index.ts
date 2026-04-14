@@ -190,6 +190,8 @@ function eventSummary(event: AstrolollEvent): string {
     case 'mount.unparked': return `Mount unparked`
     case 'mount.operation_failed': return `${event.operation} failed: ${event.reason}`
     case 'mount.tracking_changed': return `Tracking ${event.tracking ? 'on' : 'off'}${event.mode ? ` (${event.mode})` : ''}`
+    case 'mount.meridian_flip_started': return `Meridian flip started`
+    case 'mount.meridian_flip_completed': return `Meridian flip complete`
     case 'focuser.move_started': return `Focuser → ${event.target_position}`
     case 'focuser.move_completed': return `Focuser at ${event.position}`
     case 'focuser.halted': return `Focuser halted at ${event.position ?? '?'}`
