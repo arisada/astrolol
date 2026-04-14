@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Crosshair, RefreshCw, StopCircle } from 'lucide-react'
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Crosshair, RefreshCw, RotateCw, StopCircle } from 'lucide-react'
 import { api } from '@/api/client'
 import { useStore } from '@/store'
 import type { MountStatus, TrackingMode } from '@/api/types'
@@ -11,13 +11,11 @@ import { StateBadge } from '@/components/ui/badge'
 // Constants
 // ---------------------------------------------------------------------------
 
-// Angular step sizes in degrees per nudge click.
-// RA delta in hours = deg / 15 (independent of declination — good enough for manual nudge).
-const SPEEDS = [
-  { label: 'Guide', deg: 0.004  },  // ≈ 15 arcsec
-  { label: '1×',   deg: 0.017  },  // ≈ 1 arcmin
-  { label: '8×',   deg: 0.13   },  // ≈ 8 arcmin
-  { label: '32×',  deg: 0.5    },  // ≈ 30 arcmin
+const MOVE_RATES = [
+  { label: 'Guide',   rate: 'guide'     },
+  { label: 'Center',  rate: 'centering' },
+  { label: 'Find',    rate: 'find'      },
+  { label: 'Max',     rate: 'max'       },
 ] as const
 
 const TRACKING_MODES: { label: string; mode: TrackingMode }[] = [
@@ -39,7 +37,6 @@ function fmtRA(h: number | null | undefined): string {
   return `${String(H).padStart(2, '0')}h ${String(M).padStart(2, '0')}m ${S.padStart(4, '0')}s`
 }
 
-/** Format hour angle as e.g. "+0h 32m" or "−1h 05m". */
 function fmtHA(ha: number | null | undefined): string {
   if (ha == null) return '—'
   const sign = ha >= 0 ? '+' : '−'
@@ -50,7 +47,6 @@ function fmtHA(ha: number | null | undefined): string {
   return `${sign}${h}h ${String(m).padStart(2, '0')}m`
 }
 
-/** Human-readable time to / since meridian crossing. */
 function fmtMeridianDistance(ha: number): string {
   const abs = Math.abs(ha)
   const h = Math.floor(abs)
@@ -112,18 +108,15 @@ function ToggleSwitch({ checked, onChange, label, disabled }: {
 function MountControls({ deviceId }: { deviceId: string }) {
   const [status, setStatus] = useState<MountStatus | null>(null)
 
-  // Slew target state (decimal hours for RA, decimal degrees for Dec).
-  // Tracks the live position until the user manually edits a field.
   const [slewRa, setSlewRa] = useState(0)
   const [slewDec, setSlewDec] = useState(0)
-  // Set to true on first user edit; cleared if the user explicitly resets to live position.
   const slewEdited = useRef(false)
 
-  const [speedIdx, setSpeedIdx] = useState(1)
+  const [rateIdx, setRateIdx] = useState(1)
   const [trackingMode, setTrackingMode] = useState<TrackingMode>('sidereal')
   const [error, setError] = useState<string | null>(null)
+  const movingRef = useRef(false)
 
-  // Poll mount status every 2 s
   useEffect(() => {
     let alive = true
     const poll = async () => {
@@ -131,7 +124,6 @@ function MountControls({ deviceId }: { deviceId: string }) {
         const s = await api.mount.status(deviceId)
         if (alive) {
           setStatus(s)
-          // Keep slew fields in sync with live position until the user edits them
           if (!slewEdited.current && s.ra != null && s.dec != null) {
             setSlewRa(s.ra)
             setSlewDec(s.dec)
@@ -149,20 +141,34 @@ function MountControls({ deviceId }: { deviceId: string }) {
     try { await fn() } catch (e) { setError((e as Error).message) }
   }, [])
 
-  // Apply a directional nudge by computing a new target RA/Dec from the live position.
-  const nudge = useCallback(async (dRaSign: number, dDecSign: number) => {
-    if (status?.ra == null || status?.dec == null) return
-    const step = SPEEDS[speedIdx].deg
-    const newRa = ((status.ra + (dRaSign * step) / 15) + 24) % 24
-    const newDec = Math.max(-90, Math.min(90, status.dec + dDecSign * step))
-    await act(() => api.mount.slew(deviceId, newRa, newDec))
-  }, [status, speedIdx, deviceId, act])
+  const handleMoveStart = useCallback(async (direction: string) => {
+    if (movingRef.current) return
+    movingRef.current = true
+    await act(() => api.mount.startMove(deviceId, direction, MOVE_RATES[rateIdx].rate))
+  }, [deviceId, rateIdx, act])
+
+  const handleMoveStop = useCallback(async () => {
+    if (!movingRef.current) return
+    movingRef.current = false
+    await act(() => api.mount.stopMove(deviceId))
+  }, [deviceId, act])
 
   const isTracking = status?.is_tracking ?? false
   const isParked   = status?.is_parked   ?? false
+  const isSlewing  = status?.is_slewing  ?? false
   const ha         = status?.hour_angle ?? null
-  // Flip is meaningful when within 1 hour of the meridian and mount is free
-  const canFlip    = ha != null && Math.abs(ha) <= 1.0 && !isParked && !(status?.is_slewing)
+  const canFlip    = ha != null && Math.abs(ha) <= 1.0 && !isParked && !isSlewing
+
+  // Common props for d-pad buttons (hold to move)
+  const dpadBtn = (dir: string, title: string) => ({
+    onMouseDown: () => handleMoveStart(dir),
+    onMouseUp: handleMoveStop,
+    onMouseLeave: handleMoveStop,
+    onTouchStart: (e: React.TouchEvent) => { e.preventDefault(); handleMoveStart(dir) },
+    onTouchEnd: handleMoveStop,
+    disabled: !status || isParked,
+    title,
+  })
 
   return (
     <div className="h-full overflow-y-auto p-4">
@@ -171,7 +177,12 @@ function MountControls({ deviceId }: { deviceId: string }) {
         {/* Header */}
         <div className="flex items-center justify-between">
           <h2 className="text-slate-200 font-semibold truncate">{deviceId}</h2>
-          {status && <StateBadge state={status.state} />}
+          <div className="flex items-center gap-2">
+            {isSlewing && (
+              <span className="text-xs text-yellow-400 animate-pulse">Slewing…</span>
+            )}
+            {status && <StateBadge state={status.state} />}
+          </div>
         </div>
 
         {/* Live position */}
@@ -183,8 +194,12 @@ function MountControls({ deviceId }: { deviceId: string }) {
             <span className="text-slate-200">{fmtDec(status?.dec)}</span>
             <span className="text-slate-500 text-xs mt-1">Alt</span>
             <span className="text-slate-500 text-xs mt-1">Az</span>
-            <span className="text-slate-400">{status?.alt != null ? `${status.alt.toFixed(1)}°` : '—'}</span>
-            <span className="text-slate-400">{status?.az  != null ? `${status.az.toFixed(1)}°`  : '—'}</span>
+            <span className="text-slate-300">{status?.alt != null ? `${status.alt.toFixed(1)}°` : '—'}</span>
+            <span className="text-slate-300">{status?.az  != null ? `${status.az.toFixed(1)}°`  : '—'}</span>
+            <span className="text-slate-500 text-xs mt-1">HA</span>
+            <span className="text-slate-500 text-xs mt-1">Pier</span>
+            <span className="text-slate-300">{fmtHA(ha)}</span>
+            <span className="text-slate-300">{status?.pier_side ?? '—'}</span>
           </div>
         </Section>
 
@@ -200,9 +215,12 @@ function MountControls({ deviceId }: { deviceId: string }) {
               <DmsInput value={slewDec} onChange={(v) => { slewEdited.current = true; setSlewDec(v) }} mode="lat" />
             </div>
           </div>
-          <div className="flex gap-2 items-center">
+          <div className="flex gap-2 items-center flex-wrap">
             <Button size="sm" onClick={() => act(() => api.mount.slew(deviceId, slewRa, slewDec))}>
               <Crosshair size={12} className="mr-1" /> Slew
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => act(() => api.mount.sync(deviceId, slewRa, slewDec))}>
+              <RotateCw size={12} className="mr-1" /> Sync
             </Button>
             <Button size="sm" variant="outline" onClick={() => act(() => api.mount.stop(deviceId))}>
               <StopCircle size={12} className="mr-1" /> Stop
@@ -211,7 +229,13 @@ function MountControls({ deviceId }: { deviceId: string }) {
               <button
                 type="button"
                 className="ml-auto text-xs text-slate-500 hover:text-slate-300 transition-colors"
-                onClick={() => { slewEdited.current = false; if (status?.ra != null && status?.dec != null) { setSlewRa(status.ra); setSlewDec(status.dec) } }}
+                onClick={() => {
+                  slewEdited.current = false
+                  if (status?.ra != null && status?.dec != null) {
+                    setSlewRa(status.ra)
+                    setSlewDec(status.dec)
+                  }
+                }}
               >
                 ↺ live
               </button>
@@ -236,7 +260,6 @@ function MountControls({ deviceId }: { deviceId: string }) {
               onChange={(e) => {
                 const m = e.target.value as TrackingMode
                 setTrackingMode(m)
-                // Selecting a mode always applies it (enables tracking if not already on)
                 act(() => api.mount.setTracking(deviceId, true, m))
               }}
             >
@@ -249,14 +272,34 @@ function MountControls({ deviceId }: { deviceId: string }) {
           }
         </Section>
 
+        {/* Park */}
+        <Section title="Park">
+          <div className="flex items-center gap-3 flex-wrap">
+            <Button
+              size="sm"
+              variant={isParked ? 'default' : 'outline'}
+              onClick={() => act(isParked
+                ? () => api.mount.unpark(deviceId)
+                : () => api.mount.park(deviceId)
+              )}
+            >
+              {isParked ? 'Unpark' : 'Park'}
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={isParked}
+              onClick={() => act(() => api.mount.setParkPosition(deviceId))}
+              title="Set current position as the park position"
+            >
+              Set as park position
+            </Button>
+            {isParked && <span className="text-xs text-slate-500">Mount is parked.</span>}
+          </div>
+        </Section>
+
         {/* Meridian */}
         <Section title="Meridian">
-          <div className="grid grid-cols-2 gap-x-8 gap-y-1 font-mono text-sm">
-            <span className="text-slate-500 text-xs">Pier side</span>
-            <span className="text-slate-500 text-xs">Hour angle</span>
-            <span className="text-slate-200">{status?.pier_side ?? '—'}</span>
-            <span className="text-slate-200">{fmtHA(ha)}</span>
-          </div>
           {ha != null && (
             <p className="text-xs text-slate-500">{fmtMeridianDistance(ha)}</p>
           )}
@@ -273,54 +316,38 @@ function MountControls({ deviceId }: { deviceId: string }) {
             {ha != null && !canFlip && Math.abs(ha) > 1.0 && (
               <span className="text-xs text-slate-600">
                 Available within 1 h of meridian
-              </span>
+            </span>
             )}
-          </div>
-        </Section>
-
-        {/* Park */}
-        <Section title="Park">
-          <div className="flex items-center gap-3">
-            <Button
-              size="sm"
-              variant={isParked ? 'default' : 'outline'}
-              onClick={() => act(isParked
-                ? () => api.mount.unpark(deviceId)
-                : () => api.mount.park(deviceId)
-              )}
-            >
-              {isParked ? 'Unpark' : 'Park'}
-            </Button>
-            {isParked && <span className="text-xs text-slate-500">Mount is parked.</span>}
           </div>
         </Section>
 
         {/* Nudge */}
         <Section title="Nudge">
           <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-500">Speed</span>
+            <span className="text-xs text-slate-500">Rate</span>
             <select
               className="rounded bg-surface-overlay border border-surface-border px-2 py-1 text-xs text-slate-200 focus:outline-none"
-              value={speedIdx}
-              onChange={(e) => setSpeedIdx(parseInt(e.target.value))}
+              value={rateIdx}
+              onChange={(e) => setRateIdx(parseInt(e.target.value))}
             >
-              {SPEEDS.map((s, i) => <option key={s.label} value={i}>{s.label}</option>)}
+              {MOVE_RATES.map((s, i) => <option key={s.label} value={i}>{s.label}</option>)}
             </select>
+            <span className="text-xs text-slate-600 ml-2">Hold to move, release to stop</span>
           </div>
           {/* D-pad */}
-          <div className="flex flex-col items-center gap-1 self-center">
-            <Button size="icon" variant="outline" onClick={() => nudge(0, 1)} disabled={!status} title="North">
+          <div className="flex flex-col items-center gap-1 self-center select-none">
+            <Button size="icon" variant="outline" {...dpadBtn('N', 'North')} >
               <ArrowUp size={16} />
             </Button>
             <div className="flex gap-8">
-              <Button size="icon" variant="outline" onClick={() => nudge(-1, 0)} disabled={!status} title="West">
+              <Button size="icon" variant="outline" {...dpadBtn('W', 'West')} >
                 <ArrowLeft size={16} />
               </Button>
-              <Button size="icon" variant="outline" onClick={() => nudge(1, 0)} disabled={!status} title="East">
+              <Button size="icon" variant="outline" {...dpadBtn('E', 'East')} >
                 <ArrowRight size={16} />
               </Button>
             </div>
-            <Button size="icon" variant="outline" onClick={() => nudge(0, -1)} disabled={!status} title="South">
+            <Button size="icon" variant="outline" {...dpadBtn('S', 'South')} >
               <ArrowDown size={16} />
             </Button>
           </div>
@@ -348,7 +375,5 @@ export function Mount() {
     )
   }
 
-  // If multiple mounts are connected, use the first one.
-  // (Multi-mount support can be added later with a device selector.)
   return <MountControls deviceId={mounts[0].device_id} />
 }

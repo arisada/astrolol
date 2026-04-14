@@ -94,6 +94,20 @@ export const api = {
       }),
     meridianFlip: (deviceId: string) =>
       request<void>(`/mount/${deviceId}/meridian_flip`, { method: 'POST' }),
+    sync: (deviceId: string, ra: number, dec: number) =>
+      request<void>(`/mount/${deviceId}/sync`, {
+        method: 'POST',
+        body: JSON.stringify({ ra, dec }),
+      }),
+    setParkPosition: (deviceId: string) =>
+      request<void>(`/mount/${deviceId}/set_park_position`, { method: 'POST' }),
+    startMove: (deviceId: string, direction: string, rate: string) =>
+      request<void>(`/mount/${deviceId}/move`, {
+        method: 'POST',
+        body: JSON.stringify({ direction, rate }),
+      }),
+    stopMove: (deviceId: string) =>
+      request<void>(`/mount/${deviceId}/move`, { method: 'DELETE' }),
   },
 
   profiles: {

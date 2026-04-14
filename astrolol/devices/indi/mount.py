@@ -201,16 +201,73 @@ class IndiMount:
         except Exception:
             pass
 
+        alt: float | None = None
+        az: float | None = None
+        try:
+            alt = await self._client.get_number(self._device_name, "HORIZONTAL_COORD", "ALT")
+            az  = await self._client.get_number(self._device_name, "HORIZONTAL_COORD", "AZ")
+        except Exception:
+            pass
+
+        v = self._client._get_vector(self._device_name, "EQUATORIAL_EOD_COORD")
+        is_slewing = v is not None and v.state == "Busy"
+
         return MountStatus(
             state=self._state,
             ra=ra,
             dec=dec,
+            alt=alt,
+            az=az,
             is_tracking=self._is_tracking,
             is_parked=self._is_parked,
-            is_slewing=False,  # derived from INDI state but we keep it simple
+            is_slewing=is_slewing,
             pier_side=pier_side,
             hour_angle=hour_angle,
         )
+
+    async def set_park_position(self) -> None:
+        """Set the current position as the park position (TELESCOPE_PARK_OPTION=PARK_CURRENT)."""
+        await self._client.set_switch(
+            self._device_name, "TELESCOPE_PARK_OPTION", ["PARK_CURRENT"]
+        )
+
+    _SLEW_RATE_ELEMENTS = {
+        "guide":     "SLEW_GUIDE",
+        "centering": "SLEW_CENTERING",
+        "find":      "SLEW_FIND",
+        "max":       "SLEW_MAX",
+    }
+
+    async def start_move(self, direction: str, rate: str) -> None:
+        """Start continuous motion. Call stop_move() to halt.
+
+        direction: "N" | "S" | "E" | "W"
+        rate:      "guide" | "centering" | "find" | "max"
+        """
+        indi_rate = self._SLEW_RATE_ELEMENTS.get(rate, "SLEW_CENTERING")
+        try:
+            await self._client.set_switch(self._device_name, "TELESCOPE_SLEW_RATE", [indi_rate])
+        except Exception:
+            pass  # not all drivers expose a writable slew rate
+
+        if direction in ("N", "S"):
+            element = "MOTION_NORTH" if direction == "N" else "MOTION_SOUTH"
+            await self._client.set_switch(self._device_name, "TELESCOPE_MOTION_NS", [element])
+        elif direction in ("E", "W"):
+            element = "MOTION_EAST" if direction == "E" else "MOTION_WEST"
+            await self._client.set_switch(self._device_name, "TELESCOPE_MOTION_WE", [element])
+
+    async def stop_move(self) -> None:
+        """Stop all directional motion."""
+        import asyncio as _asyncio
+        for prop in ("TELESCOPE_MOTION_NS", "TELESCOPE_MOTION_WE"):
+            try:
+                await _asyncio.wait_for(
+                    self._client.set_switch(self._device_name, prop, []),
+                    timeout=2.0,
+                )
+            except Exception:
+                pass
 
     async def meridian_flip(self) -> None:
         """Slew to the current target on the opposite pier side (meridian flip).

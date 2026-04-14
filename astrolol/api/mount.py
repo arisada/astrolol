@@ -92,3 +92,35 @@ async def meridian_flip(device_id: str, request: Request) -> dict[str, str]:
         raise HTTPException(status_code=404, detail=str(exc))
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc))
+
+
+@router.post("/{device_id}/set_park_position", status_code=204)
+async def set_park_position(device_id: str, request: Request) -> None:
+    """Set the current mount position as the park position."""
+    try:
+        await _manager(request).set_park_position(device_id)
+    except (DeviceNotFoundError, DeviceKindError) as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+
+class MoveRequest(BaseModel):
+    direction: str   # "N" | "S" | "E" | "W"
+    rate: str = "centering"  # "guide" | "centering" | "find" | "max"
+
+
+@router.post("/{device_id}/move", status_code=204)
+async def start_move(device_id: str, body: MoveRequest, request: Request) -> None:
+    """Start continuous directional motion. Send DELETE /move to stop."""
+    try:
+        await _manager(request).start_move(device_id, body.direction, body.rate)
+    except (DeviceNotFoundError, DeviceKindError) as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+
+@router.delete("/{device_id}/move", status_code=204)
+async def stop_move(device_id: str, request: Request) -> None:
+    """Stop all directional motion started by POST /move."""
+    try:
+        await _manager(request).stop_move(device_id)
+    except (DeviceNotFoundError, DeviceKindError) as exc:
+        raise HTTPException(status_code=404, detail=str(exc))

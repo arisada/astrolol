@@ -122,6 +122,24 @@ class MountManager:
         )
         logger.info("mount.tracking_changed", device_id=device_id, tracking=enabled, mode=mode)
 
+    async def set_park_position(self, device_id: str) -> None:
+        """Set the current position as the park position."""
+        mount = self._device_manager.get_mount(device_id)
+        await mount.set_park_position()
+        logger.info("mount.park_position_set", device_id=device_id)
+
+    async def start_move(self, device_id: str, direction: str, rate: str) -> None:
+        """Start continuous directional motion at the given slew rate."""
+        mount = self._device_manager.get_mount(device_id)
+        await mount.start_move(direction, rate)
+        logger.info("mount.move_started", device_id=device_id, direction=direction, rate=rate)
+
+    async def stop_move(self, device_id: str) -> None:
+        """Stop all directional motion."""
+        mount = self._device_manager.get_mount(device_id)
+        await mount.stop_move()
+        logger.info("mount.move_stopped", device_id=device_id)
+
     async def meridian_flip(self, device_id: str) -> None:
         """
         Perform a meridian flip: slew to the current position on the opposite pier side.
