@@ -31,6 +31,7 @@ export default defineConfig({
       '/health':   { target: backendHttp, changeOrigin: true },
       '/plugins':  { target: backendHttp, changeOrigin: true },
       '/hello':    { target: backendHttp, changeOrigin: true },
+      '/admin':    { target: backendHttp, changeOrigin: true },
       '/ws':       { target: backendWs,   ws: true, changeOrigin: true },
     },
   },

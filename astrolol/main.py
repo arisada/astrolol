@@ -134,6 +134,21 @@ def create_app() -> FastAPI:
     async def health() -> dict[str, str]:
         return {"status": "ok"}
 
+    @app.post("/admin/restart", status_code=202)
+    async def admin_restart() -> dict[str, str]:
+        """Replace the running process with a fresh instance (same argv/env)."""
+        import asyncio
+        import os
+        import sys
+
+        async def _do_restart() -> None:
+            await asyncio.sleep(0.2)  # let the 202 response flush
+            logger.info("admin.restart")
+            os.execv(sys.executable, [sys.executable] + sys.argv)
+
+        asyncio.create_task(_do_restart())
+        return {"status": "restarting"}
+
     @app.get("/plugins")
     async def list_plugins(request: Request) -> list[dict]:
         """Return all discovered plugins with their enabled state."""

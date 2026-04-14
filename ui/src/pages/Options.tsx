@@ -133,6 +133,7 @@ export function Options() {
   const setPluginInfos = useStore((s) => s.setPluginInfos)
   const [pluginSaveStatus, setPluginSaveStatus] = useState<'idle' | 'saved' | 'error'>('idle')
   const [restartNeeded, setRestartNeeded] = useState(false)
+  const [restarting, setRestarting] = useState(false)
 
   useEffect(() => {
     api.settings.get()
@@ -152,6 +153,24 @@ export function Options() {
     } catch {
       setSaveStatus('error')
     }
+  }
+
+  const restartNow = async () => {
+    setRestarting(true)
+    try {
+      await fetch('/admin/restart', { method: 'POST' })
+    } catch {
+      // expected — process may die before responding
+    }
+    // Poll /health until the server is back up, then reload
+    const poll = async () => {
+      try {
+        const r = await fetch('/health')
+        if (r.ok) { window.location.reload(); return }
+      } catch { /* still down */ }
+      setTimeout(poll, 800)
+    }
+    setTimeout(poll, 1200)
   }
 
   const togglePlugin = async (plugin: PluginInfo) => {
@@ -280,9 +299,20 @@ export function Options() {
             <p className="text-xs text-status-error mt-2">Failed to save plugin settings.</p>
           )}
           {restartNeeded && (
-            <p className="text-xs text-slate-400 mt-2">
-              Restart astrolol for plugin changes to take effect.
-            </p>
+            <div className="flex items-center gap-3 mt-2">
+              <p className="text-xs text-slate-400">
+                {restarting ? 'Restarting…' : 'Restart required for changes to take effect.'}
+              </p>
+              {!restarting && (
+                <button
+                  type="button"
+                  onClick={restartNow}
+                  className="text-xs px-2 py-1 rounded bg-accent text-white hover:bg-accent/80 transition-colors"
+                >
+                  Restart now
+                </button>
+              )}
+            </div>
           )}
         </Section>
       )}
