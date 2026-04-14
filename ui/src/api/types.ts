@@ -161,6 +161,16 @@ export interface SetPropertyRequest {
   on_elements?: string[]
 }
 
+export type PreConnectPropSpec =
+  | { values: Record<string, string | number>; on_elements?: never }
+  | { on_elements: string[]; values?: never }
+
+export type PreConnectProps = Record<string, PreConnectPropSpec>
+
+export interface LoadDriverResponse {
+  properties: DeviceProperty[]
+}
+
 // --- WebSocket events (discriminated union) ---
 
 interface BaseEvent {

@@ -8,6 +8,7 @@ import type {
   ExposureResult,
   FocuserStatus,
   ImagerStatus,
+  LoadDriverResponse,
   MountStatus,
   PluginInfo,
   Profile,
@@ -109,6 +110,11 @@ export const api = {
   indi: {
     drivers: (kind?: string) =>
       request<DriverEntry[]>(kind ? `/indi/drivers/${kind}` : '/indi/drivers'),
+    loadDriver: (executable: string, deviceName: string) =>
+      request<LoadDriverResponse>('/indi/load_driver', {
+        method: 'POST',
+        body: JSON.stringify({ executable, device_name: deviceName }),
+      }),
   },
 
   settings: {

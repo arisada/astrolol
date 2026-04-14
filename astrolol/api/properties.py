@@ -60,7 +60,7 @@ _STATE = {"Idle": "idle", "Ok": "ok", "Busy": "busy", "Alert": "alert"}
 _ISR = {"OneOfMany": "1ofmany", "AtMostOne": "atmost1", "AnyOfMany": "nofmany"}
 
 
-def _prop_to_out(p: Any) -> PropertyOut | None:
+def prop_to_out(p: Any) -> PropertyOut | None:
     """Convert an indipyclient PropertyVector to PropertyOut. Returns None for BLOBs."""
     vtype = p.vectortype  # 'SwitchVector' | 'NumberVector' | 'TextVector' | 'LightVector' | 'BLOBVector'
     name = p.name
@@ -154,7 +154,7 @@ async def get_properties(device_id: str, request: Request) -> list[PropertyOut]:
     client = _get_indi_client(request)
     indi_name = _resolve_indi_name(device_id, request)
     snapshot = await client.get_properties_snapshot(indi_name)
-    props = [_prop_to_out(p) for p in snapshot.values()]
+    props = [prop_to_out(p) for p in snapshot.values()]
     result = [p for p in props if p is not None]
     result.sort(key=lambda x: (x.group, x.name))
     return result

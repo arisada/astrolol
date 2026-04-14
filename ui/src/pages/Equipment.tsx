@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Camera, ChevronLeft, Crosshair, Plug, PlugZap, RefreshCw, Telescope } from 'lucide-react'
 import { api } from '@/api/client'
-import type { ConnectedDevice, DeviceKind, DriverEntry } from '@/api/types'
+import type { ConnectedDevice, DeviceKind, DeviceProperty, DriverEntry, PreConnectProps } from '@/api/types'
 import { useStore } from '@/store'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -12,13 +12,12 @@ import { DevicePropertiesPanel } from '@/components/DevicePropertiesPanel'
 // Types & constants
 // ---------------------------------------------------------------------------
 
-type WizardStep = 'type' | 'manufacturer' | 'model' | 'confirm'
+type WizardStep = 'type' | 'manufacturer' | 'model' | 'confirm' | 'configure'
 
 const DEVICE_ID_RE = /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/
 
 function suggestDeviceId(kind: DeviceKind, driver: DriverEntry | null): string {
   if (!driver) return ''
-  // Prefer executable stem (strip indi_ prefix) as it's always URL-safe
   const raw = driver.executable.replace(/^indi_/, '') || driver.manufacturer
   const slug = raw.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/, '').slice(0, 40)
   return slug ? `${kind}_${slug}` : ''
@@ -40,6 +39,29 @@ function KindIcon({ kind, size = 28 }: { kind: DeviceKind; size?: number }) {
   if (kind === 'camera') return <Camera size={size} />
   if (kind === 'mount') return <Telescope size={size} />
   return <Crosshair size={size} />
+}
+
+// ---------------------------------------------------------------------------
+// Pre-connect props helpers
+// ---------------------------------------------------------------------------
+
+function initPreConnectProps(properties: DeviceProperty[]): PreConnectProps {
+  const result: PreConnectProps = {}
+  for (const prop of properties) {
+    if (prop.permission === 'ro') continue
+    if (prop.name === 'CONNECTION') continue
+    if (prop.type === 'switch') {
+      const on = prop.widgets.filter((w) => w.value === true).map((w) => w.name)
+      result[prop.name] = { on_elements: on }
+    } else if (prop.type === 'text' || prop.type === 'number') {
+      const values: Record<string, string | number> = {}
+      for (const w of prop.widgets) {
+        values[w.name] = (w.value as string | number) ?? (prop.type === 'number' ? 0 : '')
+      }
+      result[prop.name] = { values }
+    }
+  }
+  return result
 }
 
 // ---------------------------------------------------------------------------
@@ -110,7 +132,6 @@ function ManufacturerStep({
             {m}
           </button>
         ))}
-        {/* Always offer a manual path */}
         <button
           onClick={() => onSelect(null)}
           className="text-left rounded px-3 py-2 text-xs text-slate-500 hover:text-slate-400 transition-colors mt-1 border-t border-surface-border pt-3"
@@ -163,79 +184,27 @@ function ModelStep({
   )
 }
 
-const BAUD_RATES = ['9600', '19200', '38400', '57600', '115200', '230400']
-
-// Serial connection fields shown for mount and focuser (not USB cameras)
-function SerialFields({
-  devicePort,
-  baudRate,
-  onPortChange,
-  onBaudChange,
-}: {
-  devicePort: string
-  baudRate: string
-  onPortChange: (v: string) => void
-  onBaudChange: (v: string) => void
-}) {
-  return (
-    <div className="flex flex-col gap-3 pt-2 border-t border-surface-border">
-      <p className="text-xs text-slate-500">Serial / USB-serial connection</p>
-      <div className="flex gap-3">
-        <div className="flex flex-col gap-1 flex-1">
-          <label className="text-xs text-slate-400">Device port</label>
-          <Input
-            placeholder="/dev/ttyUSB0"
-            value={devicePort}
-            onChange={(e) => onPortChange(e.target.value)}
-          />
-        </div>
-        <div className="flex flex-col gap-1 w-36">
-          <label className="text-xs text-slate-400">Baud rate</label>
-          <select
-            value={baudRate}
-            onChange={(e) => onBaudChange(e.target.value)}
-            className="bg-surface border border-surface-border rounded px-3 py-1.5 text-sm text-slate-200
-              focus:outline-none focus:ring-1 focus:ring-accent h-9"
-          >
-            <option value="">Driver default</option>
-            {BAUD_RATES.map((r) => (
-              <option key={r} value={r}>{r}</option>
-            ))}
-          </select>
-        </div>
-      </div>
-      <p className="text-xs text-slate-600">
-        Run <code className="text-slate-500">ls /dev/ttyUSB* /dev/ttyACM*</code> to find your port.
-        Most mounts use 9600 baud (EQ8 and some others use 115200).
-      </p>
-    </div>
-  )
-}
-
-// Step 4 — confirm and connect
+// Step 4 — confirm details and load driver
 function ConfirmStep({
   kind,
   driver,
   onBack,
-  onConnect,
-  connecting,
+  onLoadDriver,
+  loading,
   error,
 }: {
   kind: DeviceKind
-  driver: DriverEntry | null  // null = manual entry
+  driver: DriverEntry | null
   onBack: () => void
-  onConnect: (deviceName: string, executable: string, deviceId: string, devicePort: string, baudRate: string) => void
-  connecting: boolean
+  onLoadDriver: (deviceName: string, executable: string, deviceId: string) => void
+  loading: boolean
   error: string | null
 }) {
   const [deviceName, setDeviceName] = useState(driver?.device_name ?? '')
   const [executable, setExecutable] = useState(driver?.executable ?? '')
   const [deviceId, setDeviceId] = useState(() => suggestDeviceId(kind, driver))
-  const [devicePort, setDevicePort] = useState('')
-  const [baudRate, setBaudRate] = useState('')
 
   const deviceIdInvalid = deviceId !== '' && !DEVICE_ID_RE.test(deviceId)
-  const needsSerial = kind === 'mount' || kind === 'focuser'
 
   return (
     <div>
@@ -253,7 +222,6 @@ function ConfirmStep({
       </p>
 
       <div className="flex flex-col gap-3">
-        {/* INDI device name — pre-filled from catalog, editable */}
         <div className="flex flex-col gap-1">
           <label className="text-xs text-slate-400">
             INDI device name <span className="text-status-error">*</span>
@@ -265,7 +233,6 @@ function ConfirmStep({
           />
         </div>
 
-        {/* Driver executable — pre-filled from catalog, always editable */}
         <div className="flex flex-col gap-1">
           <label className="text-xs text-slate-400">
             Driver executable
@@ -278,7 +245,6 @@ function ConfirmStep({
           />
         </div>
 
-        {/* Device ID — suggested from driver, editable, validated */}
         <div className="flex flex-col gap-1">
           <label className="text-xs text-slate-400">
             Device ID
@@ -297,30 +263,230 @@ function ConfirmStep({
           )}
         </div>
 
-        {/* Serial connection — mounts and focusers only */}
-        {needsSerial && (
-          <SerialFields
-            devicePort={devicePort}
-            baudRate={baudRate}
-            onPortChange={setDevicePort}
-            onBaudChange={setBaudRate}
-          />
-        )}
-
         {error && (
           <p className="text-xs text-status-error bg-status-error/10 rounded px-3 py-2">{error}</p>
         )}
 
         <Button
           type="button"
-          disabled={!deviceName || connecting || deviceIdInvalid}
+          disabled={!deviceName || loading || deviceIdInvalid}
           className="self-start"
-          onClick={() => onConnect(deviceName, executable, deviceId, devicePort, baudRate)}
+          onClick={() => onLoadDriver(deviceName, executable, deviceId)}
         >
           <Plug size={14} className="mr-2" />
-          {connecting ? 'Connecting…' : 'Connect'}
+          {loading ? 'Loading driver…' : 'Load driver'}
         </Button>
+
+        <p className="text-xs text-slate-600">
+          Loading the driver reads its available settings so you can configure them before connecting.
+        </p>
       </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Property editor for Step 5 (configure)
+// ---------------------------------------------------------------------------
+
+function PropEditor({
+  prop,
+  value,
+  onChange,
+}: {
+  prop: DeviceProperty
+  value: PreConnectProps[string] | undefined
+  onChange: (spec: PreConnectProps[string]) => void
+}) {
+  if (prop.type === 'switch') {
+    const currentOn = (value as { on_elements: string[] } | undefined)?.on_elements ?? []
+    const rule = prop.switch_rule ?? '1ofmany'
+
+    if (rule === '1ofmany' || rule === 'atmost1') {
+      const selected = currentOn[0] ?? ''
+      return (
+        <select
+          value={selected}
+          onChange={(e) => onChange({ on_elements: e.target.value ? [e.target.value] : [] })}
+          className="bg-surface border border-surface-border rounded px-3 py-1.5 text-sm text-slate-200
+            focus:outline-none focus:ring-1 focus:ring-accent"
+        >
+          {rule === 'atmost1' && <option value="">— none —</option>}
+          {prop.widgets.map((w) => (
+            <option key={w.name} value={w.name}>
+              {w.label}
+            </option>
+          ))}
+        </select>
+      )
+    }
+
+    // nofmany — checkboxes
+    return (
+      <div className="flex flex-wrap gap-x-4 gap-y-1">
+        {prop.widgets.map((w) => {
+          const checked = currentOn.includes(w.name)
+          return (
+            <label key={w.name} className="flex items-center gap-2 text-sm text-slate-300 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={checked}
+                onChange={(e) => {
+                  const next = e.target.checked
+                    ? [...currentOn, w.name]
+                    : currentOn.filter((n) => n !== w.name)
+                  onChange({ on_elements: next })
+                }}
+                className="accent-accent"
+              />
+              {w.label}
+            </label>
+          )
+        })}
+      </div>
+    )
+  }
+
+  if (prop.type === 'number') {
+    const vals = (value as { values: Record<string, string | number> } | undefined)?.values ?? {}
+    return (
+      <div className="flex flex-wrap gap-3">
+        {prop.widgets.map((w) => (
+          <div key={w.name} className="flex flex-col gap-0.5">
+            <span className="text-xs text-slate-500">{w.label}</span>
+            <Input
+              type="number"
+              min={w.min}
+              max={w.max}
+              step={w.step}
+              value={vals[w.name] ?? (w.value as number) ?? 0}
+              onChange={(e) =>
+                onChange({ values: { ...vals, [w.name]: parseFloat(e.target.value) || 0 } })
+              }
+              className="w-32"
+            />
+          </div>
+        ))}
+      </div>
+    )
+  }
+
+  if (prop.type === 'text') {
+    const vals = (value as { values: Record<string, string | number> } | undefined)?.values ?? {}
+    return (
+      <div className="flex flex-col gap-2">
+        {prop.widgets.map((w) => (
+          <div key={w.name} className="flex flex-col gap-0.5">
+            {prop.widgets.length > 1 && (
+              <span className="text-xs text-slate-500">{w.label}</span>
+            )}
+            <Input
+              placeholder={w.label}
+              value={(vals[w.name] as string) ?? (w.value as string) ?? ''}
+              onChange={(e) => onChange({ values: { ...vals, [w.name]: e.target.value } })}
+            />
+          </div>
+        ))}
+      </div>
+    )
+  }
+
+  return null
+}
+
+// Step 5 — configure driver properties and connect
+function ConfigureStep({
+  kind,
+  driver,
+  properties,
+  preConnectProps,
+  onPreConnectPropsChange,
+  onBack,
+  onConnect,
+  connecting,
+  error,
+}: {
+  kind: DeviceKind
+  driver: DriverEntry | null
+  properties: DeviceProperty[]
+  preConnectProps: PreConnectProps
+  onPreConnectPropsChange: (props: PreConnectProps) => void
+  onBack: () => void
+  onConnect: () => void
+  connecting: boolean
+  error: string | null
+}) {
+  // Only show writable properties that aren't CONNECTION itself
+  const editable = properties.filter(
+    (p) => p.name !== 'CONNECTION' && p.permission !== 'ro' && p.type !== 'blob',
+  )
+
+  // Group by group name
+  const groups: Record<string, DeviceProperty[]> = {}
+  for (const p of editable) {
+    if (!groups[p.group]) groups[p.group] = []
+    groups[p.group].push(p)
+  }
+
+  const handlePropChange = (propName: string, spec: PreConnectProps[string]) => {
+    onPreConnectPropsChange({ ...preConnectProps, [propName]: spec })
+  }
+
+  return (
+    <div>
+      <StepBack onClick={onBack} />
+      <p className="text-xs text-slate-500 mb-4">
+        <span className="text-slate-300 font-medium">{KIND_LABELS[kind]}</span>
+        {driver && (
+          <>
+            {' · '}
+            <span className="text-slate-300">{driver.label}</span>
+          </>
+        )}
+        {' · '}Configure before connecting
+      </p>
+
+      {editable.length === 0 ? (
+        <p className="text-sm text-slate-500 mb-4">No configurable properties. Click Connect to proceed.</p>
+      ) : (
+        <div className="flex flex-col gap-6 mb-4 max-h-80 overflow-y-auto pr-1">
+          {Object.entries(groups).map(([group, props]) => (
+            <div key={group}>
+              {group && (
+                <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">
+                  {group}
+                </p>
+              )}
+              <div className="flex flex-col gap-3">
+                {props.map((prop) => (
+                  <div key={prop.name} className="flex flex-col gap-1">
+                    <label className="text-xs text-slate-400">{prop.label || prop.name}</label>
+                    <PropEditor
+                      prop={prop}
+                      value={preConnectProps[prop.name]}
+                      onChange={(spec) => handlePropChange(prop.name, spec)}
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {error && (
+        <p className="text-xs text-status-error bg-status-error/10 rounded px-3 py-2 mb-3">{error}</p>
+      )}
+
+      <Button
+        type="button"
+        disabled={connecting}
+        className="self-start"
+        onClick={onConnect}
+      >
+        <Plug size={14} className="mr-2" />
+        {connecting ? 'Connecting…' : 'Connect'}
+      </Button>
     </div>
   )
 }
@@ -339,8 +505,18 @@ export function Equipment() {
   const [selectedDriver, setSelectedDriver] = useState<DriverEntry | null>(null)
   const [drivers, setDrivers] = useState<DriverEntry[]>([])
   const [error, setError] = useState<string | null>(null)
+  const [loadingDriver, setLoadingDriver] = useState(false)
   const [connecting, setConnecting] = useState(false)
   const [propertiesDeviceId, setPropertiesDeviceId] = useState<string | null>(null)
+
+  // Two-phase state
+  const [driverProperties, setDriverProperties] = useState<DeviceProperty[]>([])
+  const [preConnectProps, setPreConnectProps] = useState<PreConnectProps>({})
+  const [pendingConnect, setPendingConnect] = useState<{
+    deviceName: string
+    executable: string
+    deviceId: string
+  } | null>(null)
 
   const refresh = () => {
     api.devices.connected().then(setConnectedDevices).catch(console.error)
@@ -348,7 +524,6 @@ export function Equipment() {
 
   useEffect(() => { refresh() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Load catalog whenever kind changes
   useEffect(() => {
     if (step === 'type') return
     setDrivers([])
@@ -368,7 +543,6 @@ export function Equipment() {
     setSelectedDriver(null)
     setError(null)
     if (manufacturer === null) {
-      // Manual entry — skip model step
       setStep('confirm')
     } else {
       setStep('model')
@@ -383,7 +557,9 @@ export function Equipment() {
 
   const handleBack = () => {
     setError(null)
-    if (step === 'confirm' && selectedManufacturer === null) {
+    if (step === 'configure') {
+      setStep('confirm')
+    } else if (step === 'confirm' && selectedManufacturer === null) {
       setStep('manufacturer')
     } else if (step === 'confirm') {
       setStep('model')
@@ -394,19 +570,35 @@ export function Equipment() {
     }
   }
 
-  const handleConnect = async (deviceName: string, executable: string, deviceId: string, devicePort: string, baudRate: string) => {
+  const handleLoadDriver = async (deviceName: string, executable: string, deviceId: string) => {
+    setError(null)
+    setLoadingDriver(true)
+    try {
+      const result = await api.indi.loadDriver(executable, deviceName)
+      setDriverProperties(result.properties)
+      setPreConnectProps(initPreConnectProps(result.properties))
+      setPendingConnect({ deviceName, executable, deviceId })
+      setStep('configure')
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setLoadingDriver(false)
+    }
+  }
+
+  const handleConnect = async () => {
+    if (!pendingConnect) return
     setError(null)
     setConnecting(true)
     try {
       await api.devices.connect({
-        device_id: deviceId || undefined,
+        device_id: pendingConnect.deviceId || undefined,
         kind: selectedKind,
         adapter_key: KIND_ADAPTER[selectedKind],
         params: {
-          device_name: deviceName,
-          executable,
-          ...(devicePort ? { device_port: devicePort } : {}),
-          ...(baudRate  ? { device_baud_rate: baudRate }  : {}),
+          device_name: pendingConnect.deviceName,
+          executable: pendingConnect.executable,
+          pre_connect_props: preConnectProps,
         },
       })
       refresh()
@@ -514,9 +706,22 @@ export function Equipment() {
               kind={selectedKind}
               driver={selectedDriver}
               onBack={handleBack}
+              onLoadDriver={handleLoadDriver}
+              loading={loadingDriver}
+              error={error}
+            />
+          )}
+          {step === 'configure' && (
+            <ConfigureStep
+              kind={selectedKind}
+              driver={selectedDriver}
+              properties={driverProperties}
+              preConnectProps={preConnectProps}
+              onPreConnectPropsChange={setPreConnectProps}
+              onBack={handleBack}
               onConnect={handleConnect}
               connecting={connecting}
-              error={error ?? null}
+              error={error}
             />
           )}
         </div>
