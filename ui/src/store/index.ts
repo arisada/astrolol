@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { AstrolollEvent, ConnectedDevice, FocuserStatus, MountStatus } from '@/api/types'
+import type { AstrolollEvent, ConnectedDevice, FocuserStatus, MountStatus, PluginInfo } from '@/api/types'
 
 const MAX_LOG_ENTRIES = 1000
 
@@ -48,11 +48,15 @@ interface AppState {
   // Last error (shown as global toast)
   lastError: LastError | null
 
+  // Plugin metadata from /plugins endpoint
+  pluginInfos: PluginInfo[]
+
   // Actions
   setWsConnected: (v: boolean) => void
   setConnectedDevices: (devices: ConnectedDevice[]) => void
   applyEvent: (event: AstrolollEvent) => void
   clearLastError: () => void
+  setPluginInfos: (infos: PluginInfo[]) => void
 }
 
 // Event types that represent errors and should set lastError
@@ -70,9 +74,11 @@ export const useStore = create<AppState>((set, get) => ({
   imagerBusy: {},
   log: [],
   lastError: null,
+  pluginInfos: [],
 
   setWsConnected: (v) => set({ wsConnected: v }),
   clearLastError: () => set({ lastError: null }),
+  setPluginInfos: (infos) => set({ pluginInfos: infos }),
 
   setConnectedDevices: (devices) => set({ connectedDevices: devices }),
 

@@ -30,14 +30,12 @@ class ProfileStore:
                 for p in data.get("profiles", [])
             }
             self._last_active_id = data.get("last_active_profile_id")
-            self._user_settings = UserSettings(
-                save_dir_template=data.get(
-                    "save_dir_template", _DEFAULT_SETTINGS.save_dir_template
-                ),
-                save_filename_template=data.get(
-                    "save_filename_template", _DEFAULT_SETTINGS.save_filename_template
-                ),
-            )
+            # Pick up any UserSettings fields present in the JSON; unknown keys are
+            # ignored and missing keys fall back to model defaults automatically.
+            settings_data = {
+                k: data[k] for k in UserSettings.model_fields if k in data
+            }
+            self._user_settings = UserSettings(**settings_data)
         except Exception:
             pass  # corrupt file — start fresh
 
@@ -46,8 +44,8 @@ class ProfileStore:
         payload = {
             "profiles": [p.model_dump() for p in self._profiles.values()],
             "last_active_profile_id": self._last_active_id,
-            "save_dir_template": self._user_settings.save_dir_template,
-            "save_filename_template": self._user_settings.save_filename_template,
+            # Spread all UserSettings fields so new fields are auto-persisted
+            **self._user_settings.model_dump(),
         }
         self._path.write_text(json.dumps(payload, indent=2))
 

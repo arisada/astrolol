@@ -24,8 +24,9 @@ from astrolol.api.profiles import router as profiles_router
 from astrolol.api.properties import router as properties_router
 from astrolol.api.settings import router as settings_router
 from astrolol.profiles.store import ProfileStore
-from astrolol.app import build_plugin_manager, build_registry
+from astrolol.app import build_plugin_manager, build_registry, discover_plugins, setup_plugins
 from astrolol.core.events import EventBus
+from astrolol.core.plugin_api import PluginContext
 from astrolol.devices.manager import DeviceManager
 from astrolol.focuser import FocuserManager
 from astrolol.imaging import ImagerManager
@@ -73,6 +74,16 @@ def create_app() -> FastAPI:
     mount_manager = MountManager(device_manager=device_manager, event_bus=event_bus)
     focuser_manager = FocuserManager(device_manager=device_manager, event_bus=event_bus)
 
+    # Feature plugins — discover all, set up enabled ones
+    user_settings = profile_store.get_user_settings()
+    plugin_ctx = PluginContext(
+        event_bus=event_bus,
+        device_manager=device_manager,
+        device_registry=registry,
+    )
+    discovered_plugins = discover_plugins()
+    setup_plugins(app, plugin_ctx, discovered_plugins, user_settings.enabled_plugins)
+
     app.state.registry = registry
     app.state.plugin_manager = pm
     app.state.event_bus = event_bus
@@ -82,6 +93,8 @@ def create_app() -> FastAPI:
     app.state.focuser_manager = focuser_manager
     app.state.profile_store = profile_store
     app.state.active_profile = None
+    app.state.discovered_plugins = discovered_plugins
+    app.state.enabled_plugin_ids = set(user_settings.enabled_plugins)
 
     app.include_router(devices_router)
     app.include_router(properties_router)
@@ -120,6 +133,22 @@ def create_app() -> FastAPI:
     @app.get("/health")
     async def health() -> dict[str, str]:
         return {"status": "ok"}
+
+    @app.get("/plugins")
+    async def list_plugins(request: Request) -> list[dict]:
+        """Return all discovered plugins with their enabled state."""
+        discovered: dict = request.app.state.discovered_plugins
+        enabled: set = request.app.state.enabled_plugin_ids
+        return [
+            {
+                "id": p.manifest.id,
+                "name": p.manifest.name,
+                "version": p.manifest.version,
+                "description": p.manifest.description,
+                "enabled": p.manifest.id in enabled,
+            }
+            for p in discovered.values()
+        ]
 
     @app.get("/events/history")
     async def events_history(request: Request) -> list[dict]:

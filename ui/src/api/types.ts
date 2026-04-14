@@ -61,6 +61,15 @@ export interface ExposureRequest {
 export interface UserSettings {
   save_dir_template: string
   save_filename_template: string
+  enabled_plugins: string[]
+}
+
+export interface PluginInfo {
+  id: string
+  name: string
+  version: string
+  description: string
+  enabled: boolean
 }
 
 export interface ExposureResult {

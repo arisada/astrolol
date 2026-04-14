@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { api } from '@/api/client'
-import type { UserSettings } from '@/api/types'
+import type { PluginInfo, UserSettings } from '@/api/types'
+import { useStore } from '@/store'
 
 interface IndiSettings {
   manageServer: boolean
@@ -127,6 +128,12 @@ export function Options() {
   const [saveFilename, setSaveFilename] = useState('%F_%C_%Es_%Gg')
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
 
+  // Plugin enable/disable
+  const pluginInfos = useStore((s) => s.pluginInfos)
+  const setPluginInfos = useStore((s) => s.setPluginInfos)
+  const [pluginSaveStatus, setPluginSaveStatus] = useState<'idle' | 'saved' | 'error'>('idle')
+  const [restartNeeded, setRestartNeeded] = useState(false)
+
   useEffect(() => {
     api.settings.get()
       .then((s) => {
@@ -139,11 +146,28 @@ export function Options() {
   const persistSaveSettings = async () => {
     setSaveStatus('saving')
     try {
-      await api.settings.put({ save_dir_template: saveDir, save_filename_template: saveFilename } as UserSettings)
+      await api.settings.put({ save_dir_template: saveDir, save_filename_template: saveFilename, enabled_plugins: pluginInfos.filter((p) => p.enabled).map((p) => p.id) })
       setSaveStatus('saved')
       setTimeout(() => setSaveStatus('idle'), 2000)
     } catch {
       setSaveStatus('error')
+    }
+  }
+
+  const togglePlugin = async (plugin: PluginInfo) => {
+    const updated = pluginInfos.map((p) =>
+      p.id === plugin.id ? { ...p, enabled: !p.enabled } : p,
+    )
+    const enabledIds = updated.filter((p) => p.enabled).map((p) => p.id)
+    try {
+      const current = await api.settings.get()
+      await api.settings.put({ ...current, enabled_plugins: enabledIds })
+      setPluginInfos(updated)
+      setPluginSaveStatus('saved')
+      setRestartNeeded(true)
+      setTimeout(() => setPluginSaveStatus('idle'), 2000)
+    } catch {
+      setPluginSaveStatus('error')
     }
   }
 
@@ -235,6 +259,33 @@ export function Options() {
           )}
         </div>
       </Section>
+
+      {pluginInfos.length > 0 && (
+        <Section title="Plugins">
+          <div className="space-y-3">
+            {pluginInfos.map((plugin) => (
+              <Row
+                key={plugin.id}
+                label={plugin.name}
+                hint={plugin.description || undefined}
+              >
+                <Toggle value={plugin.enabled} onChange={() => togglePlugin(plugin)} />
+              </Row>
+            ))}
+          </div>
+          {pluginSaveStatus === 'saved' && (
+            <p className="text-xs text-status-connected mt-2">Saved.</p>
+          )}
+          {pluginSaveStatus === 'error' && (
+            <p className="text-xs text-status-error mt-2">Failed to save plugin settings.</p>
+          )}
+          {restartNeeded && (
+            <p className="text-xs text-slate-400 mt-2">
+              Restart astrolol for plugin changes to take effect.
+            </p>
+          )}
+        </Section>
+      )}
 
       <p className="text-xs text-slate-600 mt-4">
         INDI server settings are UI previews only — set <code className="text-slate-500">ASTROLOL_*</code> environment

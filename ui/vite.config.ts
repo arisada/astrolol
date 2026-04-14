@@ -11,9 +11,13 @@ const backendWs   = backendHttp.replace(/^http/, 'ws')
 export default defineConfig({
   plugins: [react()],
   resolve: {
-    alias: { '@': path.resolve(__dirname, './src') },
+    alias: {
+      '@': path.resolve(__dirname, './src'),
+      '@plugins': path.resolve(__dirname, '../plugins'),
+    },
   },
   server: {
+    fs: { allow: ['..'] },
     proxy: {
       '/api':      { target: backendHttp, changeOrigin: true },
       '/devices':  { target: backendHttp, changeOrigin: true },
@@ -25,6 +29,8 @@ export default defineConfig({
       '/settings': { target: backendHttp, changeOrigin: true },
       '/events':   { target: backendHttp, changeOrigin: true },
       '/health':   { target: backendHttp, changeOrigin: true },
+      '/plugins':  { target: backendHttp, changeOrigin: true },
+      '/hello':    { target: backendHttp, changeOrigin: true },
       '/ws':       { target: backendWs,   ws: true, changeOrigin: true },
     },
   },

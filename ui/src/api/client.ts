@@ -9,6 +9,7 @@ import type {
   FocuserStatus,
   ImagerStatus,
   MountStatus,
+  PluginInfo,
   Profile,
   SetPropertyRequest,
   TrackingMode,
@@ -113,6 +114,10 @@ export const api = {
   settings: {
     get: () => request<UserSettings>('/settings'),
     put: (body: UserSettings) => request<UserSettings>('/settings', { method: 'PUT', body: JSON.stringify(body) }),
+  },
+
+  plugins: {
+    list: () => request<PluginInfo[]>('/plugins'),
   },
 
   focuser: {

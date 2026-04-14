@@ -1,17 +1,28 @@
 import { NavLink } from 'react-router-dom'
 import { BookOpen, Camera, Cpu, ScrollText, Settings, Telescope, Wifi, WifiOff } from 'lucide-react'
 import { useStore } from '@/store'
+import { getPluginEntry } from '@/plugin-registry'
 
 export function Sidebar() {
   const wsConnected = useStore((s) => s.wsConnected)
   const hasMounts   = useStore((s) => s.connectedDevices.some((d) => d.kind === 'mount'))
   const hasError    = useStore((s) => s.lastError !== null)
+  const enabledPlugins = useStore((s) => s.pluginInfos.filter((p) => p.enabled))
+
+  const pluginNavItems = enabledPlugins
+    .map((p) => {
+      const entry = getPluginEntry(p.id)
+      if (!entry) return null
+      return { to: entry.to, icon: entry.icon, label: entry.label }
+    })
+    .filter(Boolean) as { to: string; icon: typeof Cpu; label: string }[]
 
   const navItems = [
     { to: '/equipment', icon: Cpu,        label: 'Equipment' },
     { to: '/profiles',  icon: BookOpen,   label: 'Profiles'  },
     ...(hasMounts ? [{ to: '/mount', icon: Telescope, label: 'Mount' }] : []),
     { to: '/imaging',   icon: Camera,     label: 'Imaging'   },
+    ...pluginNavItems,
     { to: '/logs',      icon: ScrollText, label: 'Logs', badge: hasError },
     { to: '/options',   icon: Settings,   label: 'Options'   },
   ]
