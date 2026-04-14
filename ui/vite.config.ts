@@ -1,8 +1,6 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
-import type { ServerResponse } from 'http'
-
 // Backend URL for the dev-server proxy.  In Docker Compose the BACKEND_URL
 // env var is set to the service name; locally it defaults to localhost.
 const backendHttp = process.env.BACKEND_URL ?? 'http://localhost:8000'
@@ -11,16 +9,25 @@ const backendWs   = backendHttp.replace(/^http/, 'ws')
 /**
  * Attach an error handler to an http-proxy instance so that when the backend
  * is unreachable (ECONNREFUSED, startup gap, mid-restart) the browser gets a
- * clean 503 JSON response instead of Vite logging a scary "http proxy error"
- * to the console and the browser receiving a raw network failure.
+ * clean response instead of Vite logging "http proxy error" to the console.
+ *
+ * The third argument from http-proxy is http.ServerResponse for HTTP requests
+ * but net.Socket for WebSocket upgrades, so we must guard before calling
+ * writeHead (which only exists on ServerResponse).
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function withFallback(proxy: any): void {
-  proxy.on('error', (_err: Error, _req: unknown, res: ServerResponse) => {
-    if (!res.headersSent) {
-      res.writeHead(503, { 'Content-Type': 'application/json' })
-      res.end(JSON.stringify({ detail: 'Backend unavailable' }))
-    }
+  proxy.on('error', (_err: Error, _req: unknown, res: any) => {
+    try {
+      if (typeof res?.writeHead === 'function') {
+        // Regular HTTP request — return a clean 503
+        res.writeHead(503, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ detail: 'Backend unavailable' }))
+      } else {
+        // WebSocket socket — just close it
+        res?.end?.()
+      }
+    } catch { /* ignore secondary errors in the error handler */ }
   })
 }
 
