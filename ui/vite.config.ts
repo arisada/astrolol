@@ -1,11 +1,32 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import path from 'path'
+import type { ServerResponse } from 'http'
 
 // Backend URL for the dev-server proxy.  In Docker Compose the BACKEND_URL
 // env var is set to the service name; locally it defaults to localhost.
 const backendHttp = process.env.BACKEND_URL ?? 'http://localhost:8000'
 const backendWs   = backendHttp.replace(/^http/, 'ws')
+
+/**
+ * Attach an error handler to an http-proxy instance so that when the backend
+ * is unreachable (ECONNREFUSED, startup gap, mid-restart) the browser gets a
+ * clean 503 JSON response instead of Vite logging a scary "http proxy error"
+ * to the console and the browser receiving a raw network failure.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function withFallback(proxy: any): void {
+  proxy.on('error', (_err: Error, _req: unknown, res: ServerResponse) => {
+    if (!res.headersSent) {
+      res.writeHead(503, { 'Content-Type': 'application/json' })
+      res.end(JSON.stringify({ detail: 'Backend unavailable' }))
+    }
+  })
+}
+
+function p(target: string) {
+  return { target, changeOrigin: true, configure: withFallback }
+}
 
 // https://vitejs.dev/config/
 export default defineConfig({
@@ -19,20 +40,20 @@ export default defineConfig({
   server: {
     fs: { allow: ['..'] },
     proxy: {
-      '/api':      { target: backendHttp, changeOrigin: true },
-      '/devices':  { target: backendHttp, changeOrigin: true },
-      '/profiles': { target: backendHttp, changeOrigin: true },
-      '/imager':   { target: backendHttp, changeOrigin: true },
-      '/mount':    { target: backendHttp, changeOrigin: true },
-      '/focuser':  { target: backendHttp, changeOrigin: true },
-      '/indi':     { target: backendHttp, changeOrigin: true },
-      '/settings': { target: backendHttp, changeOrigin: true },
-      '/events':   { target: backendHttp, changeOrigin: true },
-      '/health':   { target: backendHttp, changeOrigin: true },
-      '/plugins':  { target: backendHttp, changeOrigin: true },
-      '/hello':    { target: backendHttp, changeOrigin: true },
-      '/admin':    { target: backendHttp, changeOrigin: true },
-      '/ws':       { target: backendWs,   ws: true, changeOrigin: true },
+      '/api':      p(backendHttp),
+      '/devices':  p(backendHttp),
+      '/profiles': p(backendHttp),
+      '/imager':   p(backendHttp),
+      '/mount':    p(backendHttp),
+      '/focuser':  p(backendHttp),
+      '/indi':     p(backendHttp),
+      '/settings': p(backendHttp),
+      '/events':   p(backendHttp),
+      '/health':   p(backendHttp),
+      '/plugins':  p(backendHttp),
+      '/hello':    p(backendHttp),
+      '/admin':    p(backendHttp),
+      '/ws': { target: backendWs, ws: true, changeOrigin: true, configure: withFallback },
     },
   },
   build: {
