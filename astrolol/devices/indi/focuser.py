@@ -23,9 +23,10 @@ class IndiFocuser:
 
     ADAPTER_KEY = "indi_focuser"
 
-    def __init__(self, device_name: str, client: IndiClient) -> None:
+    def __init__(self, device_name: str, client: IndiClient, device_port: str | None = None) -> None:
         self._device_name = device_name
         self._client = client
+        self._device_port = device_port
         self._state = DeviceState.DISCONNECTED
 
     # ------------------------------------------------------------------
@@ -35,7 +36,10 @@ class IndiFocuser:
     async def connect(self) -> None:
         self._state = DeviceState.CONNECTING
         try:
-            await self._client.connect_device(self._device_name)
+            await self._client.connect_device(
+                self._device_name,
+                device_port=self._device_port,
+            )
             self._state = DeviceState.CONNECTED
         except Exception:
             self._state = DeviceState.ERROR

@@ -143,12 +143,40 @@ class IndiClient(IPyClient):
     # Device lifecycle
     # ------------------------------------------------------------------
 
-    async def connect_device(self, device_name: str, timeout: float = 10.0) -> None:
-        """Connect an INDI device and wait for its full property set to appear."""
+    async def connect_device(
+        self,
+        device_name: str,
+        *,
+        prop_timeout: float = 10.0,
+        conn_timeout: float = 25.0,
+        device_port: str | None = None,
+    ) -> None:
+        """Connect an INDI device and wait for its full property set to appear.
+
+        Args:
+            device_name:  INDI device name (e.g. "EQMod Mount").
+            prop_timeout: seconds to wait for the driver to announce CONNECTION.
+            conn_timeout: seconds to wait for CONNECTION to reach Ok after
+                          sending CONNECT.  Real hardware (serial mounts,
+                          focusers) often needs 15–25 s for initialisation.
+            device_port:  if set, write DEVICE_PORT before sending CONNECT.
+                          Required for serial devices (e.g. "/dev/ttyUSB0").
+        """
         # Step 1: wait for the device and its CONNECTION property to be announced.
-        await self.wait_for_property(device_name, "CONNECTION", timeout=timeout)
+        await self.wait_for_property(device_name, "CONNECTION", timeout=prop_timeout)
+
+        # Step 1b: configure serial port if provided.
+        if device_port:
+            try:
+                await self.wait_for_property(device_name, "DEVICE_PORT", timeout=2.0)
+                await self.set_text(device_name, "DEVICE_PORT", {"PORT": device_port})
+                logger.info("indi.device_port_set", device=device_name, port=device_port)
+            except Exception as exc:
+                logger.warning("indi.device_port_set_failed", device=device_name, error=str(exc))
+
         # Step 2: send CONNECTION=CONNECT.
         await self.set_switch(device_name, "CONNECTION", ["CONNECT"])
+
         # Step 3: wait for CONNECTION to reach Ok with CONNECT=On.
         await self._wait_cond(
             lambda: (
@@ -156,7 +184,7 @@ class IndiClient(IPyClient):
                 and self._get_vector(device_name, "CONNECTION") is not None
                 and self._get_vector(device_name, "CONNECTION")["CONNECT"] == "On"
             ),
-            timeout=timeout,
+            timeout=conn_timeout,
         )
         # Step 4: let the initial defXxxVector flood drain.  In asyncio the
         # event loop processes pending data during the sleep, so 150 ms of

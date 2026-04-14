@@ -41,10 +41,12 @@ class IndiCamera:
         client: IndiClient,
         images_dir: Path | None = None,
         *,
+        device_port: str | None = None,
         exposure_timeout_extra: float = 30.0,
     ) -> None:
         self._device_name = device_name
         self._client = client
+        self._device_port = device_port
         self._images_dir = images_dir or settings.images_dir
         self._exposure_timeout_extra = exposure_timeout_extra
         self._state = DeviceState.DISCONNECTED
@@ -57,7 +59,10 @@ class IndiCamera:
     async def connect(self) -> None:
         self._state = DeviceState.CONNECTING
         try:
-            await self._client.connect_device(self._device_name)
+            await self._client.connect_device(
+                self._device_name,
+                device_port=self._device_port,
+            )
             await self._client.enable_blob(self._device_name)
             self._state = DeviceState.CONNECTED
         except Exception:

@@ -10,6 +10,7 @@ Two modes:
 from __future__ import annotations
 
 import asyncio
+import errno
 import os
 import tempfile
 from pathlib import Path
@@ -154,7 +155,12 @@ class IndiServer:
         logger.debug("indi.fifo_created", path=str(fifo))
 
     async def _fifo_write(self, command: str) -> None:
-        """Open the FIFO for writing (non-blocking so we don't hang)."""
+        """Open the FIFO for writing and send command.
+
+        Uses O_NONBLOCK so we never block forever, but retries on ENXIO
+        (no reader yet — indiserver hasn't opened the FIFO for reading).
+        Retries for up to 5 seconds with short back-off.
+        """
         fifo = str(self._fifo_path)
 
         def _write() -> None:
@@ -164,10 +170,21 @@ class IndiServer:
             finally:
                 os.close(fd)
 
-        try:
-            await asyncio.to_thread(_write)
-        except OSError as exc:
-            logger.warning("indi.fifo_write_failed", command=command.strip(), error=str(exc))
+        deadline = asyncio.get_event_loop().time() + 5.0
+        delay = 0.2
+        while True:
+            try:
+                await asyncio.to_thread(_write)
+                return
+            except OSError as exc:
+                if exc.errno == errno.ENXIO and asyncio.get_event_loop().time() < deadline:
+                    # indiserver hasn't opened the FIFO for reading yet — wait and retry
+                    logger.debug("indi.fifo_not_ready", command=command.strip(), retry_in=delay)
+                    await asyncio.sleep(delay)
+                    delay = min(delay * 1.5, 1.0)
+                else:
+                    logger.warning("indi.fifo_write_failed", command=command.strip(), error=str(exc))
+                    return
 
     def _cleanup_fifo(self) -> None:
         try:
