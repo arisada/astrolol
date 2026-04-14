@@ -102,6 +102,7 @@ _STRUCTLOG_META_KEYS = frozenset({
 # Map logger module path segments → short component labels shown in the UI
 _COMPONENT_MAP = {
     "devices": "device",
+    "indi":    "indi",
     "mount":   "mount",
     "imaging": "imager",
     "focuser": "focuser",
@@ -112,7 +113,10 @@ _COMPONENT_MAP = {
 
 def _logger_to_component(logger_name: str) -> str:
     parts = (logger_name or "").split(".")
-    # e.g. "astrolol.devices.indi.client" → check "devices" first
+    # "indi" is a sub-package of "devices" — check it before the generic loop
+    # so "astrolol.devices.indi.client" → "indi", not "device".
+    if "indi" in parts:
+        return "indi"
     for part in parts:
         if part in _COMPONENT_MAP:
             return _COMPONENT_MAP[part]
