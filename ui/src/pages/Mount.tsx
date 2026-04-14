@@ -186,7 +186,7 @@ function MountControls({ deviceId }: { deviceId: string }) {
         </div>
 
         {/* Live position */}
-        <Section title="Position">
+        <Section title="Position (JNOW)">
           <div className="grid grid-cols-2 gap-x-8 gap-y-1 font-mono text-sm">
             <span className="text-slate-500 text-xs">RA</span>
             <span className="text-slate-500 text-xs">Dec</span>
@@ -204,7 +204,7 @@ function MountControls({ deviceId }: { deviceId: string }) {
         </Section>
 
         {/* Slew */}
-        <Section title="Slew to">
+        <Section title="Slew to (JNOW)">
           <div className="flex flex-col gap-2">
             <div className="flex items-center gap-2">
               <span className="text-xs text-slate-500 w-8 shrink-0">RA</span>
