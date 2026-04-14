@@ -107,6 +107,12 @@ class IndiClient(IPyClient):
             key = (event.devicename, event.vectorname)
             self._blob_versions[key] = self._blob_versions.get(key, 0) + 1
 
+        if isinstance(event, indi_events.Message) and event.message:
+            if event.devicename:
+                logger.info("indi.message", device=event.devicename, message=event.message)
+            else:
+                logger.info("indi.message", message=event.message)
+
         if self._cond is not None:
             async with self._cond:
                 self._cond.notify_all()
