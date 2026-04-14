@@ -9,8 +9,9 @@ class DeviceRegistry:
     cameras: dict[str, Type[ICamera]] = field(default_factory=dict)
     mounts: dict[str, Type[IMount]] = field(default_factory=dict)
     focusers: dict[str, Type[IFocuser]] = field(default_factory=dict)
-    # Set by the INDI plugin so properties endpoints can query live device state
+    # Set by the INDI plugin so properties and load-driver endpoints can reach INDI
     indi_client: Any = None
+    indi_manager: Any = None
 
     def register_camera(self, key: str, adapter: Type[ICamera]) -> None:
         self.cameras[key] = adapter

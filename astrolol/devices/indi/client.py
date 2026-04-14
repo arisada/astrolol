@@ -149,41 +149,49 @@ class IndiClient(IPyClient):
         *,
         prop_timeout: float = 10.0,
         conn_timeout: float = 25.0,
-        device_port: str | None = None,
-        device_baud_rate: str | None = None,
+        pre_connect_props: dict[str, dict] | None = None,
     ) -> None:
         """Connect an INDI device and wait for its full property set to appear.
 
         Args:
-            device_name:      INDI device name (e.g. "EQMod Mount").
-            prop_timeout:     seconds to wait for the driver to announce CONNECTION.
-            conn_timeout:     seconds to wait for CONNECTION to reach Ok after
-                              sending CONNECT.  Real hardware (serial mounts,
-                              focusers) often needs 15–25 s for initialisation.
-            device_port:      if set, write DEVICE_PORT before sending CONNECT.
-                              Required for serial devices (e.g. "/dev/ttyUSB0").
-            device_baud_rate: if set, select DEVICE_BAUD_RATE switch element
-                              before sending CONNECT (e.g. "9600", "115200").
+            device_name:       INDI device name (e.g. "EQMod Mount").
+            prop_timeout:      seconds to wait for the driver to announce CONNECTION.
+            conn_timeout:      seconds to wait for CONNECTION to reach Ok after
+                               sending CONNECT.  Real hardware (serial mounts,
+                               focusers) often needs 15–25 s for initialisation.
+            pre_connect_props: properties to set before sending CONNECT.
+                               Format: {prop_name: {"values": {elem: val}} or
+                                                   {"on_elements": [elem, ...]}}
+                               Text vs number is auto-detected from the live vector.
         """
         # Step 1: wait for the device and its CONNECTION property to be announced.
         await self.wait_for_property(device_name, "CONNECTION", timeout=prop_timeout)
 
-        # Step 1b: configure serial connection if provided.
-        # DEVICE_PORT and DEVICE_BAUD_RATE must be set before CONNECTION=CONNECT.
-        if device_port:
-            try:
-                await self.wait_for_property(device_name, "DEVICE_PORT", timeout=2.0)
-                await self.set_text(device_name, "DEVICE_PORT", {"PORT": device_port})
-                logger.info("indi.device_port_set", device=device_name, port=device_port)
-            except Exception as exc:
-                logger.warning("indi.device_port_set_failed", device=device_name, error=str(exc))
-        if device_baud_rate:
-            try:
-                await self.wait_for_property(device_name, "DEVICE_BAUD_RATE", timeout=2.0)
-                await self.set_switch(device_name, "DEVICE_BAUD_RATE", [device_baud_rate])
-                logger.info("indi.device_baud_rate_set", device=device_name, baud_rate=device_baud_rate)
-            except Exception as exc:
-                logger.warning("indi.device_baud_rate_set_failed", device=device_name, error=str(exc))
+        # Step 1b: apply caller-specified pre-connect properties (e.g. DEVICE_PORT).
+        if pre_connect_props:
+            for prop_name, spec in pre_connect_props.items():
+                try:
+                    await self.wait_for_property(device_name, prop_name, timeout=2.0)
+                    if "on_elements" in spec:
+                        await self.set_switch(device_name, prop_name, spec["on_elements"])
+                    elif "values" in spec:
+                        v = self._get_vector(device_name, prop_name)
+                        if v is not None and v.vectortype == "NumberVector":
+                            await self.set_number(
+                                device_name, prop_name,
+                                {k: float(val) for k, val in spec["values"].items()},
+                            )
+                        else:
+                            await self.set_text(
+                                device_name, prop_name,
+                                {k: str(val) for k, val in spec["values"].items()},
+                            )
+                    logger.info("indi.pre_connect_prop_set", device=device_name, prop=prop_name)
+                except Exception as exc:
+                    logger.warning(
+                        "indi.pre_connect_prop_failed",
+                        device=device_name, prop=prop_name, error=str(exc),
+                    )
 
         # Step 2: send CONNECTION=CONNECT.
         await self.set_switch(device_name, "CONNECTION", ["CONNECT"])

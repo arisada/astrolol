@@ -73,6 +73,24 @@ class IndiConnectionManager:
                 self._started = True
             self._ref_count += 1
 
+    async def ensure_started(self) -> None:
+        """Ensure indiserver and PyIndi client are running.
+
+        Unlike acquire(), does not increment ref count.  Use this when you need
+        INDI services running (e.g. to load a driver and inspect its properties)
+        but are not yet connecting a device.
+        """
+        current_loop = asyncio.get_running_loop()
+        if self._lock is None or self._loop is not current_loop:
+            self._lock = asyncio.Lock()
+            self._loop = current_loop
+            self._started = False
+        async with self._lock:
+            if not self._started:
+                await self._server.start()
+                await self._client.connect()
+                self._started = True
+
     async def release(self) -> None:
         """Called by each INDI adapter on disconnect()."""
         async with self._lock:
@@ -99,8 +117,16 @@ def _make_camera_class(manager: IndiConnectionManager):
     class _Camera(IndiCamera):
         _manager = manager
 
-        def __init__(self, device_name: str, executable: str = "", device_port: str = "", device_baud_rate: str = "", **_kwargs):
-            super().__init__(device_name=device_name, client=manager.client, device_port=device_port or None, device_baud_rate=device_baud_rate or None)
+        def __init__(self, device_name: str, executable: str = "",
+                     pre_connect_props: dict | None = None,
+                     device_port: str = "", device_baud_rate: str = "", **_kwargs):
+            props = dict(pre_connect_props or {})
+            if device_port and "DEVICE_PORT" not in props:
+                props["DEVICE_PORT"] = {"values": {"PORT": device_port}}
+            if device_baud_rate and "DEVICE_BAUD_RATE" not in props:
+                props["DEVICE_BAUD_RATE"] = {"on_elements": [device_baud_rate]}
+            super().__init__(device_name=device_name, client=manager.client,
+                             pre_connect_props=props or None)
             self._executable = executable
 
         async def connect(self) -> None:
@@ -134,8 +160,16 @@ def _make_mount_class(manager: IndiConnectionManager):
     class _Mount(IndiMount):
         _manager = manager
 
-        def __init__(self, device_name: str, executable: str = "", device_port: str = "", device_baud_rate: str = "", **_kwargs):
-            super().__init__(device_name=device_name, client=manager.client, device_port=device_port or None, device_baud_rate=device_baud_rate or None)
+        def __init__(self, device_name: str, executable: str = "",
+                     pre_connect_props: dict | None = None,
+                     device_port: str = "", device_baud_rate: str = "", **_kwargs):
+            props = dict(pre_connect_props or {})
+            if device_port and "DEVICE_PORT" not in props:
+                props["DEVICE_PORT"] = {"values": {"PORT": device_port}}
+            if device_baud_rate and "DEVICE_BAUD_RATE" not in props:
+                props["DEVICE_BAUD_RATE"] = {"on_elements": [device_baud_rate]}
+            super().__init__(device_name=device_name, client=manager.client,
+                             pre_connect_props=props or None)
             self._executable = executable
 
         async def connect(self) -> None:
@@ -169,8 +203,16 @@ def _make_focuser_class(manager: IndiConnectionManager):
     class _Focuser(IndiFocuser):
         _manager = manager
 
-        def __init__(self, device_name: str, executable: str = "", device_port: str = "", device_baud_rate: str = "", **_kwargs):
-            super().__init__(device_name=device_name, client=manager.client, device_port=device_port or None, device_baud_rate=device_baud_rate or None)
+        def __init__(self, device_name: str, executable: str = "",
+                     pre_connect_props: dict | None = None,
+                     device_port: str = "", device_baud_rate: str = "", **_kwargs):
+            props = dict(pre_connect_props or {})
+            if device_port and "DEVICE_PORT" not in props:
+                props["DEVICE_PORT"] = {"values": {"PORT": device_port}}
+            if device_baud_rate and "DEVICE_BAUD_RATE" not in props:
+                props["DEVICE_BAUD_RATE"] = {"on_elements": [device_baud_rate]}
+            super().__init__(device_name=device_name, client=manager.client,
+                             pre_connect_props=props or None)
             self._executable = executable
 
         async def connect(self) -> None:
@@ -213,4 +255,5 @@ class IndiPlugin:
         registry.register_mount("indi_mount", _make_mount_class(manager))
         registry.register_focuser("indi_focuser", _make_focuser_class(manager))
         registry.indi_client = manager.client
+        registry.indi_manager = manager
         logger.info("indi.adapters_registered")
