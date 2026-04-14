@@ -163,6 +163,55 @@ function ModelStep({
   )
 }
 
+const BAUD_RATES = ['9600', '19200', '38400', '57600', '115200', '230400']
+
+// Serial connection fields shown for mount and focuser (not USB cameras)
+function SerialFields({
+  devicePort,
+  baudRate,
+  onPortChange,
+  onBaudChange,
+}: {
+  devicePort: string
+  baudRate: string
+  onPortChange: (v: string) => void
+  onBaudChange: (v: string) => void
+}) {
+  return (
+    <div className="flex flex-col gap-3 pt-2 border-t border-surface-border">
+      <p className="text-xs text-slate-500">Serial / USB-serial connection</p>
+      <div className="flex gap-3">
+        <div className="flex flex-col gap-1 flex-1">
+          <label className="text-xs text-slate-400">Device port</label>
+          <Input
+            placeholder="/dev/ttyUSB0"
+            value={devicePort}
+            onChange={(e) => onPortChange(e.target.value)}
+          />
+        </div>
+        <div className="flex flex-col gap-1 w-36">
+          <label className="text-xs text-slate-400">Baud rate</label>
+          <select
+            value={baudRate}
+            onChange={(e) => onBaudChange(e.target.value)}
+            className="bg-surface border border-surface-border rounded px-3 py-1.5 text-sm text-slate-200
+              focus:outline-none focus:ring-1 focus:ring-accent h-9"
+          >
+            <option value="">Driver default</option>
+            {BAUD_RATES.map((r) => (
+              <option key={r} value={r}>{r}</option>
+            ))}
+          </select>
+        </div>
+      </div>
+      <p className="text-xs text-slate-600">
+        Run <code className="text-slate-500">ls /dev/ttyUSB* /dev/ttyACM*</code> to find your port.
+        Most mounts use 9600 baud (EQ8 and some others use 115200).
+      </p>
+    </div>
+  )
+}
+
 // Step 4 — confirm and connect
 function ConfirmStep({
   kind,
@@ -175,15 +224,18 @@ function ConfirmStep({
   kind: DeviceKind
   driver: DriverEntry | null  // null = manual entry
   onBack: () => void
-  onConnect: (deviceName: string, executable: string, deviceId: string) => void
+  onConnect: (deviceName: string, executable: string, deviceId: string, devicePort: string, baudRate: string) => void
   connecting: boolean
   error: string | null
 }) {
   const [deviceName, setDeviceName] = useState(driver?.device_name ?? '')
   const [executable, setExecutable] = useState(driver?.executable ?? '')
   const [deviceId, setDeviceId] = useState(() => suggestDeviceId(kind, driver))
+  const [devicePort, setDevicePort] = useState('')
+  const [baudRate, setBaudRate] = useState('')
 
   const deviceIdInvalid = deviceId !== '' && !DEVICE_ID_RE.test(deviceId)
+  const needsSerial = kind === 'mount' || kind === 'focuser'
 
   return (
     <div>
@@ -245,6 +297,16 @@ function ConfirmStep({
           )}
         </div>
 
+        {/* Serial connection — mounts and focusers only */}
+        {needsSerial && (
+          <SerialFields
+            devicePort={devicePort}
+            baudRate={baudRate}
+            onPortChange={setDevicePort}
+            onBaudChange={setBaudRate}
+          />
+        )}
+
         {error && (
           <p className="text-xs text-status-error bg-status-error/10 rounded px-3 py-2">{error}</p>
         )}
@@ -253,7 +315,7 @@ function ConfirmStep({
           type="button"
           disabled={!deviceName || connecting || deviceIdInvalid}
           className="self-start"
-          onClick={() => onConnect(deviceName, executable, deviceId)}
+          onClick={() => onConnect(deviceName, executable, deviceId, devicePort, baudRate)}
         >
           <Plug size={14} className="mr-2" />
           {connecting ? 'Connecting…' : 'Connect'}
@@ -332,7 +394,7 @@ export function Equipment() {
     }
   }
 
-  const handleConnect = async (deviceName: string, executable: string, deviceId: string) => {
+  const handleConnect = async (deviceName: string, executable: string, deviceId: string, devicePort: string, baudRate: string) => {
     setError(null)
     setConnecting(true)
     try {
@@ -340,7 +402,12 @@ export function Equipment() {
         device_id: deviceId || undefined,
         kind: selectedKind,
         adapter_key: KIND_ADAPTER[selectedKind],
-        params: { device_name: deviceName, executable },
+        params: {
+          device_name: deviceName,
+          executable,
+          ...(devicePort ? { device_port: devicePort } : {}),
+          ...(baudRate  ? { device_baud_rate: baudRate }  : {}),
+        },
       })
       refresh()
       setStep('type')
@@ -449,7 +516,7 @@ export function Equipment() {
               onBack={handleBack}
               onConnect={handleConnect}
               connecting={connecting}
-              error={error}
+              error={error ?? null}
             />
           )}
         </div>

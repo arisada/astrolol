@@ -99,8 +99,8 @@ def _make_camera_class(manager: IndiConnectionManager):
     class _Camera(IndiCamera):
         _manager = manager
 
-        def __init__(self, device_name: str, executable: str = "", device_port: str = "", **_kwargs):
-            super().__init__(device_name=device_name, client=manager.client, device_port=device_port or None)
+        def __init__(self, device_name: str, executable: str = "", device_port: str = "", device_baud_rate: str = "", **_kwargs):
+            super().__init__(device_name=device_name, client=manager.client, device_port=device_port or None, device_baud_rate=device_baud_rate or None)
             self._executable = executable
 
         async def connect(self) -> None:
@@ -134,8 +134,8 @@ def _make_mount_class(manager: IndiConnectionManager):
     class _Mount(IndiMount):
         _manager = manager
 
-        def __init__(self, device_name: str, executable: str = "", device_port: str = "", **_kwargs):
-            super().__init__(device_name=device_name, client=manager.client, device_port=device_port or None)
+        def __init__(self, device_name: str, executable: str = "", device_port: str = "", device_baud_rate: str = "", **_kwargs):
+            super().__init__(device_name=device_name, client=manager.client, device_port=device_port or None, device_baud_rate=device_baud_rate or None)
             self._executable = executable
 
         async def connect(self) -> None:
@@ -169,8 +169,8 @@ def _make_focuser_class(manager: IndiConnectionManager):
     class _Focuser(IndiFocuser):
         _manager = manager
 
-        def __init__(self, device_name: str, executable: str = "", device_port: str = "", **_kwargs):
-            super().__init__(device_name=device_name, client=manager.client, device_port=device_port or None)
+        def __init__(self, device_name: str, executable: str = "", device_port: str = "", device_baud_rate: str = "", **_kwargs):
+            super().__init__(device_name=device_name, client=manager.client, device_port=device_port or None, device_baud_rate=device_baud_rate or None)
             self._executable = executable
 
         async def connect(self) -> None:
