@@ -10,6 +10,17 @@ from typing import Any
 import structlog
 
 
+class _DropMessageFilter(logging.Filter):
+    """Drop log records whose message starts with a given prefix."""
+
+    def __init__(self, prefix: str) -> None:
+        super().__init__()
+        self._prefix = prefix
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        return not record.getMessage().startswith(self._prefix)
+
+
 def setup_logging(log_file: Path | None = None) -> None:
     """
     Wire structlog to stdlib logging and optionally tee to a rotating log file.
@@ -64,6 +75,12 @@ def setup_logging(log_file: Path | None = None) -> None:
     logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
     logging.getLogger("uvicorn.error").setLevel(logging.WARNING)
 
+    # uvicorn emits WARNING-level "Invalid HTTP request received." whenever a
+    # browser/proxy sends a non-HTTP probe (e.g. h2 ALPN, health checks using raw
+    # TCP, or the OS closing an idle keep-alive).  It is harmless noise.
+    _invalid_http_filter = _DropMessageFilter("Invalid HTTP request received.")
+    logging.getLogger("uvicorn.error").addFilter(_invalid_http_filter)
+
 
 # ── EventBus log bridge ───────────────────────────────────────────────────────
 # This processor sits in the structlog chain and forwards each INFO+ log entry
@@ -74,6 +91,12 @@ def setup_logging(log_file: Path | None = None) -> None:
 _SKIP_LOGGERS = frozenset({
     "astrolol.core.events.bus",
     "asyncio",
+})
+
+# Keys added by structlog processors themselves — not user context, skip in extras
+_STRUCTLOG_META_KEYS = frozenset({
+    "event", "level", "logger", "timestamp", "_record", "_from_structlog",
+    "exc_info", "stack_info",
 })
 
 # Map logger module path segments → short component labels shown in the UI
@@ -115,7 +138,18 @@ class EventBusForwarder:
                 from astrolol.core.events.models import LogEvent
                 level = event_dict.get("level", method)
                 component = _logger_to_component(str(event_dict.get("logger", "")))
-                message = str(event_dict.get("event", ""))
+                event_name = str(event_dict.get("event", ""))
+                # Append extra context fields (driver=, device=, error=, …) so the
+                # UI log panel shows the full structured entry, not just the name.
+                extras = {
+                    k: v for k, v in event_dict.items()
+                    if k not in _STRUCTLOG_META_KEYS and not k.startswith("_")
+                }
+                if extras:
+                    extra_str = " ".join(f"{k}={v}" for k, v in extras.items())
+                    message = f"{event_name} {extra_str}"
+                else:
+                    message = event_name
                 evt = LogEvent(level=level, component=component, message=message)
                 try:
                     loop = asyncio.get_running_loop()
