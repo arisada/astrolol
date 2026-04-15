@@ -228,10 +228,27 @@ class IndiMount:
         )
 
     async def set_park_position(self) -> None:
-        """Set the current position as the park position (TELESCOPE_PARK_OPTION=PARK_CURRENT)."""
+        """Set the current position as the park position and persist it to disk.
+
+        INDI requires two steps:
+          1. PARK_CURRENT — tells the driver to use the current position as park.
+          2. PARK_WRITE_DATA — writes the park data to the driver's park file
+             (e.g. ~/.indi/ParkData.xml for EQMod) so it survives a driver restart.
+        """
         await self._client.set_switch(
             self._device_name, "TELESCOPE_PARK_OPTION", ["PARK_CURRENT"]
         )
+        try:
+            await self._client.set_switch(
+                self._device_name, "TELESCOPE_PARK_OPTION", ["PARK_WRITE_DATA"]
+            )
+            logger.info("indi.park_position_saved", device=self._device_name)
+        except Exception as exc:
+            # PARK_WRITE_DATA is not present in all drivers — treat as best-effort.
+            logger.warning(
+                "indi.park_write_data_failed",
+                device=self._device_name, error=str(exc),
+            )
 
     _SLEW_RATE_ELEMENTS = {
         "guide":     "SLEW_GUIDE",
