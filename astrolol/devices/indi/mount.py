@@ -186,6 +186,7 @@ class IndiMount:
             pass
 
         hour_angle: float | None = None
+        lst: float | None = None
         try:
             lst = await self._client.get_number(
                 self._device_name, "TIME_LST", "LST"
@@ -223,6 +224,7 @@ class IndiMount:
             is_slewing=is_slewing,
             pier_side=pier_side,
             hour_angle=hour_angle,
+            lst=lst,
         )
 
     async def set_park_position(self) -> None:

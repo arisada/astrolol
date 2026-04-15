@@ -157,7 +157,10 @@ function MountControls({ deviceId }: { deviceId: string }) {
   const isParked   = status?.is_parked   ?? false
   const isSlewing  = status?.is_slewing  ?? false
   const ha         = status?.hour_angle ?? null
-  const canFlip    = ha != null && Math.abs(ha) <= 1.0 && !isParked && !isSlewing
+  const lst        = status?.lst ?? null
+  // Flip is useful once the mount has passed the meridian (HA > 0) and within 2h past it.
+  // Before the meridian (HA < 0) a flip would point the OTA through the mount.
+  const canFlip    = ha != null && ha > 0 && ha <= 2.0 && !isParked && !isSlewing
 
   // Common props for d-pad buttons (hold to move)
   const dpadBtn = (dir: string, title: string) => ({
@@ -197,9 +200,13 @@ function MountControls({ deviceId }: { deviceId: string }) {
             <span className="text-slate-300">{status?.alt != null ? `${status.alt.toFixed(1)}°` : '—'}</span>
             <span className="text-slate-300">{status?.az  != null ? `${status.az.toFixed(1)}°`  : '—'}</span>
             <span className="text-slate-500 text-xs mt-1">HA</span>
-            <span className="text-slate-500 text-xs mt-1">Pier</span>
+            <span className="text-slate-500 text-xs mt-1">LST</span>
             <span className="text-slate-300">{fmtHA(ha)}</span>
+            <span className="text-slate-300">{lst != null ? fmtRA(lst) : '—'}</span>
+            <span className="text-slate-500 text-xs mt-1">Pier</span>
+            <span className="text-slate-500 text-xs mt-1" />
             <span className="text-slate-300">{status?.pier_side ?? '—'}</span>
+            <span />
           </div>
         </Section>
 
@@ -309,14 +316,20 @@ function MountControls({ deviceId }: { deviceId: string }) {
               variant="outline"
               disabled={!canFlip}
               onClick={() => act(() => api.mount.meridianFlip(deviceId))}
-              title={canFlip ? 'Perform meridian flip' : ha == null ? 'Hour angle unknown' : 'Outside ±1 h window'}
+              title={
+                canFlip            ? 'Perform meridian flip' :
+                ha == null         ? 'Hour angle unknown' :
+                ha <= 0            ? 'Mount has not crossed the meridian yet' :
+                                     'More than 2 h past meridian — slew to target first'
+              }
             >
               <RefreshCw size={12} className="mr-1.5" /> Meridian Flip
             </Button>
-            {ha != null && !canFlip && Math.abs(ha) > 1.0 && (
-              <span className="text-xs text-slate-600">
-                Available within 1 h of meridian
-            </span>
+            {ha != null && !canFlip && ha <= 0 && (
+              <span className="text-xs text-slate-600">Waiting for meridian crossing</span>
+            )}
+            {ha != null && !canFlip && ha > 2.0 && (
+              <span className="text-xs text-yellow-700">Slew to target before flipping</span>
             )}
           </div>
         </Section>

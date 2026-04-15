@@ -56,7 +56,8 @@ class MountStatus(BaseModel):
     is_parked: bool = False
     is_slewing: bool = False
     pier_side: str | None = None    # "East" | "West" — which side of the pier the OTA is on
-    hour_angle: float | None = None  # decimal hours, negative = east (pre-meridian), positive = west (post)
+    hour_angle: float | None = None   # decimal hours, negative = east (pre-meridian), positive = west (post)
+    lst: float | None = None           # Local Sidereal Time in decimal hours
 
 
 # --- Focuser ---

@@ -38,6 +38,7 @@ export interface MountStatus {
   is_slewing: boolean
   pier_side: 'East' | 'West' | null
   hour_angle: number | null  // decimal hours; negative = east of meridian (pre-flip), positive = west (post)
+  lst: number | null         // Local Sidereal Time in decimal hours
 }
 
 export interface FocuserStatus {
