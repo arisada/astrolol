@@ -168,11 +168,13 @@ class IndiMount:
         if tracking is not None:
             self._is_tracking = tracking
 
-        parked = self._client.get_switch_state_nowait(
-            self._device_name, "TELESCOPE_PARK", "PARK"
-        )
-        if parked is not None:
-            self._is_parked = parked
+        park_v = self._client._get_vector(self._device_name, "TELESCOPE_PARK")
+        if park_v is not None and park_v.state != "Busy":
+            parked = self._client.get_switch_state_nowait(
+                self._device_name, "TELESCOPE_PARK", "PARK"
+            )
+            if parked is not None:
+                self._is_parked = parked
 
         # Optional properties — read non-blocking; absent on some drivers.
         pier_side: str | None = None
