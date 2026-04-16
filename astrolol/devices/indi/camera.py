@@ -183,9 +183,20 @@ class IndiCamera:
         cooler_on = False
         cooler_power: float | None = None
 
-        temperature = self._client.get_number_nowait(
-            self._device_name, "CCD_TEMPERATURE", "CCD_TEMPERATURE_VALUE"
-        )
+        # Read temperature — try getfloatvalue first, fall back to direct member access
+        # (some simulator builds put CCD_TEMPERATURE in Alert state which can cause
+        # getfloatvalue to misbehave in certain indipyclient builds)
+        temp_v = self._client._get_vector(self._device_name, "CCD_TEMPERATURE")
+        if temp_v is not None:
+            try:
+                temperature = temp_v.getfloatvalue("CCD_TEMPERATURE_VALUE")
+            except Exception:
+                try:
+                    member = temp_v.data.get("CCD_TEMPERATURE_VALUE")
+                    if member is not None:
+                        temperature = float(str(member.membervalue).strip())
+                except Exception:
+                    pass
 
         cooler_on_val = self._client.get_switch_state_nowait(
             self._device_name, "CCD_COOLER", "COOLER_ON"
@@ -202,6 +213,27 @@ class IndiCamera:
             cooler_on=cooler_on,
             cooler_power=cooler_power,
         )
+
+    async def push_scope_info(self, focal_length: float, aperture: float) -> None:
+        """Push telescope optics to the camera's SCOPE_INFO property (best-effort)."""
+        try:
+            await self._client.set_number(
+                self._device_name,
+                "SCOPE_INFO",
+                {"FOCAL_LENGTH": focal_length, "APERTURE": aperture},
+            )
+            logger.info(
+                "indi.camera_scope_info_pushed",
+                device=self._device_name,
+                focal_length=focal_length,
+                aperture=aperture,
+            )
+        except Exception as exc:
+            logger.debug(
+                "indi.camera_scope_info_skipped",
+                device=self._device_name,
+                error=str(exc),
+            )
 
     async def set_cooler(self, enabled: bool, target_temperature: float | None) -> None:
         """Enable/disable the cooler and optionally set the target temperature."""

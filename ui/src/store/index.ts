@@ -58,6 +58,7 @@ interface AppState {
   setWsConnected: (v: boolean) => void
   setConnectedDevices: (devices: ConnectedDevice[]) => void
   setCameraStatus: (deviceId: string, status: CameraStatus) => void
+  setFocuserStatus: (deviceId: string, status: FocuserStatus) => void
   setFilterWheelStatus: (deviceId: string, status: FilterWheelStatus) => void
   applyEvent: (event: AstrolollEvent) => void
   clearLastError: () => void
@@ -90,6 +91,8 @@ export const useStore = create<AppState>((set, get) => ({
   setConnectedDevices: (devices) => set({ connectedDevices: devices }),
   setCameraStatus: (deviceId, status) =>
     set((s) => ({ cameraStatuses: { ...s.cameraStatuses, [deviceId]: status } })),
+  setFocuserStatus: (deviceId, status) =>
+    set((s) => ({ focuserStatuses: { ...s.focuserStatuses, [deviceId]: status } })),
   setFilterWheelStatus: (deviceId, status) =>
     set((s) => ({ filterWheelStatuses: { ...s.filterWheelStatuses, [deviceId]: status } })),
 

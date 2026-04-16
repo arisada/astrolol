@@ -42,13 +42,28 @@ class IndiFilterWheel:
         logger.info("indi.filter_wheel_selected", device=self._device_name, slot=slot)
 
     async def get_status(self) -> FilterWheelStatus:
-        slot_val = self._client.get_number_nowait(
-            self._device_name, "FILTER_SLOT", "FILTER_SLOT_VALUE"
-        )
-        current_slot = int(slot_val) if slot_val is not None else None
-
         fw_v = self._client._get_vector(self._device_name, "FILTER_SLOT")
         is_moving = fw_v is not None and fw_v.state == "Busy"
+
+        current_slot: int | None = None
+        slot_count_from_max: int | None = None
+        if fw_v is not None:
+            try:
+                current_slot = int(fw_v.getfloatvalue("FILTER_SLOT_VALUE"))
+            except Exception:
+                try:
+                    member = fw_v.data.get("FILTER_SLOT_VALUE")
+                    if member is not None:
+                        current_slot = int(float(str(member.membervalue).strip()))
+                except Exception:
+                    pass
+            # Read slot count from the member's max attribute
+            try:
+                member = fw_v.data.get("FILTER_SLOT_VALUE")
+                if member is not None:
+                    slot_count_from_max = int(float(str(member.max)))
+            except Exception:
+                pass
 
         filter_names: list[str] = []
         name_v = self._client._get_vector(self._device_name, "FILTER_NAME")
@@ -66,7 +81,13 @@ class IndiFilterWheel:
                 except (KeyError, Exception):
                     break
 
-        filter_count = len(filter_names) if filter_names else None
+        # filter_count: prefer length of names, fall back to FILTER_SLOT max
+        if filter_names:
+            filter_count = len(filter_names)
+        elif slot_count_from_max and slot_count_from_max > 0:
+            filter_count = slot_count_from_max
+        else:
+            filter_count = None
 
         return FilterWheelStatus(
             state=self._state,

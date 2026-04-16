@@ -127,6 +127,19 @@ class ImagerManager:
         """Called when a profile is activated or cleared."""
         self._active_profile = profile
 
+    async def push_scope_info(self, device_id: str) -> None:
+        """Push telescope optics from the active profile to the camera's SCOPE_INFO."""
+        profile = self._active_profile
+        if profile is None or profile.telescope is None:
+            return
+        try:
+            camera = self._device_manager.get_camera(device_id)
+            push = getattr(camera, "push_scope_info", None)
+            if push is not None:
+                await push(profile.telescope.focal_length, profile.telescope.aperture)
+        except Exception as exc:
+            logger.warning("imager.scope_info_push_failed", device_id=device_id, error=str(exc))
+
     # --- Public API ---
 
     async def expose(self, device_id: str, request: ExposureRequest) -> ExposureResult:

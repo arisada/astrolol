@@ -399,11 +399,19 @@ function FocuserPanel({
   onSettings: (id: string) => void
 }) {
   const focuserStatuses = useStore((s) => s.focuserStatuses)
+  const setFocuserStatus = useStore((s) => s.setFocuserStatus)
   const position = focuserStatuses[deviceId]?.position
 
   const [target, setTarget] = useState('')
   const [step, setStep] = useLocalStorage('imaging.focuserStep', '100')
   const [error, setError] = useState<string | null>(null)
+
+  // Fetch initial position immediately on mount
+  useEffect(() => {
+    api.focuser.status(deviceId)
+      .then((s) => setFocuserStatus(deviceId, s))
+      .catch(() => {})
+  }, [deviceId, setFocuserStatus])
 
   const act = async (fn: () => Promise<unknown>) => {
     setError(null)

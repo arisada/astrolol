@@ -61,6 +61,9 @@ def create_app() -> FastAPI:
                             device_id=pd.config.device_id,
                             error=str(exc),
                         )
+                    else:
+                        if pd.config.kind == "camera":
+                            await app.state.imager_manager.push_scope_info(pd.config.device_id)
             except KeyError:
                 logger.warning("startup.last_profile_not_found", profile_id=last_id)
         yield

@@ -32,6 +32,17 @@ async def _push_mount_site_data(request: Request, device_id: str) -> None:
         logger.warning("mount.site_data_push_failed", device_id=device_id, error=str(exc))
 
 
+async def _push_camera_scope_info(request: Request, device_id: str) -> None:
+    """Best-effort: push telescope optics from active profile to camera SCOPE_INFO."""
+    try:
+        imager_manager = getattr(request.app.state, "imager_manager", None)
+        if imager_manager is None:
+            return
+        await imager_manager.push_scope_info(device_id)
+    except Exception as exc:
+        logger.warning("camera.scope_info_push_failed", device_id=device_id, error=str(exc))
+
+
 class ConnectResponse(BaseModel):
     device_id: str
 
@@ -70,6 +81,8 @@ async def connect_device(config: DeviceConfig, request: Request) -> ConnectRespo
         raise HTTPException(status_code=502, detail=str(exc)) from exc
     if config.kind == "mount":
         await _push_mount_site_data(request, device_id)
+    elif config.kind == "camera":
+        await _push_camera_scope_info(request, device_id)
     return ConnectResponse(device_id=device_id)
 
 
@@ -105,3 +118,5 @@ async def reconnect_device(device_id: str, request: Request) -> None:
     config = _manager(request).get_config(device_id)
     if config.kind == "mount":
         await _push_mount_site_data(request, device_id)
+    elif config.kind == "camera":
+        await _push_camera_scope_info(request, device_id)
