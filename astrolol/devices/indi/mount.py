@@ -310,6 +310,40 @@ class IndiMount:
         await self._wait_slew_done()
         self._is_tracking = True
 
+    async def set_location(self, lat: float, lon: float, alt: float) -> None:
+        """Push geographic coordinates to the driver (GEOGRAPHIC_COORD).
+
+        Required for accurate GoTo, meridian-flip window, and alt/az display.
+        Best-effort: silently ignored if the driver does not expose GEOGRAPHIC_COORD.
+        """
+        await self._client.set_number(
+            self._device_name,
+            "GEOGRAPHIC_COORD",
+            {"LAT": lat, "LONG": lon, "ELEV": alt},
+        )
+        logger.info("indi.mount_location_set", device=self._device_name, lat=lat, lon=lon, alt=alt)
+
+    async def set_time_utc(self) -> None:
+        """Push current UTC time and local UTC offset to the driver (TIME_UTC).
+
+        Required for accurate sidereal-time computation, GoTo, and tracking.
+        The UTC offset is informational (drivers use UTC for all math) but
+        sent for completeness so the driver's local-time display is correct.
+        """
+        import datetime
+        utc_now = datetime.datetime.now(datetime.timezone.utc)
+        local_offset = datetime.datetime.now().astimezone().utcoffset()
+        offset_hours = local_offset.total_seconds() / 3600.0 if local_offset else 0.0
+        await self._client.set_text(
+            self._device_name,
+            "TIME_UTC",
+            {
+                "UTC": utc_now.strftime("%Y-%m-%dT%H:%M:%S"),
+                "OFFSET": str(offset_hours),
+            },
+        )
+        logger.info("indi.mount_time_set", device=self._device_name, utc=utc_now.isoformat())
+
     async def ping(self) -> bool:
         try:
             await self._client.wait_for_property(

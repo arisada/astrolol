@@ -46,6 +46,15 @@ Items designed for but not yet built. Ordered roughly by priority.
 - **Plugin tests auto-discovered** — add `plugins/` to `testpaths` in `pyproject.toml` once
   there are enough plugins to justify it.
 
+## Imaging — deferred
+
+- **Observation target** — introduce a `Target` concept (RA/Dec J2000 + optional object name
+  looked up from a catalogue, e.g. "M31", "NGC 7293").  A target is distinct from the mount's
+  current reported position: the mount may be slightly off after a GoTo, and a target can be
+  set before the mount has finished slewing.  The active target should be stored in
+  `MountManager` and written as `OBJECT` in FITS headers.  A Simbad/NED name-resolver plugin
+  would populate the object name automatically.
+
 ## Post-MVP
 
 - **Sequencer** — state machine (idle → slewing → focusing → guiding → imaging → dithering).

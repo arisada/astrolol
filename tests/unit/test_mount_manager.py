@@ -16,6 +16,38 @@ from astrolol.devices.base.models import SlewTarget, TrackingMode
 from astrolol.devices.config import DeviceConfig
 from astrolol.devices.manager import DeviceManager
 from astrolol.mount.manager import MountManager
+from astrolol.profiles.models import ObserverLocation
+from tests.conftest import FakeMount
+
+
+# ---------------------------------------------------------------------------
+# Helper mount that records set_location / set_time_utc calls
+# ---------------------------------------------------------------------------
+
+class _SiteAwareMount(FakeMount):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.site_lat: float | None = None
+        self.site_lon: float | None = None
+        self.site_alt: float | None = None
+        self.time_set_count: int = 0
+
+    async def set_location(self, lat: float, lon: float, alt: float) -> None:
+        self.site_lat = lat
+        self.site_lon = lon
+        self.site_alt = alt
+
+    async def set_time_utc(self) -> None:
+        self.time_set_count += 1
+
+
+class _FailingSiteMount(FakeMount):
+    """Mount whose set_location / set_time_utc always raise."""
+    async def set_location(self, lat: float, lon: float, alt: float) -> None:
+        raise RuntimeError("driver rejected location")
+
+    async def set_time_utc(self) -> None:
+        raise RuntimeError("driver rejected time")
 
 
 async def connected_mount(manager: DeviceManager, device_id: str = "mount1") -> str:
@@ -386,3 +418,67 @@ async def test_park_error_publishes_operation_failed(
     assert len(failed) == 1
     assert failed[0].operation == "park"
     assert "hardware fault" in failed[0].reason
+
+
+# --- push_site_data ---
+
+@pytest.mark.asyncio
+async def test_push_site_data_sets_location_and_time(
+    manager: DeviceManager, event_bus
+) -> None:
+    """push_site_data pushes both location and UTC time when location is provided."""
+    manager.registry.register_mount("site_mount", _SiteAwareMount)  # type: ignore[arg-type]
+    await manager.connect(DeviceConfig(device_id="m1", kind="mount", adapter_key="site_mount"))
+    mm = MountManager(device_manager=manager, event_bus=event_bus)
+
+    loc = ObserverLocation(name="Paris", latitude=48.85, longitude=2.35, altitude=35.0)
+    await mm.push_site_data("m1", loc)
+
+    fake: _SiteAwareMount = manager._devices["m1"].instance  # type: ignore[assignment]
+    assert fake.site_lat == pytest.approx(48.85)
+    assert fake.site_lon == pytest.approx(2.35)
+    assert fake.site_alt == pytest.approx(35.0)
+    assert fake.time_set_count == 1
+
+
+@pytest.mark.asyncio
+async def test_push_site_data_no_location_still_sets_time(
+    manager: DeviceManager, event_bus
+) -> None:
+    """push_site_data always sets UTC time even when location is None."""
+    manager.registry.register_mount("site_mount", _SiteAwareMount)  # type: ignore[arg-type]
+    await manager.connect(DeviceConfig(device_id="m1", kind="mount", adapter_key="site_mount"))
+    mm = MountManager(device_manager=manager, event_bus=event_bus)
+
+    await mm.push_site_data("m1", location=None)
+
+    fake: _SiteAwareMount = manager._devices["m1"].instance  # type: ignore[assignment]
+    assert fake.site_lat is None     # location not pushed
+    assert fake.time_set_count == 1  # time was pushed
+
+
+@pytest.mark.asyncio
+async def test_push_site_data_tolerates_driver_failure(
+    manager: DeviceManager, event_bus
+) -> None:
+    """push_site_data does not raise when the driver rejects time/location."""
+    manager.registry.register_mount("failing_site_mount", _FailingSiteMount)  # type: ignore[arg-type]
+    await manager.connect(DeviceConfig(device_id="m1", kind="mount", adapter_key="failing_site_mount"))
+    mm = MountManager(device_manager=manager, event_bus=event_bus)
+
+    loc = ObserverLocation(latitude=48.85, longitude=2.35, altitude=35.0)
+    # Must not raise even though the mount raises on both calls
+    await mm.push_site_data("m1", loc)
+
+
+@pytest.mark.asyncio
+async def test_push_site_data_skips_mount_without_site_methods(
+    manager: DeviceManager, event_bus
+) -> None:
+    """push_site_data is silent when the adapter has no set_location / set_time_utc."""
+    # FakeMount has neither method → push_site_data should be a no-op without raising
+    await manager.connect(DeviceConfig(device_id="m1", kind="mount", adapter_key="fake_mount"))
+    mm = MountManager(device_manager=manager, event_bus=event_bus)
+
+    loc = ObserverLocation(latitude=48.85, longitude=2.35, altitude=35.0)
+    await mm.push_site_data("m1", loc)  # no-op, no exception

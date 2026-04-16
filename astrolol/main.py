@@ -49,6 +49,10 @@ def create_app() -> FastAPI:
                 for pd in profile.devices:
                     try:
                         await app.state.device_manager.connect(pd.config)
+                        if pd.config.kind == "mount":
+                            await app.state.mount_manager.push_site_data(
+                                pd.config.device_id, profile.location
+                            )
                     except Exception as exc:
                         logger.warning(
                             "startup.device_connect_failed",

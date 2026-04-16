@@ -1,3 +1,4 @@
+import structlog
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
@@ -10,11 +11,25 @@ from astrolol.core.errors import (
 from astrolol.devices.config import DeviceConfig
 from astrolol.devices.manager import DeviceManager
 
+logger = structlog.get_logger()
 router = APIRouter(prefix="/devices", tags=["devices"])
 
 
 def _manager(request: Request) -> DeviceManager:
     return request.app.state.device_manager
+
+
+async def _push_mount_site_data(request: Request, device_id: str) -> None:
+    """Best-effort: push UTC + active-profile location to a newly connected mount."""
+    try:
+        mount_manager = getattr(request.app.state, "mount_manager", None)
+        if mount_manager is None:
+            return
+        profile = getattr(request.app.state, "active_profile", None)
+        location = profile.location if profile is not None else None
+        await mount_manager.push_site_data(device_id, location)
+    except Exception as exc:
+        logger.warning("mount.site_data_push_failed", device_id=device_id, error=str(exc))
 
 
 class ConnectResponse(BaseModel):
@@ -47,13 +62,15 @@ async def connect_device(config: DeviceConfig, request: Request) -> ConnectRespo
     """Connect a device from a DeviceConfig. Returns the device_id."""
     try:
         device_id = await _manager(request).connect(config)
-        return ConnectResponse(device_id=device_id)
     except AdapterNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
     except DeviceAlreadyConnectedError as exc:
         raise HTTPException(status_code=409, detail=str(exc))
     except DeviceConnectionError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
+    if config.kind == "mount":
+        await _push_mount_site_data(request, device_id)
+    return ConnectResponse(device_id=device_id)
 
 
 @router.delete("/connected/{device_id}", status_code=204)
@@ -85,3 +102,6 @@ async def reconnect_device(device_id: str, request: Request) -> None:
         raise HTTPException(status_code=409, detail=str(exc))
     except DeviceConnectionError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
+    config = _manager(request).get_config(device_id)
+    if config.kind == "mount":
+        await _push_mount_site_data(request, device_id)

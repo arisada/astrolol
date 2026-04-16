@@ -19,6 +19,7 @@ from astrolol.core.events import (
 from astrolol.core.errors import DeviceNotFoundError, DeviceKindError
 from astrolol.devices.base.models import MountStatus, SlewTarget, TrackingMode
 from astrolol.devices.manager import DeviceManager
+from astrolol.profiles.models import ObserverLocation
 
 logger = structlog.get_logger()
 
@@ -154,6 +155,31 @@ class MountManager:
         )
         await self._event_bus.publish(MountMeridianFlipStarted(device_id=device_id))
         logger.info("mount.meridian_flip_started", device_id=device_id)
+
+    async def push_site_data(
+        self,
+        device_id: str,
+        location: ObserverLocation | None = None,
+    ) -> None:
+        """Push UTC time (always) and geographic location (when available) to the mount.
+
+        Uses duck-typing so non-INDI adapters that don't implement these methods
+        are silently skipped.  Failures are logged as warnings and never propagated
+        — this is best-effort initialisation, not a hard requirement for connect.
+        """
+        mount = self._device_manager.get_mount(device_id)
+
+        if hasattr(mount, "set_time_utc"):
+            try:
+                await mount.set_time_utc()
+            except Exception as exc:
+                logger.warning("mount.time_set_failed", device_id=device_id, error=str(exc))
+
+        if location is not None and hasattr(mount, "set_location"):
+            try:
+                await mount.set_location(location.latitude, location.longitude, location.altitude)
+            except Exception as exc:
+                logger.warning("mount.location_set_failed", device_id=device_id, error=str(exc))
 
     async def get_status(self, device_id: str) -> MountStatus:
         mount = self._device_manager.get_mount(device_id)
