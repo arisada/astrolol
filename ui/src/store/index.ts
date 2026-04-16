@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { AstrolollEvent, ConnectedDevice, FocuserStatus, MountStatus, PluginInfo } from '@/api/types'
+import type { AstrolollEvent, CameraStatus, ConnectedDevice, FilterWheelStatus, FocuserStatus, MountStatus, PluginInfo } from '@/api/types'
 
 const MAX_LOG_ENTRIES = 1000
 
@@ -14,6 +14,7 @@ export interface LogEntry {
 
 export interface LatestImage {
   previewUrl: string
+  previewUrlLinear: string | null
   fitsPath: string
   deviceId: string
   width: number
@@ -37,6 +38,8 @@ interface AppState {
   // Per-device status (keyed by device_id)
   mountStatuses: Record<string, MountStatus>
   focuserStatuses: Record<string, FocuserStatus>
+  cameraStatuses: Record<string, CameraStatus>
+  filterWheelStatuses: Record<string, FilterWheelStatus>
 
   // Imager
   latestImage: LatestImage | null
@@ -54,6 +57,8 @@ interface AppState {
   // Actions
   setWsConnected: (v: boolean) => void
   setConnectedDevices: (devices: ConnectedDevice[]) => void
+  setCameraStatus: (deviceId: string, status: CameraStatus) => void
+  setFilterWheelStatus: (deviceId: string, status: FilterWheelStatus) => void
   applyEvent: (event: AstrolollEvent) => void
   clearLastError: () => void
   setPluginInfos: (infos: PluginInfo[]) => void
@@ -70,6 +75,8 @@ export const useStore = create<AppState>((set, get) => ({
   connectedDevices: [],
   mountStatuses: {},
   focuserStatuses: {},
+  cameraStatuses: {},
+  filterWheelStatuses: {},
   latestImage: null,
   imagerBusy: {},
   log: [],
@@ -81,6 +88,10 @@ export const useStore = create<AppState>((set, get) => ({
   setPluginInfos: (infos) => set({ pluginInfos: infos }),
 
   setConnectedDevices: (devices) => set({ connectedDevices: devices }),
+  setCameraStatus: (deviceId, status) =>
+    set((s) => ({ cameraStatuses: { ...s.cameraStatuses, [deviceId]: status } })),
+  setFilterWheelStatus: (deviceId, status) =>
+    set((s) => ({ filterWheelStatuses: { ...s.filterWheelStatuses, [deviceId]: status } })),
 
   applyEvent: (event) => {
     const state = get()
@@ -121,10 +132,12 @@ export const useStore = create<AppState>((set, get) => ({
       }
       case 'imager.exposure_completed': {
         const filename = event.preview_path.split('/').pop()!
+        const filenameLinear = event.preview_path_linear?.split('/').pop() ?? null
         set({
           imagerBusy: { ...state.imagerBusy, [event.device_id]: false },
           latestImage: {
             previewUrl: `/imager/images/${filename}`,
+            previewUrlLinear: filenameLinear ? `/imager/images/${filenameLinear}` : null,
             fitsPath: event.fits_path,
             deviceId: event.device_id,
             width: event.width,

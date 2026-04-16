@@ -76,10 +76,26 @@ export interface PluginInfo {
   enabled: boolean
 }
 
+export interface CameraStatus {
+  state: DeviceState
+  temperature: number | null
+  cooler_on: boolean
+  cooler_power: number | null
+}
+
+export interface FilterWheelStatus {
+  state: DeviceState
+  current_slot: number | null
+  filter_count: number | null
+  filter_names: string[]
+  is_moving: boolean
+}
+
 export interface ExposureResult {
   device_id: string
   fits_path: string
   preview_path: string
+  preview_path_linear: string | null
   duration: number
   width: number
   height: number
@@ -213,6 +229,7 @@ export interface ExposureCompletedEvent extends BaseEvent {
   device_id: string
   fits_path: string
   preview_path: string
+  preview_path_linear: string | null
   duration: number
   width: number
   height: number

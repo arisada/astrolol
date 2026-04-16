@@ -1,11 +1,13 @@
 import type {
   ActivationResult,
+  CameraStatus,
   ConnectedDevice,
   DeviceConfig,
   DeviceProperty,
   DriverEntry,
   ExposureRequest,
   ExposureResult,
+  FilterWheelStatus,
   FocuserStatus,
   ImagerStatus,
   IndiDeviceMessage,
@@ -61,6 +63,12 @@ export const api = {
 
   imager: {
     status: (deviceId: string) => request<ImagerStatus>(`/imager/${deviceId}/status`),
+    cameraStatus: (deviceId: string) => request<CameraStatus>(`/imager/${deviceId}/camera_status`),
+    setCooler: (deviceId: string, enabled: boolean, targetTemperature?: number) =>
+      request<void>(`/imager/${deviceId}/cooler`, {
+        method: 'POST',
+        body: JSON.stringify({ enabled, target_temperature: targetTemperature ?? null }),
+      }),
     expose: (deviceId: string, body: ExposureRequest) =>
       request<ExposureResult>(`/imager/${deviceId}/expose`, {
         method: 'POST',
@@ -77,6 +85,15 @@ export const api = {
       const filename = previewPath.split('/').pop()!
       return `/imager/images/${filename}`
     },
+  },
+
+  filterWheel: {
+    status: (deviceId: string) => request<FilterWheelStatus>(`/filter_wheel/${deviceId}/status`),
+    select: (deviceId: string, slot: number) =>
+      request<void>(`/filter_wheel/${deviceId}/select`, {
+        method: 'POST',
+        body: JSON.stringify({ slot }),
+      }),
   },
 
   mount: {
