@@ -2,8 +2,10 @@ from pathlib import Path
 
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse
+from pydantic import BaseModel
 
 from astrolol.core.errors import DeviceNotFoundError, DeviceKindError
+from astrolol.devices.base.models import CameraStatus
 from astrolol.imaging.imager import ImagerManager
 from astrolol.imaging.models import ExposureRequest, ExposureResult, ImagerStatus
 
@@ -59,6 +61,33 @@ async def stop_loop(device_id: str, request: Request) -> None:
         raise HTTPException(status_code=404, detail=str(exc))
     except ValueError as exc:
         raise HTTPException(status_code=409, detail=str(exc))
+
+
+@router.get("/{device_id}/camera_status", response_model=CameraStatus)
+async def camera_status(device_id: str, request: Request) -> CameraStatus:
+    """Current camera hardware status: temperature, cooler, etc."""
+    try:
+        camera = _imager(request)._device_manager.get_camera(device_id)
+        return await camera.get_status()
+    except (DeviceNotFoundError, DeviceKindError) as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+
+class SetCoolerRequest(BaseModel):
+    enabled: bool
+    target_temperature: float | None = None
+
+
+@router.post("/{device_id}/cooler", status_code=204)
+async def set_cooler(device_id: str, body: SetCoolerRequest, request: Request) -> None:
+    """Enable/disable the camera cooler and optionally set a target temperature."""
+    try:
+        camera = _imager(request)._device_manager.get_camera(device_id)
+        await camera.set_cooler(body.enabled, body.target_temperature)
+    except (DeviceNotFoundError, DeviceKindError) as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
 
 
 @router.get("/images/{filename}")

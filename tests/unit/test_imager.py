@@ -135,6 +135,7 @@ async def test_two_cameras_independent(
 
     await imager_manager.stop_loop("cam1")
     assert imager_manager.get_status("cam1").state == ImagerState.IDLE
-    assert imager_manager.get_status("cam2").state == ImagerState.LOOPING
+    # cam2 may be LOOPING (between frames) or EXPOSING (in a frame) — not IDLE
+    assert imager_manager.get_status("cam2").state != ImagerState.IDLE
 
     await imager_manager.stop_loop("cam2")

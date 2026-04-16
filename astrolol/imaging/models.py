@@ -26,6 +26,7 @@ class ExposureResult(BaseModel):
     device_id: str
     fits_path: str
     preview_path: str
+    preview_path_linear: str | None = None
     duration: float
     width: int
     height: int

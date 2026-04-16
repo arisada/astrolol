@@ -20,7 +20,7 @@ from astrolol.core.events import (
 from astrolol.devices.base.models import ExposureParams
 from astrolol.devices.manager import DeviceManager
 from astrolol.imaging.models import ExposureRequest, ExposureResult, ImagerState, ImagerStatus
-from astrolol.imaging.preview import fits_to_jpeg
+from astrolol.imaging.preview import fits_to_jpeg, fits_to_jpeg_linear
 
 if TYPE_CHECKING:
     from astrolol.profiles.models import Profile
@@ -261,14 +261,17 @@ class ImagerManager:
             except Exception:
                 logger.warning("imager.save_move_failed", src=str(fits_path), dst=str(final_fits))
 
-        # Preview always lives in images_dir so the serve endpoint can find it
-        preview_path = self._preview_path(fits_path.stem, self._images_dir)
-        fits_to_jpeg(fits_path, preview_path, quality=settings.jpeg_quality)
+        # Generate two previews (auto-stretch + linear) — both live in images_dir
+        preview_path = self._preview_path(fits_path.stem, self._images_dir, suffix="auto")
+        preview_path_linear = self._preview_path(fits_path.stem, self._images_dir, suffix="linear")
+        await asyncio.to_thread(fits_to_jpeg, fits_path, preview_path, settings.jpeg_quality)
+        await asyncio.to_thread(fits_to_jpeg_linear, fits_path, preview_path_linear, settings.jpeg_quality)
 
         result = ExposureResult(
             device_id=device_id,
             fits_path=str(fits_path),
             preview_path=str(preview_path),
+            preview_path_linear=str(preview_path_linear),
             duration=image.exposure_duration,
             width=image.width,
             height=image.height,
@@ -278,6 +281,7 @@ class ImagerManager:
                 device_id=device_id,
                 fits_path=result.fits_path,
                 preview_path=result.preview_path,
+                preview_path_linear=result.preview_path_linear,
                 duration=result.duration,
                 width=result.width,
                 height=result.height,
@@ -307,6 +311,6 @@ class ImagerManager:
                 imager.state = ImagerState.IDLE
 
     @staticmethod
-    def _preview_path(stem: str, directory: Path) -> Path:
+    def _preview_path(stem: str, directory: Path, suffix: str = "auto") -> Path:
         ts = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S%f")
-        return directory / f"{stem}_{ts}_preview.jpg"
+        return directory / f"{stem}_{ts}_preview_{suffix}.jpg"

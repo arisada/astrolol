@@ -203,6 +203,26 @@ class IndiCamera:
             cooler_power=cooler_power,
         )
 
+    async def set_cooler(self, enabled: bool, target_temperature: float | None) -> None:
+        """Enable/disable the cooler and optionally set the target temperature."""
+        try:
+            await self._client.set_switch(
+                self._device_name,
+                "CCD_COOLER",
+                ["COOLER_ON"] if enabled else ["COOLER_OFF"],
+            )
+        except Exception as exc:
+            logger.debug("indi.camera_cooler_switch_skipped", device=self._device_name, error=str(exc))
+        if target_temperature is not None:
+            try:
+                await self._client.set_number(
+                    self._device_name,
+                    "CCD_TEMPERATURE",
+                    {"CCD_TEMPERATURE_VALUE": float(target_temperature)},
+                )
+            except Exception as exc:
+                logger.debug("indi.camera_temperature_set_skipped", device=self._device_name, error=str(exc))
+
     async def ping(self) -> bool:
         try:
             await self._client.wait_for_property(

@@ -57,6 +57,9 @@ class FakeCamera:
         state = DeviceState.CONNECTED if self.connected else DeviceState.DISCONNECTED
         return CameraStatus(state=state)
 
+    async def set_cooler(self, enabled: bool, target_temperature: float | None) -> None:
+        pass
+
     async def ping(self) -> bool:
         return self.connected
 
@@ -81,6 +84,9 @@ class FailingCamera:
 
     async def get_status(self) -> CameraStatus:
         return CameraStatus(state=DeviceState.ERROR)
+
+    async def set_cooler(self, enabled: bool, target_temperature: float | None) -> None:
+        pass
 
     async def ping(self) -> bool:
         return False
