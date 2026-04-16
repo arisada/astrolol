@@ -7,9 +7,10 @@ import pytest
 from astropy.io import fits
 
 from astrolol.core.events import EventBus
-from astrolol.devices.base.models import CameraStatus, DeviceState, ExposureParams, FocuserStatus, Image, MountStatus, SlewTarget
+from astrolol.devices.base.models import CameraStatus, DeviceState, ExposureParams, FilterWheelStatus, FocuserStatus, Image, MountStatus, RotatorStatus, SlewTarget
 from astrolol.devices.manager import DeviceManager
 from astrolol.devices.registry import DeviceRegistry
+from astrolol.filter_wheel import FilterWheelManager
 from astrolol.focuser import FocuserManager
 from astrolol.imaging import ImagerManager
 from astrolol.mount import MountManager
@@ -184,6 +185,58 @@ class FakeFocuser:
         return self.connected
 
 
+class FakeFilterWheel:
+    """Minimal IFilterWheel implementation."""
+
+    def __init__(self, **kwargs: object) -> None:
+        self.connected = False
+        self._slot: int = 1
+        self._filter_names: list[str] = ["L", "R", "G", "B"]
+
+    async def connect(self) -> None:
+        self.connected = True
+
+    async def disconnect(self) -> None:
+        self.connected = False
+
+    async def select_filter(self, slot: int) -> None:
+        self._slot = slot
+
+    async def get_status(self) -> FilterWheelStatus:
+        state = DeviceState.CONNECTED if self.connected else DeviceState.DISCONNECTED
+        return FilterWheelStatus(
+            state=state,
+            current_slot=self._slot,
+            filter_count=len(self._filter_names),
+            filter_names=self._filter_names,
+            is_moving=False,
+        )
+
+    async def ping(self) -> bool:
+        return self.connected
+
+
+class FakeRotator:
+    """Minimal IRotator implementation."""
+
+    def __init__(self, **kwargs: object) -> None:
+        self.connected = False
+        self._position: float = 0.0
+
+    async def connect(self) -> None:
+        self.connected = True
+
+    async def disconnect(self) -> None:
+        self.connected = False
+
+    async def get_status(self) -> RotatorStatus:
+        state = DeviceState.CONNECTED if self.connected else DeviceState.DISCONNECTED
+        return RotatorStatus(state=state, position=self._position, is_moving=False)
+
+    async def ping(self) -> bool:
+        return self.connected
+
+
 @pytest.fixture
 def registry() -> DeviceRegistry:
     r = DeviceRegistry()
@@ -191,6 +244,8 @@ def registry() -> DeviceRegistry:
     r.register_camera("failing_camera", FailingCamera)  # type: ignore[arg-type]
     r.register_mount("fake_mount", FakeMount)  # type: ignore[arg-type]
     r.register_focuser("fake_focuser", FakeFocuser)  # type: ignore[arg-type]
+    r.register_filter_wheel("fake_filter_wheel", FakeFilterWheel)  # type: ignore[arg-type]
+    r.register_rotator("fake_rotator", FakeRotator)  # type: ignore[arg-type]
     return r
 
 
@@ -217,3 +272,8 @@ def mount_manager(manager: DeviceManager, event_bus: EventBus) -> MountManager:
 @pytest.fixture
 def focuser_manager(manager: DeviceManager, event_bus: EventBus) -> FocuserManager:
     return FocuserManager(device_manager=manager, event_bus=event_bus)
+
+
+@pytest.fixture
+def filter_wheel_manager(manager: DeviceManager, event_bus: EventBus) -> FilterWheelManager:
+    return FilterWheelManager(device_manager=manager, event_bus=event_bus)

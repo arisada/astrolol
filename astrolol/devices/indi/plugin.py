@@ -1,5 +1,6 @@
 """
-Bundled INDI plugin — registers IndiCamera, IndiMount, IndiFocuser.
+Bundled INDI plugin — registers IndiCamera, IndiMount, IndiFocuser,
+IndiFilterWheel, IndiRotator, IndiRawDevice, and multi-role companion discovery.
 
 This module is imported directly by astrolol.app when building the plugin
 manager.  It handles the ImportError from pyindi-client gracefully so the
@@ -17,6 +18,7 @@ import structlog
 import pluggy
 
 from astrolol.plugin import hookimpl
+from astrolol.devices.config import DeviceConfig
 from astrolol.devices.registry import DeviceRegistry
 
 logger = structlog.get_logger()
@@ -98,6 +100,32 @@ class IndiConnectionManager:
             # We intentionally keep the server alive until app shutdown so
             # re-connecting a device is fast.  The server will be reaped by
             # the OS when astrolol exits.
+
+    async def discover_roles(self, device_name: str) -> list[str]:
+        """Wait for properties to stabilize then return discovered role kinds."""
+        # Poll until property count stops growing
+        prev_count = -1
+        while True:
+            await asyncio.sleep(1.0)
+            device = self._client.data.get(device_name) or {}
+            count = len(device)
+            if count == prev_count:
+                break
+            prev_count = count
+
+        roles = []
+        client = self._client
+        if client._get_vector(device_name, "CCD_EXPOSURE") is not None or client._get_vector(device_name, "CCD1") is not None:
+            roles.append("camera")
+        if client._get_vector(device_name, "EQUATORIAL_EOD_COORD") is not None:
+            roles.append("mount")
+        if client._get_vector(device_name, "ABS_FOCUS_POSITION") is not None:
+            roles.append("focuser")
+        if client._get_vector(device_name, "FILTER_SLOT") is not None:
+            roles.append("filter_wheel")
+        if client._get_vector(device_name, "ABS_ROTATOR_ANGLE") is not None:
+            roles.append("rotator")
+        return roles
 
     @property
     def client(self):  # type: ignore[return]
@@ -240,6 +268,97 @@ def _make_focuser_class(manager: IndiConnectionManager):
     return _Focuser
 
 
+def _make_filter_wheel_class(manager: IndiConnectionManager):
+    from astrolol.devices.indi.filter_wheel import IndiFilterWheel
+
+    class _FilterWheel(IndiFilterWheel):
+        _manager = manager
+
+        def __init__(self, device_name: str, executable: str = "",
+                     pre_connect_props: dict | None = None, **_kwargs):
+            super().__init__(device_name=device_name, client=manager.client,
+                             pre_connect_props=pre_connect_props or None)
+            self._executable = executable
+
+        async def connect(self) -> None:
+            await self._manager.acquire()
+            if self._executable:
+                await self._manager.load_driver(self._executable)
+            await super().connect()
+
+        async def disconnect(self) -> None:
+            try:
+                await super().disconnect()
+            finally:
+                if self._executable:
+                    await self._manager.unload_driver(self._executable)
+                await self._manager.release()
+
+    _FilterWheel.__name__ = "IndiFilterWheel"
+    _FilterWheel.__qualname__ = "IndiFilterWheel"
+    return _FilterWheel
+
+
+def _make_rotator_class(manager: IndiConnectionManager):
+    from astrolol.devices.indi.rotator import IndiRotator
+
+    class _Rotator(IndiRotator):
+        _manager = manager
+
+        def __init__(self, device_name: str, executable: str = "",
+                     pre_connect_props: dict | None = None, **_kwargs):
+            super().__init__(device_name=device_name, client=manager.client,
+                             pre_connect_props=pre_connect_props or None)
+            self._executable = executable
+
+        async def connect(self) -> None:
+            await self._manager.acquire()
+            if self._executable:
+                await self._manager.load_driver(self._executable)
+            await super().connect()
+
+        async def disconnect(self) -> None:
+            try:
+                await super().disconnect()
+            finally:
+                if self._executable:
+                    await self._manager.unload_driver(self._executable)
+                await self._manager.release()
+
+    _Rotator.__name__ = "IndiRotator"
+    _Rotator.__qualname__ = "IndiRotator"
+    return _Rotator
+
+
+def _make_indi_raw_class(manager: IndiConnectionManager):
+    from astrolol.devices.indi.raw import IndiRawDevice
+
+    class _IndiRaw(IndiRawDevice):
+        _manager = manager
+
+        def __init__(self, device_name: str, executable: str = "", **_kwargs):
+            super().__init__(device_name=device_name, client=manager.client)
+            self._executable = executable
+
+        async def connect(self) -> None:
+            await self._manager.acquire()
+            if self._executable:
+                await self._manager.load_driver(self._executable)
+            await super().connect()
+
+        async def disconnect(self) -> None:
+            try:
+                await super().disconnect()
+            finally:
+                if self._executable:
+                    await self._manager.unload_driver(self._executable)
+                await self._manager.release()
+
+    _IndiRaw.__name__ = "IndiRawDevice"
+    _IndiRaw.__qualname__ = "IndiRawDevice"
+    return _IndiRaw
+
+
 class IndiPlugin:
     """pluggy hookimpl that registers all INDI adapters."""
 
@@ -254,6 +373,37 @@ class IndiPlugin:
         registry.register_camera("indi_camera", _make_camera_class(manager))
         registry.register_mount("indi_mount", _make_mount_class(manager))
         registry.register_focuser("indi_focuser", _make_focuser_class(manager))
+        registry.register_filter_wheel("indi_filter_wheel", _make_filter_wheel_class(manager))
+        registry.register_rotator("indi_rotator", _make_rotator_class(manager))
+        registry.register_indi_raw("indi_raw", _make_indi_raw_class(manager))
         registry.indi_client = manager.client
         registry.indi_manager = manager
+
+        # Set up companion discoverer for multi-role INDI drivers
+        async def companion_discoverer(config: DeviceConfig) -> list[DeviceConfig]:
+            device_name = config.params.get("device_name", "")
+            if not device_name:
+                return []
+
+            roles = await manager.discover_roles(device_name)
+            primary_kind = config.kind
+
+            # Build a set of already-connected device kinds for this driver
+            # (We can't easily check the device_manager here, so we just exclude primary)
+            companion_configs = []
+            for role in roles:
+                if role == primary_kind:
+                    continue
+                adapter_key = f"indi_{role}"
+                companion_config = DeviceConfig(
+                    kind=role,
+                    adapter_key=adapter_key,
+                    params={"device_name": device_name, "executable": ""},
+                    driver_name=device_name,
+                )
+                companion_configs.append(companion_config)
+
+            return companion_configs
+
+        registry.companion_discoverer = companion_discoverer
         logger.info("indi.adapters_registered")

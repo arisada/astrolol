@@ -16,6 +16,7 @@ from fastapi.responses import JSONResponse
 
 from astrolol.api.static import mount_ui
 from astrolol.api.devices import router as devices_router
+from astrolol.api.filter_wheel import router as filter_wheel_router
 from astrolol.api.focuser import router as focuser_router
 from astrolol.api.imager import router as imager_router
 from astrolol.api.indi import router as indi_router
@@ -28,6 +29,7 @@ from astrolol.app import build_plugin_manager, build_registry, discover_plugins,
 from astrolol.core.events import EventBus
 from astrolol.core.plugin_api import PluginContext
 from astrolol.devices.manager import DeviceManager
+from astrolol.filter_wheel import FilterWheelManager
 from astrolol.focuser import FocuserManager
 from astrolol.imaging import ImagerManager
 from astrolol.mount import MountManager
@@ -77,6 +79,7 @@ def create_app() -> FastAPI:
     imager_manager = ImagerManager(device_manager=device_manager, event_bus=event_bus, profile_store=profile_store)
     mount_manager = MountManager(device_manager=device_manager, event_bus=event_bus)
     focuser_manager = FocuserManager(device_manager=device_manager, event_bus=event_bus)
+    filter_wheel_manager = FilterWheelManager(device_manager=device_manager, event_bus=event_bus)
 
     # Feature plugins — discover all, set up enabled ones
     user_settings = profile_store.get_user_settings()
@@ -95,6 +98,7 @@ def create_app() -> FastAPI:
     app.state.imager_manager = imager_manager
     app.state.mount_manager = mount_manager
     app.state.focuser_manager = focuser_manager
+    app.state.filter_wheel_manager = filter_wheel_manager
     app.state.profile_store = profile_store
     app.state.active_profile = None
     app.state.discovered_plugins = discovered_plugins
@@ -106,6 +110,7 @@ def create_app() -> FastAPI:
     app.include_router(imager_router)
     app.include_router(mount_router)
     app.include_router(focuser_router)
+    app.include_router(filter_wheel_router)
     app.include_router(indi_router)
     app.include_router(settings_router)
 

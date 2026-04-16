@@ -17,7 +17,7 @@ from astrolol.core.events import (
     DeviceStateChanged,
     EventBus,
 )
-from astrolol.devices.base import ICamera, IFocuser, IMount
+from astrolol.devices.base import ICamera, IFocuser, IFilterWheel, IMount, IRotator
 from astrolol.devices.base.models import DeviceState
 from astrolol.devices.config import DeviceConfig
 from astrolol.devices.registry import DeviceRegistry
@@ -34,8 +34,10 @@ _SINGLETON_KINDS: frozenset[str] = frozenset({"mount"})
 @dataclass
 class ConnectedDevice:
     config: DeviceConfig
-    instance: Any  # ICamera | IMount | IFocuser
+    instance: Any  # ICamera | IMount | IFocuser | IFilterWheel | IRotator
     state: DeviceState = DeviceState.CONNECTED
+    companions: list[str] = field(default_factory=list)
+    primary_id: str | None = None
 
 
 @dataclass
@@ -96,7 +98,8 @@ class DeviceManager:
                 f"Device '{config.device_id}' failed to connect: {exc}"
             ) from exc
 
-        self._devices[config.device_id] = ConnectedDevice(config=config, instance=instance)
+        entry = ConnectedDevice(config=config, instance=instance)
+        self._devices[config.device_id] = entry
         await self.event_bus.publish(
             DeviceConnected(device_kind=config.kind, device_key=config.device_id)
         )
@@ -104,16 +107,42 @@ class DeviceManager:
             config, DeviceState.CONNECTING, DeviceState.CONNECTED
         )
         log.info("device.connected")
+
+        # Companion discovery — only for primary devices (not companions themselves)
+        if entry.primary_id is None and self.registry.companion_discoverer is not None:
+            try:
+                companion_configs = await self.registry.companion_discoverer(config)
+                for companion_config in companion_configs:
+                    try:
+                        companion_id = await self._connect_companion(companion_config, config.device_id)
+                        entry.companions.append(companion_id)
+                    except Exception as exc:
+                        log.warning(
+                            "device.companion_connect_failed",
+                            companion_id=companion_config.device_id,
+                            error=str(exc),
+                        )
+            except Exception as exc:
+                log.warning("device.companion_discovery_failed", error=str(exc))
+
         return config.device_id
 
     async def disconnect(self, device_id: str) -> None:
         """
         Disconnect and remove a device. Safe to call even if the device is unresponsive —
         the instance is always removed from the manager regardless of disconnect() outcome.
+        Companions are disconnected first before the primary.
         """
         entry = self._get_entry(device_id)
         log = logger.bind(device_id=device_id, kind=entry.config.kind)
         log.info("device.disconnecting")
+
+        # Disconnect companions first
+        for companion_id in list(entry.companions):
+            try:
+                await self._disconnect_device(companion_id)
+            except Exception as exc:
+                log.warning("device.companion_disconnect_error", companion_id=companion_id, error=str(exc))
 
         try:
             await asyncio.wait_for(entry.instance.disconnect(), timeout=CONNECT_TIMEOUT)
@@ -188,6 +217,12 @@ class DeviceManager:
     def get_focuser(self, device_id: str) -> IFocuser:
         return self._get_typed(device_id, "focuser")  # type: ignore[return-value]
 
+    def get_filter_wheel(self, device_id: str) -> IFilterWheel:
+        return self._get_typed(device_id, "filter_wheel")  # type: ignore[return-value]
+
+    def get_rotator(self, device_id: str) -> IRotator:
+        return self._get_typed(device_id, "rotator")  # type: ignore[return-value]
+
     def get_config(self, device_id: str) -> DeviceConfig:
         """Return the full DeviceConfig (including params) for a connected device."""
         return self._get_entry(device_id).config
@@ -205,11 +240,67 @@ class DeviceManager:
 
     # --- Internal helpers ---
 
+    async def _connect_companion(self, config: DeviceConfig, primary_id: str) -> str:
+        """Connect a companion device and mark it as belonging to primary_id."""
+        log = logger.bind(device_id=config.device_id, kind=config.kind, primary_id=primary_id)
+
+        if config.device_id in self._devices:
+            raise DeviceAlreadyConnectedError(
+                f"Companion device '{config.device_id}' is already connected."
+            )
+
+        adapter_class = self._lookup_adapter(config)
+        instance = adapter_class(**config.params)
+
+        await self._publish_state_change(config, DeviceState.DISCONNECTED, DeviceState.CONNECTING)
+        log.info("device.companion_connecting")
+
+        try:
+            await asyncio.wait_for(instance.connect(), timeout=CONNECT_TIMEOUT)
+        except asyncio.TimeoutError:
+            await self._publish_state_change(config, DeviceState.CONNECTING, DeviceState.ERROR)
+            raise DeviceConnectionError(
+                f"Companion device '{config.device_id}' timed out after {CONNECT_TIMEOUT}s."
+            )
+        except Exception as exc:
+            await self._publish_state_change(config, DeviceState.CONNECTING, DeviceState.ERROR)
+            raise DeviceConnectionError(
+                f"Companion device '{config.device_id}' failed to connect: {exc}"
+            ) from exc
+
+        entry = ConnectedDevice(config=config, instance=instance, primary_id=primary_id)
+        self._devices[config.device_id] = entry
+        await self.event_bus.publish(
+            DeviceConnected(device_kind=config.kind, device_key=config.device_id)
+        )
+        await self._publish_state_change(config, DeviceState.CONNECTING, DeviceState.CONNECTED)
+        log.info("device.companion_connected")
+        return config.device_id
+
+    async def _disconnect_device(self, device_id: str) -> None:
+        """Disconnect and remove a device without companion handling (used for companions)."""
+        if device_id not in self._devices:
+            return
+        entry = self._devices[device_id]
+        log = logger.bind(device_id=device_id, kind=entry.config.kind)
+        try:
+            await asyncio.wait_for(entry.instance.disconnect(), timeout=CONNECT_TIMEOUT)
+        except Exception as exc:
+            log.warning("device.disconnect_error", error=str(exc))
+        finally:
+            del self._devices[device_id]
+            await self.event_bus.publish(
+                DeviceDisconnected(device_kind=entry.config.kind, device_key=device_id)
+            )
+
     def _lookup_adapter(self, config: DeviceConfig) -> Any:
         pool = {
             "camera": self.registry.cameras,
             "mount": self.registry.mounts,
             "focuser": self.registry.focusers,
+            "filter_wheel": self.registry.filter_wheels,
+            "rotator": self.registry.rotators,
+            "indi": self.registry.indi_raws,
         }.get(config.kind, {})
 
         adapter_class = pool.get(config.adapter_key)
