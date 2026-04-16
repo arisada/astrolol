@@ -2,26 +2,8 @@
 
 Items designed for but not yet built. Ordered roughly by priority.
 
-## Done (recent)
-
-- ~~**INDI adapters**~~ — `ICamera`, `IMount`, `IFocuser` in `astrolol/devices/indi/` using
-  `indipyclient`. 191 unit tests + 34 integration tests against real INDI simulators.
-- ~~**Equipment profiles**~~ — named device configs persisted to JSON (`ProfileStore`).
-  CRUD endpoints, activate/deactivate, reconnect on startup.
-- ~~**Friendly device IDs**~~ — auto-generated from driver name (e.g. `mount_eqmod_telescope`);
-  user-supplied IDs validated for safe characters.
-- ~~**Mount extras**~~ — tracking rate (sidereal/lunar/solar), `mount.operation_failed` event,
-  `mount.unparked` event, pier side + hour angle in status, meridian flip button and endpoint.
-- ~~**Plugin system**~~ — `Plugin` protocol, filesystem discovery under `plugins/`, enable/disable
-  via `UserSettings.enabled_plugins`, `GET /plugins`, `POST /admin/restart`.
-- ~~**Hello world plugin**~~ — full-stack PoC: `POST /hello/property`, React page, sidebar entry,
-  Options toggle, 21 tests.
-
 ## Pre-release priorities
 
-- **Watchdog** — per-device async task calling `ping()` periodically, transitions device to
-  `DISCONNECTED` on repeated failure, publishes `device.state_changed` event. No crashes,
-  clean user-facing errors on hardware loss.
 - **Auth / security** — API keys or JWT tokens. Required before any internet exposure.
 - **PHD2 integration** — async JSON-RPC client for guiding start/stop/status/events.
   Good candidate for a plugin.
@@ -58,7 +40,7 @@ Items designed for but not yet built. Ordered roughly by priority.
 ## Post-MVP
 
 - **Sequencer** — state machine (idle → slewing → focusing → guiding → imaging → dithering).
-  Cancellable at every step. Build watchdog + PHD2 first. Strong plugin candidate.
+  Cancellable at every step. Build PHD2 first. Strong plugin candidate.
 - **Persistence layer** — SQLAlchemy + aiosqlite + Alembic migrations. Session history,
   image metadata, autofocus run data.
 - **Autofocus module** — V-curve fitting, backlash compensation, temperature compensation.
