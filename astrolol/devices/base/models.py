@@ -67,3 +67,21 @@ class FocuserStatus(BaseModel):
     position: int | None = None
     is_moving: bool = False
     temperature: float | None = None
+
+
+# --- Filter Wheel ---
+
+class FilterWheelStatus(BaseModel):
+    state: DeviceState
+    current_slot: int | None = None   # 1-indexed
+    filter_count: int | None = None
+    filter_names: list[str] = []
+    is_moving: bool = False
+
+
+# --- Rotator ---
+
+class RotatorStatus(BaseModel):
+    state: DeviceState
+    position: float | None = None    # degrees
+    is_moving: bool = False

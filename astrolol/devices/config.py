@@ -40,7 +40,14 @@ class DeviceConfig(BaseModel):
             "and underscores; max 64 characters. Example: 'main_camera'."
         ),
     )
-    kind: str = Field(description="Device type: 'camera' | 'mount' | 'focuser'")
+    driver_name: str | None = Field(
+        default=None,
+        description=(
+            "Physical INDI driver name when this device was auto-discovered from a "
+            "multi-role driver. Example: 'CCD Simulator'."
+        ),
+    )
+    kind: str = Field(description="Device type: 'camera' | 'mount' | 'focuser' | 'filter_wheel' | 'rotator' | 'indi'")
     adapter_key: str = Field(description="Adapter registered by a plugin, e.g. 'indi_camera'")
     params: dict[str, Any] = Field(
         default_factory=dict,

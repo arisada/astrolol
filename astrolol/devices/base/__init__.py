@@ -1,4 +1,4 @@
-from astrolol.devices.base.interfaces import ICamera, IMount, IFocuser
+from astrolol.devices.base.interfaces import ICamera, IMount, IFocuser, IFilterWheel, IRotator
 from astrolol.devices.base.models import (
     DeviceState,
     ExposureParams,
@@ -7,10 +7,13 @@ from astrolol.devices.base.models import (
     SlewTarget,
     MountStatus,
     FocuserStatus,
+    FilterWheelStatus,
+    RotatorStatus,
 )
 
 __all__ = [
-    "ICamera", "IMount", "IFocuser",
+    "ICamera", "IMount", "IFocuser", "IFilterWheel", "IRotator",
     "DeviceState", "ExposureParams", "Image", "CameraStatus",
     "SlewTarget", "MountStatus", "FocuserStatus",
+    "FilterWheelStatus", "RotatorStatus",
 ]

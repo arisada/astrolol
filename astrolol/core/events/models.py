@@ -170,6 +170,15 @@ class FocuserHalted(BaseEvent):
     position: int | None = None
 
 
+# --- Filter Wheel events ---
+
+class FilterWheelFilterChanged(BaseEvent):
+    type: Literal["filter_wheel.filter_changed"] = "filter_wheel.filter_changed"
+    device_id: str
+    slot: int
+    filter_name: str | None = None
+
+
 # Discriminated union — add new event types here as they are introduced
 Event = Annotated[
     Union[
@@ -179,6 +188,7 @@ Event = Annotated[
         MountParked, MountUnparked, MountSynced, MountTrackingChanged, MountOperationFailed,
         MountMeridianFlipStarted, MountMeridianFlipCompleted,
         FocuserMoveStarted, FocuserMoveCompleted, FocuserHalted,
+        FilterWheelFilterChanged,
     ],
     Field(discriminator="type"),
 ]

@@ -22,7 +22,7 @@ class Telescope(BaseModel):
 
 
 class ProfileDevice(BaseModel):
-    role: Literal["camera", "mount", "focuser"]
+    role: Literal["camera", "mount", "focuser", "filter_wheel", "rotator", "indi"]
     config: DeviceConfig
 
 
