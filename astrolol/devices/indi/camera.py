@@ -183,26 +183,18 @@ class IndiCamera:
         cooler_on = False
         cooler_power: float | None = None
 
-        try:
-            temperature = await self._client.get_number(
-                self._device_name, "CCD_TEMPERATURE", "CCD_TEMPERATURE_VALUE"
-            )
-        except Exception:
-            pass
+        temperature = self._client.get_number_nowait(
+            self._device_name, "CCD_TEMPERATURE", "CCD_TEMPERATURE_VALUE"
+        )
 
-        try:
-            cooler_on = await self._client.get_switch_state(
-                self._device_name, "CCD_COOLER", "COOLER_ON"
-            )
-        except Exception:
-            pass
+        cooler_on_val = self._client.get_switch_state_nowait(
+            self._device_name, "CCD_COOLER", "COOLER_ON"
+        )
+        cooler_on = cooler_on_val if cooler_on_val is not None else False
 
-        try:
-            cooler_power = await self._client.get_number(
-                self._device_name, "CCD_COOLER_POWER", "CCD_COOLER_VALUE"
-            )
-        except Exception:
-            pass
+        cooler_power = self._client.get_number_nowait(
+            self._device_name, "CCD_COOLER_POWER", "CCD_COOLER_VALUE"
+        )
 
         return CameraStatus(
             state=self._state,

@@ -212,10 +212,10 @@ class IndiClient(IPyClient):
             timeout=conn_timeout,
         )
         # Step 4: let the initial defXxxVector flood drain.  In asyncio the
-        # event loop processes pending data during the sleep, so 150 ms of
+        # event loop processes pending data during the sleep, so 50 ms of
         # silence is enough to guarantee all properties are known before we
         # send the first command.
-        await asyncio.sleep(0.15)
+        await asyncio.sleep(0.05)
         logger.info("indi.device_connected", device=device_name)
 
     async def disconnect_device(self, device_name: str) -> None:
@@ -242,6 +242,18 @@ class IndiClient(IPyClient):
         v = await self.wait_for_property(device_name, prop_name)
         return v.getfloatvalue(element)
 
+    def get_number_nowait(
+        self, device_name: str, prop_name: str, element: str
+    ) -> float | None:
+        """Return a number element immediately, or None if the property is not yet known."""
+        v = self._get_vector(device_name, prop_name)
+        if v is None:
+            return None
+        try:
+            return v.getfloatvalue(element)
+        except Exception:
+            return None
+
     async def get_switch_state(
         self, device_name: str, prop_name: str, element: str
     ) -> bool:
@@ -250,6 +262,16 @@ class IndiClient(IPyClient):
         if val is None:
             raise KeyError(f"Element {element} not found in {device_name}/{prop_name}")
         return val.membervalue == "On"
+
+    def get_switch_state_nowait(
+        self, device_name: str, prop_name: str, element: str
+    ) -> bool | None:
+        """Return a switch element state immediately, or None if not yet known."""
+        v = self._get_vector(device_name, prop_name)
+        if v is None:
+            return None
+        val = v.data.get(element)
+        return val.membervalue == "On" if val is not None else None
 
     async def get_properties_snapshot(self, device_name: str) -> dict[str, Any]:
         device = self.data.get(device_name)

@@ -97,10 +97,10 @@ class IndiMount:
 
     async def park(self) -> None:
         await self._client.set_switch(self._device_name, "TELESCOPE_PARK", ["PARK"])
-        # Wait for TELESCOPE_PARK to go BUSY then return to OK.
-        # busy_timeout=5s gives the driver time to acknowledge the command.
+        # busy_timeout=1s: drivers acknowledge within a fraction of a second;
+        # done_timeout=120s: real mounts can take up to two minutes to reach park.
         await self._client.wait_prop_busy_then_done(
-            self._device_name, "TELESCOPE_PARK", busy_timeout=5.0, done_timeout=120.0
+            self._device_name, "TELESCOPE_PARK", busy_timeout=1.0, done_timeout=120.0
         )
         self._is_parked = True
         self._is_tracking = False
@@ -108,7 +108,7 @@ class IndiMount:
     async def unpark(self) -> None:
         await self._client.set_switch(self._device_name, "TELESCOPE_PARK", ["UNPARK"])
         await self._client.wait_prop_busy_then_done(
-            self._device_name, "TELESCOPE_PARK", busy_timeout=5.0, done_timeout=120.0
+            self._device_name, "TELESCOPE_PARK", busy_timeout=1.0, done_timeout=120.0
         )
         self._is_parked = False
 
@@ -149,9 +149,9 @@ class IndiMount:
         self._is_tracking = enabled
 
     async def get_status(self) -> MountStatus:
+        # Required properties — wait briefly for them to arrive after connect.
         ra: float | None = None
         dec: float | None = None
-
         try:
             ra = await self._client.get_number(
                 self._device_name, "EQUATORIAL_EOD_COORD", "RA"
@@ -162,53 +162,39 @@ class IndiMount:
         except Exception:
             pass
 
-        try:
-            self._is_tracking = await self._client.get_switch_state(
-                self._device_name, "TELESCOPE_TRACK_STATE", "TRACK_ON"
-            )
-        except Exception:
-            pass
+        tracking = self._client.get_switch_state_nowait(
+            self._device_name, "TELESCOPE_TRACK_STATE", "TRACK_ON"
+        )
+        if tracking is not None:
+            self._is_tracking = tracking
 
-        try:
-            self._is_parked = await self._client.get_switch_state(
-                self._device_name, "TELESCOPE_PARK", "PARK"
-            )
-        except Exception:
-            pass
+        parked = self._client.get_switch_state_nowait(
+            self._device_name, "TELESCOPE_PARK", "PARK"
+        )
+        if parked is not None:
+            self._is_parked = parked
 
+        # Optional properties — read non-blocking; absent on some drivers.
         pier_side: str | None = None
-        try:
-            pier_east = await self._client.get_switch_state(
-                self._device_name, "TELESCOPE_PIER_SIDE", "PIER_EAST"
-            )
+        pier_east = self._client.get_switch_state_nowait(
+            self._device_name, "TELESCOPE_PIER_SIDE", "PIER_EAST"
+        )
+        if pier_east is not None:
             pier_side = "East" if pier_east else "West"
-        except Exception:
-            pass
 
         hour_angle: float | None = None
         lst: float | None = None
-        try:
-            lst = await self._client.get_number(
-                self._device_name, "TIME_LST", "LST"
-            )
-            if ra is not None and lst is not None:
-                ha = lst - ra
-                # Normalize to -12..+12
-                while ha > 12:
-                    ha -= 24
-                while ha < -12:
-                    ha += 24
-                hour_angle = ha
-        except Exception:
-            pass
+        lst = self._client.get_number_nowait(self._device_name, "TIME_LST", "LST")
+        if ra is not None and lst is not None:
+            ha = lst - ra
+            while ha > 12:
+                ha -= 24
+            while ha < -12:
+                ha += 24
+            hour_angle = ha
 
-        alt: float | None = None
-        az: float | None = None
-        try:
-            alt = await self._client.get_number(self._device_name, "HORIZONTAL_COORD", "ALT")
-            az  = await self._client.get_number(self._device_name, "HORIZONTAL_COORD", "AZ")
-        except Exception:
-            pass
+        alt = self._client.get_number_nowait(self._device_name, "HORIZONTAL_COORD", "ALT")
+        az  = self._client.get_number_nowait(self._device_name, "HORIZONTAL_COORD", "AZ")
 
         v = self._client._get_vector(self._device_name, "EQUATORIAL_EOD_COORD")
         is_slewing = v is not None and v.state == "Busy"

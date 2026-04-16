@@ -32,7 +32,7 @@ async def _poll_until(
     url: str,
     predicate: Callable[[dict[str, Any]], bool],
     timeout: float = 60.0,
-    interval: float = 0.3,
+    interval: float = 0.1,
 ) -> dict[str, Any]:
     """Poll *url* until *predicate(body)* is True or *timeout* seconds elapse."""
     deadline = asyncio.get_event_loop().time() + timeout
@@ -107,7 +107,7 @@ def _start_indiserver(port: int, *drivers: str) -> subprocess.Popen:
         proc.kill()
         proc.wait()
         pytest.skip(f"indiserver did not open port {port} within 5s (drivers={drivers})")
-    time.sleep(0.3)
+    time.sleep(0.1)
     if proc.poll() is not None:
         pytest.skip(
             f"indiserver crashed after bind (rc={proc.returncode}, drivers={drivers})"
@@ -302,6 +302,7 @@ async def connected_mount(mount_client):
     })
     assert r.status_code == 201, r.text
     yield mount_client
+    await mount_client.post("/mount/mount1/stop")  # cancel any in-progress task
     await mount_client.delete("/devices/connected/mount1")
 
 

@@ -54,7 +54,7 @@ def _start_indiserver(port: int, *drivers: str) -> subprocess.Popen:
         proc.kill()
         proc.wait()
         pytest.skip(f"indiserver did not open port {port} within 5 s (drivers={drivers})")
-    time.sleep(0.3)  # extra margin for INDI protocol init
+    time.sleep(0.1)  # brief margin for INDI protocol init
     if proc.poll() is not None:
         pytest.skip(
             f"indiserver crashed after bind (rc={proc.returncode}, drivers={drivers})"
@@ -124,7 +124,7 @@ def _shared_server():
 # Mount (Telescope Simulator)
 # ---------------------------------------------------------------------------
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 async def mount(_shared_server):
     from astrolol.devices.indi.client import IndiClient
     from astrolol.devices.indi.mount import IndiMount
@@ -150,11 +150,14 @@ async def test_mount_get_status_has_position(mount):
 
 async def test_mount_slew(mount):
     from astrolol.devices.base.models import SlewTarget
-    await mount.slew(SlewTarget(ra=2.0, dec=20.0))
+    # Slew a small offset from current position so the simulator finishes quickly.
+    status = await mount.get_status()
+    target_ra = ((status.ra or 0.0) + 0.05) % 24  # ~3 arcminutes east
+    await mount.slew(SlewTarget(ra=target_ra, dec=(status.dec or 0.0)))
     await asyncio.sleep(0.5)  # let position update propagate
     status = await mount.get_status()
     assert status.ra is not None
-    assert abs(status.ra - 2.0) < 0.5
+    assert abs(status.ra - target_ra) < 0.5
 
 
 async def test_mount_set_tracking(mount):
@@ -181,7 +184,7 @@ async def test_mount_ping(mount):
 # Focuser (Focuser Simulator)
 # ---------------------------------------------------------------------------
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 async def focuser(_shared_server):
     from astrolol.devices.indi.client import IndiClient
     from astrolol.devices.indi.focuser import IndiFocuser
@@ -229,8 +232,8 @@ async def test_focuser_ping(focuser):
 # Camera (CCD Simulator)
 # ---------------------------------------------------------------------------
 
-@pytest.fixture
-async def camera(_shared_server, tmp_path):
+@pytest.fixture(scope="module")
+async def camera(_shared_server, tmp_path_factory):
     from astrolol.devices.indi.client import IndiClient
     from astrolol.devices.indi.camera import IndiCamera
     client = IndiClient(host="localhost", port=_SHARED_PORT)
@@ -238,7 +241,7 @@ async def camera(_shared_server, tmp_path):
     cam = IndiCamera(
         device_name="CCD Simulator",
         client=client,
-        images_dir=tmp_path / "images",
+        images_dir=tmp_path_factory.mktemp("sim_cam_images"),
     )
     await cam.connect()
     yield cam

@@ -109,12 +109,9 @@ class IndiFocuser:
         except Exception:
             pass
 
-        try:
-            temperature = await self._client.get_number(
-                self._device_name, "FOCUS_TEMPERATURE", "TEMPERATURE"
-            )
-        except Exception:
-            pass
+        temperature = self._client.get_number_nowait(
+            self._device_name, "FOCUS_TEMPERATURE", "TEMPERATURE"
+        )
 
         return FocuserStatus(
             state=self._state,
