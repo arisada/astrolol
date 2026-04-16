@@ -141,7 +141,8 @@ class IndiClient(IPyClient):
                 if remaining <= 0:
                     raise TimeoutError(f"Condition not met within {timeout}s")
                 try:
-                    await asyncio.wait_for(self._cond.wait(), timeout=remaining)
+                    # Cap at 0.5 s so a missed notification is caught quickly.
+                    await asyncio.wait_for(self._cond.wait(), timeout=min(remaining, 0.5))
                 except asyncio.TimeoutError:
                     pass  # loop will re-check deadline
 
