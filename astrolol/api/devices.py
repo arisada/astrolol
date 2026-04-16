@@ -43,7 +43,7 @@ async def list_available(request: Request) -> dict[str, list[str]]:
 
 
 @router.get("/connected")
-async def list_connected(request: Request) -> list[dict[str, str]]:
+async def list_connected(request: Request) -> list[dict]:
     """List all currently connected device instances."""
     return _manager(request).list_connected()
 

@@ -1,7 +1,7 @@
 // Hand-written types mirroring the Python Pydantic models.
 // Run `npm run generate-api-types` to regenerate from the live OpenAPI spec.
 
-export type DeviceKind = 'camera' | 'mount' | 'focuser'
+export type DeviceKind = 'camera' | 'mount' | 'focuser' | 'filter_wheel' | 'rotator' | 'indi'
 export type DeviceState = 'disconnected' | 'connecting' | 'connected' | 'busy' | 'error'
 
 export interface DeviceConfig {
@@ -25,6 +25,9 @@ export interface ConnectedDevice {
   kind: DeviceKind
   adapter_key: string
   state: DeviceState
+  companions: string[]
+  primary_id: string | null
+  driver_name: string | null
 }
 
 export interface MountStatus {
@@ -102,7 +105,7 @@ export interface Telescope {
   aperture: number
 }
 
-export type DeviceRole = 'camera' | 'mount' | 'focuser'
+export type DeviceRole = 'camera' | 'mount' | 'focuser' | 'filter_wheel' | 'rotator' | 'indi'
 
 export interface ProfileDevice {
   role: DeviceRole

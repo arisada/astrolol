@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Camera, ChevronLeft, Crosshair, Link2, Plug, PlugZap, RefreshCw, Telescope, Trash2 } from 'lucide-react'
+import { Camera, ChevronLeft, CircleDot, Crosshair, FilterIcon, Link2, Plug, PlugZap, RefreshCw, Telescope, Trash2 } from 'lucide-react'
 import { api } from '@/api/client'
 import type { ConnectedDevice, DeviceKind, DeviceProperty, DriverEntry, PreConnectProps } from '@/api/types'
 import { useStore } from '@/store'
@@ -27,17 +27,25 @@ const KIND_LABELS: Record<DeviceKind, string> = {
   camera: 'Camera',
   mount: 'Mount',
   focuser: 'Focuser',
+  filter_wheel: 'Filter Wheel',
+  rotator: 'Rotator',
+  indi: 'INDI Device',
 }
 
 const KIND_ADAPTER: Record<DeviceKind, string> = {
   camera: 'indi_camera',
   mount: 'indi_mount',
   focuser: 'indi_focuser',
+  filter_wheel: 'indi_filter_wheel',
+  rotator: 'indi_rotator',
+  indi: 'indi_raw',
 }
 
 function KindIcon({ kind, size = 28 }: { kind: DeviceKind; size?: number }) {
   if (kind === 'camera') return <Camera size={size} />
   if (kind === 'mount') return <Telescope size={size} />
+  if (kind === 'filter_wheel') return <FilterIcon size={size} />
+  if (kind === 'rotator') return <CircleDot size={size} />
   return <Crosshair size={size} />
 }
 
@@ -79,9 +87,10 @@ function StepBack({ onClick }: { onClick: () => void }) {
   )
 }
 
-// Step 1 — choose device type
+// Step 1 — choose device type (only manually-connectable kinds)
 function TypeStep({ onSelect }: { onSelect: (kind: DeviceKind) => void }) {
   const kinds: DeviceKind[] = ['camera', 'mount', 'focuser']
+  // filter_wheel, rotator, indi are auto-discovered as companions
   return (
     <div>
       <p className="text-xs text-slate-500 mb-4">What do you want to connect?</p>
@@ -492,6 +501,87 @@ function ConfigureStep({
 }
 
 // ---------------------------------------------------------------------------
+// Connected device row
+// ---------------------------------------------------------------------------
+
+function DeviceRow({
+  d,
+  propertiesDeviceId,
+  onToggleProperties,
+  onDisconnect,
+  onReconnect,
+  onRemove,
+  isCompanion = false,
+}: {
+  d: ConnectedDevice
+  propertiesDeviceId: string | null
+  onToggleProperties: (id: string) => void
+  onDisconnect: (id: string) => void
+  onReconnect: (id: string) => void
+  onRemove: (id: string) => void
+  isCompanion?: boolean
+}) {
+  return (
+    <div
+      className={[
+        'flex items-center justify-between bg-surface-raised border rounded px-4 py-3 cursor-pointer transition-colors',
+        d.state === 'disconnected' ? 'opacity-60' : '',
+        isCompanion ? 'border-l-2 border-l-accent/30' : '',
+        propertiesDeviceId === d.device_id
+          ? 'border-accent'
+          : 'border-surface-border hover:border-slate-600',
+      ].join(' ')}
+      onClick={() => onToggleProperties(d.device_id)}
+    >
+      <div className="flex items-center gap-3">
+        <span className={isCompanion ? 'text-slate-600' : 'text-slate-500'}>
+          <KindIcon kind={d.kind} size={16} />
+        </span>
+        <div className="flex flex-col gap-0.5">
+          <span className="text-sm font-medium text-slate-200">{d.device_id}</span>
+          <span className="text-xs text-slate-500">
+            {KIND_LABELS[d.kind] ?? d.kind}
+            {isCompanion && <span className="ml-1 text-slate-600">· auto-discovered</span>}
+          </span>
+        </div>
+      </div>
+      <div className="flex items-center gap-2">
+        <StateBadge state={d.state} />
+        {d.state === 'disconnected' ? (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={(e) => { e.stopPropagation(); onReconnect(d.device_id) }}
+            title="Reconnect"
+          >
+            <Link2 size={14} className="text-slate-400" />
+          </Button>
+        ) : (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={(e) => { e.stopPropagation(); onDisconnect(d.device_id) }}
+            title="Disconnect (keep registered)"
+          >
+            <PlugZap size={14} className="text-slate-400" />
+          </Button>
+        )}
+        {!isCompanion && (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={(e) => { e.stopPropagation(); onRemove(d.device_id) }}
+            title="Remove device"
+          >
+            <Trash2 size={14} className="text-slate-500" />
+          </Button>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
 
@@ -644,64 +734,43 @@ export function Equipment() {
         {connectedDevices.length === 0 ? (
           <p className="text-sm text-slate-500">No devices connected.</p>
         ) : (
-          <div className="flex flex-col gap-2">
-            {connectedDevices.map((d: ConnectedDevice) => (
-              <div
-                key={d.device_id}
-                className={[
-                  'flex items-center justify-between bg-surface-raised border rounded px-4 py-3 cursor-pointer transition-colors',
-                  d.state === 'disconnected' ? 'opacity-60' : '',
-                  propertiesDeviceId === d.device_id
-                    ? 'border-accent'
-                    : 'border-surface-border hover:border-slate-600',
-                ].join(' ')}
-                onClick={() =>
-                  setPropertiesDeviceId(
-                    propertiesDeviceId === d.device_id ? null : d.device_id
-                  )
-                }
-              >
-                <div className="flex items-center gap-3">
-                  <span className="text-slate-500">
-                    <KindIcon kind={d.kind} size={16} />
-                  </span>
-                  <div className="flex flex-col gap-0.5">
-                    <span className="text-sm font-medium text-slate-200">{d.device_id}</span>
-                    <span className="text-xs text-slate-500">{d.adapter_key}</span>
+          <div className="flex flex-col gap-3">
+            {connectedDevices
+              .filter((d: ConnectedDevice) => d.primary_id === null)
+              .map((primary: ConnectedDevice) => {
+                const companions = connectedDevices.filter(
+                  (d: ConnectedDevice) => d.primary_id === primary.device_id
+                )
+                return (
+                  <div key={primary.device_id} className="flex flex-col gap-1">
+                    <DeviceRow
+                      d={primary}
+                      propertiesDeviceId={propertiesDeviceId}
+                      onToggleProperties={(id) =>
+                        setPropertiesDeviceId(propertiesDeviceId === id ? null : id)
+                      }
+                      onDisconnect={handleDisconnect}
+                      onReconnect={handleReconnect}
+                      onRemove={handleRemove}
+                    />
+                    {companions.map((c: ConnectedDevice) => (
+                      <div key={c.device_id} className="ml-6 flex flex-col gap-1">
+                        <DeviceRow
+                          d={c}
+                          propertiesDeviceId={propertiesDeviceId}
+                          onToggleProperties={(id) =>
+                            setPropertiesDeviceId(propertiesDeviceId === id ? null : id)
+                          }
+                          onDisconnect={handleDisconnect}
+                          onReconnect={handleReconnect}
+                          onRemove={handleRemove}
+                          isCompanion
+                        />
+                      </div>
+                    ))}
                   </div>
-                </div>
-                <div className="flex items-center gap-2">
-                  <StateBadge state={d.state} />
-                  {d.state === 'disconnected' ? (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={(e) => { e.stopPropagation(); handleReconnect(d.device_id) }}
-                      title="Reconnect"
-                    >
-                      <Link2 size={14} className="text-slate-400" />
-                    </Button>
-                  ) : (
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={(e) => { e.stopPropagation(); handleDisconnect(d.device_id) }}
-                      title="Disconnect (keep registered)"
-                    >
-                      <PlugZap size={14} className="text-slate-400" />
-                    </Button>
-                  )}
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={(e) => { e.stopPropagation(); handleRemove(d.device_id) }}
-                    title="Remove device"
-                  >
-                    <Trash2 size={14} className="text-slate-500" />
-                  </Button>
-                </div>
-              </div>
-            ))}
+                )
+              })}
           </div>
         )}
       </section>
