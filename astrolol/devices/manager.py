@@ -110,6 +110,59 @@ class DeviceManager:
             )
             log.info("device.disconnected")
 
+    async def soft_disconnect(self, device_id: str) -> None:
+        """Disconnect device hardware but keep it registered so it can be reconnected.
+
+        The device entry remains in the manager with state=DISCONNECTED.
+        """
+        entry = self._get_entry(device_id)
+        log = logger.bind(device_id=device_id, kind=entry.config.kind)
+        log.info("device.disconnecting")
+
+        try:
+            await asyncio.wait_for(entry.instance.disconnect(), timeout=CONNECT_TIMEOUT)
+        except Exception as exc:
+            log.warning("device.disconnect_error", error=str(exc))
+
+        entry.state = DeviceState.DISCONNECTED
+        await self._publish_state_change(entry.config, DeviceState.CONNECTED, DeviceState.DISCONNECTED)
+        await self.event_bus.publish(
+            DeviceDisconnected(device_kind=entry.config.kind, device_key=device_id)
+        )
+        log.info("device.disconnected")
+
+    async def reconnect(self, device_id: str) -> None:
+        """Reconnect a previously soft-disconnected device without re-registering it."""
+        entry = self._get_entry(device_id)
+        if entry.state == DeviceState.CONNECTED:
+            raise DeviceAlreadyConnectedError(f"Device '{device_id}' is already connected.")
+
+        log = logger.bind(device_id=device_id, kind=entry.config.kind)
+        await self._publish_state_change(entry.config, DeviceState.DISCONNECTED, DeviceState.CONNECTING)
+        log.info("device.connecting")
+
+        try:
+            await asyncio.wait_for(entry.instance.connect(), timeout=CONNECT_TIMEOUT)
+        except asyncio.TimeoutError:
+            entry.state = DeviceState.ERROR
+            await self._publish_state_change(entry.config, DeviceState.CONNECTING, DeviceState.ERROR)
+            raise DeviceConnectionError(
+                f"Device '{device_id}' timed out after {CONNECT_TIMEOUT}s during reconnect."
+            )
+        except Exception as exc:
+            entry.state = DeviceState.ERROR
+            await self._publish_state_change(entry.config, DeviceState.CONNECTING, DeviceState.ERROR)
+            raise DeviceConnectionError(
+                f"Device '{device_id}' failed to reconnect: {exc}"
+            ) from exc
+
+        entry.state = DeviceState.CONNECTED
+        await self.event_bus.publish(
+            DeviceConnected(device_kind=entry.config.kind, device_key=device_id)
+        )
+        await self._publish_state_change(entry.config, DeviceState.CONNECTING, DeviceState.CONNECTED)
+        log.info("device.connected")
+
     def get_camera(self, device_id: str) -> ICamera:
         return self._get_typed(device_id, "camera")  # type: ignore[return-value]
 

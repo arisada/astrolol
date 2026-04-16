@@ -5,7 +5,7 @@ import { getPluginEntry } from '@/plugin-registry'
 
 export function Sidebar() {
   const wsConnected = useStore((s) => s.wsConnected)
-  const hasMounts   = useStore((s) => s.connectedDevices.some((d) => d.kind === 'mount'))
+  const hasMounts   = useStore((s) => s.connectedDevices.some((d) => d.kind === 'mount' && d.state === 'connected'))
   const hasError    = useStore((s) => s.lastError !== null)
   const enabledPlugins = useStore((s) => s.pluginInfos.filter((p) => p.enabled))
 

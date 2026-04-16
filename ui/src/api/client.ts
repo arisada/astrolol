@@ -43,7 +43,11 @@ export const api = {
         body: JSON.stringify(config),
       }),
     disconnect: (deviceId: string) =>
+      request<void>(`/devices/connected/${deviceId}/disconnect`, { method: 'POST' }),
+    remove: (deviceId: string) =>
       request<void>(`/devices/connected/${deviceId}`, { method: 'DELETE' }),
+    reconnect: (deviceId: string) =>
+      request<void>(`/devices/connected/${deviceId}/reconnect`, { method: 'POST' }),
     getConfig: (deviceId: string) =>
       request<DeviceConfig>(`/devices/connected/${deviceId}/config`),
     properties: (deviceId: string) =>

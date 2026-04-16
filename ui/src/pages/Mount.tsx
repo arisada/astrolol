@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Crosshair, RefreshCw, RotateCw, StopCircle } from 'lucide-react'
+import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Crosshair, RefreshCw, RotateCw, Settings, StopCircle } from 'lucide-react'
 import { api } from '@/api/client'
 import { useStore } from '@/store'
 import type { MountStatus, TrackingMode } from '@/api/types'
 import { Button } from '@/components/ui/button'
 import { DmsInput } from '@/components/ui/dms-input'
 import { StateBadge } from '@/components/ui/badge'
+import { DevicePropertiesPanel } from '@/components/DevicePropertiesPanel'
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -107,6 +108,7 @@ function ToggleSwitch({ checked, onChange, label, disabled }: {
 
 function MountControls({ deviceId }: { deviceId: string }) {
   const [status, setStatus] = useState<MountStatus | null>(null)
+  const [showIndiPanel, setShowIndiPanel] = useState(false)
 
   const [slewRa, setSlewRa] = useState(0)
   const [slewDec, setSlewDec] = useState(0)
@@ -185,8 +187,20 @@ function MountControls({ deviceId }: { deviceId: string }) {
               <span className="text-xs text-yellow-400 animate-pulse">Slewing…</span>
             )}
             {status && <StateBadge state={status.state} />}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setShowIndiPanel((v) => !v)}
+              title="INDI properties"
+              className={showIndiPanel ? 'text-accent' : ''}
+            >
+              <Settings size={15} />
+            </Button>
           </div>
         </div>
+        {showIndiPanel && (
+          <DevicePropertiesPanel deviceId={deviceId} onClose={() => setShowIndiPanel(false)} />
+        )}
 
         {/* Live position */}
         <Section title="Position (JNOW)">

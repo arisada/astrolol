@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Camera, ChevronLeft, Crosshair, Plug, PlugZap, RefreshCw, Telescope } from 'lucide-react'
+import { Camera, ChevronLeft, Crosshair, Link2, Plug, PlugZap, RefreshCw, Telescope, Trash2 } from 'lucide-react'
 import { api } from '@/api/client'
 import type { ConnectedDevice, DeviceKind, DeviceProperty, DriverEntry, PreConnectProps } from '@/api/types'
 import { useStore } from '@/store'
@@ -615,6 +615,17 @@ export function Equipment() {
     refresh()
   }
 
+  const handleReconnect = async (deviceId: string) => {
+    await api.devices.reconnect(deviceId).catch(console.error)
+    refresh()
+  }
+
+  const handleRemove = async (deviceId: string) => {
+    await api.devices.remove(deviceId).catch(console.error)
+    if (propertiesDeviceId === deviceId) setPropertiesDeviceId(null)
+    refresh()
+  }
+
   return (
     <>
     <div className="p-6 max-w-3xl">
@@ -639,6 +650,7 @@ export function Equipment() {
                 key={d.device_id}
                 className={[
                   'flex items-center justify-between bg-surface-raised border rounded px-4 py-3 cursor-pointer transition-colors',
+                  d.state === 'disconnected' ? 'opacity-60' : '',
                   propertiesDeviceId === d.device_id
                     ? 'border-accent'
                     : 'border-surface-border hover:border-slate-600',
@@ -658,15 +670,34 @@ export function Equipment() {
                     <span className="text-xs text-slate-500">{d.adapter_key}</span>
                   </div>
                 </div>
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2">
                   <StateBadge state={d.state} />
+                  {d.state === 'disconnected' ? (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={(e) => { e.stopPropagation(); handleReconnect(d.device_id) }}
+                      title="Reconnect"
+                    >
+                      <Link2 size={14} className="text-slate-400" />
+                    </Button>
+                  ) : (
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={(e) => { e.stopPropagation(); handleDisconnect(d.device_id) }}
+                      title="Disconnect (keep registered)"
+                    >
+                      <PlugZap size={14} className="text-slate-400" />
+                    </Button>
+                  )}
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={(e) => { e.stopPropagation(); handleDisconnect(d.device_id) }}
-                    title="Disconnect"
+                    onClick={(e) => { e.stopPropagation(); handleRemove(d.device_id) }}
+                    title="Remove device"
                   >
-                    <PlugZap size={14} className="text-slate-400" />
+                    <Trash2 size={14} className="text-slate-500" />
                   </Button>
                 </div>
               </div>

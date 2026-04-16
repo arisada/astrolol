@@ -58,8 +58,30 @@ async def connect_device(config: DeviceConfig, request: Request) -> ConnectRespo
 
 @router.delete("/connected/{device_id}", status_code=204)
 async def disconnect_device(device_id: str, request: Request) -> None:
-    """Disconnect a device by its device_id."""
+    """Disconnect and fully remove a device by its device_id."""
     try:
         await _manager(request).disconnect(device_id)
     except DeviceNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
+
+
+@router.post("/connected/{device_id}/disconnect", status_code=204)
+async def soft_disconnect_device(device_id: str, request: Request) -> None:
+    """Disconnect device hardware but keep it registered for quick reconnect."""
+    try:
+        await _manager(request).soft_disconnect(device_id)
+    except DeviceNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+
+@router.post("/connected/{device_id}/reconnect", status_code=204)
+async def reconnect_device(device_id: str, request: Request) -> None:
+    """Reconnect a previously disconnected (but still registered) device."""
+    try:
+        await _manager(request).reconnect(device_id)
+    except DeviceNotFoundError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except DeviceAlreadyConnectedError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
+    except DeviceConnectionError as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc

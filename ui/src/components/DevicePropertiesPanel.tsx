@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { X } from 'lucide-react'
+import { ChevronRight, X } from 'lucide-react'
 import { api } from '@/api/client'
 import type { DeviceProperty, IndiDeviceMessage, PropertyWidget } from '@/api/types'
 import { Button } from '@/components/ui/button'
@@ -391,8 +391,16 @@ export function DevicePropertiesPanel({ deviceId, onClose }: Props) {
 
   const groups = groupBy(properties, (p) => p.group || 'General')
 
+  // Accordion: open the first group by default, only one open at a time
+  const [openGroup, setOpenGroup] = useState<string | null>(null)
+  useEffect(() => {
+    if (openGroup === null && groups.length > 0) {
+      setOpenGroup(groups[0][0])
+    }
+  }, [groups.length]) // eslint-disable-line react-hooks/exhaustive-deps
+
   return (
-    <div className="fixed top-0 right-0 bottom-0 z-50 flex flex-col w-[480px] border-l border-surface-border bg-surface-raised shadow-2xl overflow-hidden">
+    <div className="fixed top-0 right-0 bottom-0 z-50 flex flex-col w-[640px] border-l border-surface-border bg-surface-raised shadow-2xl overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-surface-border flex-shrink-0">
         <div>
@@ -432,18 +440,32 @@ export function DevicePropertiesPanel({ deviceId, onClose }: Props) {
           ) : properties.length === 0 ? (
             <p className="text-xs text-slate-500 p-4">Loading properties…</p>
           ) : (
-            groups.map(([group, props]) => (
-              <div key={group}>
-                <p className="text-xs font-medium text-slate-500 uppercase tracking-wider px-4 py-2 bg-surface sticky top-0">
-                  {group}
-                </p>
-                <div className="px-4">
-                  {props.map((p) => (
-                    <PropertyRow key={p.name} prop={p} deviceId={deviceId} />
-                  ))}
+            groups.map(([group, props]) => {
+              const isOpen = openGroup === group
+              return (
+                <div key={group} className="border-b border-surface-border last:border-0">
+                  <button
+                    onClick={() => setOpenGroup(isOpen ? null : group)}
+                    className="w-full flex items-center justify-between px-4 py-2.5 bg-surface hover:bg-surface-overlay transition-colors sticky top-0 z-10"
+                  >
+                    <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">
+                      {group}
+                    </span>
+                    <ChevronRight
+                      size={13}
+                      className={`text-slate-500 transition-transform ${isOpen ? 'rotate-90' : ''}`}
+                    />
+                  </button>
+                  {isOpen && (
+                    <div className="px-4">
+                      {props.map((p) => (
+                        <PropertyRow key={p.name} prop={p} deviceId={deviceId} />
+                      ))}
+                    </div>
+                  )}
                 </div>
-              </div>
-            ))
+              )
+            })
           )
         ) : (
           <MessagesTab indiDeviceName={indiDeviceName} />
