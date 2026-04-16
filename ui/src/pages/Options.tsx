@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { api } from '@/api/client'
-import type { PluginInfo, UserSettings } from '@/api/types'
+import type { PluginInfo } from '@/api/types'
 import { useStore } from '@/store'
 
 interface IndiSettings {

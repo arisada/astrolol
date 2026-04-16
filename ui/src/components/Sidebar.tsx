@@ -15,7 +15,7 @@ export function Sidebar() {
       if (!entry) return null
       return { to: entry.to, icon: entry.icon, label: entry.label }
     })
-    .filter(Boolean) as { to: string; icon: typeof Cpu; label: string }[]
+    .filter(Boolean) as { to: string; icon: typeof Cpu; label: string; badge?: boolean }[]
 
   const navItems = [
     { to: '/equipment', icon: Cpu,        label: 'Equipment' },

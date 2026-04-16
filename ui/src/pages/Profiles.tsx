@@ -32,12 +32,18 @@ const ROLE_LABELS: Record<DeviceRole, string> = {
   camera: 'Camera',
   mount: 'Mount',
   focuser: 'Focuser',
+  filter_wheel: 'Filter Wheel',
+  rotator: 'Rotator',
+  indi: 'INDI Device',
 }
 
 const KIND_ADAPTER: Record<DeviceRole, string> = {
   camera: 'indi_camera',
   mount: 'indi_mount',
   focuser: 'indi_focuser',
+  filter_wheel: 'indi_filter_wheel',
+  rotator: 'indi_rotator',
+  indi: 'indi_raw',
 }
 
 function emptyLocation(): ObserverLocation {
