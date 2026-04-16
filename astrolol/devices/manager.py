@@ -26,6 +26,10 @@ logger = structlog.get_logger()
 
 CONNECT_TIMEOUT = 30.0  # seconds
 
+# Device kinds where only one instance may be active at a time.
+# Connecting a new device of a singleton kind evicts any existing device of that kind.
+_SINGLETON_KINDS: frozenset[str] = frozenset({"mount"})
+
 
 @dataclass
 class ConnectedDevice:
@@ -54,6 +58,18 @@ class DeviceManager:
             raise DeviceAlreadyConnectedError(
                 f"Device '{config.device_id}' is already connected."
             )
+
+        if config.kind in _SINGLETON_KINDS:
+            existing = [
+                did for did, entry in self._devices.items()
+                if entry.config.kind == config.kind
+            ]
+            for did in existing:
+                log.info("device.evicting_singleton", evicted_id=did, kind=config.kind)
+                try:
+                    await self.disconnect(did)
+                except Exception as exc:
+                    log.warning("device.evict_failed", evicted_id=did, error=str(exc))
 
         adapter_class = self._lookup_adapter(config)
         instance = adapter_class(**config.params)

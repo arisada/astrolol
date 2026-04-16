@@ -118,6 +118,67 @@ async def test_get_wrong_kind_raises(manager: DeviceManager) -> None:
         manager.get_mount("cam1")
 
 
+# --- singleton kind enforcement ---
+
+def mount_config(device_id: str = "mount1", adapter_key: str = "fake_mount") -> DeviceConfig:
+    return DeviceConfig(kind="mount", adapter_key=adapter_key, device_id=device_id)
+
+
+@pytest.mark.asyncio
+async def test_connecting_second_mount_evicts_first(manager: DeviceManager) -> None:
+    await manager.connect(mount_config("mount1"))
+    assert any(d["device_id"] == "mount1" for d in manager.list_connected())
+
+    await manager.connect(mount_config("mount2"))
+
+    ids = {d["device_id"] for d in manager.list_connected()}
+    assert "mount1" not in ids
+    assert "mount2" in ids
+
+
+@pytest.mark.asyncio
+async def test_singleton_eviction_publishes_disconnected_event(
+    manager: DeviceManager, event_bus
+) -> None:
+    await manager.connect(mount_config("mount1"))
+    q = event_bus.subscribe()
+    while not q.empty():
+        await q.get()
+
+    await manager.connect(mount_config("mount2"))
+
+    events = []
+    while not q.empty():
+        events.append(q.get_nowait())
+    # Drain any remaining events fired async
+    import asyncio
+    await asyncio.sleep(0)
+    while not q.empty():
+        events.append(q.get_nowait())
+
+    types = [e.type for e in events]
+    assert "device.disconnected" in types
+    disconnected = next(e for e in events if e.type == "device.disconnected")
+    assert disconnected.device_key == "mount1"
+
+
+@pytest.mark.asyncio
+async def test_two_focusers_can_coexist(manager: DeviceManager) -> None:
+    """Focusers are not singletons — two can be connected simultaneously."""
+    await manager.connect(DeviceConfig(kind="focuser", adapter_key="fake_focuser", device_id="foc1"))
+    await manager.connect(DeviceConfig(kind="focuser", adapter_key="fake_focuser", device_id="foc2"))
+    ids = {d["device_id"] for d in manager.list_connected()}
+    assert {"foc1", "foc2"}.issubset(ids)
+
+
+@pytest.mark.asyncio
+async def test_same_mount_id_still_raises_already_connected(manager: DeviceManager) -> None:
+    """Reconnecting the exact same device_id should still raise, not silently succeed."""
+    await manager.connect(mount_config("mount1"))
+    with pytest.raises(DeviceAlreadyConnectedError):
+        await manager.connect(mount_config("mount1"))
+
+
 # --- list_connected ---
 
 @pytest.mark.asyncio
