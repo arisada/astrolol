@@ -389,7 +389,7 @@ function FocuserPanel() {
 // ── Event Log ─────────────────────────────────────────────────────────────────
 
 function EventLog() {
-  const log = useStore((s) => s.log)
+  const log = useStore((s) => s.log.filter((e) => e.component === 'imager' || e.component === 'indi'))
   return (
     <div className="h-28 bg-surface border-t border-surface-border overflow-y-auto px-3 py-2 font-mono">
       {log.map((e) => (

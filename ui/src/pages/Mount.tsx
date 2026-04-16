@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Crosshair, RefreshCw, RotateCw, Settings, StopCircle } from 'lucide-react'
 import { api } from '@/api/client'
 import { useStore } from '@/store'
+import type { LogEntry } from '@/store'
 import type { MountStatus, TrackingMode } from '@/api/types'
 import { Button } from '@/components/ui/button'
 import { DmsInput } from '@/components/ui/dms-input'
@@ -103,6 +104,24 @@ function ToggleSwitch({ checked, onChange, label, disabled }: {
 }
 
 // ---------------------------------------------------------------------------
+// Event log (mount + indi messages only)
+// ---------------------------------------------------------------------------
+
+function MountEventLog() {
+  const log = useStore((s) => s.log.filter((e: LogEntry) => e.component === 'mount' || e.component === 'indi'))
+  return (
+    <div className="h-28 bg-surface border-t border-surface-border overflow-y-auto px-3 py-2 font-mono shrink-0">
+      {log.map((e: LogEntry) => (
+        <div key={e.id} className="flex gap-2 text-xs leading-5">
+          <span className="text-slate-600 shrink-0">{e.timestamp.slice(11, 19)}</span>
+          <span className={`truncate ${e.level === 'error' ? 'text-status-error' : 'text-slate-400'}`}>{e.message}</span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Main controls component (rendered when a mount is connected)
 // ---------------------------------------------------------------------------
 
@@ -176,7 +195,8 @@ function MountControls({ deviceId }: { deviceId: string }) {
   })
 
   return (
-    <div className="h-full overflow-y-auto p-4">
+    <div className="h-full flex flex-col">
+    <div className="flex-1 overflow-y-auto p-4">
       <div className="max-w-md mx-auto flex flex-col gap-4">
 
         {/* Header */}
@@ -382,6 +402,8 @@ function MountControls({ deviceId }: { deviceId: string }) {
 
         {error && <p className="text-xs text-status-error">{error}</p>}
       </div>
+    </div>
+    <MountEventLog />
     </div>
   )
 }
