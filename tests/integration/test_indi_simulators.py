@@ -11,6 +11,7 @@ from __future__ import annotations
 import asyncio
 import shutil
 import subprocess
+import tempfile
 import time
 from pathlib import Path
 
@@ -26,8 +27,12 @@ _BASE_PORT = 17600
 
 def _start_indiserver(port: int, *drivers: str) -> subprocess.Popen:
     import socket
+    # Use a unique socket path so this instance does not collide with a
+    # running indiserver (which binds /tmp/indiserver by default) or with
+    # the API integration test module which runs its own instance.
+    socket_path = f"/tmp/indiserver_sim_{port}"
     proc = subprocess.Popen(
-        ["indiserver", "-p", str(port), *drivers],
+        ["indiserver", "-p", str(port), "-u", socket_path, *drivers],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
     )

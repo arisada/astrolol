@@ -2,8 +2,9 @@
 End-to-end API integration tests: HTTP → FastAPI → INDI adapter → indiserver → simulator.
 
 Skipped automatically when indiserver is not installed.
-All device kinds share a single indiserver instance because indiserver binds a
-global abstract Unix socket (@/tmp/indiserver) — only one instance can run per host.
+All device kinds share a single indiserver instance.  Each test module passes
+-u <unique_socket_path> to indiserver so that multiple instances can coexist
+with each other and with any user-run indiserver.
 
 The canonical scenario exercised by test_camera_full_workflow:
   1. GET  /devices/available           → indi_camera is listed
@@ -81,8 +82,11 @@ _BASE_PORT = 17700
 # ---------------------------------------------------------------------------
 
 def _start_indiserver(port: int, *drivers: str) -> subprocess.Popen:
+    # Use a unique socket path so this instance does not collide with a
+    # running indiserver (default /tmp/indiserver) or the simulator test module.
+    socket_path = f"/tmp/indiserver_api_{port}"
     proc = subprocess.Popen(
-        ["indiserver", "-p", str(port), *drivers],
+        ["indiserver", "-p", str(port), "-u", socket_path, *drivers],
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
     )
