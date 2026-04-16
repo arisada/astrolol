@@ -25,6 +25,8 @@ from astrolol.devices.registry import DeviceRegistry
 logger = structlog.get_logger()
 
 CONNECT_TIMEOUT = 30.0  # seconds
+WATCHDOG_INTERVAL = 30.0  # seconds between ping checks
+WATCHDOG_PING_TIMEOUT = 10.0  # seconds to wait for ping response
 
 # Device kinds where only one instance may be active at a time.
 # Connecting a new device of a singleton kind evicts any existing device of that kind.
@@ -38,6 +40,7 @@ class ConnectedDevice:
     state: DeviceState = DeviceState.CONNECTED
     companions: list[str] = field(default_factory=list)
     primary_id: str | None = None
+    _watchdog: asyncio.Task | None = field(default=None, repr=False)
 
 
 @dataclass
@@ -100,6 +103,7 @@ class DeviceManager:
 
         entry = ConnectedDevice(config=config, instance=instance)
         self._devices[config.device_id] = entry
+        self._start_watchdog(config.device_id)
         await self.event_bus.publish(
             DeviceConnected(device_kind=config.kind, device_key=config.device_id)
         )
@@ -137,6 +141,8 @@ class DeviceManager:
         log = logger.bind(device_id=device_id, kind=entry.config.kind)
         log.info("device.disconnecting")
 
+        await self._cancel_watchdog(entry)
+
         # Disconnect companions first
         for companion_id in list(entry.companions):
             try:
@@ -163,6 +169,8 @@ class DeviceManager:
         entry = self._get_entry(device_id)
         log = logger.bind(device_id=device_id, kind=entry.config.kind)
         log.info("device.disconnecting")
+
+        await self._cancel_watchdog(entry)
 
         try:
             await asyncio.wait_for(entry.instance.disconnect(), timeout=CONNECT_TIMEOUT)
@@ -202,6 +210,7 @@ class DeviceManager:
             ) from exc
 
         entry.state = DeviceState.CONNECTED
+        self._start_watchdog(device_id)
         await self.event_bus.publish(
             DeviceConnected(device_kind=entry.config.kind, device_key=device_id)
         )
@@ -227,18 +236,68 @@ class DeviceManager:
         """Return the full DeviceConfig (including params) for a connected device."""
         return self._get_entry(device_id).config
 
-    def list_connected(self) -> list[dict[str, str]]:
+    def list_connected(self) -> list[dict]:
         return [
             {
                 "device_id": d.config.device_id,
                 "kind": d.config.kind,
                 "adapter_key": d.config.adapter_key,
                 "state": d.state.value,
+                "companions": list(d.companions),
+                "primary_id": d.primary_id,
+                "driver_name": d.config.driver_name or d.config.params.get("device_name"),
             }
             for d in self._devices.values()
         ]
 
     # --- Internal helpers ---
+
+    async def _watchdog_worker(self, device_id: str) -> None:
+        """Periodically ping a device and update its state on failure/recovery."""
+        try:
+            while True:
+                await asyncio.sleep(WATCHDOG_INTERVAL)
+                entry = self._devices.get(device_id)
+                if entry is None:
+                    return
+                if entry.state not in (DeviceState.CONNECTED, DeviceState.ERROR):
+                    continue
+                try:
+                    ok = await asyncio.wait_for(
+                        entry.instance.ping(), timeout=WATCHDOG_PING_TIMEOUT
+                    )
+                except Exception:
+                    ok = False
+
+                if not ok and entry.state == DeviceState.CONNECTED:
+                    logger.warning("device.watchdog_failed", device_id=device_id, kind=entry.config.kind)
+                    entry.state = DeviceState.ERROR
+                    await self._publish_state_change(entry.config, DeviceState.CONNECTED, DeviceState.ERROR)
+                elif ok and entry.state == DeviceState.ERROR:
+                    logger.info("device.watchdog_recovered", device_id=device_id, kind=entry.config.kind)
+                    entry.state = DeviceState.CONNECTED
+                    await self._publish_state_change(entry.config, DeviceState.ERROR, DeviceState.CONNECTED)
+        except asyncio.CancelledError:
+            pass
+
+    def _start_watchdog(self, device_id: str) -> None:
+        entry = self._devices.get(device_id)
+        if entry is None:
+            return
+        if entry._watchdog is not None and not entry._watchdog.done():
+            entry._watchdog.cancel()
+        entry._watchdog = asyncio.create_task(
+            self._watchdog_worker(device_id), name=f"watchdog:{device_id}"
+        )
+
+    async def _cancel_watchdog(self, entry: ConnectedDevice) -> None:
+        if entry._watchdog is not None and not entry._watchdog.done():
+            entry._watchdog.cancel()
+            try:
+                await entry._watchdog
+            except asyncio.CancelledError:
+                pass
+            entry._watchdog = None
 
     async def _connect_companion(self, config: DeviceConfig, primary_id: str) -> str:
         """Connect a companion device and mark it as belonging to primary_id."""
@@ -270,6 +329,7 @@ class DeviceManager:
 
         entry = ConnectedDevice(config=config, instance=instance, primary_id=primary_id)
         self._devices[config.device_id] = entry
+        self._start_watchdog(config.device_id)
         await self.event_bus.publish(
             DeviceConnected(device_kind=config.kind, device_key=config.device_id)
         )
@@ -283,6 +343,7 @@ class DeviceManager:
             return
         entry = self._devices[device_id]
         log = logger.bind(device_id=device_id, kind=entry.config.kind)
+        await self._cancel_watchdog(entry)
         try:
             await asyncio.wait_for(entry.instance.disconnect(), timeout=CONNECT_TIMEOUT)
         except Exception as exc:

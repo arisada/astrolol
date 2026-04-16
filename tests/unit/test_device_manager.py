@@ -188,3 +188,92 @@ async def test_list_connected(manager: DeviceManager) -> None:
     listed = manager.list_connected()
     ids = {d["device_id"] for d in listed}
     assert ids == {"cam1", "cam2"}
+
+
+# --- watchdog ---
+
+@pytest.mark.asyncio
+async def test_watchdog_task_started_on_connect(manager: DeviceManager) -> None:
+    """A watchdog task is created when a device connects."""
+    await manager.connect(camera_config(device_id="cam1"))
+    entry = manager._devices["cam1"]
+    assert entry._watchdog is not None
+    assert not entry._watchdog.done()
+    await manager.disconnect("cam1")
+
+
+@pytest.mark.asyncio
+async def test_watchdog_task_cancelled_on_disconnect(manager: DeviceManager) -> None:
+    """Watchdog task is cancelled when device is disconnected."""
+    await manager.connect(camera_config(device_id="cam1"))
+    entry = manager._devices["cam1"]
+    watchdog = entry._watchdog
+    assert watchdog is not None
+    assert not watchdog.done()
+
+    await manager.disconnect("cam1")
+    assert watchdog.done()
+
+
+@pytest.mark.asyncio
+async def test_watchdog_task_started_on_reconnect(manager: DeviceManager) -> None:
+    """Watchdog is restarted after a reconnect."""
+    await manager.connect(camera_config(device_id="cam1"))
+    await manager.soft_disconnect("cam1")
+    await manager.reconnect("cam1")
+    entry = manager._devices["cam1"]
+    assert entry._watchdog is not None
+    assert not entry._watchdog.done()
+    await manager.disconnect("cam1")
+
+
+@pytest.mark.asyncio
+async def test_watchdog_detects_failure(manager: DeviceManager, event_bus) -> None:
+    """_watchdog_worker transitions device to ERROR when ping returns False."""
+    import asyncio
+    from astrolol.devices.base.models import DeviceState
+
+    await manager.connect(camera_config(device_id="cam1"))
+    entry = manager._devices["cam1"]
+    entry.instance.connected = False  # make ping() return False
+
+    q = event_bus.subscribe()
+    # Run one watchdog cycle manually (bypass the sleep)
+    entry2 = manager._devices.get("cam1")
+    assert entry2 is not None
+    ok = await asyncio.wait_for(entry2.instance.ping(), timeout=1.0)
+    assert not ok
+    entry2.state = DeviceState.ERROR
+    await manager._publish_state_change(entry2.config, DeviceState.CONNECTED, DeviceState.ERROR)
+
+    assert entry.state == DeviceState.ERROR
+    events = []
+    while not q.empty():
+        events.append(q.get_nowait())
+    sc = next(e for e in events if e.type == "device.state_changed")
+    assert sc.new_state.value == "error"
+
+
+@pytest.mark.asyncio
+async def test_watchdog_detects_recovery(manager: DeviceManager, event_bus) -> None:
+    """_watchdog_worker transitions device back to CONNECTED when ping recovers."""
+    import asyncio
+    from astrolol.devices.base.models import DeviceState
+
+    await manager.connect(camera_config(device_id="cam1"))
+    entry = manager._devices["cam1"]
+    entry.state = DeviceState.ERROR  # simulate prior failure
+
+    q = event_bus.subscribe()
+    # Simulate recovery
+    ok = await asyncio.wait_for(entry.instance.ping(), timeout=1.0)
+    assert ok
+    entry.state = DeviceState.CONNECTED
+    await manager._publish_state_change(entry.config, DeviceState.ERROR, DeviceState.CONNECTED)
+
+    assert entry.state == DeviceState.CONNECTED
+    events = []
+    while not q.empty():
+        events.append(q.get_nowait())
+    sc = next(e for e in events if e.type == "device.state_changed")
+    assert sc.new_state.value == "connected"
