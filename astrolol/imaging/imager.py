@@ -250,7 +250,7 @@ class ImagerManager:
         fits_path = Path(image.fits_path)
         self._images_dir.mkdir(parents=True, exist_ok=True)
 
-        _write_imagetyp(fits_path, request.frame_type)
+        await asyncio.to_thread(_write_imagetyp, fits_path, request.frame_type)
         if profile is not None:
             await asyncio.to_thread(_patch_fits_headers, fits_path, profile, ra, dec)
 
@@ -269,7 +269,7 @@ class ImagerManager:
             save_dir.mkdir(parents=True, exist_ok=True)
             final_fits = save_dir / f"{file_part}.fits"
             try:
-                shutil.move(str(fits_path), final_fits)
+                await asyncio.to_thread(shutil.move, str(fits_path), str(final_fits))
                 fits_path = final_fits
             except Exception:
                 logger.warning("imager.save_move_failed", src=str(fits_path), dst=str(final_fits))

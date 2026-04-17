@@ -1,3 +1,5 @@
+import asyncio
+import os
 import traceback
 from contextlib import asynccontextmanager
 
@@ -41,6 +43,11 @@ def create_app() -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI):  # noqa: ANN202
         # --- Startup ---
+
+        if os.getenv("PYTHONASYNCIODEBUG"):
+            asyncio.get_event_loop().set_debug(True)
+            logger.info("asyncio.debug_mode_enabled")
+
         store: ProfileStore = app.state.profile_store
         last_id = store.get_last_active_id()
         if last_id is not None:
@@ -84,16 +91,6 @@ def create_app() -> FastAPI:
     focuser_manager = FocuserManager(device_manager=device_manager, event_bus=event_bus)
     filter_wheel_manager = FilterWheelManager(device_manager=device_manager, event_bus=event_bus)
 
-    # Feature plugins — discover all, set up enabled ones
-    user_settings = profile_store.get_user_settings()
-    plugin_ctx = PluginContext(
-        event_bus=event_bus,
-        device_manager=device_manager,
-        device_registry=registry,
-    )
-    discovered_plugins = discover_plugins()
-    setup_plugins(app, plugin_ctx, discovered_plugins, user_settings.enabled_plugins)
-
     app.state.registry = registry
     app.state.plugin_manager = pm
     app.state.event_bus = event_bus
@@ -104,6 +101,19 @@ def create_app() -> FastAPI:
     app.state.filter_wheel_manager = filter_wheel_manager
     app.state.profile_store = profile_store
     app.state.active_profile = None
+
+    # Feature plugins — discover all, set up enabled ones
+    # app.state must be fully populated before setup() is called so plugins can
+    # access managers and the profile store during their setup phase.
+    user_settings = profile_store.get_user_settings()
+    plugin_ctx = PluginContext(
+        event_bus=event_bus,
+        device_manager=device_manager,
+        device_registry=registry,
+    )
+    discovered_plugins = discover_plugins()
+    setup_plugins(app, plugin_ctx, discovered_plugins, user_settings.enabled_plugins)
+
     app.state.discovered_plugins = discovered_plugins
     app.state.enabled_plugin_ids = set(user_settings.enabled_plugins)
 

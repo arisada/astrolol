@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
+import sys
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from typing import Any
@@ -46,7 +48,18 @@ def setup_logging(log_file: Path | None = None) -> None:
         cache_logger_on_first_use=True,
     )
 
-    formatter = structlog.stdlib.ProcessorFormatter(
+    # Console: human-readable with colors when attached to a TTY
+    use_colors = sys.stderr.isatty()
+    console_formatter = structlog.stdlib.ProcessorFormatter(
+        processors=[
+            structlog.stdlib.ProcessorFormatter.remove_processors_meta,
+            structlog.dev.ConsoleRenderer(colors=use_colors),
+        ],
+        foreign_pre_chain=shared_processors,
+    )
+
+    # File (and non-TTY pipes): newline-delimited JSON for grep/logstash
+    json_formatter = structlog.stdlib.ProcessorFormatter(
         processors=[
             structlog.stdlib.ProcessorFormatter.remove_processors_meta,
             structlog.processors.JSONRenderer(),
@@ -60,7 +73,7 @@ def setup_logging(log_file: Path | None = None) -> None:
     root.handlers.clear()
 
     stderr_handler = logging.StreamHandler()
-    stderr_handler.setFormatter(formatter)
+    stderr_handler.setFormatter(console_formatter)
     root.addHandler(stderr_handler)
 
     if log_file is not None:
@@ -68,12 +81,17 @@ def setup_logging(log_file: Path | None = None) -> None:
         file_handler = RotatingFileHandler(
             log_file, maxBytes=10_000_000, backupCount=5, encoding="utf-8"
         )
-        file_handler.setFormatter(formatter)
+        file_handler.setFormatter(json_formatter)
         root.addHandler(file_handler)
 
     # Suppress noisy third-party loggers
     logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
     logging.getLogger("uvicorn.error").setLevel(logging.WARNING)
+
+    # When PYTHONASYNCIODEBUG=1 is set, expose asyncio's slow-callback warnings.
+    # asyncio logs any callback/coroutine taking > 100 ms at WARNING level.
+    if os.getenv("PYTHONASYNCIODEBUG"):
+        logging.getLogger("asyncio").setLevel(logging.DEBUG)
 
     # uvicorn emits WARNING-level "Invalid HTTP request received." whenever a
     # browser/proxy sends a non-HTTP probe (e.g. h2 ALPN, health checks using raw
@@ -108,6 +126,7 @@ _COMPONENT_MAP = {
     "focuser": "focuser",
     "profiles": "profiles",
     "api":     "api",
+    "phd2":    "phd2",
 }
 
 
