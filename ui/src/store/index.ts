@@ -2,7 +2,7 @@ import { create } from 'zustand'
 import type { AstrolollEvent, CameraStatus, ConnectedDevice, FilterWheelStatus, FocuserStatus, MountStatus, Phd2Status, PluginInfo } from '@/api/types'
 
 const MAX_LOG_ENTRIES = 1000
-const MAX_GUIDE_STEPS = 100
+const MAX_GUIDE_STEPS = 500   // keep a large buffer; graph slices client-side
 
 export interface LogEntry {
   id: string
@@ -33,6 +33,7 @@ export interface GuidePoint {
   frame: number
   ra: number
   dec: number
+  ts: string  // ISO timestamp from the guide_step event
 }
 
 interface AppState {
@@ -116,7 +117,7 @@ export const useStore = create<AppState>((set, get) => ({
 
     // High-frequency data events — update state only, never write to the log
     if (event.type === 'phd2.guide_step') {
-      const point: GuidePoint = { frame: event.frame, ra: event.ra_dist, dec: event.dec_dist }
+      const point: GuidePoint = { frame: event.frame, ra: event.ra_dist, dec: event.dec_dist, ts: event.timestamp }
       set((s) => ({
         phd2GuidePoints: [...s.phd2GuidePoints, point].slice(-MAX_GUIDE_STEPS),
       }))

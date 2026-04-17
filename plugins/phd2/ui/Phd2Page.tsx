@@ -1,45 +1,193 @@
-import { useEffect, useState } from 'react'
-import { Crosshair, Pause, Play, Square, Target, Wifi, WifiOff } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { Crosshair, Pause, Play, Settings, Square, Target, Wifi, WifiOff } from 'lucide-react'
 import { api } from '@/api/client'
 import { useStore } from '@/store'
 import type { GuidePoint } from '@/store'
-import type { Phd2Status } from '@/api/types'
 import { Button } from '@/components/ui/button'
+
+// ── Graph constants ────────────────────────────────────────────────────────────
+
+const GRAPH_H  = 130
+const MARGIN_L = 28   // left margin inside SVG coordinate space for y-axis labels
+const X_AXIS_H = 14   // extra height below the graph for x-axis tick labels
+
+const GRAPH_SCALES: Array<{ label: string; range: number }> = [
+  { label: '±0.5"', range: 1.0 },
+  { label: '±1"',   range: 2.0 },
+  { label: '±2"',   range: 4.0 },
+  { label: '±3"',   range: 6.0 },
+]
+
+const SAMPLE_OPTIONS = [50, 100, 200, 500]
+
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function lsGet(key: string, fallback: string): string {
+  try { return localStorage.getItem(key) ?? fallback } catch { return fallback }
+}
+function lsSet(key: string, value: string): void {
+  try { localStorage.setItem(key, value) } catch { /* ignore */ }
+}
+
+/** Format as negative elapsed label, e.g. "-1m30s", "-45s", "0" */
+function fmtAgo(secondsAgo: number): string {
+  if (secondsAgo < 1) return '0'
+  if (secondsAgo < 60) return `-${Math.round(secondsAgo)}s`
+  const m = Math.floor(secondsAgo / 60)
+  const s = Math.round(secondsAgo % 60)
+  return s === 0 ? `-${m}m` : `-${m}m${s}s`
+}
+
+// ── Toggle switch (local — same pattern as Mount page) ────────────────────────
+
+function ToggleSwitch({ checked, onChange, label }: {
+  checked: boolean; onChange: () => void; label: string
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      onClick={onChange}
+      className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors focus:outline-none cursor-pointer
+        ${checked ? 'bg-accent' : 'bg-surface-border'}`}
+      aria-label={label}
+    >
+      <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform
+        ${checked ? 'translate-x-[22px]' : 'translate-x-0.5'}`}
+      />
+    </button>
+  )
+}
 
 // ── Guide graph ───────────────────────────────────────────────────────────────
 
-const GRAPH_W = 340
-const GRAPH_H = 100
-const GRAPH_RANGE = 2.0  // arcsec full scale (±1")
+function GuideGraph({ points, range, rmsTotal }: {
+  points: GuidePoint[]
+  range: number
+  rmsTotal: number | null | undefined
+}) {
+  const wrapRef = useRef<HTMLDivElement>(null)
+  const [W, setW] = useState(400)
 
-function GuideGraph({ points }: { points: GuidePoint[] }) {
+  useEffect(() => {
+    const el = wrapRef.current
+    if (!el) return
+    const ro = new ResizeObserver(entries => {
+      const w = Math.round(entries[0].contentRect.width)
+      if (w > 0) setW(w)
+    })
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+
   if (points.length === 0) {
     return (
-      <div className="flex items-center justify-center h-24 text-xs text-slate-600">
+      <div ref={wrapRef} className="flex items-center justify-center h-24 text-xs text-slate-600">
         No guide data
       </div>
     )
   }
 
-  const toY = (v: number) => {
-    const frac = (v / GRAPH_RANGE) * 0.5 + 0.5
-    return Math.round((1 - frac) * GRAPH_H)
+  const halfRange = range / 2
+  // Width available for the actual data area (right of y-axis labels)
+  const dataW = W - MARGIN_L
+
+  // arcsec value → SVG y (positive arcsec = up = smaller y)
+  const toY = (v: number): number => GRAPH_H / 2 - (v / halfRange) * (GRAPH_H / 2)
+
+  // point index → SVG x, offset by MARGIN_L so labels fit inside the SVG
+  const n = points.length
+  const toX = (i: number): number =>
+    MARGIN_L + (n <= 1 ? dataW / 2 : Math.round((i / (n - 1)) * dataW))
+
+  // Horizontal grid lines every 0.5" (0.25" for tight scale)
+  const gridStep = range <= 1.0 ? 0.25 : 0.5
+  const gridLines: number[] = []
+  for (let v = -halfRange; v <= halfRange + 0.0001; v += gridStep) {
+    gridLines.push(Math.round(v * 1000) / 1000)
   }
 
-  const toX = (i: number) => Math.round((i / Math.max(points.length - 1, 1)) * GRAPH_W)
+  // Data paths
+  const raPath  = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${toX(i)},${toY(p.ra).toFixed(1)}`).join(' ')
+  const decPath = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${toX(i)},${toY(p.dec).toFixed(1)}`).join(' ')
 
-  const raPath = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${toX(i)},${toY(p.ra)}`).join(' ')
-  const decPath = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${toX(i)},${toY(p.dec)}`).join(' ')
+  // X-axis: 0 at the right ("now"), negative values going left
+  // Up to 5 ticks; use array index as React key so elements are stable DOM nodes
+  // that just get their content updated — avoids repaint artifacts from key churn.
+  const xTicks: Array<{ x: number; label: string }> = []
+  if (n > 1) {
+    const tLast = Date.parse(points[n - 1].ts)
+    const numTicks = Math.min(5, n)
+    for (let t = 0; t < numTicks; t++) {
+      const idx   = Math.round(t * (n - 1) / (numTicks - 1))
+      const secsAgo = (tLast - Date.parse(points[idx].ts)) / 1000
+      xTicks.push({ x: toX(idx), label: fmtAgo(secsAgo) })
+    }
+  }
+
+  // RMS average band: symmetric dashed lines at ±rmsTotal clamped to graph bounds
+  const rmsY    = rmsTotal != null && rmsTotal > 0 ? Math.max(0, Math.min(GRAPH_H, toY(rmsTotal)))  : null
+  const rmsYNeg = rmsTotal != null && rmsTotal > 0 ? Math.max(0, Math.min(GRAPH_H, toY(-rmsTotal))) : null
 
   return (
-    <svg width={GRAPH_W} height={GRAPH_H} className="w-full" viewBox={`0 0 ${GRAPH_W} ${GRAPH_H}`}>
-      <line x1="0" y1={GRAPH_H / 2} x2={GRAPH_W} y2={GRAPH_H / 2}
-        stroke="#334155" strokeWidth="1" strokeDasharray="4 4" />
-      <path d={raPath} fill="none" stroke="#f97316" strokeWidth="1.5" />
-      <path d={decPath} fill="none" stroke="#60a5fa" strokeWidth="1.5" />
-      <text x="4" y="10" fontSize="9" fill="#f97316">RA</text>
-      <text x="24" y="10" fontSize="9" fill="#60a5fa">Dec</text>
-    </svg>
+    // No pl-6 / overflow="visible" — MARGIN_L is baked into the SVG coordinate space
+    <div ref={wrapRef} className="w-full">
+      <svg width={W} height={GRAPH_H + X_AXIS_H} viewBox={`0 0 ${W} ${GRAPH_H + X_AXIS_H}`}>
+
+        {/* Horizontal grid lines (start at MARGIN_L so they don't overlap labels) */}
+        {gridLines.map(v => {
+          const y = toY(v)
+          const isZero = Math.abs(v) < 0.001
+          return (
+            <line key={v}
+              x1={MARGIN_L} y1={y} x2={W} y2={y}
+              stroke={isZero ? '#334155' : '#1e293b'}
+              strokeWidth={isZero ? 1 : 0.5}
+              strokeDasharray={isZero ? '4 4' : undefined}
+            />
+          )
+        })}
+
+        {/* Y-axis labels inside the left margin */}
+        {gridLines.filter(v => Math.abs(v) > 0.001).map(v => (
+          <text key={v} x={MARGIN_L - 4} y={toY(v) + 3} fontSize="8" fill="#475569" textAnchor="end">
+            {v > 0 ? `+${v}` : `${v}`}
+          </text>
+        ))}
+
+        {/* RMS average band */}
+        {rmsY != null && rmsYNeg != null && (
+          <>
+            <line x1={MARGIN_L} y1={rmsY} x2={W} y2={rmsY}
+              stroke="#94a3b8" strokeWidth={1} strokeDasharray="4 4" />
+            <line x1={MARGIN_L} y1={rmsYNeg} x2={W} y2={rmsYNeg}
+              stroke="#94a3b8" strokeWidth={1} strokeDasharray="4 4" />
+            <text x={W - 2} y={rmsY - 3} fontSize="8" fill="#94a3b8" textAnchor="end">
+              ±{rmsTotal!.toFixed(2)}&quot;
+            </text>
+          </>
+        )}
+
+        {/* RA (blue) and Dec (red) data paths */}
+        <path d={raPath}  fill="none" stroke="#60a5fa" strokeWidth={1.5} />
+        <path d={decPath} fill="none" stroke="#f87171" strokeWidth={1.5} />
+
+        {/* X-axis temporal labels — keyed by index so DOM nodes are stable */}
+        {xTicks.map(({ x, label }, idx) => (
+          <text key={idx} x={x} y={GRAPH_H + 11} fontSize="8" fill="#475569" textAnchor="middle">
+            {label}
+          </text>
+        ))}
+
+        {/* Legend */}
+        <text x={MARGIN_L + 4}  y={10} fontSize="9" fill="#60a5fa">RA</text>
+        <text x={MARGIN_L + 22} y={10} fontSize="9" fill="#f87171">Dec</text>
+        {rmsY != null && (
+          <text x={MARGIN_L + 44} y={10} fontSize="9" fill="#94a3b8">RMS avg</text>
+        )}
+      </svg>
+    </div>
   )
 }
 
@@ -52,7 +200,7 @@ function StateBadge({ state, connected }: { state: string; connected: boolean })
       ? 'text-green-400 border-green-700'
       : state === 'Paused'
         ? 'text-yellow-400 border-yellow-700'
-        : state === 'LostLock'
+        : state === 'Star loss'
           ? 'text-red-400 border-red-700'
           : 'text-slate-400 border-slate-600'
 
@@ -94,18 +242,41 @@ function Phd2EventLog() {
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
+// TODO: audit Connect/Disconnect button style against Equipment page for consistency
+
 export function Phd2Page() {
-  const guidePoints = useStore((s) => s.phd2GuidePoints)
-  const storedStatus = useStore((s) => s.phd2Status)
-  const setPhd2Status = useStore((s) => s.setPhd2Status)
+  const allGuidePoints = useStore((s) => s.phd2GuidePoints)
+  const status         = useStore((s) => s.phd2Status)
+  const setPhd2Status  = useStore((s) => s.setPhd2Status)
 
-  const [status, setStatus] = useState<Phd2Status | null>(storedStatus)
   const [error, setError] = useState<string | null>(null)
+  const [showSettings, setShowSettings] = useState(false)
 
+  // UI preferences persisted via localStorage (graph display only — not server state)
+  const [graphRange, setGraphRange] = useState(() =>
+    parseFloat(lsGet('phd2_graph_range', '2.0'))
+  )
+  const [maxSamples, setMaxSamples] = useState(() =>
+    parseInt(lsGet('phd2_max_samples', '100'), 10)
+  )
+
+  // Debug state: server is the source of truth (returned in status.debug_enabled).
+  // Optimistic local copy so the toggle feels instant; reverts on API error.
+  // When the server restarts (debug_enabled resets to false), the next status poll
+  // updates this automatically — no stale localStorage involved.
+  const [debugEnabled, setDebugEnabled] = useState(false)
+  useEffect(() => {
+    if (status != null) setDebugEnabled(status.debug_enabled)
+  }, [status?.debug_enabled])  // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Slice the store's large ring buffer to the user-configured window
+  const guidePoints = allGuidePoints.slice(-maxSamples)
+
+  // Poll /phd2/status every 3 s to get RMS values (not emitted via WS)
   useEffect(() => {
     const poll = () => {
       api.phd2.status()
-        .then((s) => { setStatus(s); setPhd2Status(s) })
+        .then((s) => setPhd2Status(s))
         .catch(() => {})
     }
     poll()
@@ -113,53 +284,119 @@ export function Phd2Page() {
     return () => clearInterval(id)
   }, [setPhd2Status])
 
-  useEffect(() => {
-    if (storedStatus) setStatus(storedStatus)
-  }, [storedStatus])
-
   const act = async (fn: () => Promise<void>) => {
     setError(null)
     try { await fn() } catch (e) { setError((e as Error).message) }
   }
 
-  const guiding = status?.state === 'Guiding'
-  const paused  = status?.state === 'Paused'
-  const connected = status?.connected ?? false
+  const toggleDebug = async () => {
+    const next = !debugEnabled
+    setDebugEnabled(next)   // optimistic
+    try {
+      await api.phd2.setDebug(next)
+    } catch (e) {
+      setDebugEnabled(!next)  // revert on error
+      setError((e as Error).message)
+    }
+  }
+
+  const handleGraphRangeChange = (range: number) => {
+    setGraphRange(range)
+    lsSet('phd2_graph_range', String(range))
+  }
+
+  const handleMaxSamplesChange = (n: number) => {
+    setMaxSamples(n)
+    lsSet('phd2_max_samples', String(n))
+  }
+
+  const guiding    = status?.state === 'Guiding'
+  const paused     = status?.state === 'Paused'
+  const connected  = status?.connected ?? false
+  const dithering  = status?.is_dithering ?? false
 
   return (
     <div className="flex flex-col h-full">
-    <div className="p-6 max-w-lg mx-auto flex flex-col gap-4 flex-1 overflow-y-auto">
+    <div className="p-4 max-w-2xl mx-auto w-full flex flex-col gap-4 flex-1 overflow-y-auto">
 
-      {/* Header + connect/disconnect */}
+      {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Crosshair size={20} className="text-accent" />
           <h1 className="text-base font-semibold text-slate-200">PHD2 Guiding</h1>
           {status && <StateBadge state={status.state} connected={status.connected} />}
         </div>
-        <Button
-          size="sm"
-          variant={connected ? 'danger' : 'outline'}
-          onClick={() => act(connected ? api.phd2.disconnect : api.phd2.connect)}
-        >
-          {connected
-            ? <><WifiOff size={12} className="mr-1" /> Disconnect</>
-            : <><Wifi size={12} className="mr-1" /> Connect</>
-          }
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            variant={connected ? 'danger' : 'outline'}
+            onClick={() => act(connected ? api.phd2.disconnect : api.phd2.connect)}
+          >
+            {connected
+              ? <><WifiOff size={12} className="mr-1" /> Disconnect</>
+              : <><Wifi size={12} className="mr-1" /> Connect</>
+            }
+          </Button>
+          <Button
+            size="icon"
+            variant="ghost"
+            onClick={() => setShowSettings((v) => !v)}
+            title="Graph & debug settings"
+            className={showSettings ? 'text-accent' : ''}
+          >
+            <Settings size={15} />
+          </Button>
+        </div>
       </div>
 
-      {/* Guide graph */}
+      {/* Settings panel */}
+      {showSettings && (
+        <div className="border border-surface-border rounded-lg p-3 bg-surface-raised flex flex-col gap-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-slate-400">Graph vertical scale</span>
+            <select
+              className="rounded bg-surface-overlay border border-surface-border px-2 py-1 text-xs text-slate-200 focus:outline-none"
+              value={graphRange}
+              onChange={(e) => handleGraphRangeChange(parseFloat(e.target.value))}
+            >
+              {GRAPH_SCALES.map(({ label, range }) => (
+                <option key={range} value={range}>{label}</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-slate-400">Samples shown</span>
+            <select
+              className="rounded bg-surface-overlay border border-surface-border px-2 py-1 text-xs text-slate-200 focus:outline-none"
+              value={maxSamples}
+              onChange={(e) => handleMaxSamplesChange(parseInt(e.target.value, 10))}
+            >
+              {SAMPLE_OPTIONS.map((n) => (
+                <option key={n} value={n}>{n}</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-xs text-slate-400">PHD2 debug logging</p>
+              <p className="text-xs text-slate-600">Prints raw JSON-RPC traffic to the server console</p>
+            </div>
+            <ToggleSwitch checked={debugEnabled} onChange={toggleDebug} label="PHD2 debug logging" />
+          </div>
+        </div>
+      )}
+
+      {/* Guide graph — full available width */}
       <div className="border border-surface-border rounded p-3 bg-surface-raised">
-        <p className="text-xs text-slate-500 mb-2">Guide error (arcsec, ±1")</p>
-        <GuideGraph points={guidePoints} />
+        <p className="text-xs text-slate-500 mb-2">Guide error (arcsec)</p>
+        <GuideGraph points={guidePoints} range={graphRange} rmsTotal={status?.rms_total} />
       </div>
 
       {/* Metrics */}
       <div className="border border-surface-border rounded p-3 bg-surface-raised flex flex-col gap-1.5">
-        <Metric label="RMS RA"    value={status?.rms_ra}    unit={'"'} />
-        <Metric label="RMS Dec"   value={status?.rms_dec}   unit={'"'} />
-        <Metric label="RMS Total" value={status?.rms_total} unit={'"'} />
+        <Metric label="RMS RA"      value={status?.rms_ra}    unit={'"'} />
+        <Metric label="RMS Dec"     value={status?.rms_dec}   unit={'"'} />
+        <Metric label="RMS average" value={status?.rms_total} unit={'"'} />
         <div className="border-t border-surface-border my-1" />
         <Metric label="Star SNR" value={status?.star_snr} />
         <div className="flex items-center justify-between">
@@ -206,10 +443,11 @@ export function Phd2Page() {
             size="sm"
             variant="outline"
             onClick={() => act(() => api.phd2.dither())}
-            disabled={!connected || !guiding}
-            title="Dither once"
+            disabled={!connected || !guiding || dithering}
+            title={dithering ? 'Dither already in progress' : 'Dither once'}
           >
-            <Target size={12} className="mr-1" /> Dither
+            <Target size={12} className="mr-1" />
+            {dithering ? 'Dithering…' : 'Dither'}
           </Button>
         </div>
         {error && <p className="text-xs text-status-error">{error}</p>}

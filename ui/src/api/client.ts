@@ -185,6 +185,8 @@ export const api = {
       }),
     pause: () => request<void>('/phd2/pause', { method: 'POST' }),
     resume: () => request<void>('/phd2/resume', { method: 'POST' }),
+    setDebug: (enabled: boolean) =>
+      request<void>('/phd2/debug', { method: 'POST', body: JSON.stringify({ enabled }) }),
   },
 
   focuser: {

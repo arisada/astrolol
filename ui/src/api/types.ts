@@ -89,6 +89,8 @@ export interface Phd2Status {
   rms_total: number | null
   pixel_scale: number | null
   star_snr: number | null
+  is_dithering: boolean
+  debug_enabled: boolean
 }
 
 export interface PluginInfo {

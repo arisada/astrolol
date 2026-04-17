@@ -37,6 +37,15 @@ Items designed for but not yet built. Ordered roughly by priority.
   `MountManager` and written as `OBJECT` in FITS headers.  A Simbad/NED name-resolver plugin
   would populate the object name automatically.
 
+## UI consistency audit
+
+- **Shared connect/disconnect button pattern** — PHD2 page uses an inline variant-switching
+  button while Equipment page uses a different pattern. Audit all pages (PHD2, Equipment,
+  Focuser, Mount) and extract a shared `ConnectButton` component so styling is identical
+  everywhere.
+- **ToggleSwitch duplication** — defined locally in both `Mount.tsx` and `Phd2Page.tsx`.
+  Extract to `ui/src/components/ui/toggle-switch.tsx` and import from both.
+
 ## Post-MVP
 
 - **Sequencer** — state machine (idle → slewing → focusing → guiding → imaging → dithering).
