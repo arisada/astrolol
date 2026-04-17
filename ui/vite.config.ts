@@ -42,6 +42,10 @@ export default defineConfig({
     alias: {
       '@': path.resolve(__dirname, './src'),
       '@plugins': path.resolve(__dirname, '../plugins'),
+      // Allow plugin pages (outside ui/) to import packages from ui/node_modules
+      'lucide-react': path.resolve(__dirname, './node_modules/lucide-react'),
+      'react': path.resolve(__dirname, './node_modules/react'),
+      'react/jsx-runtime': path.resolve(__dirname, './node_modules/react/jsx-runtime'),
     },
   },
   server: {
@@ -60,6 +64,7 @@ export default defineConfig({
       '/health':   p(backendHttp),
       '/plugins':  p(backendHttp),
       '/hello':    p(backendHttp),
+      '/phd2':     p(backendHttp),
       '/admin':    p(backendHttp),
       '/ws': { target: backendWs, ws: true, changeOrigin: true, configure: withFallback },
     },

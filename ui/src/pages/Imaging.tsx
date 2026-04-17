@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
-  Camera, ChevronDown, ChevronUp, Play, Settings, Square, StopCircle, Thermometer,
+  Camera, ChevronDown, ChevronUp, Crosshair, Play, Settings, Square, StopCircle, Thermometer,
 } from 'lucide-react'
 import { api } from '@/api/client'
 import { useStore } from '@/store'
-import type { CameraStatus, FilterWheelStatus, FrameType } from '@/api/types'
+import type { CameraStatus, DitherConfig, FilterWheelStatus, FrameType } from '@/api/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { DevicePropertiesPanel } from '@/components/DevicePropertiesPanel'
@@ -213,6 +213,10 @@ function CameraPanel({
   const [looping, setLooping] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // Dither settings (persisted)
+  const [ditherFrames, setDitherFrames] = useLocalStorage<string>('imaging.ditherFrames', '')
+  const [ditherMinutes, setDitherMinutes] = useLocalStorage<string>('imaging.ditherMinutes', '')
+
   // Camera hardware status (temperature, cooler)
   const [cameraStatus, setCameraStatus] = useState<CameraStatus | null>(null)
   const [targetTemp, setTargetTemp] = useLocalStorage<string>('imaging.targetTemp', '')
@@ -246,6 +250,14 @@ function CameraPanel({
     return () => clearInterval(id)
   }, [deviceId]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  const buildDitherConfig = (): DitherConfig | undefined => {
+    const frames = parseInt(ditherFrames)
+    const minutes = parseFloat(ditherMinutes)
+    if (!isNaN(frames) && frames > 0) return { every_frames: frames }
+    if (!isNaN(minutes) && minutes > 0) return { every_minutes: minutes }
+    return undefined
+  }
+
   const expose = async () => {
     setError(null)
     try {
@@ -260,7 +272,10 @@ function CameraPanel({
         await api.imager.stopLoop(deviceId)
         setLooping(false)
       } else {
-        await api.imager.startLoop(deviceId, { duration, gain, binning, frame_type: frameType, save: saveSubs })
+        await api.imager.startLoop(deviceId, {
+          duration, gain, binning, frame_type: frameType, save: saveSubs,
+          dither: buildDitherConfig() ?? null,
+        })
         setLooping(true)
       }
     } catch (e) { setError((e as Error).message) }
@@ -373,6 +388,34 @@ function CameraPanel({
           >
             {histoAuto ? 'Auto' : 'Linear'}
           </button>
+        </div>
+
+        {/* Guiding / dither */}
+        <div className="border-t border-surface-border pt-2 flex flex-col gap-2">
+          <div className="flex items-center gap-1.5">
+            <Crosshair size={10} className="text-slate-500" />
+            <span className="text-xs text-slate-500 uppercase tracking-wider">Guiding</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-slate-400 shrink-0">Dither every</span>
+            <Input
+              type="number" min="1" step="1" placeholder="—"
+              value={ditherFrames}
+              onChange={(e) => { setDitherFrames(e.target.value); if (e.target.value) setDitherMinutes('') }}
+              className="w-14 text-xs text-center"
+            />
+            <span className="text-xs text-slate-400 shrink-0">frames</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-slate-400 shrink-0">Dither every</span>
+            <Input
+              type="number" min="0.1" step="0.5" placeholder="—"
+              value={ditherMinutes}
+              onChange={(e) => { setDitherMinutes(e.target.value); if (e.target.value) setDitherFrames('') }}
+              className="w-14 text-xs text-center"
+            />
+            <span className="text-xs text-slate-400 shrink-0">minutes</span>
+          </div>
         </div>
 
         {/* Actions */}
@@ -513,7 +556,7 @@ function FilterWheelPanel({
 // ── Event Log ─────────────────────────────────────────────────────────────────
 
 function EventLog() {
-  const log = useStore((s) => s.log.filter((e) => e.component === 'imager' || e.component === 'indi'))
+  const log = useStore((s) => s.log.filter((e) => e.component === 'imager' || e.component === 'indi' || e.component === 'phd2'))
   return (
     <div className="h-28 bg-surface border-t border-surface-border overflow-y-auto px-3 py-2 font-mono">
       {log.map((e) => (

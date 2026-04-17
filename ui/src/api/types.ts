@@ -53,6 +53,16 @@ export interface FocuserStatus {
 
 export type FrameType = 'light' | 'dark' | 'flat' | 'bias'
 
+export interface DitherConfig {
+  every_frames?: number | null
+  every_minutes?: number | null
+  pixels?: number
+  ra_only?: boolean
+  settle_pixels?: number
+  settle_time?: number
+  settle_timeout?: number
+}
+
 export interface ExposureRequest {
   duration: number
   gain?: number
@@ -60,12 +70,25 @@ export interface ExposureRequest {
   frame_type?: FrameType
   count?: number | null
   save?: boolean
+  dither?: DitherConfig | null
 }
 
 export interface UserSettings {
   save_dir_template: string
   save_filename_template: string
   enabled_plugins: string[]
+  phd2_host: string
+  phd2_port: number
+}
+
+export interface Phd2Status {
+  connected: boolean
+  state: string
+  rms_ra: number | null
+  rms_dec: number | null
+  rms_total: number | null
+  pixel_scale: number | null
+  star_snr: number | null
 }
 
 export interface PluginInfo {
@@ -280,6 +303,20 @@ export interface FocuserHaltedEvent extends BaseEvent { type: 'focuser.halted'; 
 
 export interface LogEvent extends BaseEvent { type: 'log'; level: string; component: string; message: string }
 
+export interface Phd2ConnectedEvent extends BaseEvent { type: 'phd2.connected' }
+export interface Phd2DisconnectedEvent extends BaseEvent { type: 'phd2.disconnected' }
+export interface Phd2StateChangedEvent extends BaseEvent { type: 'phd2.state_changed'; state: string }
+export interface Phd2GuideStepEvent extends BaseEvent {
+  type: 'phd2.guide_step'
+  frame: number
+  ra_dist: number
+  dec_dist: number
+  ra_corr: number
+  dec_corr: number
+  star_snr: number | null
+}
+export interface Phd2SettledEvent extends BaseEvent { type: 'phd2.settled'; error: string | null }
+
 export type AstrolollEvent =
   | DeviceConnectedEvent | DeviceDisconnectedEvent | DeviceStateChangedEvent
   | ExposureStartedEvent | ExposureCompletedEvent | ExposureFailedEvent
@@ -288,4 +325,6 @@ export type AstrolollEvent =
   | MountParkedEvent | MountUnparkedEvent | MountTrackingChangedEvent | MountOperationFailedEvent
   | MountMeridianFlipStartedEvent | MountMeridianFlipCompletedEvent
   | FocuserMoveStartedEvent | FocuserMoveCompletedEvent | FocuserHaltedEvent
+  | Phd2ConnectedEvent | Phd2DisconnectedEvent | Phd2StateChangedEvent
+  | Phd2GuideStepEvent | Phd2SettledEvent
   | LogEvent

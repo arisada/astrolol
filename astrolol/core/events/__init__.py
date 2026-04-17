@@ -24,6 +24,11 @@ from astrolol.core.events.models import (
     FocuserMoveCompleted,
     FocuserHalted,
     FilterWheelFilterChanged,
+    Phd2Connected,
+    Phd2Disconnected,
+    Phd2StateChanged,
+    Phd2GuideStep,
+    Phd2Settled,
     Event,
 )
 
@@ -53,5 +58,10 @@ __all__ = [
     "FocuserMoveCompleted",
     "FocuserHalted",
     "FilterWheelFilterChanged",
+    "Phd2Connected",
+    "Phd2Disconnected",
+    "Phd2StateChanged",
+    "Phd2GuideStep",
+    "Phd2Settled",
     "Event",
 ]

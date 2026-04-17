@@ -1,9 +1,10 @@
 import asyncio
 import shutil
+import time as _time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Awaitable, Callable
 
 import structlog
 
@@ -19,7 +20,7 @@ from astrolol.core.events import (
 )
 from astrolol.devices.base.models import ExposureParams
 from astrolol.devices.manager import DeviceManager
-from astrolol.imaging.models import ExposureRequest, ExposureResult, ImagerState, ImagerStatus
+from astrolol.imaging.models import DitherConfig, ExposureRequest, ExposureResult, ImagerState, ImagerStatus
 from astrolol.imaging.preview import fits_to_jpeg, fits_to_jpeg_linear
 
 if TYPE_CHECKING:
@@ -122,6 +123,9 @@ class ImagerManager:
         self._active_profile: "Profile | None" = None
         self._profile_store = profile_store
         self._save_counters: dict[str, int] = {}
+        # Optional dither hook set by the PHD2 plugin on startup.
+        # Signature: async (config: DitherConfig) -> None
+        self._dither_fn: Callable[[DitherConfig], Awaitable[None]] | None = None
 
     def set_context(self, profile: "Profile | None") -> None:
         """Called when a profile is activated or cleared."""
@@ -306,8 +310,31 @@ class ImagerManager:
 
     async def _loop_worker(self, imager: CameraImager, request: ExposureRequest) -> None:
         count = 0
+        last_dither_at = _time.monotonic()
         try:
             while request.count is None or count < request.count:
+                # Between-frame dither (skip before the very first exposure)
+                if count > 0 and request.dither is not None and self._dither_fn is not None:
+                    cfg = request.dither
+                    should_dither = False
+                    if cfg.every_frames is not None and count % cfg.every_frames == 0:
+                        should_dither = True
+                    if cfg.every_minutes is not None:
+                        elapsed_min = (_time.monotonic() - last_dither_at) / 60.0
+                        if elapsed_min >= cfg.every_minutes:
+                            should_dither = True
+                    if should_dither:
+                        try:
+                            logger.info("imager.dithering", device_id=imager.device_id, frame=count)
+                            await self._dither_fn(cfg)
+                            last_dither_at = _time.monotonic()
+                        except Exception as exc:
+                            logger.warning(
+                                "imager.dither_failed",
+                                device_id=imager.device_id,
+                                error=str(exc),
+                            )
+
                 await self._do_expose(imager, request)
                 imager.state = ImagerState.LOOPING  # restore after _do_expose sets EXPOSING
                 count += 1

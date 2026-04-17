@@ -1,7 +1,8 @@
 import { create } from 'zustand'
-import type { AstrolollEvent, CameraStatus, ConnectedDevice, FilterWheelStatus, FocuserStatus, MountStatus, PluginInfo } from '@/api/types'
+import type { AstrolollEvent, CameraStatus, ConnectedDevice, FilterWheelStatus, FocuserStatus, MountStatus, Phd2Status, PluginInfo } from '@/api/types'
 
 const MAX_LOG_ENTRIES = 1000
+const MAX_GUIDE_STEPS = 100
 
 export interface LogEntry {
   id: string
@@ -26,6 +27,12 @@ export interface LastError {
   message: string
   timestamp: string
   eventType: string
+}
+
+export interface GuidePoint {
+  frame: number
+  ra: number
+  dec: number
 }
 
 interface AppState {
@@ -54,6 +61,10 @@ interface AppState {
   // Plugin metadata from /plugins endpoint
   pluginInfos: PluginInfo[]
 
+  // PHD2 guiding
+  phd2Status: Phd2Status | null
+  phd2GuidePoints: GuidePoint[]
+
   // Actions
   setWsConnected: (v: boolean) => void
   setConnectedDevices: (devices: ConnectedDevice[]) => void
@@ -63,6 +74,7 @@ interface AppState {
   applyEvent: (event: AstrolollEvent) => void
   clearLastError: () => void
   setPluginInfos: (infos: PluginInfo[]) => void
+  setPhd2Status: (status: Phd2Status) => void
 }
 
 // Event types that represent errors and should set lastError
@@ -83,10 +95,13 @@ export const useStore = create<AppState>((set, get) => ({
   log: [],
   lastError: null,
   pluginInfos: [],
+  phd2Status: null,
+  phd2GuidePoints: [],
 
   setWsConnected: (v) => set({ wsConnected: v }),
   clearLastError: () => set({ lastError: null }),
   setPluginInfos: (infos) => set({ pluginInfos: infos }),
+  setPhd2Status: (status) => set({ phd2Status: status }),
 
   setConnectedDevices: (devices) => set({ connectedDevices: devices }),
   setCameraStatus: (deviceId, status) =>
@@ -98,6 +113,15 @@ export const useStore = create<AppState>((set, get) => ({
 
   applyEvent: (event) => {
     const state = get()
+
+    // High-frequency data events — update state only, never write to the log
+    if (event.type === 'phd2.guide_step') {
+      const point: GuidePoint = { frame: event.frame, ra: event.ra_dist, dec: event.dec_dist }
+      set((s) => ({
+        phd2GuidePoints: [...s.phd2GuidePoints, point].slice(-MAX_GUIDE_STEPS),
+      }))
+      return
+    }
 
     const eventId = (event as { id: string }).id
     // Dedup: history replay and brief dual-connection windows can send the same event twice
@@ -188,6 +212,19 @@ export const useStore = create<AppState>((set, get) => ({
         set({ log, lastError })
         break
       }
+      case 'phd2.connected': {
+        set({ phd2Status: { connected: true, state: 'Unknown', rms_ra: null, rms_dec: null, rms_total: null, pixel_scale: null, star_snr: null }, log, lastError })
+        break
+      }
+      case 'phd2.disconnected': {
+        set({ phd2Status: { connected: false, state: 'Disconnected', rms_ra: null, rms_dec: null, rms_total: null, pixel_scale: null, star_snr: null }, phd2GuidePoints: [], log, lastError })
+        break
+      }
+      case 'phd2.state_changed': {
+        set((s) => ({ phd2Status: s.phd2Status ? { ...s.phd2Status, state: event.state } : null, log, lastError }))
+        break
+      }
+      case 'phd2.settled':
       default:
         set({ log, lastError })
     }
@@ -217,6 +254,11 @@ function eventSummary(event: AstrolollEvent): string {
     case 'focuser.move_started': return `Focuser → ${event.target_position}`
     case 'focuser.move_completed': return `Focuser at ${event.position}`
     case 'focuser.halted': return `Focuser halted at ${event.position ?? '?'}`
+    case 'phd2.connected': return 'PHD2 connected'
+    case 'phd2.disconnected': return 'PHD2 disconnected'
+    case 'phd2.state_changed': return `PHD2 ${event.state}`
+    case 'phd2.guide_step': return `Guide step #${event.frame}: RA ${event.ra_dist.toFixed(3)}" Dec ${event.dec_dist.toFixed(3)}"`
+    case 'phd2.settled': return event.error ? `PHD2 settle failed: ${event.error}` : 'PHD2 settled'
     default: return (event as { type: string }).type
   }
 }

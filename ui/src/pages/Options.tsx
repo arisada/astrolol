@@ -128,6 +128,10 @@ export function Options() {
   const [saveFilename, setSaveFilename] = useState('%F_%C_%Es_%Gg')
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
 
+  // PHD2 settings
+  const [phd2Host, setPhd2Host] = useState('localhost')
+  const [phd2Port, setPhd2Port] = useState(4400)
+
   // Plugin enable/disable
   const pluginInfos = useStore((s) => s.pluginInfos)
   const setPluginInfos = useStore((s) => s.setPluginInfos)
@@ -140,6 +144,8 @@ export function Options() {
       .then((s) => {
         setSaveDir(s.save_dir_template)
         setSaveFilename(s.save_filename_template)
+        setPhd2Host(s.phd2_host)
+        setPhd2Port(s.phd2_port)
       })
       .catch(() => { /* backend may not be running */ })
   }, [])
@@ -147,7 +153,7 @@ export function Options() {
   const persistSaveSettings = async () => {
     setSaveStatus('saving')
     try {
-      await api.settings.put({ save_dir_template: saveDir, save_filename_template: saveFilename, enabled_plugins: pluginInfos.filter((p) => p.enabled).map((p) => p.id) })
+      await api.settings.put({ save_dir_template: saveDir, save_filename_template: saveFilename, enabled_plugins: pluginInfos.filter((p) => p.enabled).map((p) => p.id), phd2_host: phd2Host, phd2_port: phd2Port })
       setSaveStatus('saved')
       setTimeout(() => setSaveStatus('idle'), 2000)
     } catch {
@@ -224,6 +230,25 @@ export function Options() {
           {saveStatus === 'saved' && <p className="text-xs text-status-connected">Saved.</p>}
           {saveStatus === 'error' && <p className="text-xs text-status-error">Failed to save settings.</p>}
         </div>
+      </Section>
+
+      <Section title="PHD2 Guiding">
+        <Row label="PHD2 host" hint="Hostname or IP where PHD2 is running">
+          <TextInput
+            value={phd2Host}
+            onChange={setPhd2Host}
+            onBlur={persistSaveSettings}
+            className="w-40"
+          />
+        </Row>
+        <Row label="PHD2 port" hint="Default: 4400">
+          <TextInput
+            value={String(phd2Port)}
+            onChange={(v) => setPhd2Port(parseInt(v) || 4400)}
+            onBlur={persistSaveSettings}
+            className="w-24"
+          />
+        </Row>
       </Section>
 
       <Section title="INDI Server">

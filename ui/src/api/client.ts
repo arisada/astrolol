@@ -13,6 +13,7 @@ import type {
   IndiDeviceMessage,
   LoadDriverResponse,
   MountStatus,
+  Phd2Status,
   PluginInfo,
   Profile,
   SetPropertyRequest,
@@ -162,6 +163,28 @@ export const api = {
 
   plugins: {
     list: () => request<PluginInfo[]>('/plugins'),
+  },
+
+  phd2: {
+    connect: () => request<void>('/phd2/connect', { method: 'POST' }),
+    disconnect: () => request<void>('/phd2/disconnect', { method: 'POST' }),
+    status: () => request<Phd2Status>('/phd2/status'),
+    guide: (settlePixels?: number, settleTime?: number, settleTimeout?: number, recalibrate?: boolean) =>
+      request<void>('/phd2/guide', {
+        method: 'POST',
+        body: JSON.stringify({
+          settle: { pixels: settlePixels ?? 1.5, time: settleTime ?? 10, timeout: settleTimeout ?? 60 },
+          recalibrate: recalibrate ?? false,
+        }),
+      }),
+    stop: () => request<void>('/phd2/stop', { method: 'POST' }),
+    dither: (pixels?: number, raOnly?: boolean) =>
+      request<void>('/phd2/dither', {
+        method: 'POST',
+        body: JSON.stringify({ pixels: pixels ?? 5.0, ra_only: raOnly ?? false }),
+      }),
+    pause: () => request<void>('/phd2/pause', { method: 'POST' }),
+    resume: () => request<void>('/phd2/resume', { method: 'POST' }),
   },
 
   focuser: {

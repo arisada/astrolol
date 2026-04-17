@@ -48,6 +48,15 @@ def create_app() -> FastAPI:
             asyncio.get_event_loop().set_debug(True)
             logger.info("asyncio.debug_mode_enabled")
 
+        # Start enabled feature plugins (PHD2, etc.)
+        for plugin_id in app.state.enabled_plugin_ids:
+            plugin = app.state.discovered_plugins.get(plugin_id)
+            if plugin is not None:
+                try:
+                    await plugin.startup()
+                except Exception as exc:
+                    logger.error("plugin.startup_failed", plugin_id=plugin_id, error=str(exc))
+
         store: ProfileStore = app.state.profile_store
         last_id = store.get_last_active_id()
         if last_id is not None:
@@ -74,7 +83,15 @@ def create_app() -> FastAPI:
             except KeyError:
                 logger.warning("startup.last_profile_not_found", profile_id=last_id)
         yield
-        # --- Shutdown (nothing needed yet) ---
+
+        # --- Shutdown ---
+        for plugin_id in app.state.enabled_plugin_ids:
+            plugin = app.state.discovered_plugins.get(plugin_id)
+            if plugin is not None:
+                try:
+                    await plugin.shutdown()
+                except Exception as exc:
+                    logger.error("plugin.shutdown_failed", plugin_id=plugin_id, error=str(exc))
 
     app = FastAPI(title="astrolol", version="0.1.0", lifespan=lifespan)
 

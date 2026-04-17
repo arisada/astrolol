@@ -6,3 +6,8 @@ declare module '@plugins/hello/ui/HelloPage' {
   import type { ComponentType } from 'react'
   export const HelloPage: ComponentType
 }
+
+declare module '@plugins/phd2/ui/Phd2Page' {
+  import type { ComponentType } from 'react'
+  export const Phd2Page: ComponentType
+}

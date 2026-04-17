@@ -7,8 +7,9 @@
  */
 import type { ComponentType } from 'react'
 import type { LucideIcon } from 'lucide-react'
-import { Smile } from 'lucide-react'
+import { Crosshair, Smile } from 'lucide-react'
 import { HelloPage } from '@plugins/hello/ui/HelloPage'
+import { Phd2Page } from '@plugins/phd2/ui/Phd2Page'
 
 export interface PluginRegistryEntry {
   to: string
@@ -23,6 +24,12 @@ const PLUGIN_REGISTRY: Record<string, PluginRegistryEntry> = {
     icon: Smile,
     label: 'Hello',
     Component: HelloPage,
+  },
+  phd2: {
+    to: '/phd2',
+    icon: Crosshair,
+    label: 'Guiding',
+    Component: Phd2Page,
   },
 }
 
