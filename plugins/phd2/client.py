@@ -65,10 +65,14 @@ class Phd2Client:
         # Settle signalling — set by _handle_event when SettleDone arrives
         self._settle_event: asyncio.Event | None = None
         self._settle_error: str | None = None
+        self._dithering = False  # True while a dither+settle is in progress
 
         # Lifecycle
         self._stop = False
         self._task: asyncio.Task[None] | None = None
+
+        # Debug mode — prints raw JSON-RPC traffic to stdout when enabled
+        self._debug = False
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -94,6 +98,12 @@ class Phd2Client:
         await self.stop()
         await self.start()
 
+    def set_debug(self, enabled: bool) -> None:
+        """Enable or disable raw JSON-RPC traffic logging to stdout."""
+        self._debug = enabled
+        state = "enabled" if enabled else "disabled"
+        print(f"\033[90mPHD2 debug logging {state}\033[0m", flush=True)
+
     # ------------------------------------------------------------------
     # Status
     # ------------------------------------------------------------------
@@ -117,6 +127,8 @@ class Phd2Client:
             rms_total=round(rms_total, 3) if rms_total is not None else None,
             pixel_scale=self._pixel_scale,
             star_snr=self._star_snr,
+            is_dithering=self._dithering,
+            debug_enabled=self._debug,
         )
 
     # ------------------------------------------------------------------
@@ -147,7 +159,10 @@ class Phd2Client:
         """Send a dither command and block until PHD2 reports SettleDone."""
         if not self._connected:
             raise ConnectionError("Not connected to PHD2")
+        if self._dithering:
+            raise RuntimeError("Dither already in progress")
 
+        self._dithering = True
         event = asyncio.Event()
         self._settle_event = event
         self._settle_error = None
@@ -159,6 +174,7 @@ class Phd2Client:
         except asyncio.TimeoutError:
             raise TimeoutError("PHD2 settle timed out")
         finally:
+            self._dithering = False
             if self._settle_event is event:
                 self._settle_event = None
 
@@ -241,6 +257,12 @@ class Phd2Client:
             except json.JSONDecodeError:
                 continue
 
+            if self._debug:
+                if "Event" in msg:
+                    print(f"\033[33mPHD2 ← {json.dumps(msg)}\033[0m", flush=True)
+                else:
+                    print(f"\033[32mPHD2 ← {json.dumps(msg)}\033[0m", flush=True)
+
             if "Event" in msg:
                 await self._handle_event(msg)
             elif "id" in msg:
@@ -269,6 +291,11 @@ class Phd2Client:
             snr = msg.get("SNR")
             self._star_snr = float(snr) if snr is not None else None
 
+            # A GuideStep means the star is being tracked — recover from Star loss
+            if self._state == "Star loss":
+                self._state = "Guiding"
+                await self._event_bus.publish(Phd2StateChanged(state=self._state))
+
             scale = self._pixel_scale or 1.0
             await self._event_bus.publish(
                 Phd2GuideStep(
@@ -296,6 +323,7 @@ class Phd2Client:
             self._state = "Guiding"
             self._ra_steps.clear()
             self._dec_steps.clear()
+            await self._event_bus.publish(Phd2StateChanged(state=self._state))
 
         elif event_name == "GuidingStopped":
             self._state = "Stopped"
@@ -310,7 +338,7 @@ class Phd2Client:
             await self._event_bus.publish(Phd2StateChanged(state=self._state))
 
         elif event_name == "StarLost":
-            self._state = "LostLock"
+            self._state = "Star loss"
             await self._event_bus.publish(Phd2StateChanged(state=self._state))
 
         elif event_name == "StarSelected":
@@ -342,6 +370,9 @@ class Phd2Client:
         payload: dict[str, Any] = {"method": method, "id": rid}
         if params is not None:
             payload["params"] = params
+
+        if self._debug:
+            print(f"\033[36mPHD2 → {json.dumps(payload)}\033[0m", flush=True)
 
         self._writer.write((json.dumps(payload) + "\r\n").encode())
         await self._writer.drain()

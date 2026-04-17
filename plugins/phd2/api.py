@@ -3,7 +3,7 @@ import structlog
 from fastapi import APIRouter, HTTPException, Request
 
 from plugins.phd2.client import Phd2Client
-from plugins.phd2.models import DitherRequest, GuideRequest, Phd2Status
+from plugins.phd2.models import DebugRequest, DitherRequest, GuideRequest, Phd2Status
 
 logger = structlog.get_logger()
 router = APIRouter(prefix="/phd2", tags=["phd2"])
@@ -120,3 +120,9 @@ async def resume(request: Request) -> None:
     except Exception as exc:
         logger.warning("phd2.resume_failed", reason=str(exc))
         raise HTTPException(status_code=502, detail=f"PHD2: {exc}") from exc
+
+
+@router.post("/debug", status_code=204)
+async def set_debug(req: DebugRequest, request: Request) -> None:
+    """Enable or disable raw JSON-RPC traffic logging to the server console."""
+    _client(request).set_debug(req.enabled)

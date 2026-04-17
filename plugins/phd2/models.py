@@ -10,6 +10,8 @@ class Phd2Status(BaseModel):
     rms_total: float | None = None
     pixel_scale: float | None = None  # arcsec/px; None = not fetched yet
     star_snr: float | None = None
+    is_dithering: bool = False
+    debug_enabled: bool = False
 
 
 class SettleParams(BaseModel):
@@ -27,3 +29,7 @@ class DitherRequest(BaseModel):
     pixels: float = Field(default=5.0, gt=0, description="Dither amount in guide camera pixels")
     ra_only: bool = False
     settle: SettleParams = SettleParams()
+
+
+class DebugRequest(BaseModel):
+    enabled: bool

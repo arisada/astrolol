@@ -36,6 +36,8 @@ class FakePhd2Client:
             rms_total=0.31,
             pixel_scale=1.5,
             star_snr=42.0,
+            is_dithering=False,
+            debug_enabled=False,
         )
 
     async def guide(self, **kwargs: object) -> None:
@@ -57,6 +59,9 @@ class FakePhd2Client:
     async def resume(self) -> None:
         self._maybe_raise()
         self.calls.append(("resume", {}))
+
+    def set_debug(self, enabled: bool) -> None:
+        self.calls.append(("set_debug", {"enabled": enabled}))
 
 
 @pytest.fixture()
@@ -198,6 +203,20 @@ def test_resume_connection_error_returns_503(client: TestClient, fake: FakePhd2C
     fake._raise = ConnectionError("gone")
     r = client.post("/phd2/resume")
     assert r.status_code == 503
+
+
+# ── Debug ─────────────────────────────────────────────────────────────────────
+
+def test_debug_enable(client: TestClient, fake: FakePhd2Client) -> None:
+    r = client.post("/phd2/debug", json={"enabled": True})
+    assert r.status_code == 204
+    assert fake.calls[-1] == ("set_debug", {"enabled": True})
+
+
+def test_debug_disable(client: TestClient, fake: FakePhd2Client) -> None:
+    r = client.post("/phd2/debug", json={"enabled": False})
+    assert r.status_code == 204
+    assert fake.calls[-1] == ("set_debug", {"enabled": False})
 
 
 # ── Plugin manifest ───────────────────────────────────────────────────────────
