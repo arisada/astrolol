@@ -160,6 +160,39 @@ function JobRow({ job, onCancel }: { job: SolveJob; onCancel: (id: string) => vo
 
 // ── Settings panel ─────────────────────────────────────────────────────────────
 
+// Numeric input that keeps a raw string while typing and only commits a
+// parsed value on blur, so the user can freely delete and retype digits.
+function NumericInput({ value, onChange, placeholder, allowNull }: {
+  value: number | null
+  onChange: (v: number | null) => void
+  placeholder?: string
+  allowNull?: boolean
+}) {
+  const [raw, setRaw] = useState(value != null ? String(value) : '')
+  useEffect(() => { setRaw(value != null ? String(value) : '') }, [value])
+
+  const commit = () => {
+    if (raw.trim() === '') {
+      if (allowNull) { onChange(null); return }
+      setRaw(value != null ? String(value) : '')  // revert
+      return
+    }
+    const n = parseFloat(raw)
+    if (isNaN(n)) { setRaw(value != null ? String(value) : ''); return }
+    onChange(n)
+  }
+
+  return (
+    <input
+      value={raw}
+      placeholder={placeholder}
+      onChange={(e) => setRaw(e.target.value)}
+      onBlur={commit}
+      className="rounded border border-surface-border bg-surface-overlay px-2 py-1.5 text-xs text-slate-200 font-mono focus:outline-none focus:ring-1 focus:ring-accent w-full"
+    />
+  )
+}
+
 function SettingsPanel({ settings, onChange }: { settings: UserSettings; onChange: (s: UserSettings) => void }) {
   const [saving, setSaving] = useState(false)
   const [local, setLocal] = useState(settings)
@@ -190,19 +223,19 @@ function SettingsPanel({ settings, onChange }: { settings: UserSettings; onChang
       </div>
       <div className="flex flex-col gap-1">
         <span className="text-xs text-slate-400">Search radius (°)</span>
-        {inp(String(local.astap_search_radius), (v) => setLocal({ ...local, astap_search_radius: parseFloat(v) || 30 }))}
+        <NumericInput value={local.astap_search_radius}
+          onChange={(v) => setLocal({ ...local, astap_search_radius: v ?? 30 })} />
       </div>
       <div className="flex flex-col gap-1">
         <span className="text-xs text-slate-400">Tolerance</span>
-        {inp(String(local.astap_tolerance), (v) => setLocal({ ...local, astap_tolerance: parseFloat(v) || 0.007 }))}
+        <NumericInput value={local.astap_tolerance}
+          onChange={(v) => setLocal({ ...local, astap_tolerance: v ?? 0.007 })} />
       </div>
       <div className="flex flex-col gap-1">
         <span className="text-xs text-slate-400">Pixel size (µm, optional)</span>
-        {inp(
-          local.pixel_size_um != null ? String(local.pixel_size_um) : '',
-          (v) => setLocal({ ...local, pixel_size_um: v ? (parseFloat(v) || null) : null }),
-          'e.g. 3.76'
-        )}
+        <NumericInput value={local.pixel_size_um} allowNull
+          onChange={(v) => setLocal({ ...local, pixel_size_um: v })}
+          placeholder="e.g. 3.76" />
       </div>
       <Button size="sm" onClick={save} disabled={saving} className="self-start">
         {saving ? 'Saving…' : 'Save'}
