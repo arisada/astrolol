@@ -113,7 +113,7 @@ class SolveManager:
         self,
         event_bus: EventBus,
         astap_bin: str = "astap_cli",
-        astap_db_path: str = "/usr/share/astap",
+        astap_db_path: str = "/opt/astap",
     ) -> None:
         self._event_bus = event_bus
         self._astap_bin = astap_bin
@@ -212,7 +212,6 @@ class SolveManager:
                 "-r", str(req.radius),
                 "-d", self._astap_db_path,
                 "-update",
-                "-progress",      # emit progress lines to stdout
             ]
             if req.ra_hint is not None:
                 cmd += ["-ra", str(req.ra_hint / 15.0)]    # degrees → hours
