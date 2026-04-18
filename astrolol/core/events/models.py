@@ -110,6 +110,15 @@ class MountSlewAborted(BaseEvent):
     device_id: str
 
 
+class MountTargetSet(BaseEvent):
+    type: Literal["mount.target_set"] = "mount.target_set"
+    device_id: str
+    ra: float            # ICRS degrees
+    dec: float           # ICRS degrees
+    name: str | None = None
+    source: str | None = None
+
+
 class MountParked(BaseEvent):
     type: Literal["mount.parked"] = "mount.parked"
     device_id: str
@@ -248,7 +257,7 @@ Event = Annotated[
         ExposureStarted, ExposureCompleted, ExposureFailed, LoopStarted, LoopStopped,
         MountSlewStarted, MountSlewCompleted, MountSlewAborted,
         MountParked, MountUnparked, MountSynced, MountTrackingChanged, MountOperationFailed,
-        MountMeridianFlipStarted, MountMeridianFlipCompleted,
+        MountMeridianFlipStarted, MountMeridianFlipCompleted, MountTargetSet,
         FocuserMoveStarted, FocuserMoveCompleted, FocuserHalted,
         FilterWheelFilterChanged,
         Phd2Connected, Phd2Disconnected, Phd2StateChanged, Phd2GuideStep, Phd2Settled,

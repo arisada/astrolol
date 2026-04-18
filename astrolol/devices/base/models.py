@@ -1,3 +1,4 @@
+from datetime import datetime
 from enum import StrEnum
 from pydantic import BaseModel, Field
 
@@ -41,10 +42,19 @@ class CameraStatus(BaseModel):
 
 # --- Mount ---
 
-class SlewTarget(BaseModel):
-    """HTTP/JSON body for slew and sync requests. Coordinates are ICRS (J2000)."""
-    ra: float = Field(description="ICRS Right Ascension in decimal hours (0–24)")
-    dec: float = Field(description="ICRS Declination in decimal degrees (-90–90)")
+class Target(BaseModel):
+    """A sky position of interest, stored in ICRS (J2000)."""
+    ra: float            # ICRS degrees
+    dec: float           # ICRS degrees
+    name: str | None = None
+    source: str | None = None   # who set it: "user" | "catalogue" | "stellarium" | …
+    set_at: datetime
+
+    @property
+    def skycoord(self) -> "SkyCoord":
+        from astropy.coordinates import SkyCoord
+        import astropy.units as u
+        return SkyCoord(ra=self.ra * u.deg, dec=self.dec * u.deg, frame="icrs")
 
 
 class MountStatus(BaseModel):

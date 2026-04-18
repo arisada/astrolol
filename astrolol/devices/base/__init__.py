@@ -4,7 +4,7 @@ from astrolol.devices.base.models import (
     ExposureParams,
     Image,
     CameraStatus,
-    SlewTarget,
+    Target,
     MountStatus,
     FocuserStatus,
     FilterWheelStatus,
@@ -14,6 +14,6 @@ from astrolol.devices.base.models import (
 __all__ = [
     "ICamera", "IMount", "IFocuser", "IFilterWheel", "IRotator",
     "DeviceState", "ExposureParams", "Image", "CameraStatus",
-    "SlewTarget", "MountStatus", "FocuserStatus",
+    "Target", "MountStatus", "FocuserStatus",
     "FilterWheelStatus", "RotatorStatus",
 ]

@@ -223,7 +223,7 @@ function MountControls({ deviceId }: { deviceId: string }) {
         )}
 
         {/* Live position */}
-        <Section title="Position (JNOW)">
+        <Section title="Position (J2000)">
           <div className="grid grid-cols-2 gap-x-8 gap-y-1 font-mono text-sm">
             <span className="text-slate-500 text-xs">RA</span>
             <span className="text-slate-500 text-xs">Dec</span>
@@ -244,8 +244,8 @@ function MountControls({ deviceId }: { deviceId: string }) {
           </div>
         </Section>
 
-        {/* Slew */}
-        <Section title="Slew to (JNOW)">
+        {/* Target */}
+        <Section title="Target (J2000)">
           <div className="flex flex-col gap-2">
             <div className="flex items-center gap-2">
               <span className="text-xs text-slate-500 w-8 shrink-0">RA</span>
@@ -257,13 +257,16 @@ function MountControls({ deviceId }: { deviceId: string }) {
             </div>
           </div>
           <div className="flex gap-2 items-center flex-wrap">
-            <Button size="sm" onClick={() => act(() => api.mount.slew(deviceId, slewRa, slewDec))}>
-              <Crosshair size={12} className="mr-1" /> Slew
+            <Button size="sm" variant="outline" onClick={() => act(() => api.mount.setTarget(deviceId, slewRa * 15, slewDec))}>
+              <Crosshair size={12} className="mr-1" /> Set Target
             </Button>
-            <Button size="sm" variant="outline" onClick={() => act(() => api.mount.sync(deviceId, slewRa, slewDec))}>
+            <Button size="sm" onClick={() => act(() => api.mount.slew(deviceId))}>
+              Slew
+            </Button>
+            <Button size="sm" variant="outline" onClick={() => act(() => api.mount.sync(deviceId, slewRa * 15, slewDec))}>
               <RotateCw size={12} className="mr-1" /> Sync
             </Button>
-            <Button size="sm" variant="outline" onClick={() => act(() => api.mount.stop(deviceId))}>
+            <Button size="sm" variant="ghost" onClick={() => act(() => api.mount.stop(deviceId))}>
               <StopCircle size={12} className="mr-1" /> Stop
             </Button>
             {slewEdited.current && (

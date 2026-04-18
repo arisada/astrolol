@@ -4,7 +4,7 @@ import astropy.units as u
 from astropy.coordinates import SkyCoord
 
 from astrolol.core.errors import DeviceKindError, DeviceNotFoundError
-from astrolol.devices.base.models import MountStatus, SlewTarget, TrackingMode
+from astrolol.devices.base.models import MountStatus, Target, TrackingMode
 from astrolol.mount.manager import MountManager
 
 router = APIRouter(prefix="/mount", tags=["mount"])
@@ -19,6 +19,24 @@ class TrackingRequest(BaseModel):
     mode: TrackingMode | None = None
 
 
+class TargetRequest(BaseModel):
+    """ICRS (J2000) coordinates in degrees."""
+    ra: float   # ICRS degrees
+    dec: float  # ICRS degrees
+    name: str | None = None
+    source: str | None = None
+
+
+class SyncRequest(BaseModel):
+    """ICRS (J2000) coordinates in degrees."""
+    ra: float   # ICRS degrees
+    dec: float  # ICRS degrees
+
+
+def _icrs_deg_to_skycoord(ra_deg: float, dec_deg: float) -> SkyCoord:
+    return SkyCoord(ra=ra_deg * u.deg, dec=dec_deg * u.deg, frame="icrs")
+
+
 @router.get("/{device_id}/status", response_model=MountStatus)
 async def status(device_id: str, request: Request) -> MountStatus:
     try:
@@ -27,15 +45,39 @@ async def status(device_id: str, request: Request) -> MountStatus:
         raise HTTPException(status_code=404, detail=str(exc))
 
 
-def _target_to_skycoord(target: SlewTarget) -> SkyCoord:
-    return SkyCoord(ra=target.ra * u.hourangle, dec=target.dec * u.deg, frame="icrs")
+@router.put("/{device_id}/target", response_model=Target, status_code=200)
+async def set_target(device_id: str, body: TargetRequest, request: Request) -> Target:
+    """Set the current target (ICRS degrees). Returns the stored target."""
+    try:
+        coord = _icrs_deg_to_skycoord(body.ra, body.dec)
+        return await _manager(request).set_target(device_id, coord, name=body.name, source=body.source)
+    except (DeviceNotFoundError, DeviceKindError) as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+
+@router.get("/{device_id}/target", response_model=Target)
+async def get_target(device_id: str, request: Request) -> Target:
+    """Get the current target, or 404 if none is set."""
+    target = _manager(request).get_target(device_id)
+    if target is None:
+        raise HTTPException(status_code=404, detail="No target set")
+    return target
+
+
+@router.delete("/{device_id}/target", status_code=204)
+async def clear_target(device_id: str, request: Request) -> None:
+    """Clear the current target."""
+    try:
+        await _manager(request).clear_target(device_id)
+    except (DeviceNotFoundError, DeviceKindError) as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
 
 
 @router.post("/{device_id}/slew", status_code=202)
-async def slew(device_id: str, target: SlewTarget, request: Request) -> dict[str, str]:
-    """Start a slew. Returns immediately; subscribe to /ws/events for completion."""
+async def slew(device_id: str, request: Request) -> dict[str, str]:
+    """Slew to the current target. Returns immediately; subscribe to /ws/events for completion."""
     try:
-        await _manager(request).slew(device_id, _target_to_skycoord(target))
+        await _manager(request).slew(device_id)
         return {"status": "slewing", "device_id": device_id}
     except (DeviceNotFoundError, DeviceKindError) as exc:
         raise HTTPException(status_code=404, detail=str(exc))
@@ -73,9 +115,10 @@ async def unpark(device_id: str, request: Request) -> None:
 
 
 @router.post("/{device_id}/sync", status_code=204)
-async def sync(device_id: str, target: SlewTarget, request: Request) -> None:
+async def sync(device_id: str, body: SyncRequest, request: Request) -> None:
+    """Sync the mount coordinate model to the given ICRS position (degrees)."""
     try:
-        await _manager(request).sync(device_id, _target_to_skycoord(target))
+        await _manager(request).sync(device_id, _icrs_deg_to_skycoord(body.ra, body.dec))
     except (DeviceNotFoundError, DeviceKindError) as exc:
         raise HTTPException(status_code=404, detail=str(exc))
 

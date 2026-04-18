@@ -30,6 +30,14 @@ export interface ConnectedDevice {
   driver_name: string | null
 }
 
+export interface MountTarget {
+  ra: number    // ICRS degrees (J2000)
+  dec: number   // ICRS degrees (J2000)
+  name: string | null
+  source: string | null
+  set_at: string
+}
+
 export interface MountStatus {
   state: DeviceState
   ra: number | null   // ICRS decimal hours (0–24)
@@ -333,6 +341,14 @@ export interface MountSlewCompletedEvent extends BaseEvent {
 
 export interface MountSlewAbortedEvent extends BaseEvent { type: 'mount.slew_aborted'; device_id: string }
 export interface MountParkedEvent extends BaseEvent { type: 'mount.parked'; device_id: string }
+export interface MountTargetSetEvent extends BaseEvent {
+  type: 'mount.target_set'
+  device_id: string
+  ra: number    // ICRS degrees
+  dec: number   // ICRS degrees
+  name: string | null
+  source: string | null
+}
 export type TrackingMode = 'sidereal' | 'lunar' | 'solar'
 
 export interface MountTrackingChangedEvent extends BaseEvent { type: 'mount.tracking_changed'; device_id: string; tracking: boolean; mode: TrackingMode | null }
@@ -386,7 +402,7 @@ export type AstrolollEvent =
   | LoopStartedEvent | LoopStoppedEvent
   | MountSlewStartedEvent | MountSlewCompletedEvent | MountSlewAbortedEvent
   | MountParkedEvent | MountUnparkedEvent | MountTrackingChangedEvent | MountOperationFailedEvent
-  | MountMeridianFlipStartedEvent | MountMeridianFlipCompletedEvent
+  | MountMeridianFlipStartedEvent | MountMeridianFlipCompletedEvent | MountTargetSetEvent
   | FocuserMoveStartedEvent | FocuserMoveCompletedEvent | FocuserHaltedEvent
   | Phd2ConnectedEvent | Phd2DisconnectedEvent | Phd2StateChangedEvent
   | Phd2GuideStepEvent | Phd2SettledEvent

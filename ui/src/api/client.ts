@@ -14,6 +14,7 @@ import type {
   IndiDeviceMessage,
   LoadDriverResponse,
   MountStatus,
+  MountTarget,
   Phd2Status,
   PluginInfo,
   Profile,
@@ -104,11 +105,17 @@ export const api = {
 
   mount: {
     status: (deviceId: string) => request<MountStatus>(`/mount/${deviceId}/status`),
-    slew: (deviceId: string, ra: number, dec: number) =>
-      request<void>(`/mount/${deviceId}/slew`, {
-        method: 'POST',
-        body: JSON.stringify({ ra, dec }),
+    // Target: ICRS degrees (J2000)
+    setTarget: (deviceId: string, ra_deg: number, dec_deg: number, name?: string, source?: string) =>
+      request<MountTarget>(`/mount/${deviceId}/target`, {
+        method: 'PUT',
+        body: JSON.stringify({ ra: ra_deg, dec: dec_deg, name: name ?? null, source: source ?? null }),
       }),
+    getTarget: (deviceId: string) => request<MountTarget>(`/mount/${deviceId}/target`),
+    clearTarget: (deviceId: string) =>
+      request<void>(`/mount/${deviceId}/target`, { method: 'DELETE' }),
+    slew: (deviceId: string) =>
+      request<void>(`/mount/${deviceId}/slew`, { method: 'POST' }),
     stop: (deviceId: string) =>
       request<void>(`/mount/${deviceId}/stop`, { method: 'POST' }),
     park: (deviceId: string) =>
@@ -122,10 +129,11 @@ export const api = {
       }),
     meridianFlip: (deviceId: string) =>
       request<void>(`/mount/${deviceId}/meridian_flip`, { method: 'POST' }),
-    sync: (deviceId: string, ra: number, dec: number) =>
+    // sync: ICRS degrees (J2000)
+    sync: (deviceId: string, ra_deg: number, dec_deg: number) =>
       request<void>(`/mount/${deviceId}/sync`, {
         method: 'POST',
-        body: JSON.stringify({ ra, dec }),
+        body: JSON.stringify({ ra: ra_deg, dec: dec_deg }),
       }),
     setParkPosition: (deviceId: string) =>
       request<void>(`/mount/${deviceId}/set_park_position`, { method: 'POST' }),

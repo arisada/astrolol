@@ -1,5 +1,6 @@
 import asyncio
 from dataclasses import dataclass, field
+from datetime import datetime, timezone
 
 import structlog
 
@@ -13,13 +14,14 @@ from astrolol.core.events import (
     MountSlewCompleted,
     MountSlewStarted,
     MountSynced,
+    MountTargetSet,
     MountTrackingChanged,
     MountUnparked,
 )
 from astrolol.core.errors import DeviceNotFoundError, DeviceKindError
 from astropy.coordinates import SkyCoord
 
-from astrolol.devices.base.models import MountStatus, TrackingMode
+from astrolol.devices.base.models import MountStatus, Target, TrackingMode
 from astrolol.devices.manager import DeviceManager
 from astrolol.profiles.models import ObserverLocation
 
@@ -31,9 +33,13 @@ PARK_TIMEOUT = 120.0
 
 @dataclass
 class MountController:
-    """Per-mount state: tracks any in-progress slew or park task."""
+    """Per-mount state: tracks any in-progress slew or park task and the current target."""
     device_id: str
     _active_task: asyncio.Task | None = field(default=None, repr=False)
+    _target: SkyCoord | None = field(default=None, repr=False)
+    _target_name: str | None = field(default=None, repr=False)
+    _target_source: str | None = field(default=None, repr=False)
+    _target_set_at: datetime | None = field(default=None, repr=False)
 
     @property
     def is_busy(self) -> bool:
@@ -48,15 +54,71 @@ class MountManager:
 
     # --- Public API ---
 
-    async def slew(self, device_id: str, coord: SkyCoord) -> None:
+    async def set_target(
+        self,
+        device_id: str,
+        coord: SkyCoord,
+        name: str | None = None,
+        source: str | None = None,
+    ) -> Target:
+        """Set the current target for the mount. Returns the stored Target."""
+        ctrl = self._get_or_create(device_id)
+        now = datetime.now(timezone.utc)
+        ctrl._target = coord.icrs
+        ctrl._target_name = name
+        ctrl._target_source = source
+        ctrl._target_set_at = now
+
+        icrs = coord.icrs
+        await self._event_bus.publish(
+            MountTargetSet(
+                device_id=device_id,
+                ra=icrs.ra.deg,
+                dec=icrs.dec.deg,
+                name=name,
+                source=source,
+            )
+        )
+        logger.info("mount.target_set", device_id=device_id, ra=icrs.ra.deg, dec=icrs.dec.deg, name=name)
+        return Target(ra=icrs.ra.deg, dec=icrs.dec.deg, name=name, source=source, set_at=now)
+
+    def get_target(self, device_id: str) -> Target | None:
+        """Return the current target, or None if not set."""
+        ctrl = self._controllers.get(device_id)
+        if ctrl is None or ctrl._target is None:
+            return None
+        return Target(
+            ra=ctrl._target.ra.deg,
+            dec=ctrl._target.dec.deg,
+            name=ctrl._target_name,
+            source=ctrl._target_source,
+            set_at=ctrl._target_set_at,  # type: ignore[arg-type]
+        )
+
+    async def clear_target(self, device_id: str) -> None:
+        """Clear the current target."""
+        ctrl = self._get_or_create(device_id)
+        ctrl._target = None
+        ctrl._target_name = None
+        ctrl._target_source = None
+        ctrl._target_set_at = None
+        logger.info("mount.target_cleared", device_id=device_id)
+
+    async def slew(self, device_id: str) -> None:
         """
-        Start a slew to the given ICRS coordinate. Returns immediately.
+        Start a slew to the current target. Returns immediately.
         Subscribe to /ws/events for MountSlewCompleted / MountSlewAborted.
-        Raises ValueError if the mount is already busy.
+        Raises ValueError if no target is set or the mount is already busy.
         """
         ctrl = self._get_or_create(device_id)
         self._require_idle(ctrl)
 
+        if ctrl._target is None:
+            raise ValueError(
+                f"Mount '{device_id}' has no target. Call set_target() first."
+            )
+
+        coord = ctrl._target
         icrs = coord.icrs
         ctrl._active_task = asyncio.create_task(
             self._slew_worker(ctrl, coord),
