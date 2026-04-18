@@ -79,7 +79,7 @@ def _write_imagetyp(fits_path: Path, frame_type: str) -> None:
         logger.warning("imager.fits_imagetyp_failed", fits=str(fits_path))
 
 
-def _patch_fits_headers(fits_path: Path, profile: "Profile", ra: float | None, dec: float | None) -> None:
+def _patch_fits_headers(fits_path: Path, profile: "Profile", coord: "SkyCoord | None") -> None:
     """Inject observatory and telescope metadata into an existing FITS file."""
     try:
         from astropy.io import fits as astrofits
@@ -99,10 +99,10 @@ def _patch_fits_headers(fits_path: Path, profile: "Profile", ra: float | None, d
                 hdr["SITEELEV"] = (profile.location.altitude, "[m] Observer altitude")
                 if profile.location.name:
                     hdr["SITENAME"] = (profile.location.name, "Observer location name")
-            if ra is not None:
-                hdr["RA"] = (ra * 15.0, "[deg] Right ascension (J2000)")
-            if dec is not None:
-                hdr["DEC"] = (dec, "[deg] Declination (J2000)")
+            if coord is not None:
+                icrs = coord.icrs
+                hdr["RA"] = (icrs.ra.deg, "[deg] Right ascension (J2000)")
+                hdr["DEC"] = (icrs.dec.deg, "[deg] Declination (J2000)")
             hdul.flush()
     except Exception:
         logger.warning("imager.fits_header_patch_failed", fits=str(fits_path))
@@ -238,9 +238,8 @@ class ImagerManager:
             frame_type=request.frame_type,
         )
 
-        # Snapshot mount RA/DEC before the shutter opens (best represents pointing)
-        ra: float | None = None
-        dec: float | None = None
+        # Snapshot mount pointing before the shutter opens (best represents pointing)
+        coord = None
         profile = self._active_profile
         if profile is not None:
             mount_role = next(
@@ -249,9 +248,8 @@ class ImagerManager:
             if mount_role is not None:
                 try:
                     mount = self._device_manager.get_mount(mount_role.config.device_id)
-                    status = await mount.status()
-                    ra = status.ra
-                    dec = status.dec
+                    status = await mount.get_status()
+                    coord = status.skycoord
                 except Exception:
                     pass  # mount not connected or query failed — skip RA/DEC
 
@@ -280,7 +278,7 @@ class ImagerManager:
 
         await asyncio.to_thread(_write_imagetyp, fits_path, request.frame_type)
         if profile is not None:
-            await asyncio.to_thread(_patch_fits_headers, fits_path, profile, ra, dec)
+            await asyncio.to_thread(_patch_fits_headers, fits_path, profile, coord)
 
         # Optionally move to save directory using the configured template
         if request.save and self._profile_store is not None:

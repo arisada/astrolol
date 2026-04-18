@@ -32,8 +32,8 @@ export interface ConnectedDevice {
 
 export interface MountStatus {
   state: DeviceState
-  ra: number | null
-  dec: number | null
+  ra: number | null   // ICRS decimal hours (0–24)
+  dec: number | null  // ICRS decimal degrees (-90–90)
   alt: number | null
   az: number | null
   is_tracking: boolean
@@ -320,15 +320,15 @@ export interface LoopStoppedEvent extends BaseEvent { type: 'imager.loop_stopped
 export interface MountSlewStartedEvent extends BaseEvent {
   type: 'mount.slew_started'
   device_id: string
-  ra: number
-  dec: number
+  ra: number   // ICRS degrees
+  dec: number  // ICRS degrees
 }
 
 export interface MountSlewCompletedEvent extends BaseEvent {
   type: 'mount.slew_completed'
   device_id: string
-  ra: number
-  dec: number
+  ra: number   // ICRS degrees
+  dec: number  // ICRS degrees
 }
 
 export interface MountSlewAbortedEvent extends BaseEvent { type: 'mount.slew_aborted'; device_id: string }

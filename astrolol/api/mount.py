@@ -1,5 +1,7 @@
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
+import astropy.units as u
+from astropy.coordinates import SkyCoord
 
 from astrolol.core.errors import DeviceKindError, DeviceNotFoundError
 from astrolol.devices.base.models import MountStatus, SlewTarget, TrackingMode
@@ -25,11 +27,15 @@ async def status(device_id: str, request: Request) -> MountStatus:
         raise HTTPException(status_code=404, detail=str(exc))
 
 
+def _target_to_skycoord(target: SlewTarget) -> SkyCoord:
+    return SkyCoord(ra=target.ra * u.hourangle, dec=target.dec * u.deg, frame="icrs")
+
+
 @router.post("/{device_id}/slew", status_code=202)
 async def slew(device_id: str, target: SlewTarget, request: Request) -> dict[str, str]:
     """Start a slew. Returns immediately; subscribe to /ws/events for completion."""
     try:
-        await _manager(request).slew(device_id, target)
+        await _manager(request).slew(device_id, _target_to_skycoord(target))
         return {"status": "slewing", "device_id": device_id}
     except (DeviceNotFoundError, DeviceKindError) as exc:
         raise HTTPException(status_code=404, detail=str(exc))
@@ -69,7 +75,7 @@ async def unpark(device_id: str, request: Request) -> None:
 @router.post("/{device_id}/sync", status_code=204)
 async def sync(device_id: str, target: SlewTarget, request: Request) -> None:
     try:
-        await _manager(request).sync(device_id, target)
+        await _manager(request).sync(device_id, _target_to_skycoord(target))
     except (DeviceNotFoundError, DeviceKindError) as exc:
         raise HTTPException(status_code=404, detail=str(exc))
 

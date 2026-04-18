@@ -15,16 +15,32 @@ INDI telescope properties used:
 from __future__ import annotations
 
 import structlog
+from astropy.coordinates import FK5, SkyCoord
+from astropy.time import Time
+import astropy.units as u
 
 from astrolol.devices.base.models import (
     DeviceState,
     MountStatus,
-    SlewTarget,
     TrackingMode,
 )
 from astrolol.devices.indi.client import IndiClient
 
 logger = structlog.get_logger()
+
+
+def _to_jnow(coord: SkyCoord) -> SkyCoord:
+    """Convert any SkyCoord to FK5 JNow (the frame INDI EQUATORIAL_EOD_COORD uses)."""
+    return coord.transform_to(FK5(equinox=Time.now()))
+
+
+def _jnow_to_icrs(ra_hours: float, dec_deg: float) -> SkyCoord:
+    """Convert INDI JNow RA (hours) + Dec (degrees) to an ICRS SkyCoord."""
+    return SkyCoord(
+        ra=ra_hours * u.hourangle,
+        dec=dec_deg * u.deg,
+        frame=FK5(equinox=Time.now()),
+    ).icrs
 
 
 class IndiMount:
@@ -62,8 +78,8 @@ class IndiMount:
         finally:
             self._state = DeviceState.DISCONNECTED
 
-    async def slew(self, target: SlewTarget) -> None:
-        """Slew to target and block until motion stops."""
+    async def slew(self, coord: SkyCoord) -> None:
+        """Slew to coord (any frame; converted to JNow internally) and block until done."""
         # Unpark first — INDI telescope simulators (and most real drivers) ignore
         # slew commands when the mount is in a parked state.
         try:
@@ -74,6 +90,7 @@ class IndiMount:
                 await self.unpark()
         except Exception:
             pass
+        jnow = _to_jnow(coord)
         # Set ON_COORD_SET to TRACK (slew then start tracking)
         await self._client.set_switch(
             self._device_name, "ON_COORD_SET", ["TRACK"]
@@ -81,7 +98,7 @@ class IndiMount:
         await self._client.set_number(
             self._device_name,
             "EQUATORIAL_EOD_COORD",
-            {"RA": target.ra, "DEC": target.dec},
+            {"RA": jnow.ra.hour, "DEC": jnow.dec.deg},
         )
         # Wait for mount to finish slewing by polling TELESCOPE_SLEWING
         await self._wait_slew_done()
@@ -112,12 +129,13 @@ class IndiMount:
         )
         self._is_parked = False
 
-    async def sync(self, target: SlewTarget) -> None:
+    async def sync(self, coord: SkyCoord) -> None:
+        jnow = _to_jnow(coord)
         await self._client.set_switch(self._device_name, "ON_COORD_SET", ["SYNC"])
         await self._client.set_number(
             self._device_name,
             "EQUATORIAL_EOD_COORD",
-            {"RA": target.ra, "DEC": target.dec},
+            {"RA": jnow.ra.hour, "DEC": jnow.dec.deg},
         )
 
     _TRACK_RATE_ELEMENTS = {
@@ -150,13 +168,13 @@ class IndiMount:
 
     async def get_status(self) -> MountStatus:
         # Required properties — wait briefly for them to arrive after connect.
-        ra: float | None = None
-        dec: float | None = None
+        ra_jnow: float | None = None
+        dec_jnow: float | None = None
         try:
-            ra = await self._client.get_number(
+            ra_jnow = await self._client.get_number(
                 self._device_name, "EQUATORIAL_EOD_COORD", "RA"
             )
-            dec = await self._client.get_number(
+            dec_jnow = await self._client.get_number(
                 self._device_name, "EQUATORIAL_EOD_COORD", "DEC"
             )
         except Exception:
@@ -184,11 +202,12 @@ class IndiMount:
         if pier_east is not None:
             pier_side = "East" if pier_east else "West"
 
+        # Hour angle must be computed from JNow RA (same frame as LST).
         hour_angle: float | None = None
         lst: float | None = None
         lst = self._client.get_number_nowait(self._device_name, "TIME_LST", "LST")
-        if ra is not None and lst is not None:
-            ha = lst - ra
+        if ra_jnow is not None and lst is not None:
+            ha = lst - ra_jnow
             while ha > 12:
                 ha -= 24
             while ha < -12:
@@ -200,6 +219,14 @@ class IndiMount:
 
         v = self._client._get_vector(self._device_name, "EQUATORIAL_EOD_COORD")
         is_slewing = v is not None and v.state == "Busy"
+
+        # Convert JNow → ICRS so all callers work in a consistent frame.
+        ra: float | None = None
+        dec: float | None = None
+        if ra_jnow is not None and dec_jnow is not None:
+            icrs = _jnow_to_icrs(ra_jnow, dec_jnow)
+            ra = icrs.ra.hour
+            dec = icrs.dec.deg
 
         return MountStatus(
             state=self._state,

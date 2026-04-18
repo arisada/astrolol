@@ -42,14 +42,15 @@ class CameraStatus(BaseModel):
 # --- Mount ---
 
 class SlewTarget(BaseModel):
-    ra: float = Field(description="Right Ascension in decimal hours (0–24)")
-    dec: float = Field(description="Declination in decimal degrees (-90–90)")
+    """HTTP/JSON body for slew and sync requests. Coordinates are ICRS (J2000)."""
+    ra: float = Field(description="ICRS Right Ascension in decimal hours (0–24)")
+    dec: float = Field(description="ICRS Declination in decimal degrees (-90–90)")
 
 
 class MountStatus(BaseModel):
     state: DeviceState
-    ra: float | None = None
-    dec: float | None = None
+    ra: float | None = None    # ICRS decimal hours
+    dec: float | None = None   # ICRS decimal degrees
     alt: float | None = None
     az: float | None = None
     is_tracking: bool = False
@@ -58,6 +59,15 @@ class MountStatus(BaseModel):
     pier_side: str | None = None    # "East" | "West" — which side of the pier the OTA is on
     hour_angle: float | None = None   # decimal hours, negative = east (pre-meridian), positive = west (post)
     lst: float | None = None           # Local Sidereal Time in decimal hours
+
+    @property
+    def skycoord(self) -> "SkyCoord | None":
+        """Return current position as an ICRS SkyCoord, or None if unknown."""
+        if self.ra is None or self.dec is None:
+            return None
+        from astropy.coordinates import SkyCoord
+        import astropy.units as u
+        return SkyCoord(ra=self.ra * u.hourangle, dec=self.dec * u.deg, frame="icrs")
 
 
 # --- Focuser ---

@@ -7,7 +7,10 @@ import pytest
 from astropy.io import fits
 
 from astrolol.core.events import EventBus
-from astrolol.devices.base.models import CameraStatus, DeviceState, ExposureParams, FilterWheelStatus, FocuserStatus, Image, MountStatus, RotatorStatus, SlewTarget
+import astropy.units as u
+from astropy.coordinates import SkyCoord
+
+from astrolol.devices.base.models import CameraStatus, DeviceState, ExposureParams, FilterWheelStatus, FocuserStatus, Image, MountStatus, RotatorStatus
 from astrolol.devices.manager import DeviceManager
 from astrolol.devices.registry import DeviceRegistry
 from astrolol.filter_wheel import FilterWheelManager
@@ -111,10 +114,11 @@ class FakeMount:
     async def disconnect(self) -> None:
         self.connected = False
 
-    async def slew(self, target: SlewTarget) -> None:
+    async def slew(self, coord: SkyCoord) -> None:
         await asyncio.sleep(0.05)
-        self._ra = target.ra
-        self._dec = target.dec
+        icrs = coord.icrs
+        self._ra = icrs.ra.hour
+        self._dec = icrs.dec.deg
         self._parked = False
 
     async def stop(self) -> None:
@@ -128,9 +132,10 @@ class FakeMount:
     async def unpark(self) -> None:
         self._parked = False
 
-    async def sync(self, target: SlewTarget) -> None:
-        self._ra = target.ra
-        self._dec = target.dec
+    async def sync(self, coord: SkyCoord) -> None:
+        icrs = coord.icrs
+        self._ra = icrs.ra.hour
+        self._dec = icrs.dec.deg
 
     async def set_tracking(self, enabled: bool, mode=None) -> None:
         self._tracking = enabled

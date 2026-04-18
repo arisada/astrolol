@@ -17,7 +17,9 @@ from astrolol.core.events import (
     MountUnparked,
 )
 from astrolol.core.errors import DeviceNotFoundError, DeviceKindError
-from astrolol.devices.base.models import MountStatus, SlewTarget, TrackingMode
+from astropy.coordinates import SkyCoord
+
+from astrolol.devices.base.models import MountStatus, TrackingMode
 from astrolol.devices.manager import DeviceManager
 from astrolol.profiles.models import ObserverLocation
 
@@ -46,23 +48,24 @@ class MountManager:
 
     # --- Public API ---
 
-    async def slew(self, device_id: str, target: SlewTarget) -> None:
+    async def slew(self, device_id: str, coord: SkyCoord) -> None:
         """
-        Start a slew to the given RA/Dec. Returns immediately.
+        Start a slew to the given ICRS coordinate. Returns immediately.
         Subscribe to /ws/events for MountSlewCompleted / MountSlewAborted.
         Raises ValueError if the mount is already busy.
         """
         ctrl = self._get_or_create(device_id)
         self._require_idle(ctrl)
 
+        icrs = coord.icrs
         ctrl._active_task = asyncio.create_task(
-            self._slew_worker(ctrl, target),
+            self._slew_worker(ctrl, coord),
             name=f"mount_slew_{device_id}",
         )
         await self._event_bus.publish(
-            MountSlewStarted(device_id=device_id, ra=target.ra, dec=target.dec)
+            MountSlewStarted(device_id=device_id, ra=icrs.ra.deg, dec=icrs.dec.deg)
         )
-        logger.info("mount.slew_started", device_id=device_id, ra=target.ra, dec=target.dec)
+        logger.info("mount.slew_started", device_id=device_id, ra=icrs.ra.deg, dec=icrs.dec.deg)
 
     async def stop(self, device_id: str) -> None:
         """
@@ -106,14 +109,15 @@ class MountManager:
         await self._event_bus.publish(MountUnparked(device_id=device_id))
         logger.info("mount.unparked", device_id=device_id)
 
-    async def sync(self, device_id: str, target: SlewTarget) -> None:
-        """Sync the mount's coordinate model to the given position."""
+    async def sync(self, device_id: str, coord: SkyCoord) -> None:
+        """Sync the mount's coordinate model to the given ICRS position."""
         mount = self._device_manager.get_mount(device_id)
-        await mount.sync(target)
+        await mount.sync(coord)
+        icrs = coord.icrs
         await self._event_bus.publish(
-            MountSynced(device_id=device_id, ra=target.ra, dec=target.dec)
+            MountSynced(device_id=device_id, ra=icrs.ra.deg, dec=icrs.dec.deg)
         )
-        logger.info("mount.synced", device_id=device_id, ra=target.ra, dec=target.dec)
+        logger.info("mount.synced", device_id=device_id, ra=icrs.ra.deg, dec=icrs.dec.deg)
 
     async def set_tracking(self, device_id: str, enabled: bool, mode: TrackingMode | None = None) -> None:
         mount = self._device_manager.get_mount(device_id)
@@ -198,13 +202,14 @@ class MountManager:
                 f"Mount '{ctrl.device_id}' is busy. Call stop() first."
             )
 
-    async def _slew_worker(self, ctrl: MountController, target: SlewTarget) -> None:
+    async def _slew_worker(self, ctrl: MountController, coord: SkyCoord) -> None:
         device_id = ctrl.device_id
         mount = self._device_manager.get_mount(device_id)
+        icrs = coord.icrs
         try:
-            await asyncio.wait_for(mount.slew(target), timeout=SLEW_TIMEOUT)
+            await asyncio.wait_for(mount.slew(coord), timeout=SLEW_TIMEOUT)
             await self._event_bus.publish(
-                MountSlewCompleted(device_id=device_id, ra=target.ra, dec=target.dec)
+                MountSlewCompleted(device_id=device_id, ra=icrs.ra.deg, dec=icrs.dec.deg)
             )
             logger.info("mount.slew_completed", device_id=device_id)
         except asyncio.CancelledError:

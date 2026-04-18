@@ -12,7 +12,10 @@ from astrolol.core.events import (
     MountTrackingChanged,
     MountUnparked,
 )
-from astrolol.devices.base.models import SlewTarget, TrackingMode
+import astropy.units as u
+from astropy.coordinates import SkyCoord
+
+from astrolol.devices.base.models import TrackingMode
 from astrolol.devices.config import DeviceConfig
 from astrolol.devices.manager import DeviceManager
 from astrolol.mount.manager import MountManager
@@ -60,8 +63,8 @@ async def connected_mount(manager: DeviceManager, device_id: str = "mount1") -> 
 @pytest.mark.asyncio
 async def test_slew_returns_immediately(mount_manager: MountManager, manager: DeviceManager) -> None:
     await connected_mount(manager)
-    target = SlewTarget(ra=6.0, dec=45.0)
-    await mount_manager.slew("mount1", target)
+    coord = SkyCoord(ra=6.0 * u.hourangle, dec=45.0 * u.deg, frame="icrs")
+    await mount_manager.slew("mount1", coord)
     # should not block — task runs in background
     status = await mount_manager.get_status("mount1")
     assert status.ra is not None
@@ -76,12 +79,12 @@ async def test_slew_publishes_started_and_completed(
     while not q.empty():
         await q.get()
 
-    target = SlewTarget(ra=6.0, dec=45.0)
-    await mount_manager.slew("mount1", target)
+    coord = SkyCoord(ra=6.0 * u.hourangle, dec=45.0 * u.deg, frame="icrs")
+    await mount_manager.slew("mount1", coord)
 
     started = await asyncio.wait_for(q.get(), timeout=2.0)
     assert isinstance(started, MountSlewStarted)
-    assert started.ra == 6.0
+    assert started.ra == pytest.approx(90.0)   # 6h × 15 = 90°
 
     # wait for background task to finish
     ctrl = mount_manager._controllers["mount1"]
@@ -90,7 +93,7 @@ async def test_slew_publishes_started_and_completed(
 
     completed = await asyncio.wait_for(q.get(), timeout=2.0)
     assert isinstance(completed, MountSlewCompleted)
-    assert completed.dec == 45.0
+    assert completed.dec == pytest.approx(45.0)
 
 
 @pytest.mark.asyncio
@@ -98,8 +101,8 @@ async def test_slew_updates_position(
     mount_manager: MountManager, manager: DeviceManager
 ) -> None:
     await connected_mount(manager)
-    target = SlewTarget(ra=12.5, dec=-30.0)
-    await mount_manager.slew("mount1", target)
+    coord = SkyCoord(ra=12.5 * u.hourangle, dec=-30.0 * u.deg, frame="icrs")
+    await mount_manager.slew("mount1", coord)
 
     ctrl = mount_manager._controllers["mount1"]
     if ctrl._active_task:
@@ -115,9 +118,9 @@ async def test_slew_while_busy_raises(
     mount_manager: MountManager, manager: DeviceManager
 ) -> None:
     await connected_mount(manager)
-    await mount_manager.slew("mount1", SlewTarget(ra=1.0, dec=0.0))
+    await mount_manager.slew("mount1", SkyCoord(ra=1.0 * u.hourangle, dec=0.0 * u.deg, frame="icrs"))
     with pytest.raises(ValueError, match="busy"):
-        await mount_manager.slew("mount1", SlewTarget(ra=2.0, dec=0.0))
+        await mount_manager.slew("mount1", SkyCoord(ra=2.0 * u.hourangle, dec=0.0 * u.deg, frame="icrs"))
     await mount_manager.stop("mount1")
 
 
@@ -132,7 +135,7 @@ async def test_stop_aborts_slew(
     while not q.empty():
         await q.get()
 
-    await mount_manager.slew("mount1", SlewTarget(ra=1.0, dec=0.0))
+    await mount_manager.slew("mount1", SkyCoord(ra=1.0 * u.hourangle, dec=0.0 * u.deg, frame="icrs"))
     await mount_manager.stop("mount1")
 
     events = []
@@ -213,12 +216,12 @@ async def test_sync_publishes_event(
     while not q.empty():
         await q.get()
 
-    target = SlewTarget(ra=5.5, dec=22.0)
-    await mount_manager.sync("mount1", target)
+    coord = SkyCoord(ra=5.5 * u.hourangle, dec=22.0 * u.deg, frame="icrs")
+    await mount_manager.sync("mount1", coord)
 
     event = await asyncio.wait_for(q.get(), timeout=1.0)
     assert isinstance(event, MountSynced)
-    assert event.ra == 5.5
+    assert event.ra == pytest.approx(5.5 * 15)   # 5.5h × 15 = 82.5°
 
 
 # --- tracking ---
@@ -338,7 +341,7 @@ async def test_slew_error_publishes_operation_failed(
     with patch.object(
         manager._devices["mount1"].instance, "slew", side_effect=failing_slew
     ):
-        await mount_manager.slew("mount1", SlewTarget(ra=1.0, dec=0.0))
+        await mount_manager.slew("mount1", SkyCoord(ra=1.0 * u.hourangle, dec=0.0 * u.deg, frame="icrs"))
         ctrl = mount_manager._controllers["mount1"]
         if ctrl._active_task:
             await asyncio.wait_for(ctrl._active_task, timeout=2.0)
@@ -374,7 +377,7 @@ async def test_slew_timeout_publishes_operation_failed(
     with patch.object(
         manager._devices["mount1"].instance, "slew", side_effect=timing_out
     ):
-        await mount_manager.slew("mount1", SlewTarget(ra=1.0, dec=0.0))
+        await mount_manager.slew("mount1", SkyCoord(ra=1.0 * u.hourangle, dec=0.0 * u.deg, frame="icrs"))
         ctrl = mount_manager._controllers["mount1"]
         if ctrl._active_task:
             await asyncio.wait_for(ctrl._active_task, timeout=2.0)

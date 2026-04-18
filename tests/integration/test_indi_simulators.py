@@ -149,11 +149,13 @@ async def test_mount_get_status_has_position(mount):
 
 
 async def test_mount_slew(mount):
-    from astrolol.devices.base.models import SlewTarget
+    import astropy.units as u
+    from astropy.coordinates import SkyCoord
     # Slew a small offset from current position so the simulator finishes quickly.
     status = await mount.get_status()
-    target_ra = ((status.ra or 0.0) + 0.05) % 24  # ~3 arcminutes east
-    await mount.slew(SlewTarget(ra=target_ra, dec=(status.dec or 0.0)))
+    target_ra = ((status.ra or 0.0) + 0.05) % 24  # ~3 arcminutes east (ICRS hours)
+    coord = SkyCoord(ra=target_ra * u.hourangle, dec=(status.dec or 0.0) * u.deg, frame="icrs")
+    await mount.slew(coord)
     await asyncio.sleep(0.5)  # let position update propagate
     status = await mount.get_status()
     assert status.ra is not None

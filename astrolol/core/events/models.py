@@ -94,15 +94,15 @@ class LoopStopped(BaseEvent):
 class MountSlewStarted(BaseEvent):
     type: Literal["mount.slew_started"] = "mount.slew_started"
     device_id: str
-    ra: float
-    dec: float
+    ra: float   # ICRS degrees
+    dec: float  # ICRS degrees
 
 
 class MountSlewCompleted(BaseEvent):
     type: Literal["mount.slew_completed"] = "mount.slew_completed"
     device_id: str
-    ra: float
-    dec: float
+    ra: float   # ICRS degrees
+    dec: float  # ICRS degrees
 
 
 class MountSlewAborted(BaseEvent):
@@ -118,8 +118,8 @@ class MountParked(BaseEvent):
 class MountSynced(BaseEvent):
     type: Literal["mount.synced"] = "mount.synced"
     device_id: str
-    ra: float
-    dec: float
+    ra: float   # ICRS degrees
+    dec: float  # ICRS degrees
 
 
 class MountTrackingChanged(BaseEvent):
