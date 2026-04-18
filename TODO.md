@@ -4,9 +4,6 @@ Items designed for but not yet built. Ordered roughly by priority.
 
 ## Pre-release priorities
 
-- **Auth / security** — API keys or JWT tokens. Required before any internet exposure.
-- **PHD2 integration** — async JSON-RPC client for guiding start/stop/status/events.
-  Good candidate for a plugin.
 - **Plate solving** — async subprocess wrapper for ASTAP / astrometry.net with progress
   events. Also a good plugin candidate.
 
@@ -59,3 +56,4 @@ Items designed for but not yet built. Ordered roughly by priority.
 - **UI: red mode** — CSS filter toggle for night vision preservation.
 - **UI: mobile layout** — responsive breakpoints, bottom tab navigation on small screens.
 - **Caddy / systemd packaging** — deployment guide for Raspberry Pi with HTTPS and autostart.
+- **Auth / security** — API keys or JWT tokens. Required before any internet exposure.

@@ -29,6 +29,10 @@ from astrolol.core.events.models import (
     Phd2StateChanged,
     Phd2GuideStep,
     Phd2Settled,
+    PlatesolveStarted,
+    PlatesolveCompleted,
+    PlatesolveFailed,
+    PlatesolveCancelled,
     Event,
 )
 
@@ -63,5 +67,9 @@ __all__ = [
     "Phd2StateChanged",
     "Phd2GuideStep",
     "Phd2Settled",
+    "PlatesolveStarted",
+    "PlatesolveCompleted",
+    "PlatesolveFailed",
+    "PlatesolveCancelled",
     "Event",
 ]

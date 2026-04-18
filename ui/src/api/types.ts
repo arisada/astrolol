@@ -79,6 +79,47 @@ export interface UserSettings {
   enabled_plugins: string[]
   phd2_host: string
   phd2_port: number
+  astap_db_path: string
+  astap_bin: string
+  astap_search_radius: number
+  pixel_size_um: number | null
+}
+
+// --- Plate solving ---
+
+export interface SolveRequest {
+  fits_path: string
+  ra_hint?: number | null   // degrees J2000
+  dec_hint?: number | null  // degrees J2000
+  radius?: number           // search radius degrees (default 30)
+  fov?: number | null       // field width degrees (null = auto)
+}
+
+export interface SolveResult {
+  ra: number           // degrees J2000
+  dec: number          // degrees J2000
+  rotation: number     // degrees, North through East
+  pixel_scale: number  // arcsec/pixel
+  field_w: number      // degrees
+  field_h: number      // degrees
+  duration_ms: number
+}
+
+export interface DbStatus {
+  installed: boolean
+  db_path: string
+}
+
+export type SolveJobStatus = 'pending' | 'solving' | 'completed' | 'failed' | 'cancelled'
+
+export interface SolveJob {
+  id: string
+  status: SolveJobStatus
+  request: SolveRequest
+  result?: SolveResult | null
+  error?: string | null
+  created_at: string
+  completed_at?: string | null
 }
 
 export interface Phd2Status {
@@ -319,6 +360,25 @@ export interface Phd2GuideStepEvent extends BaseEvent {
 }
 export interface Phd2SettledEvent extends BaseEvent { type: 'phd2.settled'; error: string | null }
 
+export interface PlatesolveStartedEvent extends BaseEvent {
+  type: 'platesolve.started'
+  solve_id: string
+  fits_path: string
+}
+export interface PlatesolveCompletedEvent extends BaseEvent {
+  type: 'platesolve.completed'
+  solve_id: string
+  ra: number
+  dec: number
+  rotation: number
+  pixel_scale: number
+  field_w: number
+  field_h: number
+  duration_ms: number
+}
+export interface PlatesolveFailedEvent extends BaseEvent { type: 'platesolve.failed'; solve_id: string; reason: string }
+export interface PlatesolveCancelledEvent extends BaseEvent { type: 'platesolve.cancelled'; solve_id: string }
+
 export type AstrolollEvent =
   | DeviceConnectedEvent | DeviceDisconnectedEvent | DeviceStateChangedEvent
   | ExposureStartedEvent | ExposureCompletedEvent | ExposureFailedEvent
@@ -329,4 +389,5 @@ export type AstrolollEvent =
   | FocuserMoveStartedEvent | FocuserMoveCompletedEvent | FocuserHaltedEvent
   | Phd2ConnectedEvent | Phd2DisconnectedEvent | Phd2StateChangedEvent
   | Phd2GuideStepEvent | Phd2SettledEvent
+  | PlatesolveStartedEvent | PlatesolveCompletedEvent | PlatesolveFailedEvent | PlatesolveCancelledEvent
   | LogEvent

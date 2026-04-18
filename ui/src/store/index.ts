@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { AstrolollEvent, CameraStatus, ConnectedDevice, FilterWheelStatus, FocuserStatus, MountStatus, Phd2Status, PluginInfo } from '@/api/types'
+import type { AstrolollEvent, CameraStatus, ConnectedDevice, FilterWheelStatus, FocuserStatus, MountStatus, Phd2Status, PluginInfo, SolveJob, SolveResult } from '@/api/types'
 
 const MAX_LOG_ENTRIES = 1000
 const MAX_GUIDE_STEPS = 500   // keep a large buffer; graph slices client-side
@@ -66,6 +66,9 @@ interface AppState {
   phd2Status: Phd2Status | null
   phd2GuidePoints: GuidePoint[]
 
+  // Plate solving — keyed by job id for O(1) updates
+  solveJobs: Record<string, SolveJob>
+
   // Actions
   setWsConnected: (v: boolean) => void
   setConnectedDevices: (devices: ConnectedDevice[]) => void
@@ -76,6 +79,7 @@ interface AppState {
   clearLastError: () => void
   setPluginInfos: (infos: PluginInfo[]) => void
   setPhd2Status: (status: Phd2Status) => void
+  mergeSolveJobs: (jobs: SolveJob[]) => void
 }
 
 // Event types that represent errors and should set lastError
@@ -98,11 +102,17 @@ export const useStore = create<AppState>((set, get) => ({
   pluginInfos: [],
   phd2Status: null,
   phd2GuidePoints: [],
+  solveJobs: {},
 
   setWsConnected: (v) => set({ wsConnected: v }),
   clearLastError: () => set({ lastError: null }),
   setPluginInfos: (infos) => set({ pluginInfos: infos }),
   setPhd2Status: (status) => set({ phd2Status: status }),
+  mergeSolveJobs: (jobs) => set((s) => {
+    const merged = { ...s.solveJobs }
+    jobs.forEach((j) => { merged[j.id] = j })
+    return { solveJobs: merged }
+  }),
 
   setConnectedDevices: (devices) => set({ connectedDevices: devices }),
   setCameraStatus: (deviceId, status) =>
@@ -225,6 +235,48 @@ export const useStore = create<AppState>((set, get) => ({
         set((s) => ({ phd2Status: s.phd2Status ? { ...s.phd2Status, state: event.state } : null, log, lastError }))
         break
       }
+      case 'platesolve.started': {
+        set((s) => {
+          const existing = s.solveJobs[event.solve_id]
+          const job: SolveJob = existing
+            ? { ...existing, status: 'solving' }
+            : { id: event.solve_id, status: 'solving', request: { fits_path: event.fits_path }, created_at: event.timestamp }
+          return { solveJobs: { ...s.solveJobs, [event.solve_id]: job }, log, lastError }
+        })
+        break
+      }
+      case 'platesolve.completed': {
+        set((s) => {
+          const existing = s.solveJobs[event.solve_id]
+          if (!existing) return { log, lastError }
+          const result: SolveResult = {
+            ra: event.ra, dec: event.dec, rotation: event.rotation,
+            pixel_scale: event.pixel_scale, field_w: event.field_w,
+            field_h: event.field_h, duration_ms: event.duration_ms,
+          }
+          const job: SolveJob = { ...existing, status: 'completed', result, completed_at: event.timestamp }
+          return { solveJobs: { ...s.solveJobs, [event.solve_id]: job }, log, lastError }
+        })
+        break
+      }
+      case 'platesolve.failed': {
+        set((s) => {
+          const existing = s.solveJobs[event.solve_id]
+          if (!existing) return { log, lastError }
+          const job: SolveJob = { ...existing, status: 'failed', error: event.reason, completed_at: event.timestamp }
+          return { solveJobs: { ...s.solveJobs, [event.solve_id]: job }, log, lastError }
+        })
+        break
+      }
+      case 'platesolve.cancelled': {
+        set((s) => {
+          const existing = s.solveJobs[event.solve_id]
+          if (!existing) return { log, lastError }
+          const job: SolveJob = { ...existing, status: 'cancelled', completed_at: event.timestamp }
+          return { solveJobs: { ...s.solveJobs, [event.solve_id]: job }, log, lastError }
+        })
+        break
+      }
       case 'phd2.settled':
       default:
         set({ log, lastError })
@@ -260,6 +312,10 @@ function eventSummary(event: AstrolollEvent): string {
     case 'phd2.state_changed': return `PHD2 ${event.state}`
     case 'phd2.guide_step': return `Guide step #${event.frame}: RA ${event.ra_dist.toFixed(3)}" Dec ${event.dec_dist.toFixed(3)}"`
     case 'phd2.settled': return event.error ? `PHD2 settle failed: ${event.error}` : 'PHD2 settled'
+    case 'platesolve.started': return `Plate solve started: ${event.fits_path.split('/').pop()}`
+    case 'platesolve.completed': return `Plate solve done: RA ${(event.ra / 15).toFixed(4)}h Dec ${event.dec.toFixed(4)}° (${event.duration_ms}ms)`
+    case 'platesolve.failed': return `Plate solve failed: ${event.reason}`
+    case 'platesolve.cancelled': return `Plate solve cancelled`
     default: return (event as { type: string }).type
   }
 }

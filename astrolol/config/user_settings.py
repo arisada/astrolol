@@ -16,6 +16,10 @@ class UserSettings(BaseModel):
     enabled_plugins: list[str] = []
     phd2_host: str = "localhost"
     phd2_port: int = 4400
+    astap_db_path: str = "/usr/share/astap"   # directory containing the star database
+    astap_bin: str = "astap_cli"              # path or name of the astap_cli executable
+    astap_search_radius: float = 30.0         # degrees; passed as -r to astap_cli
+    pixel_size_um: float | None = None        # sensor pixel size in µm; used to hint FOV
 
 
 class UserSettingsStore:

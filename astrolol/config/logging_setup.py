@@ -125,8 +125,9 @@ _COMPONENT_MAP = {
     "imaging": "imager",
     "focuser": "focuser",
     "profiles": "profiles",
-    "api":     "api",
-    "phd2":    "phd2",
+    "api":        "api",
+    "phd2":       "phd2",
+    "platesolve": "platesolve",
 }
 
 

@@ -210,6 +210,37 @@ class Phd2Settled(BaseEvent):
     error: str | None = None  # None = success
 
 
+# --- Plate-solve events ---
+
+class PlatesolveStarted(BaseEvent):
+    type: Literal["platesolve.started"] = "platesolve.started"
+    solve_id: str
+    fits_path: str
+
+
+class PlatesolveCompleted(BaseEvent):
+    type: Literal["platesolve.completed"] = "platesolve.completed"
+    solve_id: str
+    ra: float           # degrees J2000
+    dec: float          # degrees J2000
+    rotation: float     # degrees, North through East
+    pixel_scale: float  # arcsec/pixel
+    field_w: float      # degrees
+    field_h: float      # degrees
+    duration_ms: int
+
+
+class PlatesolveFailed(BaseEvent):
+    type: Literal["platesolve.failed"] = "platesolve.failed"
+    solve_id: str
+    reason: str
+
+
+class PlatesolveCancelled(BaseEvent):
+    type: Literal["platesolve.cancelled"] = "platesolve.cancelled"
+    solve_id: str
+
+
 # Discriminated union — add new event types here as they are introduced
 Event = Annotated[
     Union[
@@ -221,6 +252,7 @@ Event = Annotated[
         FocuserMoveStarted, FocuserMoveCompleted, FocuserHalted,
         FilterWheelFilterChanged,
         Phd2Connected, Phd2Disconnected, Phd2StateChanged, Phd2GuideStep, Phd2Settled,
+        PlatesolveStarted, PlatesolveCompleted, PlatesolveFailed, PlatesolveCancelled,
     ],
     Field(discriminator="type"),
 ]

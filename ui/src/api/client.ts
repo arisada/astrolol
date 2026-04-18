@@ -2,6 +2,7 @@ import type {
   ActivationResult,
   CameraStatus,
   ConnectedDevice,
+  DbStatus,
   DeviceConfig,
   DeviceProperty,
   DriverEntry,
@@ -17,6 +18,8 @@ import type {
   PluginInfo,
   Profile,
   SetPropertyRequest,
+  SolveJob,
+  SolveRequest,
   TrackingMode,
   UserSettings,
 } from './types'
@@ -187,6 +190,16 @@ export const api = {
     resume: () => request<void>('/phd2/resume', { method: 'POST' }),
     setDebug: (enabled: boolean) =>
       request<void>('/phd2/debug', { method: 'POST', body: JSON.stringify({ enabled }) }),
+  },
+
+  platesolve: {
+    solve: (req: SolveRequest) =>
+      request<SolveJob>('/platesolve/solve', { method: 'POST', body: JSON.stringify(req) }),
+    jobs: () => request<SolveJob[]>('/platesolve/jobs'),
+    status: (jobId: string) => request<SolveJob>(`/platesolve/${jobId}/status`),
+    cancel: (jobId: string) => request<void>(`/platesolve/${jobId}/cancel`, { method: 'DELETE' }),
+    dbStatus: () => request<DbStatus>('/platesolve/db_status'),
+    installDb: () => request<{ status: string }>('/platesolve/install_db', { method: 'POST' }),
   },
 
   focuser: {
