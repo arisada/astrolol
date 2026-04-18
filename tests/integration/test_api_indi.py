@@ -315,8 +315,11 @@ async def test_mount_status_has_position(connected_mount):
 
 
 async def test_mount_slew(connected_mount):
+    # set a target first (ICRS degrees), then slew
+    r = await connected_mount.put("/mount/mount1/target", json={"ra": 45.0, "dec": 45.0})
+    assert r.status_code == 200
     # slew is fire-and-forget: 202 Accepted
-    r = await connected_mount.post("/mount/mount1/slew", json={"ra": 3.0, "dec": 45.0})
+    r = await connected_mount.post("/mount/mount1/slew")
     assert r.status_code == 202
 
 
