@@ -108,9 +108,9 @@ function StatusBadge({ status }: { status: SolveJob['status'] }) {
 
 function ResultPanel({ result }: { result: SolveResult }) {
   return (
-    <div className="rounded-lg border border-green-500/30 bg-green-500/5 p-4">
+    <div className="mx-4 mb-3 rounded-lg border border-green-500/30 bg-green-500/5 p-3">
       <div className="text-xs font-medium text-green-400 uppercase tracking-wider mb-2">Solved</div>
-      <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-sm">
+      <div className="grid grid-cols-1 gap-y-1 text-xs">
         <div><span className="text-slate-500">RA</span>
           <span className="ml-2 font-mono text-slate-200">{fmtRA(result.ra / 15)}</span></div>
         <div><span className="text-slate-500">Dec</span>
@@ -121,7 +121,7 @@ function ResultPanel({ result }: { result: SolveResult }) {
           <span className="ml-2 font-mono text-slate-200">{result.pixel_scale.toFixed(3)}″/px</span></div>
         <div><span className="text-slate-500">Field</span>
           <span className="ml-2 font-mono text-slate-200">{fmtField(result.field_w)} × {fmtField(result.field_h)}</span></div>
-        <div><span className="text-slate-500">Solved in</span>
+        <div><span className="text-slate-500">Time</span>
           <span className="ml-2 font-mono text-slate-200">{(result.duration_ms / 1000).toFixed(1)}s</span></div>
       </div>
     </div>
@@ -134,14 +134,13 @@ function JobRow({ job, onCancel }: { job: SolveJob; onCancel: (id: string) => vo
   const filename = job.request.fits_path.split('/').pop() ?? job.request.fits_path
   const active = job.status === 'pending' || job.status === 'solving'
   return (
-    <div className="flex items-start gap-3 py-2 border-b border-surface-border last:border-0">
+    <div className="flex items-start gap-2 py-2 border-b border-surface-border last:border-0">
       <div className="mt-0.5 shrink-0"><StatusBadge status={job.status} /></div>
       <div className="flex-1 min-w-0">
         <div className="text-xs text-slate-300 truncate font-mono">{filename}</div>
         {job.status === 'completed' && job.result && (
           <div className="text-xs text-slate-500 mt-0.5">
             {fmtRA(job.result.ra / 15)} {fmtDec(job.result.dec)}
-            {' · '}{job.result.pixel_scale.toFixed(3)}″/px
             {' · '}{(job.result.duration_ms / 1000).toFixed(1)}s
           </div>
         )}
@@ -179,7 +178,7 @@ function SettingsPanel({ settings, onChange }: { settings: UserSettings; onChang
   )
 
   return (
-    <div className="border border-surface-border rounded-lg p-4 flex flex-col gap-3">
+    <div className="border-b border-surface-border p-4 flex flex-col gap-3">
       <h3 className="text-xs font-medium text-slate-500 uppercase tracking-wider">Settings</h3>
       <div className="flex flex-col gap-1">
         <span className="text-xs text-slate-400">ASTAP binary</span>
@@ -216,13 +215,12 @@ function DbWarningBanner({ dbPath, onInstall, installing }: {
   installing: boolean
 }) {
   return (
-    <div className="flex items-start gap-3 rounded-lg border border-yellow-600/40 bg-yellow-500/10 px-4 py-3">
-      <AlertTriangle size={16} className="text-yellow-500 shrink-0 mt-0.5" />
+    <div className="mx-4 mb-3 flex items-start gap-3 rounded-lg border border-yellow-600/40 bg-yellow-500/10 px-3 py-2">
+      <AlertTriangle size={14} className="text-yellow-500 shrink-0 mt-0.5" />
       <div className="flex-1 min-w-0">
         <p className="text-xs text-yellow-300 font-medium">Star database not found</p>
-        <p className="text-xs text-yellow-600 mt-0.5">
+        <p className="text-xs text-yellow-600 mt-0.5 break-all">
           Directory <code className="font-mono">{dbPath}</code> is empty or missing.
-          ASTAP needs a star database to solve images.
         </p>
       </div>
       <Button
@@ -232,7 +230,7 @@ function DbWarningBanner({ dbPath, onInstall, installing }: {
         disabled={installing}
         className="shrink-0 border-yellow-600/50 text-yellow-400 hover:bg-yellow-500/10"
       >
-        <Download size={12} className="mr-1.5" />
+        <Download size={12} className="mr-1" />
         {installing ? 'Installing…' : 'Install d05'}
       </Button>
     </div>
@@ -243,27 +241,76 @@ function DbWarningBanner({ dbPath, onInstall, installing }: {
 
 function SolveLog() {
   const log = useStore((s) => s.log.filter((e) => e.component === 'platesolve'))
-  const bottomRef = useRef<HTMLDivElement>(null)
+  const containerRef  = useRef<HTMLDivElement>(null)
+  const atBottomRef   = useRef(false)
+  const [height, setHeight] = useState(300) // ~h-28
+  const dragStart     = useRef<{ y: number; h: number } | null>(null)
 
+  const onScroll = () => {
+    const el = containerRef.current
+    if (!el) return
+    atBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 24
+  }
+
+  // Scroll to bottom on mount
   useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' })
+    const el = containerRef.current
+    if (!el) return
+    el.scrollTop = el.scrollHeight
+    atBottomRef.current = true
+  }, [])
+
+  // Auto-scroll when new messages arrive, if already at the bottom
+  useEffect(() => {
+    const el = containerRef.current
+    if (!el || !atBottomRef.current) return
+    el.scrollTop = el.scrollHeight
   }, [log.length])
 
+  const onDragMouseDown = (e: React.MouseEvent) => {
+    e.preventDefault()
+    dragStart.current = { y: e.clientY, h: height }
+    const onMove = (ev: MouseEvent) => {
+      if (!dragStart.current) return
+      const delta = dragStart.current.y - ev.clientY   // drag up → taller
+      setHeight(Math.max(64, dragStart.current.h + delta))
+    }
+    const onUp = () => {
+      dragStart.current = null
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+  }
+
   return (
-    <div className="h-36 shrink-0 bg-black border-t border-surface-border overflow-y-auto px-3 py-2 font-mono">
-      {log.length === 0 ? (
-        <span className="text-xs text-slate-700">Plate-solve log</span>
-      ) : (
-        [...log].reverse().map((e) => (
-          <div key={e.id} className="flex gap-2 text-xs leading-5">
-            <span className="text-slate-600 shrink-0">{e.timestamp.slice(11, 19)}</span>
-            <span className={`whitespace-pre-wrap break-all ${e.level === 'error' ? 'text-red-400' : e.level === 'warning' ? 'text-yellow-400' : 'text-slate-400'}`}>
-              {e.message}
-            </span>
-          </div>
-        ))
-      )}
-      <div ref={bottomRef} />
+    <div className="shrink-0 border-t border-surface-border" style={{ height }}>
+      {/* Drag handle */}
+      <div
+        onMouseDown={onDragMouseDown}
+        className="h-1.5 cursor-ns-resize bg-surface-border hover:bg-accent/50 active:bg-accent transition-colors"
+        title="Drag to resize"
+      />
+      <div
+        ref={containerRef}
+        onScroll={onScroll}
+        className="bg-surface overflow-y-auto px-3 py-2 font-mono"
+        style={{ height: height - 6 }}
+      >
+        {log.length === 0 ? (
+          <span className="text-xs text-slate-700">Plate-solve log</span>
+        ) : (
+          [...log].reverse().map((e) => (
+            <div key={e.id} className="flex gap-2 text-xs leading-5">
+              <span className="text-slate-600 shrink-0">{e.timestamp.slice(11, 19)}</span>
+              <span className={`whitespace-pre-wrap break-all ${e.level === 'error' ? 'text-red-400' : e.level === 'warning' ? 'text-yellow-400' : 'text-slate-400'}`}>
+                {e.message}
+              </span>
+            </div>
+          ))
+        )}
+      </div>
     </div>
   )
 }
@@ -273,19 +320,19 @@ function SolveLog() {
 function ImageViewer() {
   const image = useStore((s) => s.latestImage)
   return (
-    <div className="bg-black flex items-center justify-center relative" style={{ minHeight: '200px', maxHeight: '300px', overflow: 'hidden' }}>
+    <div className="flex-1 bg-black flex items-center justify-center relative min-h-0">
       {image ? (
         <>
           <img src={image.previewUrl} alt="Latest exposure"
-            className="max-w-full object-contain" style={{ maxHeight: '300px' }} />
+            className="max-w-full max-h-full object-contain" />
           <div className="absolute bottom-2 left-2 text-xs text-slate-400 bg-black/60 px-2 py-1 rounded">
             {image.width}×{image.height} · {image.duration}s
           </div>
         </>
       ) : (
-        <div className="text-slate-700 text-sm flex flex-col items-center gap-2 py-8">
-          <Camera size={28} />
-          <span>No image</span>
+        <div className="text-slate-600 text-sm flex flex-col items-center gap-2">
+          <Camera size={32} />
+          <span>No image yet</span>
         </div>
       )}
     </div>
@@ -302,6 +349,24 @@ function computeFov(
   if (!focalLength || !pixelSizeUm || !imageWidth) return null
   const pixelScaleArcsec = (pixelSizeUm / focalLength) * 206.265
   return (pixelScaleArcsec * imageWidth) / 3600
+}
+
+// ── Sidebar section wrapper ────────────────────────────────────────────────────
+
+function Section({ title, children, action }: {
+  title: string
+  children: React.ReactNode
+  action?: React.ReactNode
+}) {
+  return (
+    <div className="border-b border-surface-border p-4">
+      <div className="flex items-center justify-between mb-3">
+        <h3 className="text-xs font-medium text-slate-500 uppercase tracking-wider">{title}</h3>
+        {action}
+      </div>
+      {children}
+    </div>
+  )
 }
 
 // ── Main page ──────────────────────────────────────────────────────────────────
@@ -326,17 +391,17 @@ export function PlatesolvePage() {
   const [binning,  setBinning]  = useLocalStorage('platesolve.binning', 1)
   const [afterSolve, setAfterSolve] = useLocalStorage<AfterSolve>('platesolve.afterSolve', 'nothing')
 
-  const [settings, setSettings]       = useState<UserSettings | null>(null)
-  const [showSettings, setShowSettings] = useState(false)
+  const [settings, setSettings]         = useState<UserSettings | null>(null)
+  const [showSettings, setShowSettings]  = useState(false)
   const [activeProfile, setActiveProfile] = useState<Profile | null>(null)
-  const [dbStatus, setDbStatus]       = useState<DbStatus | null>(null)
-  const [installing, setInstalling]   = useState(false)
+  const [dbStatus, setDbStatus]          = useState<DbStatus | null>(null)
+  const [installing, setInstalling]      = useState(false)
 
-  const [error, setError]           = useState<string | null>(null)
-  const [busy, setBusy]             = useState(false)
-  const [activeSolveId, setActiveSolveId] = useState<string | null>(null)
-  const pendingSolveRef = useRef(false)
-  const prevSolveStatusRef = useRef<string | undefined>(undefined)
+  const [error, setError]                     = useState<string | null>(null)
+  const [busy, setBusy]                       = useState(false)
+  const [activeSolveId, setActiveSolveId]     = useState<string | null>(null)
+  const pendingSolveRef                       = useRef(false)
+  const prevSolveStatusRef                    = useRef<string | undefined>(undefined)
 
   useEffect(() => {
     api.settings.get().then(setSettings).catch(console.error)
@@ -435,7 +500,6 @@ export function PlatesolvePage() {
     setInstalling(true)
     try {
       await api.platesolve.installDb()
-      // Re-check after a delay (installation is async on the server)
       setTimeout(() => {
         api.platesolve.dbStatus().then(setDbStatus).catch(console.error)
         setInstalling(false)
@@ -457,134 +521,138 @@ export function PlatesolvePage() {
   ) : null
 
   return (
-    <div className="flex flex-col h-full min-h-0">
-      {/* Scrollable controls area */}
-      <div className="flex-1 overflow-y-auto p-4">
-        <div className="max-w-xl mx-auto flex flex-col gap-4">
+    <div className="flex h-full overflow-hidden">
 
-          {/* Header */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <ScanSearch size={18} className="text-accent" />
-              <h1 className="text-base font-semibold text-slate-200">Plate Solving</h1>
-            </div>
-            <Button variant="ghost" size="icon" onClick={() => setShowSettings((v) => !v)}
-              className={showSettings ? 'text-accent' : ''} title="Settings">
-              <Settings size={15} />
-            </Button>
+      {/* Centre: image + log */}
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        <ImageViewer />
+        <SolveLog />
+      </div>
+
+      {/* Right sidebar: controls */}
+      <aside className="w-72 shrink-0 border-l border-surface-border overflow-y-auto bg-surface-raised">
+
+        {/* Header */}
+        <div className="border-b border-surface-border p-4 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <ScanSearch size={16} className="text-accent" />
+            <span className="text-sm font-semibold text-slate-200">Plate Solving</span>
           </div>
+          <button onClick={() => setShowSettings((v) => !v)}
+            className={`text-slate-500 hover:text-slate-300 transition-colors ${showSettings ? 'text-accent' : ''}`}
+            title="Settings">
+            <Settings size={14} />
+          </button>
+        </div>
 
-          {/* Settings panel */}
-          {showSettings && settings && (
-            <SettingsPanel settings={settings} onChange={setSettings} />
-          )}
+        {/* Settings panel */}
+        {showSettings && settings && (
+          <SettingsPanel settings={settings} onChange={setSettings} />
+        )}
 
-          {/* DB warning */}
-          {dbStatus && !dbStatus.installed && (
+        {/* DB warning */}
+        {dbStatus && !dbStatus.installed && (
+          <div className="p-4 pb-0">
             <DbWarningBanner
               dbPath={dbStatus.db_path}
               onInstall={handleInstallDb}
               installing={installing}
             />
+          </div>
+        )}
+
+        {/* Camera */}
+        <Section title="Camera">
+          {cameras.length === 0 ? (
+            <span className="text-xs text-slate-600">No camera connected</span>
+          ) : cameras.length === 1 ? (
+            <span className="text-xs text-slate-300 font-mono">{cameras[0].device_id}</span>
+          ) : (
+            <select value={camera?.device_id ?? ''} onChange={(e) => setSelectedCameraId(e.target.value)}
+              className="w-full rounded bg-surface-overlay border border-surface-border px-2 py-1.5 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-accent">
+              {cameras.map((d) => <option key={d.device_id} value={d.device_id}>{d.device_id}</option>)}
+            </select>
           )}
+        </Section>
 
-          {/* Controls */}
-          <div className="border border-surface-border rounded-lg p-4 flex flex-col gap-4">
+        {/* Exposure */}
+        <Section title="Exposure">
+          <div className="flex flex-col gap-3">
+            <DurationStepper value={duration} onChange={setDuration} />
 
-            {/* Camera selector */}
             <div className="flex flex-col gap-1">
-              <span className="text-xs text-slate-400">Camera</span>
-              {cameras.length === 0 ? (
-                <span className="text-xs text-slate-600">No camera connected</span>
-              ) : cameras.length === 1 ? (
-                <span className="text-xs text-slate-300 font-mono">{cameras[0].device_id}</span>
-              ) : (
-                <select value={camera?.device_id ?? ''} onChange={(e) => setSelectedCameraId(e.target.value)}
-                  className="rounded bg-surface-overlay border border-surface-border px-2 py-1.5 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-accent">
-                  {cameras.map((d) => <option key={d.device_id} value={d.device_id}>{d.device_id}</option>)}
-                </select>
-              )}
-            </div>
-
-            {/* Duration + Binning */}
-            <div className="grid grid-cols-2 gap-4">
-              <DurationStepper value={duration} onChange={setDuration} />
-              <div className="flex flex-col gap-1">
-                <span className="text-xs text-slate-400">Binning</span>
-                <div className="flex gap-1">
-                  {BINNINGS.map((b) => (
-                    <button key={b} type="button" onClick={() => setBinning(b)}
-                      className={`px-2 py-0.5 text-xs rounded border transition-colors
-                        ${binning === b
-                          ? 'border-accent text-accent bg-accent/10'
-                          : 'border-surface-border text-slate-400 hover:border-slate-500 hover:text-slate-300'}`}>
-                      {b}×{b}
-                    </button>
-                  ))}
-                </div>
+              <span className="text-xs text-slate-400">Binning</span>
+              <div className="flex gap-1">
+                {BINNINGS.map((b) => (
+                  <button key={b} type="button" onClick={() => setBinning(b)}
+                    className={`px-2 py-0.5 text-xs rounded border transition-colors
+                      ${binning === b
+                        ? 'border-accent text-accent bg-accent/10'
+                        : 'border-surface-border text-slate-400 hover:border-slate-500 hover:text-slate-300'}`}>
+                    {b}×{b}
+                  </button>
+                ))}
               </div>
             </div>
 
-            {/* FOV info */}
             {fovHint != null && settings?.pixel_size_um && activeProfile?.telescope?.focal_length && (
               <p className="text-xs text-slate-600">
-                {`Optics: ${((settings.pixel_size_um / activeProfile.telescope.focal_length) * 206.265).toFixed(3)}″/px · FOV hint ${fmtField(fovHint)}`}
+                {`${((settings.pixel_size_um / activeProfile.telescope.focal_length) * 206.265).toFixed(3)}″/px · FOV ${fmtField(fovHint)}`}
               </p>
             )}
-
-            {/* After-solve action */}
-            <div className="flex flex-col gap-1.5">
-              <span className="text-xs text-slate-400">After solve</span>
-              {(['nothing', 'sync', 'sync_slew'] as const).map((v) => {
-                const labels: Record<AfterSolve, string> = {
-                  nothing: 'Do nothing', sync: 'Sync mount', sync_slew: 'Sync and slew',
-                }
-                return (
-                  <label key={v} className="flex items-center gap-2 cursor-pointer select-none">
-                    <input type="radio" name="afterSolve" value={v}
-                      checked={afterSolve === v} onChange={() => setAfterSolve(v)}
-                      className="accent-accent" />
-                    <span className={`text-xs ${afterSolve === v ? 'text-slate-200' : 'text-slate-400'}`}>
-                      {labels[v]}
-                    </span>
-                  </label>
-                )
-              })}
-              {afterSolve !== 'nothing' && !mount && (
-                <p className="text-xs text-yellow-600">No mount connected</p>
-              )}
-            </div>
-
-            {error && <p className="text-xs text-red-400">{error}</p>}
-
-            <Button onClick={handleExposeAndSolve} disabled={busy || !camera} className="w-full">
-              <ScanSearch size={14} className="mr-2" />
-              {busy
-                ? (activeSolveJob?.status === 'solving' ? 'Solving…' : 'Exposing…')
-                : 'Expose & Solve'}
-            </Button>
           </div>
+        </Section>
 
-          {/* Last result */}
-          {lastCompleted?.result && <ResultPanel result={lastCompleted.result} />}
+        {/* After solve */}
+        <Section title="After solve">
+          <div className="flex flex-col gap-1.5">
+            {(['nothing', 'sync', 'sync_slew'] as const).map((v) => {
+              const labels: Record<AfterSolve, string> = {
+                nothing: 'Do nothing', sync: 'Sync mount', sync_slew: 'Sync and slew',
+              }
+              return (
+                <label key={v} className="flex items-center gap-2 cursor-pointer select-none">
+                  <input type="radio" name="afterSolve" value={v}
+                    checked={afterSolve === v} onChange={() => setAfterSolve(v)}
+                    className="accent-accent" />
+                  <span className={`text-xs ${afterSolve === v ? 'text-slate-200' : 'text-slate-400'}`}>
+                    {labels[v]}
+                  </span>
+                </label>
+              )
+            })}
+            {afterSolve !== 'nothing' && !mount && (
+              <p className="text-xs text-yellow-600 mt-1">No mount connected</p>
+            )}
+          </div>
+        </Section>
 
-          {/* Job history */}
-          {jobs.length > 0 && (
-            <div className="flex flex-col gap-2">
-              <h2 className="text-xs font-medium text-slate-500 uppercase tracking-wider">Recent solves</h2>
-              <div className="rounded-lg border border-surface-border bg-surface px-4">
-                {jobs.map((job) => <JobRow key={job.id} job={job} onCancel={handleCancel} />)}
-              </div>
-            </div>
-          )}
+        {/* Action */}
+        <div className="p-4 border-b border-surface-border flex flex-col gap-2">
+          {error && <p className="text-xs text-red-400">{error}</p>}
+          <Button onClick={handleExposeAndSolve} disabled={busy || !camera} className="w-full">
+            <ScanSearch size={14} className="mr-2" />
+            {busy
+              ? (activeSolveJob?.status === 'solving' ? 'Solving…' : 'Exposing…')
+              : 'Expose & Solve'}
+          </Button>
         </div>
-      </div>
 
-      {/* Image preview — bottom */}
-      <ImageViewer />
+        {/* Last result */}
+        {lastCompleted?.result && (
+          <div className="pt-3">
+            <ResultPanel result={lastCompleted.result} />
+          </div>
+        )}
 
-      {/* Plate-solve log — very bottom */}
-      <SolveLog />
+        {/* Job history */}
+        {jobs.length > 0 && (
+          <Section title="Recent solves">
+            {jobs.map((job) => <JobRow key={job.id} job={job} onCancel={handleCancel} />)}
+          </Section>
+        )}
+
+      </aside>
     </div>
   )
 }
