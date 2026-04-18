@@ -5,12 +5,15 @@ import asyncio
 import tempfile
 from pathlib import Path
 
+import structlog
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 from astrolol.core.events.models import LogEvent
 from plugins.platesolve.models import SolveJob, SolveRequest
 from plugins.platesolve.solver import SolveManager
+
+logger = structlog.get_logger()
 
 _D05_URL = (
     "https://master.dl.sourceforge.net/project/astap-program"
@@ -24,9 +27,44 @@ def _manager(request: Request) -> SolveManager:
     return request.app.state.solve_manager  # type: ignore[no-any-return]
 
 
+async def _enrich_request(req: SolveRequest, request: Request) -> SolveRequest:
+    """Fill in ra_hint/dec_hint from the connected mount and radius from settings."""
+    app = request.app
+
+    # Radius from user settings (if caller didn't override)
+    if req.radius == 30.0:  # default — check settings
+        try:
+            settings = app.state.profile_store.get_user_settings()
+            req = req.model_copy(update={"radius": settings.astap_search_radius})
+        except Exception:
+            pass
+
+    # RA/Dec from mount current position
+    if req.ra_hint is None or req.dec_hint is None:
+        try:
+            device_manager = app.state.device_manager
+            mounts = [d for d in device_manager.list_connected() if d["kind"] == "mount"]
+            if mounts:
+                mount = device_manager.get_mount(mounts[0]["device_id"])
+                status = await mount.get_status()
+                updates: dict = {}
+                if req.ra_hint is None and status.ra is not None:
+                    updates["ra_hint"] = status.ra * 15.0   # hours → degrees
+                if req.dec_hint is None and status.dec is not None:
+                    updates["dec_hint"] = status.dec
+                if updates:
+                    req = req.model_copy(update=updates)
+                    logger.info("platesolve.hints_from_mount", **updates)
+        except Exception as exc:
+            logger.warning("platesolve.hints_unavailable", reason=str(exc))
+
+    return req
+
+
 @router.post("/solve", status_code=201, response_model=SolveJob)
 async def start_solve(req: SolveRequest, request: Request) -> SolveJob:
     """Submit a new plate-solve job. Returns immediately with the job id."""
+    req = await _enrich_request(req, request)
     return await _manager(request).submit(req)
 
 

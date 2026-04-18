@@ -3,7 +3,7 @@ import { AlertTriangle, Camera, ChevronDown, ChevronUp, Download, ScanSearch, Se
 import { api } from '@/api/client'
 import { useStore } from '@/store'
 import { Button } from '@/components/ui/button'
-import type { ConnectedDevice, DbStatus, MountStatus, Profile, SolveJob, SolveResult, UserSettings } from '@/api/types'
+import type { ConnectedDevice, DbStatus, Profile, SolveJob, SolveResult, UserSettings } from '@/api/types'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -373,7 +373,6 @@ function Section({ title, children, action }: {
 
 export function PlatesolvePage() {
   const connectedDevices = useStore((s) => s.connectedDevices)
-  const mountStatuses    = useStore((s) => s.mountStatuses)
   const latestImage      = useStore((s) => s.latestImage)
   const solveJobsMap     = useStore((s) => s.solveJobs)
   const mergeSolveJobs   = useStore((s) => s.mergeSolveJobs)
@@ -385,7 +384,6 @@ export function PlatesolvePage() {
   const camera = cameras.find((d) => d.device_id === selectedCameraId) ?? cameras[0] ?? null
 
   const mount = connectedDevices.find((d) => d.kind === 'mount') ?? null
-  const mountStatus: MountStatus | null = mount ? (mountStatuses[mount.device_id] ?? null) : null
 
   const [duration, setDuration] = useLocalStorage('platesolve.duration', 5)
   const [binning,  setBinning]  = useLocalStorage('platesolve.binning', 1)
@@ -453,8 +451,6 @@ export function PlatesolvePage() {
   const launchSolve = async (fitsPath: string, imageWidth?: number) => {
     if (!settings) return
     setError(null)
-    const ra  = mountStatus?.ra  != null ? mountStatus.ra * 15  : undefined
-    const dec = mountStatus?.dec != null ? mountStatus.dec       : undefined
     const fov = computeFov(
       activeProfile?.telescope?.focal_length,
       settings.pixel_size_um,
@@ -464,7 +460,6 @@ export function PlatesolvePage() {
     try {
       const job = await api.platesolve.solve({
         fits_path: fitsPath,
-        ra_hint: ra, dec_hint: dec,
         radius: settings.astap_search_radius,
         fov,
       })
