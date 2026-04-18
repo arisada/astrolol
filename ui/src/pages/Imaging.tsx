@@ -223,6 +223,12 @@ function CameraPanel({
 
   useEffect(() => {
     if (!deviceId) return
+
+    // Sync loop state from server on mount so Stop button is always reachable
+    api.imager.status(deviceId)
+      .then((s) => { if (s.state === 'looping') setLooping(true) })
+      .catch(() => {})
+
     api.devices.properties(deviceId)
       .then((props) => {
         for (const p of props) {
@@ -423,7 +429,7 @@ function CameraPanel({
           <Button size="sm" onClick={expose} disabled={busy}>
             <Camera size={12} className="mr-1" /> Expose
           </Button>
-          <Button size="sm" variant={looping ? 'danger' : 'outline'} onClick={toggleLoop} disabled={busy && !looping}>
+          <Button size="sm" variant={looping ? 'danger' : 'outline'} onClick={toggleLoop} disabled={!looping && busy}>
             {looping ? <><Square size={12} className="mr-1" /> Stop</> : <><Play size={12} className="mr-1" /> Loop</>}
           </Button>
         </div>
