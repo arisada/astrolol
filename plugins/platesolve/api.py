@@ -44,9 +44,9 @@ async def _compute_fov(fits_path: str, request: Request) -> float | None:
         def _read_header() -> tuple[int, int]:
             with astropy_fits.open(fits_path) as hdul:
                 hdr = hdul[0].header
-                return int(hdr["NAXIS1"]), int(hdr.get("XBINNING", 1))
+                return int(hdr["NAXIS2"]), int(hdr.get("YBINNING", hdr.get("XBINNING", 1)))
 
-        naxis1, xbinning = await asyncio.to_thread(_read_header)
+        naxis2, ybinning = await asyncio.to_thread(_read_header)
 
         # Pixel size: try CCD_INFO first, fall back to user settings
         pixel_size_um: float | None = None
@@ -63,15 +63,15 @@ async def _compute_fov(fits_path: str, request: Request) -> float | None:
         if not pixel_size_um:
             return None
 
-        sensor_width_mm = pixel_size_um * xbinning * naxis1 / 1000.0
-        fov_deg = math.degrees(2 * math.atan(sensor_width_mm / (2 * focal_length_mm)))
+        sensor_height_mm = pixel_size_um * ybinning * naxis2 / 1000.0
+        fov_deg = math.degrees(2 * math.atan(sensor_height_mm / (2 * focal_length_mm)))
         logger.info(
             "platesolve.fov_computed",
             pixel_size_um=pixel_size_um,
-            xbinning=xbinning,
-            naxis1=naxis1,
+            ybinning=ybinning,
+            naxis2=naxis2,
             focal_length_mm=focal_length_mm,
-            sensor_width_mm=round(sensor_width_mm, 4),
+            sensor_height_mm=round(sensor_height_mm, 4),
             fov_deg=round(fov_deg, 4),
         )
         return fov_deg
