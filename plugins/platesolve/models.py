@@ -12,6 +12,7 @@ class SolveRequest(BaseModel):
     ra_hint: float | None = Field(default=None, description="RA hint in degrees (J2000)")
     dec_hint: float | None = Field(default=None, description="Dec hint in degrees (J2000)")
     radius: float = Field(default=30.0, gt=0, description="Search radius in degrees")
+    tolerance: float | None = Field(default=None, gt=0, description="Star-match tolerance (None = astap default 0.007)")
     fov: float | None = Field(default=None, gt=0, description="Field width in degrees (None = auto)")
 
 

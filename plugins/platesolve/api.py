@@ -84,13 +84,18 @@ async def _enrich_request(req: SolveRequest, request: Request) -> SolveRequest:
     """Fill in ra_hint/dec_hint from the connected mount and radius from settings."""
     app = request.app
 
-    # Radius from user settings (if caller didn't override)
-    if req.radius == 30.0:  # default — check settings
-        try:
-            settings = app.state.profile_store.get_user_settings()
-            req = req.model_copy(update={"radius": settings.astap_search_radius})
-        except Exception:
-            pass
+    # Radius and tolerance from user settings (if caller didn't override)
+    try:
+        settings = app.state.profile_store.get_user_settings()
+        updates: dict = {}
+        if req.radius == 30.0:
+            updates["radius"] = settings.astap_search_radius
+        if req.tolerance is None:
+            updates["tolerance"] = settings.astap_tolerance
+        if updates:
+            req = req.model_copy(update=updates)
+    except Exception:
+        pass
 
     # FOV from FITS header + CCD_INFO + active profile
     if req.fov is None:

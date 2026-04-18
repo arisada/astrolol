@@ -217,6 +217,8 @@ class SolveManager:
                 cmd += ["-ra", str(req.ra_hint / 15.0)]    # degrees → hours
             if req.dec_hint is not None:
                 cmd += ["-spd", str(90.0 + req.dec_hint)]  # dec → south-pole distance
+            if req.tolerance is not None:
+                cmd += ["-t", str(req.tolerance)]
             if req.fov is not None:
                 cmd += ["-fov", str(req.fov)]
 

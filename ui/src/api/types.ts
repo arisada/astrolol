@@ -82,6 +82,7 @@ export interface UserSettings {
   astap_db_path: string
   astap_bin: string
   astap_search_radius: number
+  astap_tolerance: number
   pixel_size_um: number | null
 }
 

@@ -193,6 +193,10 @@ function SettingsPanel({ settings, onChange }: { settings: UserSettings; onChang
         {inp(String(local.astap_search_radius), (v) => setLocal({ ...local, astap_search_radius: parseFloat(v) || 30 }))}
       </div>
       <div className="flex flex-col gap-1">
+        <span className="text-xs text-slate-400">Tolerance</span>
+        {inp(String(local.astap_tolerance), (v) => setLocal({ ...local, astap_tolerance: parseFloat(v) || 0.007 }))}
+      </div>
+      <div className="flex flex-col gap-1">
         <span className="text-xs text-slate-400">Pixel size (µm, optional)</span>
         {inp(
           local.pixel_size_um != null ? String(local.pixel_size_um) : '',

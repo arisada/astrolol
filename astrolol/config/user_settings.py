@@ -19,6 +19,7 @@ class UserSettings(BaseModel):
     astap_db_path: str = "/opt/astap"   # directory containing the star database
     astap_bin: str = "astap_cli"              # path or name of the astap_cli executable
     astap_search_radius: float = 30.0         # degrees; passed as -r to astap_cli
+    astap_tolerance: float = 0.007            # star-match tolerance; passed as -t to astap_cli
     pixel_size_um: float | None = None        # sensor pixel size in µm; used to hint FOV
 
 
