@@ -221,7 +221,7 @@ function DbWarningBanner({ dbPath, onInstall, installing }: {
       <div className="flex-1 min-w-0">
         <p className="text-xs text-yellow-300 font-medium">Star database not found</p>
         <p className="text-xs text-yellow-600 mt-0.5">
-          No <code>.290</code> or <code>.dat</code> files in <code className="font-mono">{dbPath}</code>.
+          Directory <code className="font-mono">{dbPath}</code> is empty or missing.
           ASTAP needs a star database to solve images.
         </p>
       </div>
@@ -250,14 +250,14 @@ function SolveLog() {
   }, [log.length])
 
   return (
-    <div className="h-36 bg-black border-t border-surface-border overflow-y-auto px-3 py-2 font-mono">
+    <div className="h-36 shrink-0 bg-black border-t border-surface-border overflow-y-auto px-3 py-2 font-mono">
       {log.length === 0 ? (
         <span className="text-xs text-slate-700">Plate-solve log</span>
       ) : (
         [...log].reverse().map((e) => (
           <div key={e.id} className="flex gap-2 text-xs leading-5">
             <span className="text-slate-600 shrink-0">{e.timestamp.slice(11, 19)}</span>
-            <span className={`truncate ${e.level === 'error' ? 'text-red-400' : e.level === 'warning' ? 'text-yellow-400' : 'text-slate-400'}`}>
+            <span className={`whitespace-pre-wrap break-all ${e.level === 'error' ? 'text-red-400' : e.level === 'warning' ? 'text-yellow-400' : 'text-slate-400'}`}>
               {e.message}
             </span>
           </div>

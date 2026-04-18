@@ -63,9 +63,7 @@ class DbStatus(BaseModel):
 async def db_status(request: Request) -> DbStatus:
     """Return whether the ASTAP star database is present at the configured path."""
     db_path = Path(_manager(request)._astap_db_path)
-    installed = db_path.is_dir() and (
-        bool(list(db_path.glob("*.290"))) or bool(list(db_path.glob("*.dat")))
-    )
+    installed = db_path.is_dir() and any(db_path.iterdir())
     return DbStatus(installed=installed, db_path=str(db_path))
 
 
@@ -112,7 +110,7 @@ async def _do_install_db(event_bus) -> None:  # type: ignore[type-arg]
         await log(f"Download complete. Installing with sudo dpkg -i …")
         try:
             inst = await asyncio.create_subprocess_exec(
-                "sudo", "dpkg", "-i", str(deb_path),
+                "sudo", "-n", "dpkg", "-i", str(deb_path),
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.STDOUT,
             )
