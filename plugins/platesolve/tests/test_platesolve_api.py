@@ -260,7 +260,11 @@ def test_db_status_installed(client: TestClient, fake: FakeSolveManager, tmp_pat
 # ── POST /platesolve/install_db ───────────────────────────────────────────────
 
 def test_install_db_returns_202(client: TestClient) -> None:
-    r = client.post("/platesolve/install_db")
+    async def _noop(event_bus) -> None:  # type: ignore[type-arg]
+        pass
+
+    with patch("plugins.platesolve.api._do_install_db", _noop):
+        r = client.post("/platesolve/install_db")
     assert r.status_code == 202
     assert r.json()["status"] == "started"
 
@@ -411,3 +415,4 @@ async def test_manager_failed_job_on_bad_binary() -> None:
         assert "not found" in (updated.error or "").lower()
     finally:
         os.unlink(tmp)
+

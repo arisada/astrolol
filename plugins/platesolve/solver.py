@@ -224,16 +224,16 @@ class SolveManager:
 
             logger.info("platesolve.running", solve_id=job_id, cmd=" ".join(cmd))
 
-            try:
-                proc = await asyncio.create_subprocess_exec(
-                    *cmd,
-                    stdout=asyncio.subprocess.PIPE,
-                    stderr=asyncio.subprocess.PIPE,
-                )
-            except FileNotFoundError:
+            if not shutil.which(self._astap_bin):
                 raise RuntimeError(
                     f"'{self._astap_bin}' not found — install the astap-cli package"
                 )
+
+            proc = await asyncio.create_subprocess_exec(
+                *cmd,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
 
             stderr_chunks: list[bytes] = []
 
