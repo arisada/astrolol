@@ -46,8 +46,7 @@ class Phd2Plugin:
         logger.info("phd2.plugin_setup", host=user_settings.phd2_host, port=user_settings.phd2_port)
 
     async def startup(self) -> None:
-        if self._client is not None:
-            await self._client.start()
+        pass  # PHD2 connects only on explicit user request (POST /phd2/connect)
 
     async def shutdown(self) -> None:
         if self._client is not None:
