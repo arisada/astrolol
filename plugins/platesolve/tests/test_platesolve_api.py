@@ -321,6 +321,71 @@ async def test_manager_cancel_not_found_raises() -> None:
         await manager.cancel("nonexistent")
 
 
+# ── Real astap_cli integration test ───────────────────────────────────────────
+
+import bz2
+import shutil
+from pathlib import Path
+
+_TEST_FITS_BZ2 = Path(__file__).parent / "test.fits.bz2"
+_ASTAP_BIN = "astap_cli"
+
+
+def _find_db() -> str | None:
+    for p in ["/opt/astap", "/usr/share/astap"]:
+        path = Path(p)
+        if path.is_dir() and any(path.iterdir()):
+            return p
+    return None
+
+
+_needs_astap = pytest.mark.skipif(
+    shutil.which(_ASTAP_BIN) is None,
+    reason="astap_cli not installed",
+)
+_needs_db = pytest.mark.skipif(
+    _find_db() is None,
+    reason="astap star database not found in /opt/astap or /usr/share/astap",
+)
+
+
+@pytest.mark.asyncio
+@_needs_astap
+@_needs_db
+async def test_solve_real_image(tmp_path) -> None:
+    """End-to-end solve of the bundled test.fits using the real astap_cli."""
+    fits_copy = tmp_path / "test.fits"
+    fits_copy.write_bytes(bz2.decompress(_TEST_FITS_BZ2.read_bytes()))
+
+    db_path = _find_db()
+    manager = SolveManager(
+        event_bus=FakeEventBus(),
+        astap_bin=_ASTAP_BIN,
+        astap_db_path=db_path,
+    )
+    req = SolveRequest(
+        fits_path=str(fits_copy),
+        ra_hint=35.18,
+        dec_hint=57.005,
+        radius=30.0,
+        tolerance=0.007,
+    )
+    job = await manager.submit(req)
+
+    # Poll until terminal state (up to 120 s)
+    updated = None
+    for _ in range(240):
+        await asyncio.sleep(0.5)
+        updated = manager.get(job.id)
+        if updated and updated.status in ("completed", "failed", "cancelled"):
+            break
+
+    assert updated is not None
+    assert updated.status == "completed", f"Solve failed: {updated.error}"
+    assert abs(updated.result.ra - 35.18) < 0.5, f"RA mismatch: {updated.result.ra}"
+    assert abs(updated.result.dec - 57.005) < 0.5, f"Dec mismatch: {updated.result.dec}"
+
+
 @pytest.mark.asyncio
 async def test_manager_failed_job_on_bad_binary() -> None:
     manager = SolveManager(
