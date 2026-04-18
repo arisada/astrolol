@@ -3,7 +3,7 @@ import { AlertTriangle, Camera, ChevronDown, ChevronUp, Download, ScanSearch, Se
 import { api } from '@/api/client'
 import { useStore } from '@/store'
 import { Button } from '@/components/ui/button'
-import type { ConnectedDevice, DbStatus, Profile, SolveJob, SolveResult, UserSettings } from '@/api/types'
+import type { ConnectedDevice, DbStatus, SolveJob, SolveResult, UserSettings } from '@/api/types'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -341,15 +341,6 @@ function ImageViewer() {
 
 // ── FOV calculator ─────────────────────────────────────────────────────────────
 
-function computeFov(
-  focalLength: number | undefined,
-  pixelSizeUm: number | null | undefined,
-  imageWidth: number | null | undefined,
-): number | null {
-  if (!focalLength || !pixelSizeUm || !imageWidth) return null
-  const pixelScaleArcsec = (pixelSizeUm / focalLength) * 206.265
-  return (pixelScaleArcsec * imageWidth) / 3600
-}
 
 // ── Sidebar section wrapper ────────────────────────────────────────────────────
 
@@ -391,7 +382,6 @@ export function PlatesolvePage() {
 
   const [settings, setSettings]         = useState<UserSettings | null>(null)
   const [showSettings, setShowSettings]  = useState(false)
-  const [activeProfile, setActiveProfile] = useState<Profile | null>(null)
   const [dbStatus, setDbStatus]          = useState<DbStatus | null>(null)
   const [installing, setInstalling]      = useState(false)
 
@@ -403,7 +393,7 @@ export function PlatesolvePage() {
 
   useEffect(() => {
     api.settings.get().then(setSettings).catch(console.error)
-    api.profiles.active().then(setActiveProfile).catch(console.error)
+
     api.platesolve.jobs().then(mergeSolveJobs).catch(console.error)
     api.platesolve.dbStatus().then(setDbStatus).catch(console.error)
   }, [])  // eslint-disable-line react-hooks/exhaustive-deps
@@ -412,7 +402,7 @@ export function PlatesolvePage() {
   useEffect(() => {
     if (!pendingSolveRef.current || !latestImage) return
     pendingSolveRef.current = false
-    launchSolve(latestImage.fitsPath, latestImage.width)
+    launchSolve(latestImage.fitsPath)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [latestImage?.fitsPath])
 
@@ -448,20 +438,14 @@ export function PlatesolvePage() {
     }
   }
 
-  const launchSolve = async (fitsPath: string, imageWidth?: number) => {
+  const launchSolve = async (fitsPath: string) => {
     if (!settings) return
     setError(null)
-    const fov = computeFov(
-      activeProfile?.telescope?.focal_length,
-      settings.pixel_size_um,
-      imageWidth ?? latestImage?.width,
-    ) ?? undefined
 
     try {
       const job = await api.platesolve.solve({
         fits_path: fitsPath,
         radius: settings.astap_search_radius,
-        fov,
       })
       mergeSolveJobs([job])
       setActiveSolveId(job.id)
@@ -511,9 +495,6 @@ export function PlatesolvePage() {
   )
   const lastCompleted = jobs.find((j) => j.status === 'completed' && j.result)
 
-  const fovHint = settings ? computeFov(
-    activeProfile?.telescope?.focal_length, settings.pixel_size_um, latestImage?.width,
-  ) : null
 
   return (
     <div className="flex h-full overflow-hidden">
@@ -590,11 +571,6 @@ export function PlatesolvePage() {
               </div>
             </div>
 
-            {fovHint != null && settings?.pixel_size_um && activeProfile?.telescope?.focal_length && (
-              <p className="text-xs text-slate-600">
-                {`${((settings.pixel_size_um / activeProfile.telescope.focal_length) * 206.265).toFixed(3)}″/px · FOV ${fmtField(fovHint)}`}
-              </p>
-            )}
           </div>
         </Section>
 

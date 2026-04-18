@@ -275,3 +275,10 @@ class IndiCamera:
             return int(w), int(h)
         except Exception:
             return 0, 0
+
+    async def get_pixel_size_um(self) -> float | None:
+        """Return the physical pixel size in µm from CCD_INFO, or None if unavailable."""
+        try:
+            return float(await self._client.get_number(self._device_name, "CCD_INFO", "CCD_PIXEL_SIZE"))
+        except Exception:
+            return None

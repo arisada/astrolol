@@ -5,6 +5,7 @@ import asyncio
 import tempfile
 from pathlib import Path
 
+import astropy.io.fits as astropy_fits
 import structlog
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
@@ -27,6 +28,56 @@ def _manager(request: Request) -> SolveManager:
     return request.app.state.solve_manager  # type: ignore[no-any-return]
 
 
+async def _compute_fov(fits_path: str, request: Request) -> float | None:
+    """Compute field width (degrees) from FITS header + CCD_INFO + active profile."""
+    app = request.app
+    try:
+        profile = app.state.active_profile
+        if profile is None or not getattr(profile, "telescope", None):
+            return None
+        focal_length_mm: float = profile.telescope.focal_length
+        if not focal_length_mm:
+            return None
+
+        # NAXIS1 and XBINNING from the FITS header
+        def _read_header() -> tuple[int, int]:
+            with astropy_fits.open(fits_path) as hdul:
+                hdr = hdul[0].header
+                return int(hdr["NAXIS1"]), int(hdr.get("XBINNING", 1))
+
+        naxis1, xbinning = await asyncio.to_thread(_read_header)
+
+        # Pixel size: try CCD_INFO first, fall back to user settings
+        pixel_size_um: float | None = None
+        device_manager = app.state.device_manager
+        cameras = [d for d in device_manager.list_connected() if d["kind"] == "camera"]
+        if cameras:
+            cam = device_manager.get_camera(cameras[0]["device_id"])
+            if hasattr(cam, "get_pixel_size_um"):
+                pixel_size_um = await cam.get_pixel_size_um()
+
+        if pixel_size_um is None:
+            pixel_size_um = app.state.profile_store.get_user_settings().pixel_size_um
+
+        if not pixel_size_um:
+            return None
+
+        plate_scale = (pixel_size_um * xbinning / focal_length_mm) * 206.265  # arcsec/px
+        fov_deg = plate_scale * naxis1 / 3600.0
+        logger.info(
+            "platesolve.fov_computed",
+            pixel_size_um=pixel_size_um,
+            xbinning=xbinning,
+            naxis1=naxis1,
+            focal_length_mm=focal_length_mm,
+            fov_deg=round(fov_deg, 4),
+        )
+        return fov_deg
+    except Exception as exc:
+        logger.warning("platesolve.fov_unavailable", reason=str(exc))
+        return None
+
+
 async def _enrich_request(req: SolveRequest, request: Request) -> SolveRequest:
     """Fill in ra_hint/dec_hint from the connected mount and radius from settings."""
     app = request.app
@@ -38,6 +89,12 @@ async def _enrich_request(req: SolveRequest, request: Request) -> SolveRequest:
             req = req.model_copy(update={"radius": settings.astap_search_radius})
         except Exception:
             pass
+
+    # FOV from FITS header + CCD_INFO + active profile
+    if req.fov is None:
+        fov = await _compute_fov(req.fits_path, request)
+        if fov is not None:
+            req = req.model_copy(update={"fov": fov})
 
     # RA/Dec from mount current position
     if req.ra_hint is None or req.dec_hint is None:
