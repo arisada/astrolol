@@ -63,6 +63,15 @@ async def stop_loop(device_id: str, request: Request) -> None:
         raise HTTPException(status_code=409, detail=str(exc))
 
 
+@router.post("/{device_id}/halt", status_code=204)
+async def halt(device_id: str, request: Request) -> None:
+    """Immediately abort any running exposure and cancel any active loop."""
+    try:
+        await _imager(request).halt(device_id)
+    except (DeviceNotFoundError, DeviceKindError) as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+
 @router.get("/{device_id}/camera_status", response_model=CameraStatus)
 async def camera_status(device_id: str, request: Request) -> CameraStatus:
     """Current camera hardware status: temperature, cooler, etc."""

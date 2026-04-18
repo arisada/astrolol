@@ -271,6 +271,14 @@ function CameraPanel({
     } catch (e) { setError((e as Error).message) }
   }
 
+  const halt = async () => {
+    setError(null)
+    try {
+      await api.imager.halt(deviceId)
+      setLooping(false)
+    } catch (e) { setError((e as Error).message) }
+  }
+
   const toggleLoop = async () => {
     setError(null)
     try {
@@ -431,6 +439,9 @@ function CameraPanel({
           </Button>
           <Button size="sm" variant={looping ? 'danger' : 'outline'} onClick={toggleLoop} disabled={!looping && busy}>
             {looping ? <><Square size={12} className="mr-1" /> Stop</> : <><Play size={12} className="mr-1" /> Loop</>}
+          </Button>
+          <Button size="sm" variant="danger" onClick={halt} title="Abort exposure and cancel loop immediately">
+            <StopCircle size={12} className="mr-1" /> Halt
           </Button>
         </div>
         {error && <p className="text-xs text-status-error">{error}</p>}

@@ -85,6 +85,8 @@ export const api = {
       }),
     stopLoop: (deviceId: string) =>
       request<void>(`/imager/${deviceId}/loop`, { method: 'DELETE' }),
+    halt: (deviceId: string) =>
+      request<void>(`/imager/${deviceId}/halt`, { method: 'POST' }),
     previewUrl: (previewPath: string) => {
       const filename = previewPath.split('/').pop()!
       return `/imager/images/${filename}`

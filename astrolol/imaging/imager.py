@@ -179,6 +179,30 @@ class ImagerManager:
         await self._event_bus.publish(LoopStopped(device_id=device_id))
         logger.info("imager.loop_stopped", device_id=device_id)
 
+    async def halt(self, device_id: str) -> None:
+        """Forcibly abort any running exposure and cancel any active loop immediately."""
+        imager = self._get_or_create(device_id)
+
+        # Cancel the loop task first so it doesn't restart another exposure
+        if imager._loop_task is not None and not imager._loop_task.done():
+            imager._loop_task.cancel()
+            try:
+                await imager._loop_task
+            except (asyncio.CancelledError, Exception):
+                pass
+            imager._loop_task = None
+
+        # Abort the in-progress hardware exposure
+        try:
+            camera = self._device_manager.get_camera(device_id)
+            await camera.abort()
+        except Exception as exc:
+            logger.warning("imager.halt_abort_failed", device_id=device_id, error=str(exc))
+
+        imager.state = ImagerState.IDLE
+        await self._event_bus.publish(LoopStopped(device_id=device_id))
+        logger.info("imager.halted", device_id=device_id)
+
     def get_status(self, device_id: str) -> ImagerStatus:
         imager = self._get_or_create(device_id)
         return ImagerStatus(device_id=device_id, state=imager.state)
