@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import math
 import tempfile
 from pathlib import Path
 
@@ -62,14 +63,15 @@ async def _compute_fov(fits_path: str, request: Request) -> float | None:
         if not pixel_size_um:
             return None
 
-        plate_scale = (pixel_size_um * xbinning / focal_length_mm) * 206.265  # arcsec/px
-        fov_deg = plate_scale * naxis1 / 3600.0
+        sensor_width_mm = pixel_size_um * xbinning * naxis1 / 1000.0
+        fov_deg = math.degrees(2 * math.atan(sensor_width_mm / (2 * focal_length_mm)))
         logger.info(
             "platesolve.fov_computed",
             pixel_size_um=pixel_size_um,
             xbinning=xbinning,
             naxis1=naxis1,
             focal_length_mm=focal_length_mm,
+            sensor_width_mm=round(sensor_width_mm, 4),
             fov_deg=round(fov_deg, 4),
         )
         return fov_deg
