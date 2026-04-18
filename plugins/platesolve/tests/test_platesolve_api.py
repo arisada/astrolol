@@ -385,6 +385,10 @@ async def test_solve_real_image(tmp_path) -> None:
     assert abs(updated.result.ra - 35.18) < 0.5, f"RA mismatch: {updated.result.ra}"
     assert abs(updated.result.dec - 57.005) < 0.5, f"Dec mismatch: {updated.result.dec}"
 
+    # Allow the event loop to drain subprocess transports before it closes,
+    # preventing PytestUnraisableExceptionWarning from BaseSubprocessTransport.__del__.
+    await asyncio.sleep(0.1)
+
 
 @pytest.mark.asyncio
 async def test_manager_failed_job_on_bad_binary() -> None:
