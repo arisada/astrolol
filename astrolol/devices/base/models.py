@@ -59,8 +59,10 @@ class Target(BaseModel):
 
 class MountStatus(BaseModel):
     state: DeviceState
-    ra: float | None = None    # ICRS decimal hours
-    dec: float | None = None   # ICRS decimal degrees
+    ra: float | None = None        # ICRS (J2000) decimal hours
+    dec: float | None = None       # ICRS (J2000) decimal degrees
+    ra_jnow: float | None = None   # JNow decimal hours (FK5 current epoch)
+    dec_jnow: float | None = None  # JNow decimal degrees (FK5 current epoch)
     alt: float | None = None
     az: float | None = None
     is_tracking: bool = False

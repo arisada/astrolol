@@ -232,6 +232,8 @@ class IndiMount:
             state=self._state,
             ra=ra,
             dec=dec,
+            ra_jnow=ra_jnow,
+            dec_jnow=dec_jnow,
             alt=alt,
             az=az,
             is_tracking=self._is_tracking,

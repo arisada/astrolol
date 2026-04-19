@@ -1,7 +1,9 @@
+from typing import Literal
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 import astropy.units as u
-from astropy.coordinates import SkyCoord
+from astropy.coordinates import FK5, SkyCoord
+from astropy.time import Time
 
 from astrolol.core.errors import DeviceKindError, DeviceNotFoundError
 from astrolol.devices.base.models import MountStatus, Target, TrackingMode
@@ -20,11 +22,12 @@ class TrackingRequest(BaseModel):
 
 
 class TargetRequest(BaseModel):
-    """ICRS (J2000) coordinates in degrees."""
-    ra: float   # ICRS degrees
-    dec: float  # ICRS degrees
+    """Sky coordinates in degrees. Use frame to specify the coordinate system."""
+    ra: float   # degrees
+    dec: float  # degrees
     name: str | None = None
     source: str | None = None
+    frame: Literal["icrs", "jnow"] = "icrs"
 
 
 class SyncRequest(BaseModel):
@@ -35,6 +38,16 @@ class SyncRequest(BaseModel):
 
 def _icrs_deg_to_skycoord(ra_deg: float, dec_deg: float) -> SkyCoord:
     return SkyCoord(ra=ra_deg * u.deg, dec=dec_deg * u.deg, frame="icrs")
+
+
+def _target_request_to_skycoord(body: TargetRequest) -> SkyCoord:
+    if body.frame == "jnow":
+        return SkyCoord(
+            ra=body.ra * u.deg,
+            dec=body.dec * u.deg,
+            frame=FK5(equinox=Time.now()),
+        ).icrs
+    return _icrs_deg_to_skycoord(body.ra, body.dec)
 
 
 @router.get("/{device_id}/status", response_model=MountStatus)
@@ -49,7 +62,7 @@ async def status(device_id: str, request: Request) -> MountStatus:
 async def set_target(device_id: str, body: TargetRequest, request: Request) -> Target:
     """Set the current target (ICRS degrees). Returns the stored target."""
     try:
-        coord = _icrs_deg_to_skycoord(body.ra, body.dec)
+        coord = _target_request_to_skycoord(body)
         return await _manager(request).set_target(device_id, coord, name=body.name, source=body.source)
     except (DeviceNotFoundError, DeviceKindError) as exc:
         raise HTTPException(status_code=404, detail=str(exc))

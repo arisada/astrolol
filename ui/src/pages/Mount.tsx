@@ -3,7 +3,7 @@ import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Crosshair, RefreshCw, Rotate
 import { api } from '@/api/client'
 import { useStore } from '@/store'
 import type { LogEntry } from '@/store'
-import type { MountStatus, TrackingMode } from '@/api/types'
+import type { CoordFrame, MountStatus, TrackingMode } from '@/api/types'
 import { Button } from '@/components/ui/button'
 import { DmsInput } from '@/components/ui/dms-input'
 import { StateBadge } from '@/components/ui/badge'
@@ -72,10 +72,10 @@ function fmtDec(d: number | null | undefined): string {
 // Sub-components
 // ---------------------------------------------------------------------------
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
+function Section({ title, children }: { title: React.ReactNode; children: React.ReactNode }) {
   return (
     <div className="border border-surface-border rounded-lg p-4 flex flex-col gap-3">
-      <h3 className="text-xs font-medium text-slate-500 uppercase tracking-wider">{title}</h3>
+      <h3 className="text-xs font-medium text-slate-500 uppercase tracking-wider flex items-center">{title}</h3>
       {children}
     </div>
   )
@@ -100,6 +100,25 @@ function ToggleSwitch({ checked, onChange, label, disabled }: {
         ${checked ? 'translate-x-[22px]' : 'translate-x-0.5'}`}
       />
     </button>
+  )
+}
+
+function FrameToggle({ jnow, onChange }: { jnow: boolean; onChange: (jnow: boolean) => void }) {
+  const btn = (label: string, active: boolean, onClick: () => void) => (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`text-xs px-1.5 py-0.5 rounded transition-colors
+        ${active ? 'bg-surface-overlay text-slate-200' : 'text-slate-600 hover:text-slate-400'}`}
+    >
+      {label}
+    </button>
+  )
+  return (
+    <div className="flex items-center gap-0.5 ml-auto">
+      {btn('JNow', jnow, () => onChange(true))}
+      {btn('J2000', !jnow, () => onChange(false))}
+    </div>
   )
 }
 
@@ -135,6 +154,8 @@ function MountControls({ deviceId }: { deviceId: string }) {
 
   const [rateIdx, setRateIdx] = useState(1)
   const [trackingMode, setTrackingMode] = useState<TrackingMode>('sidereal')
+  const [positionJnow, setPositionJnow] = useState(true)   // Position section: default JNow
+  const [targetJnow, setTargetJnow] = useState(false)      // Target section: default J2000
   const [error, setError] = useState<string | null>(null)
   const movingRef = useRef(false)
 
@@ -145,9 +166,9 @@ function MountControls({ deviceId }: { deviceId: string }) {
         const s = await api.mount.status(deviceId)
         if (alive) {
           setStatus(s)
-          if (!slewEdited.current && s.ra != null && s.dec != null) {
-            setSlewRa(s.ra)
-            setSlewDec(s.dec)
+          if (!slewEdited.current) {
+            setSlewRa(s.ra ?? 0)
+            setSlewDec(s.dec ?? 0)
           }
         }
       } catch { /* ignore poll errors */ }
@@ -223,12 +244,15 @@ function MountControls({ deviceId }: { deviceId: string }) {
         )}
 
         {/* Live position */}
-        <Section title="Position (J2000)">
+        <Section title={<div className="flex items-center w-full">
+          <span>Position</span>
+          <FrameToggle jnow={positionJnow} onChange={setPositionJnow} />
+        </div>}>
           <div className="grid grid-cols-2 gap-x-8 gap-y-1 font-mono text-sm">
             <span className="text-slate-500 text-xs">RA</span>
             <span className="text-slate-500 text-xs">Dec</span>
-            <span className="text-slate-200">{fmtRA(status?.ra)}</span>
-            <span className="text-slate-200">{fmtDec(status?.dec)}</span>
+            <span className="text-slate-200">{fmtRA(positionJnow ? status?.ra_jnow : status?.ra)}</span>
+            <span className="text-slate-200">{fmtDec(positionJnow ? status?.dec_jnow : status?.dec)}</span>
             <span className="text-slate-500 text-xs mt-1">Alt</span>
             <span className="text-slate-500 text-xs mt-1">Az</span>
             <span className="text-slate-300">{status?.alt != null ? `${status.alt.toFixed(1)}°` : '—'}</span>
@@ -245,7 +269,10 @@ function MountControls({ deviceId }: { deviceId: string }) {
         </Section>
 
         {/* Target */}
-        <Section title="Target (J2000)">
+        <Section title={<div className="flex items-center w-full">
+          <span>Target</span>
+          <FrameToggle jnow={targetJnow} onChange={setTargetJnow} />
+        </div>}>
           <div className="flex flex-col gap-2">
             <div className="flex items-center gap-2">
               <span className="text-xs text-slate-500 w-8 shrink-0">RA</span>
@@ -257,7 +284,10 @@ function MountControls({ deviceId }: { deviceId: string }) {
             </div>
           </div>
           <div className="flex gap-2 items-center flex-wrap">
-            <Button size="sm" variant="outline" onClick={() => act(() => api.mount.setTarget(deviceId, slewRa * 15, slewDec))}>
+            <Button size="sm" variant="outline" onClick={() => {
+              const frame: CoordFrame = targetJnow ? 'jnow' : 'icrs'
+              act(() => api.mount.setTarget(deviceId, slewRa * 15, slewDec, undefined, undefined, frame))
+            }}>
               <Crosshair size={12} className="mr-1" /> Set Target
             </Button>
             <Button size="sm" onClick={() => act(() => api.mount.slew(deviceId))}>
@@ -275,10 +305,10 @@ function MountControls({ deviceId }: { deviceId: string }) {
                 className="ml-auto text-xs text-slate-500 hover:text-slate-300 transition-colors"
                 onClick={() => {
                   slewEdited.current = false
-                  if (status?.ra != null && status?.dec != null) {
-                    setSlewRa(status.ra)
-                    setSlewDec(status.dec)
-                  }
+                  const ra = targetJnow ? (status?.ra_jnow ?? 0) : (status?.ra ?? 0)
+                  const dec = targetJnow ? (status?.dec_jnow ?? 0) : (status?.dec ?? 0)
+                  setSlewRa(ra)
+                  setSlewDec(dec)
                 }}
               >
                 ↺ live

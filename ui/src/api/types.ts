@@ -38,10 +38,14 @@ export interface MountTarget {
   set_at: string
 }
 
+export type CoordFrame = 'icrs' | 'jnow'
+
 export interface MountStatus {
   state: DeviceState
-  ra: number | null   // ICRS decimal hours (0–24)
-  dec: number | null  // ICRS decimal degrees (-90–90)
+  ra: number | null       // ICRS (J2000) decimal hours (0–24)
+  dec: number | null      // ICRS (J2000) decimal degrees (-90–90)
+  ra_jnow: number | null  // JNow decimal hours (0–24)
+  dec_jnow: number | null // JNow decimal degrees (-90–90)
   alt: number | null
   az: number | null
   is_tracking: boolean

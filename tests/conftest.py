@@ -150,10 +150,16 @@ class FakeMount:
 
     async def get_status(self) -> MountStatus:
         state = DeviceState.CONNECTED if self.connected else DeviceState.DISCONNECTED
+        from astropy.coordinates import FK5, SkyCoord
+        from astropy.time import Time
+        icrs = SkyCoord(ra=self._ra * u.hourangle, dec=self._dec * u.deg, frame="icrs")
+        jnow = icrs.transform_to(FK5(equinox=Time.now()))
         return MountStatus(
             state=state,
             ra=self._ra,
             dec=self._dec,
+            ra_jnow=jnow.ra.hour,
+            dec_jnow=jnow.dec.deg,
             is_tracking=self._tracking,
             is_parked=self._parked,
             pier_side=self._pier_side,

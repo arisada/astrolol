@@ -1,6 +1,7 @@
 import type {
   ActivationResult,
   CameraStatus,
+  CoordFrame,
   ConnectedDevice,
   DbStatus,
   DeviceConfig,
@@ -106,10 +107,10 @@ export const api = {
   mount: {
     status: (deviceId: string) => request<MountStatus>(`/mount/${deviceId}/status`),
     // Target: ICRS degrees (J2000)
-    setTarget: (deviceId: string, ra_deg: number, dec_deg: number, name?: string, source?: string) =>
+    setTarget: (deviceId: string, ra_deg: number, dec_deg: number, name?: string, source?: string, frame: CoordFrame = 'icrs') =>
       request<MountTarget>(`/mount/${deviceId}/target`, {
         method: 'PUT',
-        body: JSON.stringify({ ra: ra_deg, dec: dec_deg, name: name ?? null, source: source ?? null }),
+        body: JSON.stringify({ ra: ra_deg, dec: dec_deg, name: name ?? null, source: source ?? null, frame }),
       }),
     getTarget: (deviceId: string) => request<MountTarget>(`/mount/${deviceId}/target`),
     clearTarget: (deviceId: string) =>
