@@ -167,8 +167,8 @@ function MountControls({ deviceId }: { deviceId: string }) {
         if (alive) {
           setStatus(s)
           if (!slewEdited.current) {
-            setSlewRa(s.ra ?? 0)
-            setSlewDec(s.dec ?? 0)
+            setSlewRa(targetJnow ? (s.ra_jnow ?? 0) : (s.ra ?? 0))
+            setSlewDec(targetJnow ? (s.dec_jnow ?? 0) : (s.dec ?? 0))
           }
         }
       } catch { /* ignore poll errors */ }
@@ -176,7 +176,7 @@ function MountControls({ deviceId }: { deviceId: string }) {
     poll()
     const id = setInterval(poll, 2000)
     return () => { alive = false; clearInterval(id) }
-  }, [deviceId])
+  }, [deviceId, targetJnow])
 
   const act = useCallback(async (fn: () => Promise<unknown>) => {
     setError(null)
