@@ -2,10 +2,15 @@
 
 Items designed for but not yet built. Ordered roughly by priority.
 
-## Pre-release priorities
+## Near-term
 
-- **Plate solving** — async subprocess wrapper for ASTAP / astrometry.net with progress
-  events. Also a good plugin candidate.
+- **Target: write OBJECT to FITS headers** — the active target name (when set) should be
+  written as the `OBJECT` keyword in captured FITS files. `ImagerManager` already reads mount
+  position for `RA`/`DEC` headers; extend it to also read `MountManager.get_target()`.
+- **Simbad / NED name resolver plugin** — resolve an object name ("M31", "NGC 7293") to
+  ICRS coordinates and call `PUT /mount/{id}/target` automatically.
+- **Target persistence across restart** — store the last-set target in `profiles.json` so
+  it survives a backend restart.
 
 ## Profiles — deferred
 
@@ -20,19 +25,22 @@ Items designed for but not yet built. Ordered roughly by priority.
 - **Runtime enable/disable without restart** — currently requires `POST /admin/restart`.
   The main blocker is that FastAPI does not support hot-swapping routers; a sub-application
   mount pattern or a proxy middleware could work around this.
-- **Plugin dependency injection via EventBus** — plugins that need to talk to each other
-  should publish/subscribe events rather than importing across plugin boundaries.
-- **Plugin tests auto-discovered** — add `plugins/` to `testpaths` in `pyproject.toml` once
-  there are enough plugins to justify it.
 
 ## Imaging — deferred
 
-- **Observation target** — introduce a `Target` concept (RA/Dec J2000 + optional object name
-  looked up from a catalogue, e.g. "M31", "NGC 7293").  A target is distinct from the mount's
-  current reported position: the mount may be slightly off after a GoTo, and a target can be
-  set before the mount has finished slewing.  The active target should be stored in
-  `MountManager` and written as `OBJECT` in FITS headers.  A Simbad/NED name-resolver plugin
-  would populate the object name automatically.
+- **Sequencer** — state machine (idle → slewing → focusing → guiding → imaging → dithering).
+  Cancellable at every step. PHD2 and plate-solve plugins already exist as building blocks.
+  Strong plugin candidate.
+- **Debayer + full STF preview** — colour camera preview shows raw Bayer grid today.
+- **Calibration pipeline** — flat/dark/bias acquisition and application (ccdproc). Plugin.
+- **Autofocus module** — V-curve fitting, backlash compensation, temperature compensation.
+  Plugin.
+
+## Mount — deferred
+
+- **Watchdog** — periodic `ping()` calls on each connected device; transition to ERROR state
+  and surface an alert in the UI without crashing the app.
+- **Pointing model** — n-point alignment corrections stored per-profile.
 
 ## UI consistency audit
 
@@ -45,15 +53,10 @@ Items designed for but not yet built. Ordered roughly by priority.
 
 ## Post-MVP
 
-- **Sequencer** — state machine (idle → slewing → focusing → guiding → imaging → dithering).
-  Cancellable at every step. Build PHD2 first. Strong plugin candidate.
 - **Persistence layer** — SQLAlchemy + aiosqlite + Alembic migrations. Session history,
   image metadata, autofocus run data.
-- **Autofocus module** — V-curve fitting, backlash compensation, temperature compensation.
-  Plugin.
-- **Calibration pipeline** — flat/dark/bias acquisition and application (ccdproc). Plugin.
-- **Debayer + full STF preview** — colour camera preview shows raw Bayer grid today.
 - **UI: red mode** — CSS filter toggle for night vision preservation.
 - **UI: mobile layout** — responsive breakpoints, bottom tab navigation on small screens.
 - **Caddy / systemd packaging** — deployment guide for Raspberry Pi with HTTPS and autostart.
 - **Auth / security** — API keys or JWT tokens. Required before any internet exposure.
+  See the Security section in README.md.

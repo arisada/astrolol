@@ -3,6 +3,8 @@
 Headless, modular, open-source astronomy platform. Runs on the machine attached to your
 telescope (Raspberry Pi, mini-PC, etc.). Connect from any web browser.
 
+Source: https://github.com/arisada/astrolol
+
 ## What works today
 
 - **Device management** — connect cameras, mounts, and focusers via INDI. Standard adapters
@@ -12,26 +14,46 @@ telescope (Raspberry Pi, mini-PC, etc.). Connect from any web browser.
 - **Imager** — single exposures and continuous loops per camera. FITS files stored server-side,
   auto-stretched JPEG preview streamed to clients.
 - **Mount control** — slew, stop, park/unpark, sync, tracking on/off (sidereal/lunar/solar).
-  Pier side, hour angle, and meridian-flip button shown when |HA| ≤ 1 h.
+  Pier side, hour angle, meridian-flip, directional nudge. Coordinates displayed in ICRS (J2000)
+  or JNow. Target concept: set a target independently of slewing, used by plate-solve sync and
+  future sequencer.
 - **Focuser control** — absolute and relative moves, halt.
+- **Plate solving** — ASTAP integration (async, cancellable). Sync-and-re-slew workflow:
+  solve, sync mount, set target, slew.
+- **PHD2 guiding** — connect to a running PHD2 instance, start/stop guiding, dithering,
+  live RMS display.
 - **Live event stream** — all state changes broadcast to connected clients over WebSocket,
   with a ring-buffer replay for late-joining clients.
 - **Plugin system** — self-contained feature plugins in `plugins/`. Each plugin registers its
   own API routes, UI page, and sidebar entry. Enable/disable from Options with a live restart.
-- **Web UI** — dark-theme React app: Equipment, Profiles, Imaging, Mount, Logs, Options pages,
-  plus one page per enabled plugin.
+- **Web UI** — dark-theme React app: Equipment, Profiles, Imaging, Mount, Focuser, Logs,
+  Options pages, plus one page per enabled plugin.
 
 ## Requirements
 
 - Python 3.11+
 - Node.js 18+ (for the web UI)
 - Linux (Raspberry Pi, mini-PC, or any machine at the scope)
-- Optional: `indi-bin` package for INDI simulator integration tests
+
+**INDI drivers** (required for real hardware and integration tests):
+```bash
+sudo apt-get install indi-bin
+```
+
+**Optional: ASTAP plate solver**
+
+```bash
+sudo apt-get install astap-cli
+```
+
+**Optional: PHD2 guiding**
+
+astrolol can connect to local or remote PHD2 instances.
 
 ## Install
 
 ```bash
-git clone https://github.com/you/astrolol
+git clone https://github.com/arisada/astrolol
 cd astrolol
 pip install -e ".[dev]"   # [dev] includes pytest, pytest-asyncio, httpx, etc.
 cd ui && npm install
@@ -74,7 +96,7 @@ Source is bind-mounted; code changes are live without rebuild. Rebuild only when
 python3 -m pytest tests/ plugins/ -v
 ```
 
-191 unit tests require no hardware. 34 integration tests (in `tests/integration/`) require
+Unit tests require no hardware. Integration tests (in `tests/integration/`) require
 `indiserver` and are skipped automatically when it is not installed.
 
 ## Adding features
@@ -86,3 +108,14 @@ Core changes (device adapters, event bus, profile store, etc.) go in `astrolol/`
 
 **Every new feature that can be tested must have tests.** Untested code in a PR will be
 sent back.
+
+## Security
+
+**astrolol has no authentication.** Anyone who can reach the web server can control your
+telescope, start exposures, and read FITS images from disk. astrolol allows setting paths to helper binaries from its web interface, which is a known security risk.
+
+- Run it on a **trusted local network only** (your home LAN, a dedicated AP at the
+  observing site, or a VPN).
+- Do **not** expose port 8000 directly to the internet or to untrusted Wi-Fi networks.
+- If you need remote access, put it behind a VPN such as WireGuard or an
+  authenticating reverse proxy (nginx with `auth_basic`).
