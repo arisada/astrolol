@@ -1,5 +1,6 @@
 import asyncio
 import shutil
+import tempfile
 import time as _time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -280,7 +281,7 @@ class ImagerManager:
         if profile is not None:
             await asyncio.to_thread(_patch_fits_headers, fits_path, profile, coord)
 
-        # Optionally move to save directory using the configured template
+        # Optionally move to save directory, or park unsaved frames in a fixed temp path
         if request.save and self._profile_store is not None:
             user_cfg = self._profile_store.get_user_settings()
             counter = self._save_counters.get(device_id, 0) + 1
@@ -299,6 +300,18 @@ class ImagerManager:
                 fits_path = final_fits
             except Exception:
                 logger.warning("imager.save_move_failed", src=str(fits_path), dst=str(final_fits))
+        elif not request.save:
+            # Move to a deterministic per-device temp path so unsaved frames don't
+            # accumulate in images_dir.  The file is overwritten on the next unsaved
+            # exposure for this camera (e.g. plate-solve previews).
+            tmp_dir = Path(tempfile.gettempdir()) / "astrolol"
+            tmp_dir.mkdir(parents=True, exist_ok=True)
+            tmp_fits = tmp_dir / f"temp_{device_id}.fits"
+            try:
+                await asyncio.to_thread(shutil.move, str(fits_path), str(tmp_fits))
+                fits_path = tmp_fits
+            except Exception:
+                logger.warning("imager.temp_move_failed", src=str(fits_path), dst=str(tmp_fits))
 
         # Generate two previews (auto-stretch + linear) — both live in images_dir
         preview_path = self._preview_path(fits_path.stem, self._images_dir, suffix="auto")

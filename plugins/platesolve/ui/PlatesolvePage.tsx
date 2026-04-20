@@ -35,6 +35,16 @@ function fmtField(deg: number): string {
   return deg >= 1 ? `${deg.toFixed(2)}°` : `${(deg * 60).toFixed(1)}′`
 }
 
+// ── Platesolve settings defaults ──────────────────────────────────────────────
+
+const DEFAULT_PLATESOLVE_SETTINGS: PlatesolveSettings = {
+  astap_bin: 'astap_cli',
+  astap_db_path: '/opt/astap',
+  astap_search_radius: 30.0,
+  astap_tolerance: 0.007,
+  pixel_size_um: null,
+}
+
 // ── localStorage helpers ───────────────────────────────────────────────────────
 
 function useLocalStorage<T>(key: string, initial: T): [T, (v: T) => void] {
@@ -475,7 +485,9 @@ export function PlatesolvePage() {
   const prevSolveStatusRef                    = useRef<string | undefined>(undefined)
 
   useEffect(() => {
-    api.plugins.getSettings<PlatesolveSettings>('platesolve').then(setSettings).catch(console.error)
+    api.plugins.getSettings<PlatesolveSettings>('platesolve')
+      .then(s => setSettings({ ...DEFAULT_PLATESOLVE_SETTINGS, ...s }))
+      .catch(console.error)
 
     api.platesolve.jobs().then(mergeSolveJobs).catch(console.error)
     api.platesolve.dbStatus().then(setDbStatus).catch(console.error)
@@ -546,7 +558,7 @@ export function PlatesolvePage() {
     prevSolveStatusRef.current = undefined
     try {
       pendingSolveRef.current = true
-      await api.imager.expose(camera.device_id, { duration, binning, frame_type: 'light', save: true })
+      await api.imager.expose(camera.device_id, { duration, binning, frame_type: 'light', save: false })
     } catch (e) {
       pendingSolveRef.current = false
       setBusy(false)

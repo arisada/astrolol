@@ -18,6 +18,26 @@ async def connected_camera(manager: DeviceManager, device_id: str = "cam1") -> s
 # --- single expose ---
 
 @pytest.mark.asyncio
+async def test_expose_no_save_uses_temp_path(
+    imager_manager: ImagerManager, manager: DeviceManager, tmp_path: Path
+) -> None:
+    """Unsaved exposures must land in a deterministic temp path, not accumulate in images_dir."""
+    await connected_camera(manager)
+    result = await imager_manager.expose("cam1", ExposureRequest(duration=1.0, save=False))
+    fits = Path(result.fits_path)
+    # File must exist and be a valid FITS
+    assert fits.exists()
+    assert fits.suffix == ".fits"
+    # Must NOT live inside the imager's images_dir (tmp_path in tests)
+    assert not fits.is_relative_to(tmp_path)
+    # Must be the deterministic per-device temp name
+    assert fits.name == "temp_cam1.fits"
+    # A second unsaved expose for the same camera overwrites the same path
+    result2 = await imager_manager.expose("cam1", ExposureRequest(duration=1.0, save=False))
+    assert result2.fits_path == result.fits_path
+
+
+@pytest.mark.asyncio
 async def test_expose_returns_result(imager_manager: ImagerManager, manager: DeviceManager) -> None:
     await connected_camera(manager)
     result = await imager_manager.expose("cam1", ExposureRequest(duration=1.0))
