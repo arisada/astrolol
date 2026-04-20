@@ -113,47 +113,66 @@ async def load_driver(body: LoadDriverRequest, request: Request) -> LoadDriverRe
     logger.info("indi.load_driver_request", executable=body.executable, device=body.device_name)
     try:
         await manager.ensure_started()
-        if body.executable:
-            await manager.load_driver(body.executable)
     except Exception as exc:
-        raise HTTPException(status_code=502, detail=f"Failed to start driver: {exc}") from exc
+        raise HTTPException(status_code=502, detail=f"Failed to start indiserver: {exc}") from exc
 
     client = manager.client
-    known_before = set(client.list_devices())
     exact_name = body.device_name
 
-    # Phase 1: try exact device name (handles single-camera and already-loaded drivers)
-    try:
-        await client.wait_for_property(exact_name, "CONNECTION", timeout=15.0)
-        # Exact match found — brief extra window to collect any additional cameras
-        # from the same multi-camera driver that came up simultaneously
-        await asyncio.sleep(1.0)
-        device_names = [exact_name] + [
-            d for d in client.list_devices()
-            if d not in known_before and d != exact_name and d.startswith(exact_name)
-        ]
-    except TimeoutError:
-        # Phase 2: prefix fallback.  Handles drivers that announce model-specific
-        # names ("ZWO CCD ASI294MC Pro") instead of the generic catalog name
-        # ("ZWO CCD").  Wait up to 5 s more (20 s total) for any matching device.
+    # t0 check: if the driver was already loaded (e.g. cameras announced at indiserver
+    # startup before the user clicked "Load driver"), return whatever is already known.
+    # This handles multi-camera setups where all devices appear seconds after indiserver
+    # starts, long before the user interacts with the UI.
+    existing = [d for d in client.list_devices() if d == exact_name or d.startswith(exact_name + " ")]
+    if existing:
         logger.info(
-            "indi.load_driver_prefix_fallback",
+            "indi.load_driver_already_announced",
             device=exact_name,
-            reason="exact name not announced; trying prefix match",
+            found=existing,
         )
+        device_names = existing
+    else:
+        # Driver not yet loaded — load it now and wait for devices to appear.
         try:
-            device_names = await client.wait_for_devices_by_prefix(
-                exact_name, known_before, timeout=5.0
-            )
+            if body.executable:
+                await manager.load_driver(body.executable)
+        except Exception as exc:
+            raise HTTPException(status_code=502, detail=f"Failed to start driver: {exc}") from exc
+
+        known_before = set(client.list_devices())
+
+        # Phase 1: try exact device name (handles single-camera setups)
+        try:
+            await client.wait_for_property(exact_name, "CONNECTION", timeout=15.0)
+            # Exact match found — brief extra window to collect any additional cameras
+            # from the same multi-camera driver that came up simultaneously
+            await asyncio.sleep(1.0)
+            device_names = [exact_name] + [
+                d for d in client.list_devices()
+                if d not in known_before and d != exact_name and d.startswith(exact_name)
+            ]
         except TimeoutError:
-            raise HTTPException(
-                status_code=504,
-                detail=(
-                    f"Driver loaded but no device starting with '{exact_name}' announced "
-                    "properties within 20 s. Check that the driver is installed and the "
-                    "device is connected."
-                ),
+            # Phase 2: prefix fallback.  Handles drivers that announce model-specific
+            # names ("ZWO CCD ASI294MC Pro") instead of the generic catalog name
+            # ("ZWO CCD").  Wait up to 5 s more (20 s total) for any matching device.
+            logger.info(
+                "indi.load_driver_prefix_fallback",
+                device=exact_name,
+                reason="exact name not announced; trying prefix match",
             )
+            try:
+                device_names = await client.wait_for_devices_by_prefix(
+                    exact_name, known_before, timeout=5.0
+                )
+            except TimeoutError:
+                raise HTTPException(
+                    status_code=504,
+                    detail=(
+                        f"Driver loaded but no device starting with '{exact_name}' announced "
+                        "properties within 20 s. Check that the driver is installed and the "
+                        "device is connected."
+                    ),
+                )
 
     resolved = device_names[0]
     snapshot = await client.get_properties_snapshot(resolved)
