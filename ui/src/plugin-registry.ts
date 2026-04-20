@@ -7,11 +7,12 @@
  */
 import type { ComponentType } from 'react'
 import type { LucideIcon } from 'lucide-react'
-import { Crosshair, ScanSearch, Smile, Telescope } from 'lucide-react'
+import { Crosshair, ScanSearch, Smile, Star, Telescope } from 'lucide-react'
 import { HelloPage } from '@plugins/hello/ui/HelloPage'
 import { Lx200Page } from '@plugins/lx200/ui/Lx200Page'
 import { Phd2Page } from '@plugins/phd2/ui/Phd2Page'
 import { PlatesolvePage } from '@plugins/platesolve/ui/PlatesolvePage'
+import { StellariumPage } from '@plugins/stellarium/ui/StellariumPage'
 
 export interface PluginRegistryEntry {
   to: string
@@ -44,6 +45,12 @@ const PLUGIN_REGISTRY: Record<string, PluginRegistryEntry> = {
     icon: Telescope,
     label: 'LX200 Server',
     Component: Lx200Page,
+  },
+  stellarium: {
+    to: '/stellarium',
+    icon: Star,
+    label: 'Stellarium',
+    Component: StellariumPage,
   },
 }
 

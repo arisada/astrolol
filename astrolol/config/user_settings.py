@@ -24,6 +24,8 @@ class UserSettings(BaseModel):
     indi_run_dir: str = "/tmp/astrolol"       # directory for INDI FIFO and state file
     lx200_port: int = 10001                   # TCP port for the LX200 server
     lx200_autostart: bool = True              # start LX200 server when plugin is enabled
+    stellarium_port: int = 10002              # TCP port for the Stellarium server
+    stellarium_autostart: bool = True         # start Stellarium server when plugin is enabled
 
 
 class UserSettingsStore:

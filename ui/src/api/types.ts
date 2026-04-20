@@ -99,6 +99,8 @@ export interface UserSettings {
   indi_run_dir: string
   lx200_port: number
   lx200_autostart: boolean
+  stellarium_port: number
+  stellarium_autostart: boolean
 }
 
 // --- Plate solving ---
