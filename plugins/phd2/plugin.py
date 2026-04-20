@@ -7,6 +7,7 @@ from fastapi import FastAPI
 from astrolol.core.plugin_api import PluginContext, PluginManifest
 from plugins.phd2.api import router
 from plugins.phd2.client import Phd2Client
+from plugins.phd2.settings import Phd2Settings
 
 logger = structlog.get_logger()
 
@@ -27,13 +28,11 @@ class Phd2Plugin:
         self._imager_manager = None
 
     def setup(self, app: FastAPI, ctx: PluginContext) -> None:
-        # Read PHD2 host/port from persisted user settings
-        profile_store = app.state.profile_store
-        user_settings = profile_store.get_user_settings()
+        cfg = ctx.get_plugin_settings("phd2", Phd2Settings)
 
         self._client = Phd2Client(
-            host=user_settings.phd2_host,
-            port=user_settings.phd2_port,
+            host=cfg.host,
+            port=cfg.port,
             event_bus=ctx.event_bus,
         )
         app.state.phd2_client = self._client
@@ -43,7 +42,7 @@ class Phd2Plugin:
         self._imager_manager._dither_fn = self._dither_fn
 
         app.include_router(router)
-        logger.info("phd2.plugin_setup", host=user_settings.phd2_host, port=user_settings.phd2_port)
+        logger.info("phd2.plugin_setup", host=cfg.host, port=cfg.port)
 
     async def startup(self) -> None:
         pass  # PHD2 connects only on explicit user request (POST /phd2/connect)

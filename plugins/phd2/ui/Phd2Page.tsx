@@ -3,6 +3,7 @@ import { Crosshair, Pause, Play, Settings, Square, Target, Wifi, WifiOff } from 
 import { api } from '@/api/client'
 import { useStore } from '@/store'
 import type { GuidePoint } from '@/store'
+import type { Phd2Settings } from '@/api/types'
 import { Button } from '@/components/ui/button'
 
 // ── Graph constants ────────────────────────────────────────────────────────────
@@ -252,6 +253,19 @@ export function Phd2Page() {
   const [error, setError] = useState<string | null>(null)
   const [showSettings, setShowSettings] = useState(false)
 
+  // Connection settings (persisted via backend plugin settings)
+  const [phd2Settings, setPhd2Settings] = useState<Phd2Settings>({ host: 'localhost', port: 4400 })
+  const [settingsSaving, setSettingsSaving] = useState(false)
+  useEffect(() => {
+    api.plugins.getSettings<Phd2Settings>('phd2')
+      .then((s) => setPhd2Settings({ host: s.host ?? 'localhost', port: s.port ?? 4400 }))
+      .catch(() => {})
+  }, [])
+  const savePhd2Settings = async () => {
+    setSettingsSaving(true)
+    try { await api.plugins.putSettings('phd2', phd2Settings) } catch { /* ignore */ } finally { setSettingsSaving(false) }
+  }
+
   // UI preferences persisted via localStorage (graph display only — not server state)
   const [graphRange, setGraphRange] = useState(() =>
     parseFloat(lsGet('phd2_graph_range', '2.0'))
@@ -352,6 +366,27 @@ export function Phd2Page() {
       {/* Settings panel */}
       {showSettings && (
         <div className="border border-surface-border rounded-lg p-3 bg-surface-raised flex flex-col gap-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-slate-400">PHD2 host</span>
+            <input
+              className="rounded border border-surface-border bg-surface-overlay px-2 py-1 text-xs text-slate-200 font-mono w-36 focus:outline-none focus:ring-1 focus:ring-accent"
+              value={phd2Settings.host}
+              onChange={(e) => setPhd2Settings((s) => ({ ...s, host: e.target.value }))}
+              onBlur={savePhd2Settings}
+            />
+          </div>
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-slate-400">PHD2 port</span>
+            <input
+              type="number"
+              className="rounded border border-surface-border bg-surface-overlay px-2 py-1 text-xs text-slate-200 font-mono w-20 focus:outline-none focus:ring-1 focus:ring-accent"
+              value={phd2Settings.port}
+              onChange={(e) => setPhd2Settings((s) => ({ ...s, port: parseInt(e.target.value) || 4400 }))}
+              onBlur={savePhd2Settings}
+            />
+          </div>
+          {settingsSaving && <span className="text-xs text-slate-500">Saving…</span>}
+          <div className="border-t border-surface-border" />
           <div className="flex items-center justify-between">
             <span className="text-xs text-slate-400">Graph vertical scale</span>
             <select

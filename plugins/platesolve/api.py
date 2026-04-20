@@ -13,6 +13,7 @@ from pydantic import BaseModel
 
 from astrolol.core.events.models import LogEvent
 from plugins.platesolve.models import SolveJob, SolveRequest
+from plugins.platesolve.settings import PlatesolveSettings
 from plugins.platesolve.solver import SolveManager
 
 logger = structlog.get_logger()
@@ -22,7 +23,7 @@ _D05_URL = (
     "/star_databases/d05_star_database.deb"
 )
 
-router = APIRouter(prefix="/platesolve", tags=["platesolve"])
+router = APIRouter(prefix="/plugins/platesolve", tags=["platesolve"])
 
 
 def _manager(request: Request) -> SolveManager:
@@ -58,7 +59,8 @@ async def _compute_fov(fits_path: str, request: Request) -> float | None:
                 pixel_size_um = await cam.get_pixel_size_um()
 
         if pixel_size_um is None:
-            pixel_size_um = app.state.profile_store.get_user_settings().pixel_size_um
+            raw = app.state.profile_store.get_user_settings().plugin_settings.get("platesolve", {})
+            pixel_size_um = PlatesolveSettings(**raw).pixel_size_um
 
         if not pixel_size_um:
             return None
@@ -84,14 +86,15 @@ async def _enrich_request(req: SolveRequest, request: Request) -> SolveRequest:
     """Fill in ra_hint/dec_hint from the connected mount and radius from settings."""
     app = request.app
 
-    # Radius and tolerance from user settings (if caller didn't override)
+    # Radius and tolerance from plugin settings (if caller didn't override)
     try:
-        settings = app.state.profile_store.get_user_settings()
+        raw = app.state.profile_store.get_user_settings().plugin_settings.get("platesolve", {})
+        ps = PlatesolveSettings(**raw)
         updates: dict = {}
         if req.radius == 30.0:
-            updates["radius"] = settings.astap_search_radius
+            updates["radius"] = ps.astap_search_radius
         if req.tolerance is None:
-            updates["tolerance"] = settings.astap_tolerance
+            updates["tolerance"] = ps.astap_tolerance
         if updates:
             req = req.model_copy(update=updates)
     except Exception:

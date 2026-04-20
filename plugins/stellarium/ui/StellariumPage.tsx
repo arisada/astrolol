@@ -21,7 +21,7 @@ export function StellariumPage() {
 
   const load = async () => {
     try {
-      const s = await fetch('/stellarium/status').then((r) => r.json())
+      const s = await fetch('/plugins/stellarium/status').then((r) => r.json())
       setStatus(s)
       setError(null)
     } catch {
@@ -39,7 +39,7 @@ export function StellariumPage() {
     if (!status) return
     setBusy(true)
     try {
-      await fetch(status.running ? '/stellarium/stop' : '/stellarium/start', { method: 'POST' })
+      await fetch(status.running ? '/plugins/stellarium/stop' : '/plugins/stellarium/start', { method: 'POST' })
       await load()
     } finally {
       setBusy(false)

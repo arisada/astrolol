@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from typing import Literal, Annotated, Union
+from typing import Literal
 from uuid import uuid4
 
 from pydantic import BaseModel, Field
@@ -189,79 +189,3 @@ class FilterWheelFilterChanged(BaseEvent):
     filter_name: str | None = None
 
 
-# --- PHD2 events ---
-
-class Phd2Connected(BaseEvent):
-    type: Literal["phd2.connected"] = "phd2.connected"
-
-
-class Phd2Disconnected(BaseEvent):
-    type: Literal["phd2.disconnected"] = "phd2.disconnected"
-
-
-class Phd2StateChanged(BaseEvent):
-    type: Literal["phd2.state_changed"] = "phd2.state_changed"
-    state: str  # PHD2 AppState: Stopped, Guiding, Calibrating, Paused, etc.
-
-
-class Phd2GuideStep(BaseEvent):
-    type: Literal["phd2.guide_step"] = "phd2.guide_step"
-    frame: int
-    ra_dist: float    # arcsec (pixels × pixel_scale; raw pixels if scale unknown)
-    dec_dist: float
-    ra_corr: float    # guide pulse duration, ms
-    dec_corr: float
-    star_snr: float | None = None
-
-
-class Phd2Settled(BaseEvent):
-    type: Literal["phd2.settled"] = "phd2.settled"
-    error: str | None = None  # None = success
-
-
-# --- Plate-solve events ---
-
-class PlatesolveStarted(BaseEvent):
-    type: Literal["platesolve.started"] = "platesolve.started"
-    solve_id: str
-    fits_path: str
-
-
-class PlatesolveCompleted(BaseEvent):
-    type: Literal["platesolve.completed"] = "platesolve.completed"
-    solve_id: str
-    ra: float           # degrees J2000
-    dec: float          # degrees J2000
-    rotation: float     # degrees, North through East
-    pixel_scale: float  # arcsec/pixel
-    field_w: float      # degrees
-    field_h: float      # degrees
-    duration_ms: int
-
-
-class PlatesolveFailed(BaseEvent):
-    type: Literal["platesolve.failed"] = "platesolve.failed"
-    solve_id: str
-    reason: str
-
-
-class PlatesolveCancelled(BaseEvent):
-    type: Literal["platesolve.cancelled"] = "platesolve.cancelled"
-    solve_id: str
-
-
-# Discriminated union — add new event types here as they are introduced
-Event = Annotated[
-    Union[
-        DeviceConnected, DeviceDisconnected, DeviceStateChanged, LogEvent,
-        ExposureStarted, ExposureCompleted, ExposureFailed, LoopStarted, LoopStopped,
-        MountSlewStarted, MountSlewCompleted, MountSlewAborted,
-        MountParked, MountUnparked, MountSynced, MountTrackingChanged, MountOperationFailed,
-        MountMeridianFlipStarted, MountMeridianFlipCompleted, MountTargetSet,
-        FocuserMoveStarted, FocuserMoveCompleted, FocuserHalted,
-        FilterWheelFilterChanged,
-        Phd2Connected, Phd2Disconnected, Phd2StateChanged, Phd2GuideStep, Phd2Settled,
-        PlatesolveStarted, PlatesolveCompleted, PlatesolveFailed, PlatesolveCancelled,
-    ],
-    Field(discriminator="type"),
-]

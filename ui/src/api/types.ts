@@ -89,18 +89,23 @@ export interface UserSettings {
   save_dir_template: string
   save_filename_template: string
   enabled_plugins: string[]
-  phd2_host: string
-  phd2_port: number
-  astap_db_path: string
+  indi_run_dir: string
+  plugin_settings: Record<string, Record<string, unknown>>
+}
+
+// --- Per-plugin settings ---
+
+export interface Phd2Settings {
+  host: string
+  port: number
+}
+
+export interface PlatesolveSettings {
   astap_bin: string
+  astap_db_path: string
   astap_search_radius: number
   astap_tolerance: number
   pixel_size_um: number | null
-  indi_run_dir: string
-  lx200_port: number
-  lx200_autostart: boolean
-  stellarium_port: number
-  stellarium_autostart: boolean
 }
 
 // --- Plate solving ---

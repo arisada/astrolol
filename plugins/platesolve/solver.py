@@ -13,8 +13,8 @@ from uuid import uuid4
 
 import structlog
 
-from astrolol.core.events import (
-    EventBus,
+from astrolol.core.events import EventBus
+from plugins.platesolve.events import (
     PlatesolveCancelled,
     PlatesolveCompleted,
     PlatesolveFailed,

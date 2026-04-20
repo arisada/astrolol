@@ -7,6 +7,7 @@ from fastapi import FastAPI
 from astrolol.core.plugin_api import PluginContext, PluginManifest
 from plugins.lx200.api import router
 from plugins.lx200.server import Lx200Server
+from plugins.lx200.settings import Lx200Settings
 
 logger = structlog.get_logger()
 
@@ -29,17 +30,17 @@ class Lx200Plugin:
         self._autostart = True
 
     def setup(self, app: FastAPI, ctx: PluginContext) -> None:
-        user_settings = app.state.profile_store.get_user_settings()
-        self._autostart = user_settings.lx200_autostart
+        cfg = ctx.get_plugin_settings("lx200", Lx200Settings)
+        self._autostart = cfg.autostart
 
         self._server = Lx200Server(
-            port=user_settings.lx200_port,
+            port=cfg.port,
             device_manager=ctx.device_manager,
             mount_manager=app.state.mount_manager,
         )
         app.state.lx200_server = self._server
         app.include_router(router)
-        logger.info("lx200.plugin_setup", port=user_settings.lx200_port)
+        logger.info("lx200.plugin_setup", port=cfg.port)
 
     async def startup(self) -> None:
         if self._server is not None and self._autostart:

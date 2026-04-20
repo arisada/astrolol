@@ -80,7 +80,7 @@ def fake(client: TestClient) -> FakePhd2Client:
 # ── Status ────────────────────────────────────────────────────────────────────
 
 def test_status_returns_200(client: TestClient) -> None:
-    r = client.get("/phd2/status")
+    r = client.get("/plugins/phd2/status")
     assert r.status_code == 200
     data = r.json()
     assert data["connected"] is True
@@ -95,7 +95,7 @@ def test_status_returns_200(client: TestClient) -> None:
 def test_status_disconnected(client: TestClient, fake: FakePhd2Client) -> None:
     fake._connected = False
     fake._state = "Disconnected"
-    r = client.get("/phd2/status")
+    r = client.get("/plugins/phd2/status")
     assert r.status_code == 200
     assert r.json()["connected"] is False
 
@@ -103,14 +103,14 @@ def test_status_disconnected(client: TestClient, fake: FakePhd2Client) -> None:
 # ── Guide ─────────────────────────────────────────────────────────────────────
 
 def test_guide_default_body(client: TestClient, fake: FakePhd2Client) -> None:
-    r = client.post("/phd2/guide", json={})
+    r = client.post("/plugins/phd2/guide", json={})
     assert r.status_code == 204
     assert fake.calls[-1][0] == "guide"
 
 
 def test_guide_custom_settle(client: TestClient, fake: FakePhd2Client) -> None:
     body = {"settle": {"pixels": 2.0, "time": 15, "timeout": 90}, "recalibrate": True}
-    r = client.post("/phd2/guide", json=body)
+    r = client.post("/plugins/phd2/guide", json=body)
     assert r.status_code == 204
     method, kwargs = fake.calls[-1]
     assert method == "guide"
@@ -122,34 +122,34 @@ def test_guide_custom_settle(client: TestClient, fake: FakePhd2Client) -> None:
 
 def test_guide_connection_error_returns_503(client: TestClient, fake: FakePhd2Client) -> None:
     fake._raise = ConnectionError("Not connected")
-    r = client.post("/phd2/guide", json={})
+    r = client.post("/plugins/phd2/guide", json={})
     assert r.status_code == 503
 
 
 def test_guide_generic_error_returns_502(client: TestClient, fake: FakePhd2Client) -> None:
     fake._raise = RuntimeError("PHD2 fault")
-    r = client.post("/phd2/guide", json={})
+    r = client.post("/plugins/phd2/guide", json={})
     assert r.status_code == 502
 
 
 # ── Stop ──────────────────────────────────────────────────────────────────────
 
 def test_stop_returns_204(client: TestClient, fake: FakePhd2Client) -> None:
-    r = client.post("/phd2/stop")
+    r = client.post("/plugins/phd2/stop")
     assert r.status_code == 204
     assert fake.calls[-1][0] == "stop_capture"
 
 
 def test_stop_connection_error_returns_503(client: TestClient, fake: FakePhd2Client) -> None:
     fake._raise = ConnectionError("gone")
-    r = client.post("/phd2/stop")
+    r = client.post("/plugins/phd2/stop")
     assert r.status_code == 503
 
 
 # ── Dither ────────────────────────────────────────────────────────────────────
 
 def test_dither_default_body(client: TestClient, fake: FakePhd2Client) -> None:
-    r = client.post("/phd2/dither", json={})
+    r = client.post("/plugins/phd2/dither", json={})
     assert r.status_code == 204
     method, kwargs = fake.calls[-1]
     assert method == "dither"
@@ -159,7 +159,7 @@ def test_dither_default_body(client: TestClient, fake: FakePhd2Client) -> None:
 
 def test_dither_custom(client: TestClient, fake: FakePhd2Client) -> None:
     body = {"pixels": 10.0, "ra_only": True, "settle": {"pixels": 3.0, "time": 5, "timeout": 30}}
-    r = client.post("/phd2/dither", json=body)
+    r = client.post("/plugins/phd2/dither", json=body)
     assert r.status_code == 204
     method, kwargs = fake.calls[-1]
     assert kwargs["pixels"] == 10.0
@@ -169,52 +169,52 @@ def test_dither_custom(client: TestClient, fake: FakePhd2Client) -> None:
 
 def test_dither_timeout_returns_504(client: TestClient, fake: FakePhd2Client) -> None:
     fake._raise = TimeoutError("settle timed out")
-    r = client.post("/phd2/dither", json={})
+    r = client.post("/plugins/phd2/dither", json={})
     assert r.status_code == 504
 
 
 def test_dither_connection_error_returns_503(client: TestClient, fake: FakePhd2Client) -> None:
     fake._raise = ConnectionError("not connected")
-    r = client.post("/phd2/dither", json={})
+    r = client.post("/plugins/phd2/dither", json={})
     assert r.status_code == 503
 
 
 # ── Pause / Resume ────────────────────────────────────────────────────────────
 
 def test_pause_returns_204(client: TestClient, fake: FakePhd2Client) -> None:
-    r = client.post("/phd2/pause")
+    r = client.post("/plugins/phd2/pause")
     assert r.status_code == 204
     assert fake.calls[-1][0] == "pause"
 
 
 def test_resume_returns_204(client: TestClient, fake: FakePhd2Client) -> None:
-    r = client.post("/phd2/resume")
+    r = client.post("/plugins/phd2/resume")
     assert r.status_code == 204
     assert fake.calls[-1][0] == "resume"
 
 
 def test_pause_connection_error_returns_503(client: TestClient, fake: FakePhd2Client) -> None:
     fake._raise = ConnectionError("gone")
-    r = client.post("/phd2/pause")
+    r = client.post("/plugins/phd2/pause")
     assert r.status_code == 503
 
 
 def test_resume_connection_error_returns_503(client: TestClient, fake: FakePhd2Client) -> None:
     fake._raise = ConnectionError("gone")
-    r = client.post("/phd2/resume")
+    r = client.post("/plugins/phd2/resume")
     assert r.status_code == 503
 
 
 # ── Debug ─────────────────────────────────────────────────────────────────────
 
 def test_debug_enable(client: TestClient, fake: FakePhd2Client) -> None:
-    r = client.post("/phd2/debug", json={"enabled": True})
+    r = client.post("/plugins/phd2/debug", json={"enabled": True})
     assert r.status_code == 204
     assert fake.calls[-1] == ("set_debug", {"enabled": True})
 
 
 def test_debug_disable(client: TestClient, fake: FakePhd2Client) -> None:
-    r = client.post("/phd2/debug", json={"enabled": False})
+    r = client.post("/plugins/phd2/debug", json={"enabled": False})
     assert r.status_code == 204
     assert fake.calls[-1] == ("set_debug", {"enabled": False})
 

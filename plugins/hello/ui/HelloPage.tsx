@@ -5,7 +5,7 @@ export function HelloPage() {
   const [status, setStatus] = useState<'idle' | 'saving' | 'error'>('idle')
 
   useEffect(() => {
-    fetch('/hello/property')
+    fetch('/plugins/hello/property')
       .then((r) => r.json())
       .then((d) => setHello(d.hello))
       .catch(() => {})
@@ -15,7 +15,7 @@ export function HelloPage() {
     const next = !hello
     setStatus('saving')
     try {
-      const r = await fetch('/hello/property', {
+      const r = await fetch('/plugins/hello/property', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ hello: next }),
@@ -48,7 +48,7 @@ export function HelloPage() {
           {status === 'error' && <span className="text-xs text-status-error">Failed to save.</span>}
         </div>
         <p className="mt-3 text-xs text-slate-500">
-          This checkbox calls <code className="text-slate-400">POST /hello/property</code> on the backend.
+          This checkbox calls <code className="text-slate-400">POST /plugins/hello/property</code> on the backend.
           It demonstrates a self-contained plugin with its own API and UI.
         </p>
       </div>

@@ -23,27 +23,27 @@ def client() -> TestClient:
 # --- API tests ---
 
 def test_get_property_default(client: TestClient) -> None:
-    r = client.get("/hello/property")
+    r = client.get("/plugins/hello/property")
     assert r.status_code == 200
     assert r.json() == {"hello": False}
 
 
 def test_set_property_true(client: TestClient) -> None:
-    r = client.post("/hello/property", json={"hello": True})
+    r = client.post("/plugins/hello/property", json={"hello": True})
     assert r.status_code == 200
     assert r.json() == {"hello": True}
 
 
 def test_set_property_roundtrip(client: TestClient) -> None:
-    client.post("/hello/property", json={"hello": True})
-    r = client.get("/hello/property")
+    client.post("/plugins/hello/property", json={"hello": True})
+    r = client.get("/plugins/hello/property")
     assert r.json() == {"hello": True}
 
 
 def test_set_property_false_after_true(client: TestClient) -> None:
-    client.post("/hello/property", json={"hello": True})
-    client.post("/hello/property", json={"hello": False})
-    r = client.get("/hello/property")
+    client.post("/plugins/hello/property", json={"hello": True})
+    client.post("/plugins/hello/property", json={"hello": False})
+    r = client.get("/plugins/hello/property")
     assert r.json() == {"hello": False}
 
 
@@ -60,9 +60,9 @@ def test_state_is_per_app() -> None:
     c1 = TestClient(app1)
     c2 = TestClient(app2)
 
-    c1.post("/hello/property", json={"hello": True})
-    assert c1.get("/hello/property").json() == {"hello": True}
-    assert c2.get("/hello/property").json() == {"hello": False}
+    c1.post("/plugins/hello/property", json={"hello": True})
+    assert c1.get("/plugins/hello/property").json() == {"hello": True}
+    assert c2.get("/plugins/hello/property").json() == {"hello": False}
 
 
 # --- Plugin manifest ---
@@ -90,5 +90,5 @@ def test_plugin_setup_registers_routes() -> None:
     plugin.setup(app, ctx)
 
     client = TestClient(app)
-    r = client.get("/hello/property")
+    r = client.get("/plugins/hello/property")
     assert r.status_code == 200

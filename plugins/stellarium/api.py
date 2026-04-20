@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from plugins.stellarium.server import StellariumServer
 
 logger = structlog.get_logger()
-router = APIRouter(prefix="/stellarium", tags=["stellarium"])
+router = APIRouter(prefix="/plugins/stellarium", tags=["stellarium"])
 
 
 class StellariumStatus(BaseModel):

@@ -6,6 +6,7 @@ from fastapi import FastAPI
 
 from astrolol.core.plugin_api import PluginContext, PluginManifest
 from plugins.platesolve.api import router
+from plugins.platesolve.settings import PlatesolveSettings
 from plugins.platesolve.solver import SolveManager
 
 logger = structlog.get_logger()
@@ -27,21 +28,20 @@ class PlatesolvePlugin:
         self._manager: SolveManager | None = None
 
     def setup(self, app: FastAPI, ctx: PluginContext) -> None:
-        profile_store = app.state.profile_store
-        user_settings = profile_store.get_user_settings()
+        cfg = ctx.get_plugin_settings("platesolve", PlatesolveSettings)
 
         self._manager = SolveManager(
             event_bus=ctx.event_bus,
-            astap_bin=user_settings.astap_bin,
-            astap_db_path=user_settings.astap_db_path,
+            astap_bin=cfg.astap_bin,
+            astap_db_path=cfg.astap_db_path,
         )
         app.state.solve_manager = self._manager
 
         app.include_router(router)
         logger.info(
             "platesolve.plugin_setup",
-            astap_bin=user_settings.astap_bin,
-            astap_db_path=user_settings.astap_db_path,
+            astap_bin=cfg.astap_bin,
+            astap_db_path=cfg.astap_db_path,
         )
 
     async def startup(self) -> None:

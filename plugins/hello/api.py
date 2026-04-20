@@ -20,7 +20,7 @@ class HelloProperty(BaseModel):
     hello: bool
 
 
-router = APIRouter(prefix="/hello", tags=["hello"])
+router = APIRouter(prefix="/plugins/hello", tags=["hello"])
 
 
 @router.get("/property", response_model=HelloState)

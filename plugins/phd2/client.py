@@ -16,8 +16,8 @@ import structlog
 from collections import deque
 from typing import Any
 
-from astrolol.core.events import (
-    EventBus,
+from astrolol.core.events import EventBus
+from plugins.phd2.events import (
     Phd2Connected,
     Phd2Disconnected,
     Phd2GuideStep,

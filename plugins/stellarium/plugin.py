@@ -7,6 +7,7 @@ from fastapi import FastAPI
 from astrolol.core.plugin_api import PluginContext, PluginManifest
 from plugins.stellarium.api import router
 from plugins.stellarium.server import StellariumServer
+from plugins.stellarium.settings import StellariumSettings
 
 logger = structlog.get_logger()
 
@@ -29,17 +30,17 @@ class StellariumPlugin:
         self._autostart = True
 
     def setup(self, app: FastAPI, ctx: PluginContext) -> None:
-        user_settings = app.state.profile_store.get_user_settings()
-        self._autostart = user_settings.stellarium_autostart
+        cfg = ctx.get_plugin_settings("stellarium", StellariumSettings)
+        self._autostart = cfg.autostart
 
         self._server = StellariumServer(
-            port=user_settings.stellarium_port,
+            port=cfg.port,
             device_manager=ctx.device_manager,
             mount_manager=app.state.mount_manager,
         )
         app.state.stellarium_server = self._server
         app.include_router(router)
-        logger.info("stellarium.plugin_setup", port=user_settings.stellarium_port)
+        logger.info("stellarium.plugin_setup", port=cfg.port)
 
     async def startup(self) -> None:
         if self._server is not None and self._autostart:

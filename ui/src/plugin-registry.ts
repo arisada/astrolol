@@ -1,18 +1,9 @@
-/**
- * Static plugin registry — maps plugin IDs to their frontend metadata.
- *
- * When a new plugin is added, register it here with its route, sidebar icon,
- * label, and page component.  The backend /plugins endpoint gates which entries
- * are actually shown — only enabled plugins appear in the sidebar and routing.
- */
+// Plugin registry — auto-discovered from each plugin's ui/index.ts.
+// Each plugin exports a default object with { icon, label, Component }.
+// The plugin ID is derived from the directory name in the path.
+// No manual registration is needed when adding a new plugin.
 import type { ComponentType } from 'react'
 import type { LucideIcon } from 'lucide-react'
-import { Crosshair, ScanSearch, Smile, Star, Telescope } from 'lucide-react'
-import { HelloPage } from '@plugins/hello/ui/HelloPage'
-import { Lx200Page } from '@plugins/lx200/ui/Lx200Page'
-import { Phd2Page } from '@plugins/phd2/ui/Phd2Page'
-import { PlatesolvePage } from '@plugins/platesolve/ui/PlatesolvePage'
-import { StellariumPage } from '@plugins/stellarium/ui/StellariumPage'
 
 export interface PluginRegistryEntry {
   to: string
@@ -21,37 +12,23 @@ export interface PluginRegistryEntry {
   Component: ComponentType
 }
 
-const PLUGIN_REGISTRY: Record<string, PluginRegistryEntry> = {
-  hello: {
-    to: '/hello',
-    icon: Smile,
-    label: 'Hello',
-    Component: HelloPage,
-  },
-  phd2: {
-    to: '/phd2',
-    icon: Crosshair,
-    label: 'Guiding',
-    Component: Phd2Page,
-  },
-  platesolve: {
-    to: '/platesolve',
-    icon: ScanSearch,
-    label: 'Plate Solving',
-    Component: PlatesolvePage,
-  },
-  lx200: {
-    to: '/lx200',
-    icon: Telescope,
-    label: 'LX200 Server',
-    Component: Lx200Page,
-  },
-  stellarium: {
-    to: '/stellarium',
-    icon: Star,
-    label: 'Stellarium',
-    Component: StellariumPage,
-  },
+// Eagerly import all plugin index files.  Vite resolves this glob at build time.
+const modules = import.meta.glob('@plugins/*/ui/index.ts', { eager: true }) as Record<
+  string,
+  { default: { icon: LucideIcon; label: string; Component: ComponentType } }
+>
+
+// Build the registry by extracting the plugin ID from each module path.
+// Path shape: "../../plugins/<id>/ui/index.ts" (as seen from this file via the @plugins alias)
+const PLUGIN_REGISTRY: Record<string, PluginRegistryEntry> = {}
+
+for (const [path, mod] of Object.entries(modules)) {
+  // Extract <id> from the path string
+  const match = path.match(/\/([^/]+)\/ui\/index\.ts$/)
+  if (!match) continue
+  const id = match[1]
+  const { icon, label, Component } = mod.default
+  PLUGIN_REGISTRY[id] = { to: `/${id}`, icon, label, Component }
 }
 
 export function getPluginEntry(id: string): PluginRegistryEntry | undefined {

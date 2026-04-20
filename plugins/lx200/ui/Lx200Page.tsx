@@ -62,7 +62,7 @@ export function Lx200Page() {
 
   const load = async () => {
     try {
-      const s = await fetch('/lx200/status').then((r) => r.json())
+      const s = await fetch('/plugins/lx200/status').then((r) => r.json())
       setStatus(s)
       setError(null)
     } catch {
@@ -80,7 +80,7 @@ export function Lx200Page() {
     if (!status) return
     setBusy(true)
     try {
-      await fetch(status.running ? '/lx200/stop' : '/lx200/start', { method: 'POST' })
+      await fetch(status.running ? '/plugins/lx200/stop' : '/plugins/lx200/start', { method: 'POST' })
       await load()
     } finally {
       setBusy(false)

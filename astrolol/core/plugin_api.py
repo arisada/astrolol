@@ -7,9 +7,12 @@ code directly; it only calls ``get_plugin()`` after discovering the module.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Protocol, runtime_checkable
+from typing import Any, Protocol, TypeVar, runtime_checkable
 
 from fastapi import FastAPI
+from pydantic import BaseModel
+
+T = TypeVar("T", bound=BaseModel)
 
 
 @dataclass
@@ -32,6 +35,22 @@ class PluginContext:
     event_bus: Any         # astrolol.core.events.bus.EventBus
     device_manager: Any    # astrolol.devices.manager.DeviceManager
     device_registry: Any   # astrolol.devices.registry.DeviceRegistry
+    profile_store: Any = None  # astrolol.profiles.store.ProfileStore
+
+    def get_plugin_settings(self, plugin_id: str, model: type[T]) -> T:
+        """Return plugin settings parsed into *model*, falling back to defaults."""
+        if self.profile_store is None:
+            return model()
+        raw = self.profile_store.get_user_settings().plugin_settings.get(plugin_id, {})
+        return model(**raw)
+
+    def save_plugin_settings(self, plugin_id: str, settings: BaseModel) -> None:
+        """Persist plugin settings under *plugin_id* in the profile store."""
+        if self.profile_store is None:
+            return
+        current = self.profile_store.get_user_settings()
+        new_ps = {**current.plugin_settings, plugin_id: settings.model_dump()}
+        self.profile_store.update_user_settings(current.model_copy(update={"plugin_settings": new_ps}))
 
 
 @runtime_checkable

@@ -224,11 +224,11 @@ export const useStore = create<AppState>((set, get) => ({
         break
       }
       case 'phd2.connected': {
-        set({ phd2Status: { connected: true, state: 'Unknown', rms_ra: null, rms_dec: null, rms_total: null, pixel_scale: null, star_snr: null }, log, lastError })
+        set({ phd2Status: { connected: true, state: 'Unknown', rms_ra: null, rms_dec: null, rms_total: null, pixel_scale: null, star_snr: null, is_dithering: false, debug_enabled: false }, log, lastError })
         break
       }
       case 'phd2.disconnected': {
-        set({ phd2Status: { connected: false, state: 'Disconnected', rms_ra: null, rms_dec: null, rms_total: null, pixel_scale: null, star_snr: null }, phd2GuidePoints: [], log, lastError })
+        set({ phd2Status: { connected: false, state: 'Disconnected', rms_ra: null, rms_dec: null, rms_total: null, pixel_scale: null, star_snr: null, is_dithering: false, debug_enabled: false }, phd2GuidePoints: [], log, lastError })
         break
       }
       case 'phd2.state_changed': {

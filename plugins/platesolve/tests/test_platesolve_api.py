@@ -108,7 +108,7 @@ def fake(client: TestClient) -> FakeSolveManager:
 # ── POST /platesolve/solve ────────────────────────────────────────────────────
 
 def test_start_solve_returns_201(client: TestClient) -> None:
-    r = client.post("/platesolve/solve", json={"fits_path": "/tmp/image.fits"})
+    r = client.post("/plugins/platesolve/solve", json={"fits_path": "/tmp/image.fits"})
     assert r.status_code == 201
     data = r.json()
     assert data["id"] == "job-0001"
@@ -125,7 +125,7 @@ def test_start_solve_with_hints(client: TestClient) -> None:
         "radius": 15.0,
         "fov": 1.0,
     }
-    r = client.post("/platesolve/solve", json=body)
+    r = client.post("/plugins/platesolve/solve", json=body)
     assert r.status_code == 201
     data = r.json()
     assert data["request"]["ra_hint"] == 83.82
@@ -135,15 +135,15 @@ def test_start_solve_with_hints(client: TestClient) -> None:
 # ── GET /platesolve/jobs ──────────────────────────────────────────────────────
 
 def test_list_jobs_empty(client: TestClient) -> None:
-    r = client.get("/platesolve/jobs")
+    r = client.get("/plugins/platesolve/jobs")
     assert r.status_code == 200
     assert r.json() == []
 
 
 def test_list_jobs_multiple(client: TestClient) -> None:
-    client.post("/platesolve/solve", json={"fits_path": "/tmp/a.fits"})
-    client.post("/platesolve/solve", json={"fits_path": "/tmp/b.fits"})
-    r = client.get("/platesolve/jobs")
+    client.post("/plugins/platesolve/solve", json={"fits_path": "/tmp/a.fits"})
+    client.post("/plugins/platesolve/solve", json={"fits_path": "/tmp/b.fits"})
+    r = client.get("/plugins/platesolve/jobs")
     assert r.status_code == 200
     jobs = r.json()
     assert len(jobs) == 2
@@ -155,10 +155,10 @@ def test_list_jobs_multiple(client: TestClient) -> None:
 # ── GET /platesolve/{id}/status ───────────────────────────────────────────────
 
 def test_get_status_pending(client: TestClient, fake: FakeSolveManager) -> None:
-    r = client.post("/platesolve/solve", json={"fits_path": "/tmp/img.fits"})
+    r = client.post("/plugins/platesolve/solve", json={"fits_path": "/tmp/img.fits"})
     job_id = r.json()["id"]
 
-    r2 = client.get(f"/platesolve/{job_id}/status")
+    r2 = client.get(f"/plugins/platesolve/{job_id}/status")
     assert r2.status_code == 200
     assert r2.json()["status"] == "pending"
 
@@ -167,7 +167,7 @@ def test_get_status_completed(client: TestClient, fake: FakeSolveManager) -> Non
     completed = _make_job(status="completed", result=_DUMMY_RESULT)
     fake._jobs[completed.id] = completed
 
-    r = client.get(f"/platesolve/{completed.id}/status")
+    r = client.get(f"/plugins/platesolve/{completed.id}/status")
     assert r.status_code == 200
     data = r.json()
     assert data["status"] == "completed"
@@ -181,7 +181,7 @@ def test_get_status_failed(client: TestClient, fake: FakeSolveManager) -> None:
     failed = _make_job(status="failed", error="No stars found")
     fake._jobs[failed.id] = failed
 
-    r = client.get(f"/platesolve/{failed.id}/status")
+    r = client.get(f"/plugins/platesolve/{failed.id}/status")
     assert r.status_code == 200
     data = r.json()
     assert data["status"] == "failed"
@@ -190,17 +190,17 @@ def test_get_status_failed(client: TestClient, fake: FakeSolveManager) -> None:
 
 
 def test_get_status_not_found(client: TestClient) -> None:
-    r = client.get("/platesolve/nonexistent/status")
+    r = client.get("/plugins/platesolve/nonexistent/status")
     assert r.status_code == 404
 
 
 # ── DELETE /platesolve/{id}/cancel ────────────────────────────────────────────
 
 def test_cancel_running_job(client: TestClient, fake: FakeSolveManager) -> None:
-    r = client.post("/platesolve/solve", json={"fits_path": "/tmp/img.fits"})
+    r = client.post("/plugins/platesolve/solve", json={"fits_path": "/tmp/img.fits"})
     job_id = r.json()["id"]
 
-    r2 = client.delete(f"/platesolve/{job_id}/cancel")
+    r2 = client.delete(f"/plugins/platesolve/{job_id}/cancel")
     assert r2.status_code == 204
     assert fake._jobs[job_id].status == "cancelled"
 
@@ -209,7 +209,7 @@ def test_cancel_already_completed_is_noop(client: TestClient, fake: FakeSolveMan
     completed = _make_job(status="completed", result=_DUMMY_RESULT)
     fake._jobs[completed.id] = completed
 
-    r = client.delete(f"/platesolve/{completed.id}/cancel")
+    r = client.delete(f"/plugins/platesolve/{completed.id}/cancel")
     # Still 204 — idempotent, not an error
     assert r.status_code == 204
     assert fake._jobs[completed.id].status == "completed"  # unchanged
@@ -219,12 +219,12 @@ def test_cancel_already_cancelled_is_noop(client: TestClient, fake: FakeSolveMan
     cancelled = _make_job(status="cancelled")
     fake._jobs[cancelled.id] = cancelled
 
-    r = client.delete(f"/platesolve/{cancelled.id}/cancel")
+    r = client.delete(f"/plugins/platesolve/{cancelled.id}/cancel")
     assert r.status_code == 204
 
 
 def test_cancel_not_found(client: TestClient) -> None:
-    r = client.delete("/platesolve/nonexistent/cancel")
+    r = client.delete("/plugins/platesolve/nonexistent/cancel")
     assert r.status_code == 404
 
 
@@ -240,7 +240,7 @@ def test_plugin_manifest() -> None:
 # ── GET /platesolve/db_status ─────────────────────────────────────────────────
 
 def test_db_status_not_installed(client: TestClient) -> None:
-    r = client.get("/platesolve/db_status")
+    r = client.get("/plugins/platesolve/db_status")
     assert r.status_code == 200
     data = r.json()
     assert data["installed"] is False
@@ -252,7 +252,7 @@ def test_db_status_installed(client: TestClient, fake: FakeSolveManager, tmp_pat
     (tmp_path / "d05_0000.290").touch()
     fake._astap_db_path = str(tmp_path)
 
-    r = client.get("/platesolve/db_status")
+    r = client.get("/plugins/platesolve/db_status")
     assert r.status_code == 200
     assert r.json()["installed"] is True
 
@@ -264,7 +264,7 @@ def test_install_db_returns_202(client: TestClient) -> None:
         pass
 
     with patch("plugins.platesolve.api._do_install_db", _noop):
-        r = client.post("/platesolve/install_db")
+        r = client.post("/plugins/platesolve/install_db")
     assert r.status_code == 202
     assert r.json()["status"] == "started"
 

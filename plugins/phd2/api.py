@@ -6,7 +6,7 @@ from plugins.phd2.client import Phd2Client
 from plugins.phd2.models import DebugRequest, DitherRequest, GuideRequest, Phd2Status
 
 logger = structlog.get_logger()
-router = APIRouter(prefix="/phd2", tags=["phd2"])
+router = APIRouter(prefix="/plugins/phd2", tags=["phd2"])
 
 
 def _client(request: Request) -> Phd2Client:

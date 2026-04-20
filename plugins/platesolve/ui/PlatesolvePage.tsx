@@ -3,7 +3,7 @@ import { AlertTriangle, Camera, ChevronDown, ChevronUp, Download, ScanSearch, Se
 import { api } from '@/api/client'
 import { useStore } from '@/store'
 import { Button } from '@/components/ui/button'
-import type { ConnectedDevice, DbStatus, SolveJob, SolveResult, UserSettings } from '@/api/types'
+import type { ConnectedDevice, DbStatus, PlatesolveSettings, SolveJob, SolveResult } from '@/api/types'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -193,14 +193,14 @@ function NumericInput({ value, onChange, placeholder, allowNull }: {
   )
 }
 
-function SettingsPanel({ settings, onChange }: { settings: UserSettings; onChange: (s: UserSettings) => void }) {
+function SettingsPanel({ settings, onChange }: { settings: PlatesolveSettings; onChange: (s: PlatesolveSettings) => void }) {
   const [saving, setSaving] = useState(false)
   const [local, setLocal] = useState(settings)
   useEffect(() => { setLocal(settings) }, [settings])
 
   const save = async () => {
     setSaving(true)
-    try { onChange(await api.settings.put(local)) } catch { /* ignore */ } finally { setSaving(false) }
+    try { onChange(await api.plugins.putSettings<PlatesolveSettings>('platesolve', local)) } catch { /* ignore */ } finally { setSaving(false) }
   }
 
   const inp = (value: string, fn: (v: string) => void, placeholder?: string) => (
@@ -417,7 +417,7 @@ export function PlatesolvePage() {
   const [binning,  setBinning]  = useLocalStorage('platesolve.binning', 1)
   const [afterSolve, setAfterSolve] = useLocalStorage<AfterSolve>('platesolve.afterSolve', 'nothing')
 
-  const [settings, setSettings]         = useState<UserSettings | null>(null)
+  const [settings, setSettings]         = useState<PlatesolveSettings | null>(null)
   const [showSettings, setShowSettings]  = useState(false)
   const [dbStatus, setDbStatus]          = useState<DbStatus | null>(null)
   const [installing, setInstalling]      = useState(false)
@@ -429,7 +429,7 @@ export function PlatesolvePage() {
   const prevSolveStatusRef                    = useRef<string | undefined>(undefined)
 
   useEffect(() => {
-    api.settings.get().then(setSettings).catch(console.error)
+    api.plugins.getSettings<PlatesolveSettings>('platesolve').then(setSettings).catch(console.error)
 
     api.platesolve.jobs().then(mergeSolveJobs).catch(console.error)
     api.platesolve.dbStatus().then(setDbStatus).catch(console.error)

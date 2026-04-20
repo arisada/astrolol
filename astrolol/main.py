@@ -129,6 +129,7 @@ def create_app() -> FastAPI:
         event_bus=event_bus,
         device_manager=device_manager,
         device_registry=registry,
+        profile_store=profile_store,
     )
     discovered_plugins = discover_plugins()
     setup_plugins(app, plugin_ctx, discovered_plugins, user_settings.enabled_plugins)
@@ -214,6 +215,21 @@ def create_app() -> FastAPI:
             }
             for p in discovered.values()
         ]
+
+    @app.get("/plugins/{plugin_id}/settings")
+    async def get_plugin_settings(plugin_id: str, request: Request) -> dict:
+        """Return persisted settings for a specific plugin (empty dict if none saved)."""
+        store: ProfileStore = request.app.state.profile_store
+        return store.get_user_settings().plugin_settings.get(plugin_id, {})
+
+    @app.put("/plugins/{plugin_id}/settings")
+    async def update_plugin_settings(plugin_id: str, body: dict, request: Request) -> dict:
+        """Persist settings for a specific plugin."""
+        store: ProfileStore = request.app.state.profile_store
+        current = store.get_user_settings()
+        new_ps = {**current.plugin_settings, plugin_id: body}
+        store.update_user_settings(current.model_copy(update={"plugin_settings": new_ps}))
+        return new_ps[plugin_id]
 
     @app.get("/events/history")
     async def events_history(request: Request) -> list[dict]:

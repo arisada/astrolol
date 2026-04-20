@@ -1,13 +1,9 @@
-// Type stubs for plugin UI modules resolved via @plugins/* alias.
-// The actual implementation lives in plugins/<name>/ui/*.tsx — Vite handles
-// the bundling; this file just satisfies tsc when it encounters these imports.
+// Type stubs for plugin UI modules resolved via the @plugins alias.
+// With import.meta.glob auto-discovery, only the index module shape matters.
 
-declare module '@plugins/hello/ui/HelloPage' {
+declare module '@plugins/*/ui/index.ts' {
   import type { ComponentType } from 'react'
-  export const HelloPage: ComponentType
-}
-
-declare module '@plugins/phd2/ui/Phd2Page' {
-  import type { ComponentType } from 'react'
-  export const Phd2Page: ComponentType
+  import type { LucideIcon } from 'lucide-react'
+  const plugin: { icon: LucideIcon; label: string; Component: ComponentType }
+  export default plugin
 }

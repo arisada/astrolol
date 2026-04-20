@@ -182,40 +182,43 @@ export const api = {
 
   plugins: {
     list: () => request<PluginInfo[]>('/plugins'),
+    getSettings: <T>(pluginId: string) => request<T>(`/plugins/${pluginId}/settings`),
+    putSettings: <T>(pluginId: string, body: T) =>
+      request<T>(`/plugins/${pluginId}/settings`, { method: 'PUT', body: JSON.stringify(body) }),
   },
 
   phd2: {
-    connect: () => request<void>('/phd2/connect', { method: 'POST' }),
-    disconnect: () => request<void>('/phd2/disconnect', { method: 'POST' }),
-    status: () => request<Phd2Status>('/phd2/status'),
+    connect: () => request<void>('/plugins/phd2/connect', { method: 'POST' }),
+    disconnect: () => request<void>('/plugins/phd2/disconnect', { method: 'POST' }),
+    status: () => request<Phd2Status>('/plugins/phd2/status'),
     guide: (settlePixels?: number, settleTime?: number, settleTimeout?: number, recalibrate?: boolean) =>
-      request<void>('/phd2/guide', {
+      request<void>('/plugins/phd2/guide', {
         method: 'POST',
         body: JSON.stringify({
           settle: { pixels: settlePixels ?? 1.5, time: settleTime ?? 10, timeout: settleTimeout ?? 60 },
           recalibrate: recalibrate ?? false,
         }),
       }),
-    stop: () => request<void>('/phd2/stop', { method: 'POST' }),
+    stop: () => request<void>('/plugins/phd2/stop', { method: 'POST' }),
     dither: (pixels?: number, raOnly?: boolean) =>
-      request<void>('/phd2/dither', {
+      request<void>('/plugins/phd2/dither', {
         method: 'POST',
         body: JSON.stringify({ pixels: pixels ?? 5.0, ra_only: raOnly ?? false }),
       }),
-    pause: () => request<void>('/phd2/pause', { method: 'POST' }),
-    resume: () => request<void>('/phd2/resume', { method: 'POST' }),
+    pause: () => request<void>('/plugins/phd2/pause', { method: 'POST' }),
+    resume: () => request<void>('/plugins/phd2/resume', { method: 'POST' }),
     setDebug: (enabled: boolean) =>
-      request<void>('/phd2/debug', { method: 'POST', body: JSON.stringify({ enabled }) }),
+      request<void>('/plugins/phd2/debug', { method: 'POST', body: JSON.stringify({ enabled }) }),
   },
 
   platesolve: {
     solve: (req: SolveRequest) =>
-      request<SolveJob>('/platesolve/solve', { method: 'POST', body: JSON.stringify(req) }),
-    jobs: () => request<SolveJob[]>('/platesolve/jobs'),
-    status: (jobId: string) => request<SolveJob>(`/platesolve/${jobId}/status`),
-    cancel: (jobId: string) => request<void>(`/platesolve/${jobId}/cancel`, { method: 'DELETE' }),
-    dbStatus: () => request<DbStatus>('/platesolve/db_status'),
-    installDb: () => request<{ status: string }>('/platesolve/install_db', { method: 'POST' }),
+      request<SolveJob>('/plugins/platesolve/solve', { method: 'POST', body: JSON.stringify(req) }),
+    jobs: () => request<SolveJob[]>('/plugins/platesolve/jobs'),
+    status: (jobId: string) => request<SolveJob>(`/plugins/platesolve/${jobId}/status`),
+    cancel: (jobId: string) => request<void>(`/plugins/platesolve/${jobId}/cancel`, { method: 'DELETE' }),
+    dbStatus: () => request<DbStatus>('/plugins/platesolve/db_status'),
+    installDb: () => request<{ status: string }>('/plugins/platesolve/install_db', { method: 'POST' }),
   },
 
   focuser: {

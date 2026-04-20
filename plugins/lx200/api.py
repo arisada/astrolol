@@ -8,7 +8,7 @@ from pydantic import BaseModel
 from plugins.lx200.server import Lx200Server
 
 logger = structlog.get_logger()
-router = APIRouter(prefix="/lx200", tags=["lx200"])
+router = APIRouter(prefix="/plugins/lx200", tags=["lx200"])
 
 
 class Lx200Status(BaseModel):
