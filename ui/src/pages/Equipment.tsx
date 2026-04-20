@@ -53,24 +53,12 @@ function KindIcon({ kind, size = 28 }: { kind: DeviceKind; size?: number }) {
 // Pre-connect props helpers
 // ---------------------------------------------------------------------------
 
-function initPreConnectProps(properties: DeviceProperty[]): PreConnectProps {
-  const result: PreConnectProps = {}
-  for (const prop of properties) {
-    if (prop.permission === 'ro') continue
-    if (prop.name === 'CONNECTION') continue
-    if (prop.type === 'switch') {
-      const on = prop.widgets.filter((w) => w.value === true).map((w) => w.name)
-      result[prop.name] = { on_elements: on }
-    } else if (prop.type === 'text' || prop.type === 'number') {
-      const values: Record<string, string | number> = {}
-      for (const w of prop.widgets) {
-        values[w.name] = (w.value as string | number) ?? (prop.type === 'number' ? 0 : '')
-      }
-      result[prop.name] = { values }
-    }
-  }
-  return result
-}
+// Pre-connect props are intentionally NOT pre-populated with the driver's
+// current values.  Sending back values the user hasn't changed can cause
+// unexpected driver behaviour — for example, ZWO cameras hang on
+// CONNECTION=CONNECT when ACTIVE_DEVICES is sent before connection with a
+// stale telescope name from a previous session (Ekos sets it post-connect).
+// Only properties the user explicitly modifies are included.
 
 // ---------------------------------------------------------------------------
 // Sub-components
@@ -308,7 +296,10 @@ function PropEditor({
   onChange: (spec: PreConnectProps[string]) => void
 }) {
   if (prop.type === 'switch') {
-    const currentOn = (value as { on_elements: string[] } | undefined)?.on_elements ?? []
+    // Fall back to the driver's current snapshot value so the user sees the
+    // existing state even if this prop hasn't been added to preConnectProps yet.
+    const driverOn = prop.widgets.filter((w) => w.value === true).map((w) => w.name)
+    const currentOn = (value as { on_elements: string[] } | undefined)?.on_elements ?? driverOn
     const rule = prop.switch_rule ?? '1ofmany'
 
     if (rule === '1ofmany' || rule === 'atmost1') {
@@ -690,7 +681,7 @@ export function Equipment() {
       const resolvedName = result.device_names?.[0] ?? deviceName
       setDiscoveredDeviceNames(result.device_names ?? [])
       setDriverProperties(result.properties)
-      setPreConnectProps(initPreConnectProps(result.properties))
+      setPreConnectProps({})
       setPendingConnect({ deviceName: resolvedName, executable, deviceId })
       setStep('configure')
     } catch (err) {

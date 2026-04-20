@@ -180,6 +180,12 @@ class IndiClient(IPyClient):
                 try:
                     await self.wait_for_property(device_name, prop_name, timeout=2.0)
                     if "on_elements" in spec:
+                        if not spec["on_elements"]:
+                            # Empty on_elements → all switches Off.  For 1ofmany
+                            # properties this is an invalid state that some drivers
+                            # handle poorly; skip it rather than risk disrupting
+                            # the driver state before CONNECTION is sent.
+                            continue
                         await self.set_switch(device_name, prop_name, spec["on_elements"])
                     elif "values" in spec:
                         v = self._get_vector(device_name, prop_name)
