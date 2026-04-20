@@ -9,15 +9,20 @@
 # changes take effect immediately without rebuilding.  Rebuilding is only
 # needed when pyproject.toml or ui/package.json change.
 # ──────────────────────────────────────────────────────────────────────────────
-FROM python:3.12-slim
+FROM ubuntu:24.04
 
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    software-properties-common nodejs npm
+RUN apt-add-repository ppa:mutlaqja/ppa
 # ── System packages ───────────────────────────────────────────────────────────
 RUN apt-get update && apt-get install -y --no-install-recommends \
-        indi-bin \
-        nodejs \
-        npm \
-    && rm -rf /var/lib/apt/lists/*
-
+        indi-bin astap-cli curl gsc gsc-data \
+        python3 python3-pip python-is-python3 \
+        && rm -rf /var/lib/apt/lists/*
+RUN curl -L -o d05_star_database.deb\
+    "https://master.dl.sourceforge.net/project/astap-program/star_databases/d05_star_database.deb" \
+    && dpkg -i "d05_star_database.deb" \
+    && rm -f "d05_star_database.deb"
 # ── Python dependencies ───────────────────────────────────────────────────────
 # Silence pip's root-user warning and version-check noise.
 ENV PIP_ROOT_USER_ACTION=ignore \
@@ -29,7 +34,7 @@ COPY pyproject.toml ./
 # real source.  PYTHONPATH=/app (set below) makes the bind-mounted source
 # importable at runtime without a separate "pip install -e ." on startup.
 RUN mkdir -p astrolol && touch astrolol/__init__.py \
-    && pip install --no-cache-dir -e ".[dev,indi]" \
+    && pip install --no-cache-dir -e ".[dev,indi]" --break-system-packages \
     && rm -rf astrolol astrolol.egg-info
 
 # ── Node dependencies ─────────────────────────────────────────────────────────
