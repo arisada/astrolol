@@ -2,6 +2,7 @@ import asyncio
 import os
 import traceback
 from contextlib import asynccontextmanager
+from pathlib import Path
 
 import uvicorn
 import structlog
@@ -97,12 +98,14 @@ def create_app() -> FastAPI:
 
     from astrolol.config.settings import settings as _settings
 
+    profile_store = ProfileStore(_settings.profiles_file)
+    user_settings = profile_store.get_user_settings()
+
     pm = build_plugin_manager()
-    registry = build_registry(pm)
+    registry = build_registry(pm, indi_run_dir=Path(user_settings.indi_run_dir))
     event_bus = EventBus()
     event_bus_forwarder.set_bus(event_bus)  # bridge structlog → EventBus
     device_manager = DeviceManager(registry=registry, event_bus=event_bus)
-    profile_store = ProfileStore(_settings.profiles_file)
     imager_manager = ImagerManager(device_manager=device_manager, event_bus=event_bus, profile_store=profile_store)
     mount_manager = MountManager(device_manager=device_manager, event_bus=event_bus)
     focuser_manager = FocuserManager(device_manager=device_manager, event_bus=event_bus)
@@ -122,7 +125,6 @@ def create_app() -> FastAPI:
     # Feature plugins — discover all, set up enabled ones
     # app.state must be fully populated before setup() is called so plugins can
     # access managers and the profile store during their setup phase.
-    user_settings = profile_store.get_user_settings()
     plugin_ctx = PluginContext(
         event_bus=event_bus,
         device_manager=device_manager,
@@ -187,6 +189,15 @@ def create_app() -> FastAPI:
 
         asyncio.create_task(_do_restart())
         return {"status": "restarting"}
+
+    @app.post("/admin/indi/stop", status_code=202)
+    async def admin_indi_stop(request: Request) -> dict[str, str]:
+        """Explicitly stop the managed indiserver."""
+        manager = getattr(request.app.state.registry, "indi_manager", None)
+        if manager is None:
+            raise HTTPException(status_code=404, detail="INDI is not configured in managed mode")
+        await manager.stop_server()
+        return {"status": "stopped"}
 
     @app.get("/plugins")
     async def list_plugins(request: Request) -> list[dict]:

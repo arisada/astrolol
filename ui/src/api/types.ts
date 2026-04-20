@@ -96,6 +96,7 @@ export interface UserSettings {
   astap_search_radius: number
   astap_tolerance: number
   pixel_size_um: number | null
+  indi_run_dir: string
 }
 
 // --- Plate solving ---

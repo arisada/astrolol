@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import importlib
 from pathlib import Path
+from typing import Optional
 
 import pluggy
 import structlog
@@ -33,8 +34,9 @@ def build_plugin_manager() -> pluggy.PluginManager:
     return pm
 
 
-def build_registry(pm: pluggy.PluginManager) -> DeviceRegistry:
+def build_registry(pm: pluggy.PluginManager, indi_run_dir: Optional[Path] = None) -> DeviceRegistry:
     registry = DeviceRegistry()
+    registry.indi_run_dir = indi_run_dir or Path("/tmp/astrolol")
     pm.hook.register_devices(registry=registry)
     logger.info("devices.registered", available=registry.all_keys())
     return registry

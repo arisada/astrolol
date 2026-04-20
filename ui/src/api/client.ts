@@ -175,6 +175,11 @@ export const api = {
     put: (body: UserSettings) => request<UserSettings>('/settings', { method: 'PUT', body: JSON.stringify(body) }),
   },
 
+  admin: {
+    restart: () => request<{ status: string }>('/admin/restart', { method: 'POST' }),
+    indiStop: () => request<{ status: string }>('/admin/indi/stop', { method: 'POST' }),
+  },
+
   plugins: {
     list: () => request<PluginInfo[]>('/plugins'),
   },

@@ -21,6 +21,7 @@ class UserSettings(BaseModel):
     astap_search_radius: float = 30.0         # degrees; passed as -r to astap_cli
     astap_tolerance: float = 0.007            # star-match tolerance; passed as -t to astap_cli
     pixel_size_um: float | None = None        # sensor pixel size in µm; used to hint FOV
+    indi_run_dir: str = "/tmp/astrolol"       # directory for INDI FIFO and state file
 
 
 class UserSettingsStore:

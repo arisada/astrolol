@@ -13,6 +13,8 @@ connects the PyIndi client on the first device connection.
 from __future__ import annotations
 
 import asyncio
+from pathlib import Path
+
 import structlog
 
 import pluggy
@@ -36,7 +38,7 @@ class IndiConnectionManager:
     connection alive as long as at least one device is connected.
     """
 
-    def __init__(self) -> None:
+    def __init__(self, run_dir: Path = Path("/tmp/astrolol")) -> None:
         from astrolol.config.settings import settings
         from astrolol.devices.indi.server import IndiServer
         from astrolol.devices.indi.client import IndiClient
@@ -45,6 +47,7 @@ class IndiConnectionManager:
             manage=settings.indi_manage_server,
             host=settings.indi_host,
             port=settings.indi_port,
+            run_dir=run_dir,
         )
         self._client = IndiClient(
             host=settings.indi_host,
@@ -136,6 +139,16 @@ class IndiConnectionManager:
 
     async def unload_driver(self, executable: str) -> None:
         await self._server.unload_driver(executable)
+
+    async def stop_server(self) -> None:
+        """Explicitly stop indiserver (called from the admin endpoint)."""
+        if self._lock is None:
+            await self._server.stop()
+            return
+        async with self._lock:
+            await self._server.stop()
+            self._started = False
+            self._ref_count = 0
 
 
 def _make_camera_class(manager: IndiConnectionManager):
@@ -365,7 +378,8 @@ class IndiPlugin:
     @hookimpl
     def register_devices(self, registry: DeviceRegistry) -> None:
         try:
-            manager = IndiConnectionManager()
+            run_dir = getattr(registry, "indi_run_dir", Path("/tmp/astrolol"))
+            manager = IndiConnectionManager(run_dir=run_dir)
         except RuntimeError as exc:
             logger.warning("indi.plugin_skipped", reason=str(exc))
             return

@@ -132,6 +132,12 @@ export function Options() {
   const [phd2Host, setPhd2Host] = useState('localhost')
   const [phd2Port, setPhd2Port] = useState(4400)
 
+  // INDI run dir
+  const [indiRunDir, setIndiRunDir] = useState('/tmp/astrolol')
+
+  // Stop INDI status
+  const [indiStopStatus, setIndiStopStatus] = useState<'idle' | 'stopping' | 'stopped' | 'error'>('idle')
+
   // Plugin enable/disable
   const pluginInfos = useStore((s) => s.pluginInfos)
   const setPluginInfos = useStore((s) => s.setPluginInfos)
@@ -146,6 +152,7 @@ export function Options() {
         setSaveFilename(s.save_filename_template)
         setPhd2Host(s.phd2_host)
         setPhd2Port(s.phd2_port)
+        setIndiRunDir(s.indi_run_dir)
       })
       .catch(() => { /* backend may not be running */ })
   }, [])
@@ -153,7 +160,15 @@ export function Options() {
   const persistSaveSettings = async () => {
     setSaveStatus('saving')
     try {
-      await api.settings.put({ save_dir_template: saveDir, save_filename_template: saveFilename, enabled_plugins: pluginInfos.filter((p) => p.enabled).map((p) => p.id), phd2_host: phd2Host, phd2_port: phd2Port })
+      const current = await api.settings.get()
+      await api.settings.put({
+        ...current,
+        save_dir_template: saveDir,
+        save_filename_template: saveFilename,
+        phd2_host: phd2Host,
+        phd2_port: phd2Port,
+        indi_run_dir: indiRunDir,
+      })
       setSaveStatus('saved')
       setTimeout(() => setSaveStatus('idle'), 2000)
     } catch {
@@ -177,6 +192,18 @@ export function Options() {
       setTimeout(poll, 800)
     }
     setTimeout(poll, 1200)
+  }
+
+  const stopIndi = async () => {
+    setIndiStopStatus('stopping')
+    try {
+      await api.admin.indiStop()
+      setIndiStopStatus('stopped')
+      setTimeout(() => setIndiStopStatus('idle'), 3000)
+    } catch {
+      setIndiStopStatus('error')
+      setTimeout(() => setIndiStopStatus('idle'), 3000)
+    }
   }
 
   const togglePlugin = async (plugin: PluginInfo) => {
@@ -261,6 +288,17 @@ export function Options() {
             onChange={(v) => setIndi((s) => ({ ...s, manageServer: v }))}
           />
         </Row>
+        <Row
+          label="Run directory"
+          hint="Directory for the INDI FIFO and state file (persisted)"
+        >
+          <TextInput
+            value={indiRunDir}
+            onChange={setIndiRunDir}
+            onBlur={persistSaveSettings}
+            className="w-48 font-mono text-xs"
+          />
+        </Row>
 
         {/* Advanced — hidden by default */}
         <div>
@@ -342,10 +380,32 @@ export function Options() {
         </Section>
       )}
 
-      <p className="text-xs text-slate-600 mt-4">
-        INDI server settings are UI previews only — set <code className="text-slate-500">ASTROLOL_*</code> environment
-        variables to configure the server before starting astrolol.
-      </p>
+      <Section title="Server">
+        <div className="flex flex-wrap gap-3">
+          <button
+            type="button"
+            onClick={restartNow}
+            disabled={restarting}
+            className="px-3 py-1.5 rounded text-sm font-medium bg-red-700 hover:bg-red-600 text-white disabled:opacity-50 transition-colors"
+          >
+            {restarting ? 'Restarting…' : 'Restart astrolol'}
+          </button>
+          <button
+            type="button"
+            onClick={stopIndi}
+            disabled={indiStopStatus === 'stopping'}
+            className="px-3 py-1.5 rounded text-sm font-medium bg-slate-600 hover:bg-slate-500 text-white disabled:opacity-50 transition-colors"
+          >
+            {indiStopStatus === 'stopping' ? 'Stopping…' : 'Stop INDI server'}
+          </button>
+        </div>
+        {indiStopStatus === 'stopped' && (
+          <p className="text-xs text-status-connected mt-2">INDI server stopped.</p>
+        )}
+        {indiStopStatus === 'error' && (
+          <p className="text-xs text-status-error mt-2">Failed to stop INDI server.</p>
+        )}
+      </Section>
     </div>
   )
 }

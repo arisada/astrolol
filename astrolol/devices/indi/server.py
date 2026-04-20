@@ -4,6 +4,8 @@ Manage an indiserver process and its FIFO control channel.
 Two modes:
   - Managed  (indi_manage_server=True, default): astrolol spawns indiserver
     with a FIFO, loads/unloads drivers dynamically via that FIFO.
+    The indiserver process survives astrolol restarts — state is persisted
+    to <run_dir>/astrolol_indi.json so the next instance can reuse it.
   - Unmanaged (indi_manage_server=False): connect to an already-running
     indiserver at (indi_host, indi_port); driver loading is a no-op.
 """
@@ -11,8 +13,10 @@ from __future__ import annotations
 
 import asyncio
 import errno
+import json
 import os
-import tempfile
+import signal
+import socket
 from pathlib import Path
 
 import structlog
@@ -20,6 +24,7 @@ import structlog
 logger = structlog.get_logger()
 
 _FIFO_NAME = "astrolol_indi.fifo"
+_STATE_NAME = "astrolol_indi.json"
 _STARTUP_WAIT = 2.0   # seconds to wait after spawning indiserver
 
 
@@ -27,13 +32,18 @@ class IndiServer:
     """
     Lifecycle manager for indiserver.
 
+    The indiserver process is detached from astrolol's process group
+    (start_new_session=True) so it survives astrolol restarts.  State
+    (PID and loaded drivers) is persisted to <run_dir>/astrolol_indi.json
+    and restored on the next startup.
+
     Usage::
 
         server = IndiServer(manage=True, host="localhost", port=7624)
         await server.start()
         await server.load_driver("indi_asi_ccd")
         ...
-        await server.stop()
+        await server.stop()  # explicit — not called on normal astrolol exit
     """
 
     def __init__(
@@ -41,14 +51,15 @@ class IndiServer:
         manage: bool = True,
         host: str = "localhost",
         port: int = 7624,
-        fifo_dir: Path | None = None,
+        run_dir: Path = Path("/tmp/astrolol"),
     ) -> None:
         self.manage = manage
         self.host = host
         self.port = port
-        self._fifo_dir = fifo_dir or Path(tempfile.gettempdir())
-        self._fifo_path = self._fifo_dir / _FIFO_NAME
-        self._process: asyncio.subprocess.Process | None = None
+        self._run_dir = run_dir
+        self._fifo_path = run_dir / _FIFO_NAME
+        self._state_path = run_dir / _STATE_NAME
+        self._managed_pid: int | None = None
         self._loaded_drivers: set[str] = set()
 
     # ------------------------------------------------------------------
@@ -60,9 +71,32 @@ class IndiServer:
             logger.info("indi.server_unmanaged", host=self.host, port=self.port)
             return
 
-        if self._process is not None:
-            return  # already running
+        if self._managed_pid is not None:
+            return  # already managing in this instance
 
+        # Check for a surviving indiserver from a previous astrolol run
+        state = self._read_state()
+        if state:
+            pid = state.get("pid")
+            if pid and self._is_our_indiserver(pid):
+                logger.info("indi.server_reusing", pid=pid)
+                self._managed_pid = pid
+                self._loaded_drivers = set(state.get("loaded_drivers", []))
+                return
+            else:
+                # Stale state — clean up
+                logger.info("indi.server_stale_state", old_pid=pid)
+                self._cleanup_state()
+
+        # Check if something else is occupying the port
+        if self._port_in_use(self.port):
+            raise RuntimeError(
+                f"Port {self.port} is in use by an unknown process. "
+                "Stop it before starting astrolol, or switch to unmanaged mode."
+            )
+
+        # Spawn a fresh indiserver in its own session (detached from astrolol)
+        self._run_dir.mkdir(parents=True, exist_ok=True)
         await self._create_fifo()
 
         cmd = [
@@ -72,39 +106,65 @@ class IndiServer:
             "-m", "100",   # max MB queued per client
         ]
         logger.info("indi.server_starting", cmd=" ".join(cmd))
-        self._process = await asyncio.create_subprocess_exec(
+        process = await asyncio.create_subprocess_exec(
             *cmd,
             stdout=asyncio.subprocess.DEVNULL,
-            stderr=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.DEVNULL,
+            start_new_session=True,
         )
         # Give indiserver a moment to open the FIFO and start listening
         await asyncio.sleep(_STARTUP_WAIT)
 
-        if self._process.returncode is not None:
-            stderr = await self._process.stderr.read()  # type: ignore[union-attr]
+        if process.returncode is not None:
             raise RuntimeError(
-                f"indiserver exited immediately (rc={self._process.returncode}): "
-                f"{stderr.decode().strip()}"
+                f"indiserver exited immediately (rc={process.returncode})"
             )
 
-        logger.info("indi.server_started", pid=self._process.pid, port=self.port)
+        self._managed_pid = process.pid
+        self._loaded_drivers = set()
+        self._save_state()
+        logger.info("indi.server_started", pid=process.pid, port=self.port)
 
     async def stop(self) -> None:
-        if not self.manage or self._process is None:
+        """Explicitly stop the indiserver.
+
+        Reads the PID from the state file, sends SIGTERM, waits, then SIGKILL.
+        Only call this when the user explicitly wants to stop indiserver — NOT
+        on normal astrolol shutdown.
+        """
+        if not self.manage:
             return
 
-        logger.info("indi.server_stopping", pid=self._process.pid)
-        self._process.terminate()
-        try:
-            await asyncio.wait_for(self._process.wait(), timeout=5.0)
-        except asyncio.TimeoutError:
-            self._process.kill()
-            await self._process.wait()
+        state = self._read_state()
+        pid = (state or {}).get("pid") or self._managed_pid
+        if pid is None:
+            logger.info("indi.server_not_running")
+            return
 
-        self._process = None
+        logger.info("indi.server_stopping", pid=pid)
+        try:
+            os.kill(pid, signal.SIGTERM)
+            # Wait up to 5 s for graceful exit
+            for _ in range(50):
+                await asyncio.sleep(0.1)
+                try:
+                    os.kill(pid, 0)  # probe: raises ProcessLookupError if dead
+                except ProcessLookupError:
+                    break
+            else:
+                # Force kill if still alive after 5 s
+                try:
+                    os.kill(pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+        except ProcessLookupError:
+            pass  # already dead
+
+        self._managed_pid = None
         self._loaded_drivers.clear()
+        self._cleanup_state()
         self._cleanup_fifo()
-        logger.info("indi.server_stopped")
+        logger.info("indi.server_stopped", pid=pid)
 
     async def load_driver(self, executable: str) -> None:
         """
@@ -122,6 +182,7 @@ class IndiServer:
 
         await self._fifo_write(f"start {executable}\n")
         self._loaded_drivers.add(executable)
+        self._save_state()
         logger.info("indi.driver_loaded", driver=executable)
 
     async def unload_driver(self, executable: str) -> None:
@@ -134,21 +195,79 @@ class IndiServer:
 
         await self._fifo_write(f"stop {executable}\n")
         self._loaded_drivers.discard(executable)
+        self._save_state()
         logger.info("indi.driver_unloaded", driver=executable)
 
     @property
     def is_running(self) -> bool:
         if not self.manage:
             return True  # assume remote server is up
-        return self._process is not None and self._process.returncode is None
+        if self._managed_pid is not None:
+            return self._is_our_indiserver(self._managed_pid)
+        # Check state file (surviving from a previous instance)
+        state = self._read_state()
+        if state:
+            pid = state.get("pid")
+            return bool(pid and self._is_our_indiserver(pid))
+        return False
+
+    # ------------------------------------------------------------------
+    # Static helpers
+    # ------------------------------------------------------------------
+
+    @staticmethod
+    def _is_our_indiserver(pid: int) -> bool:
+        """Return True if pid is a running indiserver process."""
+        try:
+            comm_path = Path(f"/proc/{pid}/comm")
+            if not comm_path.exists():
+                return False
+            return comm_path.read_text().strip() == "indiserver"
+        except OSError:
+            return False
+
+    @staticmethod
+    def _port_in_use(port: int) -> bool:
+        """Return True if something is listening on localhost:port."""
+        with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+            s.settimeout(0.5)
+            return s.connect_ex(("127.0.0.1", port)) == 0
+
+    # ------------------------------------------------------------------
+    # State helpers
+    # ------------------------------------------------------------------
+
+    def _read_state(self) -> dict | None:
+        try:
+            return json.loads(self._state_path.read_text())
+        except (OSError, json.JSONDecodeError):
+            return None
+
+    def _save_state(self) -> None:
+        try:
+            self._run_dir.mkdir(parents=True, exist_ok=True)
+            self._state_path.write_text(
+                json.dumps({
+                    "pid": self._managed_pid,
+                    "loaded_drivers": sorted(self._loaded_drivers),
+                })
+            )
+        except OSError as exc:
+            logger.warning("indi.state_save_failed", error=str(exc))
+
+    def _cleanup_state(self) -> None:
+        try:
+            self._state_path.unlink(missing_ok=True)
+        except OSError:
+            pass
 
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
 
     async def _create_fifo(self) -> None:
-        self._fifo_dir.mkdir(parents=True, exist_ok=True)
         fifo = self._fifo_path
+        # Remove stale FIFO if present — indiserver hasn't opened it yet
         if fifo.exists():
             fifo.unlink()
         await asyncio.to_thread(os.mkfifo, str(fifo))
