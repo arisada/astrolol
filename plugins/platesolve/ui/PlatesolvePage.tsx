@@ -104,9 +104,41 @@ function StatusBadge({ status }: { status: SolveJob['status'] }) {
   )
 }
 
+// ── Offset helpers ─────────────────────────────────────────────────────────────
+
+function angularSepArcsec(ra1: number, dec1: number, ra2: number, dec2: number): number {
+  const R = Math.PI / 180
+  const d1 = dec1 * R, d2 = dec2 * R, dra = (ra2 - ra1) * R, ddec = (dec2 - dec1) * R
+  const a = Math.sin(ddec / 2) ** 2 + Math.cos(d1) * Math.cos(d2) * Math.sin(dra / 2) ** 2
+  return 2 * Math.asin(Math.min(1, Math.sqrt(a))) * (180 / Math.PI) * 3600
+}
+
+function fmtOffset(arcsec: number): string {
+  const sign = arcsec >= 0 ? '+' : '−'
+  const abs = Math.abs(arcsec)
+  if (abs >= 3600) return `${sign}${(abs / 3600).toFixed(2)}°`
+  if (abs >= 60)   return `${sign}${(abs / 60).toFixed(1)}′`
+  return `${sign}${abs.toFixed(1)}″`
+}
+
+function fmtSep(arcsec: number): string {
+  if (arcsec >= 3600) return `${(arcsec / 3600).toFixed(2)}°`
+  if (arcsec >= 60)   return `${(arcsec / 60).toFixed(1)}′`
+  return `${arcsec.toFixed(1)}″`
+}
+
 // ── Result panel ───────────────────────────────────────────────────────────────
 
-function ResultPanel({ result }: { result: SolveResult }) {
+function ResultPanel({ job }: { job: SolveJob }) {
+  const result = job.result!
+  const raHint = job.request.ra_hint
+  const decHint = job.request.dec_hint
+  const hasHint = raHint != null && decHint != null
+
+  const deltaRaArcsec  = hasHint ? (result.ra - raHint) * Math.cos(result.dec * Math.PI / 180) * 3600 : null
+  const deltaDecArcsec = hasHint ? (result.dec - decHint) * 3600 : null
+  const totalArcsec    = hasHint ? angularSepArcsec(raHint, decHint, result.ra, result.dec) : null
+
   return (
     <div className="mx-4 mb-3 rounded-lg border border-green-500/30 bg-green-500/5 p-3">
       <div className="text-xs font-medium text-green-400 uppercase tracking-wider mb-2">Solved</div>
@@ -124,6 +156,20 @@ function ResultPanel({ result }: { result: SolveResult }) {
         <div><span className="text-slate-500">Time</span>
           <span className="ml-2 font-mono text-slate-200">{(result.duration_ms / 1000).toFixed(1)}s</span></div>
       </div>
+      {totalArcsec != null && deltaRaArcsec != null && deltaDecArcsec != null && (
+        <>
+          <div className="mt-2 mb-1 border-t border-green-500/20" />
+          <div className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">Mount offset</div>
+          <div className="grid grid-cols-1 gap-y-1 text-xs">
+            <div><span className="text-slate-500">ΔRA</span>
+              <span className="ml-2 font-mono text-slate-300">{fmtOffset(deltaRaArcsec)}</span></div>
+            <div><span className="text-slate-500">ΔDec</span>
+              <span className="ml-2 font-mono text-slate-300">{fmtOffset(deltaDecArcsec)}</span></div>
+            <div><span className="text-slate-500">Total</span>
+              <span className="ml-2 font-mono text-amber-400 font-medium">{fmtSep(totalArcsec)}</span></div>
+          </div>
+        </>
+      )}
     </div>
   )
 }
@@ -464,9 +510,9 @@ export function PlatesolvePage() {
   const handlePostSolve = async (result: SolveResult) => {
     if (!mount || afterSolve === 'nothing') { setBusy(false); return }
     try {
-      await api.mount.sync(mount.device_id, result.ra / 15, result.dec)
+      await api.mount.sync(mount.device_id, result.ra, result.dec)
       if (afterSolve === 'sync_slew') {
-        await api.mount.slew(mount.device_id, result.ra / 15, result.dec)
+        await api.mount.slew(mount.device_id)
       }
     } catch (e) {
       setError((e as Error).message)
@@ -649,7 +695,7 @@ export function PlatesolvePage() {
         {/* Last result */}
         {lastCompleted?.result && (
           <div className="pt-3">
-            <ResultPanel result={lastCompleted.result} />
+            <ResultPanel job={lastCompleted} />
           </div>
         )}
 
