@@ -93,10 +93,15 @@ export function StellariumPage() {
             <span className="text-slate-300 font-mono">{status.port}</span>
           </li>
           <li>Save and connect. The telescope reticle should appear on the sky.</li>
+          <li>
+            In telescope properties, set{' '}
+            <span className="text-slate-300">Coordinate system: J2000</span> (this is
+            the default).
+          </li>
         </ol>
         <p className="text-xs text-slate-600 pt-2">
           Right-click any object → Current object → Slew telescope to issue a GoTo.
-          Coordinates are J2000 (ICRS). Position is pushed to Stellarium every 500 ms.
+          Position is pushed to Stellarium every 500 ms.
         </p>
       </div>
     </div>
