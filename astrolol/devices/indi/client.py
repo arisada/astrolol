@@ -52,6 +52,13 @@ class IndiClient(IPyClient):
         super().__init__(indihost=host, indiport=port)
         self.host = host
         self.port = port
+        # Enable BLOBs by default.  indipyclient's default is "Never", which
+        # means defBLOBVector announcements (including cameras that came up
+        # before our client connected) auto-send enableBLOB("Never") and the
+        # server never forwards image data.  Setting "Also" here ensures every
+        # defBLOBVector announcement immediately enables BLOB reception — which
+        # must be set before asyncrun() is called per the indipyclient docs.
+        self.enableBLOBdefault = "Also"
         # Asyncio primitives are created in connect() so they bind to the
         # event loop that is actually running at connection time.  Creating
         # them here would bind them to whatever loop happens to be current
