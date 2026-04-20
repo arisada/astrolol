@@ -22,6 +22,8 @@ class UserSettings(BaseModel):
     astap_tolerance: float = 0.007            # star-match tolerance; passed as -t to astap_cli
     pixel_size_um: float | None = None        # sensor pixel size in µm; used to hint FOV
     indi_run_dir: str = "/tmp/astrolol"       # directory for INDI FIFO and state file
+    lx200_port: int = 10001                   # TCP port for the LX200 server
+    lx200_autostart: bool = True              # start LX200 server when plugin is enabled
 
 
 class UserSettingsStore:

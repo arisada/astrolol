@@ -7,8 +7,9 @@
  */
 import type { ComponentType } from 'react'
 import type { LucideIcon } from 'lucide-react'
-import { Crosshair, ScanSearch, Smile } from 'lucide-react'
+import { Crosshair, ScanSearch, Smile, Telescope } from 'lucide-react'
 import { HelloPage } from '@plugins/hello/ui/HelloPage'
+import { Lx200Page } from '@plugins/lx200/ui/Lx200Page'
 import { Phd2Page } from '@plugins/phd2/ui/Phd2Page'
 import { PlatesolvePage } from '@plugins/platesolve/ui/PlatesolvePage'
 
@@ -37,6 +38,12 @@ const PLUGIN_REGISTRY: Record<string, PluginRegistryEntry> = {
     icon: ScanSearch,
     label: 'Plate Solving',
     Component: PlatesolvePage,
+  },
+  lx200: {
+    to: '/lx200',
+    icon: Telescope,
+    label: 'LX200 Server',
+    Component: Lx200Page,
   },
 }
 

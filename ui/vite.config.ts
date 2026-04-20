@@ -66,6 +66,7 @@ export default defineConfig({
       '/hello':    p(backendHttp),
       '/phd2':        p(backendHttp),
       '/platesolve':  p(backendHttp),
+      '/lx200':       p(backendHttp),
       '/admin':    p(backendHttp),
       '/ws': { target: backendWs, ws: true, changeOrigin: true, configure: withFallback },
     },

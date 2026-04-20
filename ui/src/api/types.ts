@@ -97,6 +97,8 @@ export interface UserSettings {
   astap_tolerance: number
   pixel_size_um: number | null
   indi_run_dir: string
+  lx200_port: number
+  lx200_autostart: boolean
 }
 
 // --- Plate solving ---
