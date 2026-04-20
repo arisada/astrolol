@@ -278,6 +278,10 @@ export type PreConnectProps = Record<string, PreConnectPropSpec>
 
 export interface LoadDriverResponse {
   properties: DeviceProperty[]
+  /** Actual INDI device names announced by the driver.
+   *  May differ from the catalog name (e.g. indi_asi_ccd → "ZWO CCD ASI294MC Pro").
+   *  Multiple entries when several cameras of the same model are connected. */
+  device_names: string[]
 }
 
 export interface IndiDeviceMessage {

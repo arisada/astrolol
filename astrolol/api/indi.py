@@ -7,6 +7,8 @@ POST /indi/load_driver      — start indiserver, load a driver, return its prop
 """
 from __future__ import annotations
 
+import asyncio
+
 import structlog
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
@@ -85,6 +87,11 @@ class LoadDriverRequest(BaseModel):
 
 class LoadDriverResponse(BaseModel):
     properties: list[PropertyOut]
+    # Actual device names announced by the driver.  Drivers like indi_asi_ccd
+    # announce model-specific names ("ZWO CCD ASI294MC Pro") instead of the
+    # catalog name ("ZWO CCD").  When multiple cameras are connected all names
+    # are returned so the user can register each one with the correct name.
+    device_names: list[str] = []
 
 
 @router.post("/load_driver", response_model=LoadDriverResponse)
@@ -93,6 +100,11 @@ async def load_driver(body: LoadDriverRequest, request: Request) -> LoadDriverRe
 
     This is Phase 1 of two-phase connect.  The caller then configures any
     pre-connect properties and calls POST /devices/connect with pre_connect_props.
+
+    The response includes ``device_names`` — the actual INDI device names announced
+    by the driver.  For single-camera setups this is typically one entry; for
+    multi-camera setups (e.g. 3 ZWO cameras) all camera names are returned so
+    the user can register each one with the correct name.
     """
     manager = getattr(request.app.state.registry, "indi_manager", None)
     if manager is None:
@@ -107,20 +119,51 @@ async def load_driver(body: LoadDriverRequest, request: Request) -> LoadDriverRe
         raise HTTPException(status_code=502, detail=f"Failed to start driver: {exc}") from exc
 
     client = manager.client
-    try:
-        await client.wait_for_property(body.device_name, "CONNECTION", timeout=15.0)
-    except TimeoutError:
-        raise HTTPException(
-            status_code=504,
-            detail=(
-                f"Driver loaded but device '{body.device_name}' did not announce properties "
-                "within 15 s. Check that the device name matches the driver exactly."
-            ),
-        )
+    known_before = set(client.list_devices())
+    exact_name = body.device_name
 
-    snapshot = await client.get_properties_snapshot(body.device_name)
+    # Phase 1: try exact device name (handles single-camera and already-loaded drivers)
+    try:
+        await client.wait_for_property(exact_name, "CONNECTION", timeout=15.0)
+        # Exact match found — brief extra window to collect any additional cameras
+        # from the same multi-camera driver that came up simultaneously
+        await asyncio.sleep(1.0)
+        device_names = [exact_name] + [
+            d for d in client.list_devices()
+            if d not in known_before and d != exact_name and d.startswith(exact_name)
+        ]
+    except TimeoutError:
+        # Phase 2: prefix fallback.  Handles drivers that announce model-specific
+        # names ("ZWO CCD ASI294MC Pro") instead of the generic catalog name
+        # ("ZWO CCD").  Wait up to 5 s more (20 s total) for any matching device.
+        logger.info(
+            "indi.load_driver_prefix_fallback",
+            device=exact_name,
+            reason="exact name not announced; trying prefix match",
+        )
+        try:
+            device_names = await client.wait_for_devices_by_prefix(
+                exact_name, known_before, timeout=5.0
+            )
+        except TimeoutError:
+            raise HTTPException(
+                status_code=504,
+                detail=(
+                    f"Driver loaded but no device starting with '{exact_name}' announced "
+                    "properties within 20 s. Check that the driver is installed and the "
+                    "device is connected."
+                ),
+            )
+
+    resolved = device_names[0]
+    snapshot = await client.get_properties_snapshot(resolved)
     props = [prop_to_out(p) for p in snapshot.values()]
     result = [p for p in props if p is not None]
     result.sort(key=lambda x: (x.group, x.name))
-    logger.info("indi.load_driver_done", device=body.device_name, num_props=len(result))
-    return LoadDriverResponse(properties=result)
+    logger.info(
+        "indi.load_driver_done",
+        device=resolved,
+        all_devices=device_names,
+        num_props=len(result),
+    )
+    return LoadDriverResponse(properties=result, device_names=device_names)

@@ -414,6 +414,7 @@ function ConfigureStep({
   onConnect,
   connecting,
   error,
+  discoveredDeviceNames = [],
 }: {
   kind: DeviceKind
   driver: DriverEntry | null
@@ -424,6 +425,7 @@ function ConfigureStep({
   onConnect: () => void
   connecting: boolean
   error: string | null
+  discoveredDeviceNames?: string[]
 }) {
   // Only show writable properties that aren't CONNECTION itself
   const editable = properties.filter(
@@ -480,6 +482,23 @@ function ConfigureStep({
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {discoveredDeviceNames.length > 1 && (
+        <div className="bg-amber-950/30 border border-amber-700/40 rounded px-3 py-2 mb-3">
+          <p className="text-xs text-amber-400 font-medium mb-1">
+            {discoveredDeviceNames.length} cameras found on this driver
+          </p>
+          <p className="text-xs text-amber-300/80 mb-2">
+            Connect will register the first one. Add the others by repeating
+            "Load driver" with each name below:
+          </p>
+          <ul className="flex flex-col gap-0.5">
+            {discoveredDeviceNames.map((name) => (
+              <li key={name} className="text-xs font-mono text-amber-200 select-all">{name}</li>
+            ))}
+          </ul>
         </div>
       )}
 
@@ -607,6 +626,8 @@ export function Equipment() {
     executable: string
     deviceId: string
   } | null>(null)
+  // All device names announced by the loaded driver (may be model-specific and/or multiple)
+  const [discoveredDeviceNames, setDiscoveredDeviceNames] = useState<string[]>([])
 
   const refresh = () => {
     api.devices.connected().then(setConnectedDevices).catch(console.error)
@@ -665,9 +686,12 @@ export function Equipment() {
     setLoadingDriver(true)
     try {
       const result = await api.indi.loadDriver(executable, deviceName)
+      // Use the actual announced device name (may differ from catalog, e.g. "ZWO CCD ASI294MC Pro")
+      const resolvedName = result.device_names?.[0] ?? deviceName
+      setDiscoveredDeviceNames(result.device_names ?? [])
       setDriverProperties(result.properties)
       setPreConnectProps(initPreConnectProps(result.properties))
-      setPendingConnect({ deviceName, executable, deviceId })
+      setPendingConnect({ deviceName: resolvedName, executable, deviceId })
       setStep('configure')
     } catch (err) {
       setError((err as Error).message)
@@ -822,6 +846,7 @@ export function Equipment() {
               onConnect={handleConnect}
               connecting={connecting}
               error={error}
+              discoveredDeviceNames={discoveredDeviceNames}
             />
           )}
         </div>

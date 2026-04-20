@@ -227,6 +227,36 @@ class IndiClient(IPyClient):
     # Property access
     # ------------------------------------------------------------------
 
+    def list_devices(self) -> list[str]:
+        """Return the names of all devices currently known to the client."""
+        return list(self.data.keys())
+
+    async def wait_for_devices_by_prefix(
+        self,
+        prefix: str,
+        known_before: set[str],
+        timeout: float = 15.0,
+    ) -> list[str]:
+        """Wait for at least one new device whose name starts with *prefix* to appear.
+
+        Used to handle drivers (e.g. indi_asi_ccd) that announce devices as
+        "ZWO CCD ASI294MC Pro" instead of the catalog's generic "ZWO CCD".
+
+        Returns all currently-known device names that start with *prefix* and
+        were not in *known_before*.  Waits up to 1 s after the first match to
+        collect additional cameras from the same multi-camera driver.
+        """
+        await self._wait_cond(
+            lambda: any(
+                d.startswith(prefix) and d not in known_before
+                for d in self.data.keys()
+            ),
+            timeout=timeout,
+        )
+        # Short extra window to collect additional cameras from the same driver
+        await asyncio.sleep(1.0)
+        return [d for d in self.data.keys() if d.startswith(prefix) and d not in known_before]
+
     async def wait_for_property(
         self, device_name: str, prop_name: str, timeout: float = 10.0
     ) -> Any:
