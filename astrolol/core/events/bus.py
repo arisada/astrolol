@@ -7,7 +7,7 @@ from astrolol.core.events.models import BaseEvent
 
 logger = structlog.get_logger()
 
-HISTORY_SIZE = 500
+HISTORY_SIZE = 10_000
 
 
 class EventBus:
