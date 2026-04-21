@@ -87,6 +87,9 @@ def setup_logging(log_file: Path | None = None) -> None:
     # Suppress noisy third-party loggers
     logging.getLogger("uvicorn.access").setLevel(logging.WARNING)
     logging.getLogger("uvicorn.error").setLevel(logging.WARNING)
+    # indipyclient emits DEBUG-level XML traffic via its own stdlib logger.
+    # Keep it at WARNING until the user enables INDI debug via POST /indi/debug.
+    logging.getLogger("indipyclient.ipyclient").setLevel(logging.WARNING)
 
     # When PYTHONASYNCIODEBUG=1 is set, expose asyncio's slow-callback warnings.
     # asyncio logs any callback/coroutine taking > 100 ms at WARNING level.

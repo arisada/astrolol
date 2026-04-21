@@ -122,6 +122,7 @@ export function Options() {
     port: 7624,
   })
   const [showAdvanced, setShowAdvanced] = useState(false)
+  const [indiDebugLevel, setIndiDebugLevel] = useState(0)
 
   // Image saving settings (persisted via backend)
   const [saveDir, setSaveDir] = useState('~/astrolol_pictures/%D')
@@ -309,6 +310,24 @@ export function Options() {
                   disabled={indi.manageServer}
                   className="w-24"
                 />
+              </Row>
+              <Row
+                label="INDI protocol logging"
+                hint="Log XML traffic to console and log file. Resets to Off on restart."
+              >
+                <select
+                  value={indiDebugLevel}
+                  onChange={(e) => {
+                    const level = parseInt(e.target.value, 10)
+                    setIndiDebugLevel(level)
+                    api.indi.setDebugLevel(level).catch(() => {})
+                  }}
+                  className="bg-surface border border-surface-border rounded px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-accent"
+                >
+                  <option value={0}>Off</option>
+                  <option value={1}>Tags only</option>
+                  <option value={2}>Full XML</option>
+                </select>
               </Row>
             </div>
           )}

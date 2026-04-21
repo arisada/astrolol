@@ -15,12 +15,15 @@ indipyclient API notes:
 from __future__ import annotations
 
 import asyncio
+import logging
 from dataclasses import dataclass
 from typing import Any
 
 import structlog
 from indipyclient import IPyClient
 from indipyclient import events as indi_events
+
+_indi_logger = logging.getLogger("indipyclient.ipyclient")
 
 logger = structlog.get_logger()
 
@@ -69,6 +72,18 @@ class IndiClient(IPyClient):
         self._connected: asyncio.Event | None = None
         self._task: asyncio.Task[None] | None = None
         self._blob_versions: dict[tuple[str, str], int] = {}
+
+    def set_debug_level(self, level: int) -> None:
+        """Set INDI protocol debug verbosity (0=off, 1=tags, 2=full XML).
+
+        level 0 — no XML logging
+        level 1 — transmitted/received vector tags only
+        level 2 — vectors, members and contents (excluding BLOBs)
+        """
+        level = max(0, min(2, level))  # clamp; we never expose level 3 (BLOBs)
+        self.debug_verbosity(level)
+        _indi_logger.setLevel(logging.DEBUG if level > 0 else logging.WARNING)
+        logger.info("indi.debug_level_set", level=level)
 
     # ------------------------------------------------------------------
     # Lifecycle

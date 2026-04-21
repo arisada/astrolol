@@ -168,6 +168,8 @@ export const api = {
       }),
     deviceMessages: (deviceName: string) =>
       request<IndiDeviceMessage[]>(`/indi/messages/${encodeURIComponent(deviceName)}`),
+    setDebugLevel: (level: number) =>
+      request<void>('/indi/debug', { method: 'POST', body: JSON.stringify({ level }) }),
   },
 
   settings: {
