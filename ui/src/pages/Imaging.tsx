@@ -238,7 +238,10 @@ function CameraPanel({
             if (w.min != null) setGainMin(w.min as number)
             if (w.max != null) setGainMax(w.max as number)
             if (w.step != null && (w.step as number) > 0) setGainStep(w.step as number)
-            if (typeof w.value === 'number') setGain(w.value)
+            // Do NOT sync the device's current gain into the UI — the user's
+            // persisted value (localStorage) is the source of truth for what
+            // they want to shoot with.  Overwriting it here caused the gain to
+            // reset to whatever the driver last had (e.g. 200) on every load.
             break
           }
         }
