@@ -58,11 +58,18 @@ def _parse_dec(s: str) -> float:
 
 
 def _normalize_name(raw: str) -> str:
-    """NGC0224 → 'NGC 224', IC0001 → 'IC 1'."""
+    """NGC0224 → 'NGC 224', IC0001 → 'IC 1'.
+
+    Some OpenNGC rows have suffixes like 'IC 0080 NED01' (duplicate nuclei
+    or components of the same object).  We keep only the primary number and
+    discard the suffix so they still resolve to the canonical name.
+    """
     if raw.startswith("NGC"):
-        return f"NGC {int(raw[3:])}"
+        num_str = raw[3:].strip().split()[0]
+        return f"NGC {int(num_str)}"
     if raw.startswith("IC"):
-        return f"IC {int(raw[2:])}"
+        num_str = raw[2:].strip().split()[0]
+        return f"IC {int(num_str)}"
     return raw
 
 
