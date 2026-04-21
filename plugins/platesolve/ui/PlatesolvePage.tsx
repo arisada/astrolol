@@ -493,13 +493,15 @@ export function PlatesolvePage() {
     api.platesolve.dbStatus().then(setDbStatus).catch(console.error)
   }, [])  // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Auto-launch solve once new image arrives
+  // Auto-launch solve once new image arrives.
+  // Depend on the latestImage object (new reference each exposure), not fitsPath
+  // (which is constant across exposures when save=false — same temp file path).
   useEffect(() => {
     if (!pendingSolveRef.current || !latestImage) return
     pendingSolveRef.current = false
     launchSolve(latestImage.fitsPath)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [latestImage?.fitsPath])
+  }, [latestImage])
 
   // React to solve completion
   const activeSolveJob = activeSolveId ? solveJobsMap[activeSolveId] : null
