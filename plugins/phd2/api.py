@@ -4,6 +4,7 @@ from fastapi import APIRouter, HTTPException, Request
 
 from plugins.phd2.client import Phd2Client
 from plugins.phd2.models import DebugRequest, DitherRequest, GuideRequest, Phd2Status
+from plugins.phd2.settings import Phd2Settings
 
 logger = structlog.get_logger()
 router = APIRouter(prefix="/plugins/phd2", tags=["phd2"])
@@ -15,9 +16,14 @@ def _client(request: Request) -> Phd2Client:
 
 @router.post("/connect", status_code=204)
 async def connect(request: Request) -> None:
-    """Start (or restart) the PHD2 connection loop."""
+    """Start (or restart) the PHD2 connection loop using the current saved settings."""
     try:
-        await _client(request).reconnect()
+        raw: dict = {}
+        store = getattr(request.app.state, "profile_store", None)
+        if store is not None:
+            raw = store.get_user_settings().plugin_settings.get("phd2", {})
+        cfg = Phd2Settings(**raw)
+        await _client(request).reconnect(host=cfg.host, port=cfg.port)
     except Exception as exc:
         logger.warning("phd2.connect_failed", reason=str(exc))
         raise HTTPException(status_code=502, detail=str(exc)) from exc

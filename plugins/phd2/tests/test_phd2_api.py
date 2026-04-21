@@ -63,6 +63,9 @@ class FakePhd2Client:
     def set_debug(self, enabled: bool) -> None:
         self.calls.append(("set_debug", {"enabled": enabled}))
 
+    async def reconnect(self, host: str | None = None, port: int | None = None) -> None:
+        self.calls.append(("reconnect", {"host": host, "port": port}))
+
 
 @pytest.fixture()
 def client() -> TestClient:
@@ -98,6 +101,42 @@ def test_status_disconnected(client: TestClient, fake: FakePhd2Client) -> None:
     r = client.get("/plugins/phd2/status")
     assert r.status_code == 200
     assert r.json()["connected"] is False
+
+
+# ── Connect ───────────────────────────────────────────────────────────────────
+
+def test_connect_uses_default_settings(client: TestClient, fake: FakePhd2Client) -> None:
+    """POST /connect with no profile_store uses defaults (localhost:4400)."""
+    r = client.post("/plugins/phd2/connect")
+    assert r.status_code == 204
+    method, kwargs = fake.calls[-1]
+    assert method == "reconnect"
+    assert kwargs["host"] == "localhost"
+    assert kwargs["port"] == 4400
+
+
+def test_connect_reads_saved_settings(fake: FakePhd2Client) -> None:
+    """POST /connect passes host/port from saved plugin settings to reconnect()."""
+    from unittest.mock import MagicMock
+    from astrolol.config.user_settings import UserSettings
+
+    app = FastAPI()
+    app.state.phd2_client = fake
+
+    store = MagicMock()
+    store.get_user_settings.return_value = UserSettings(
+        plugin_settings={"phd2": {"host": "192.168.1.10", "port": 4401}}
+    )
+    app.state.profile_store = store
+    app.include_router(router)
+
+    with TestClient(app) as c:
+        r = c.post("/plugins/phd2/connect")
+    assert r.status_code == 204
+    method, kwargs = fake.calls[-1]
+    assert method == "reconnect"
+    assert kwargs["host"] == "192.168.1.10"
+    assert kwargs["port"] == 4401
 
 
 # ── Guide ─────────────────────────────────────────────────────────────────────

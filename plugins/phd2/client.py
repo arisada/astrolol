@@ -93,8 +93,15 @@ class Phd2Client:
             except asyncio.CancelledError:
                 pass
 
-    async def reconnect(self) -> None:
-        """Stop any existing loop then start a fresh one."""
+    async def reconnect(self, host: str | None = None, port: int | None = None) -> None:
+        """Stop any existing loop then start a fresh one.
+
+        Pass *host* and/or *port* to change the target before reconnecting.
+        """
+        if host is not None:
+            self._host = host
+        if port is not None:
+            self._port = port
         await self.stop()
         await self.start()
 
