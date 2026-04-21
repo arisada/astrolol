@@ -170,8 +170,8 @@ class IndiCamera:
 
     async def abort(self) -> None:
         try:
-            await self._client.set_number(
-                self._device_name, "CCD_ABORT_EXPOSURE", {"ABORT": 1.0}
+            await self._client.set_switch(
+                self._device_name, "CCD_ABORT_EXPOSURE", ["ABORT"]
             )
         except Exception as exc:
             logger.warning("indi.camera_abort_failed", device=self._device_name, error=str(exc))
