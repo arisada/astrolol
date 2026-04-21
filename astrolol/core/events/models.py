@@ -58,7 +58,7 @@ class ExposureStarted(BaseEvent):
     type: Literal["imager.exposure_started"] = "imager.exposure_started"
     device_id: str
     duration: float
-    gain: int
+    gain: int | None
     binning: int
 
 

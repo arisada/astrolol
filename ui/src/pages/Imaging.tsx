@@ -287,7 +287,7 @@ function CameraPanel({
   const expose = async () => {
     setError(null)
     try {
-      await api.imager.expose(deviceId, { duration, gain: 0, binning, frame_type: frameType, save: saveSubs })
+      await api.imager.expose(deviceId, { duration, gain: gainPropName ? gain : null, binning, frame_type: frameType, save: saveSubs })
     } catch (e) { setError((e as Error).message) }
   }
 
@@ -307,7 +307,7 @@ function CameraPanel({
         setLooping(false)
       } else {
         await api.imager.startLoop(deviceId, {
-          duration, gain: 0, binning, frame_type: frameType, save: saveSubs,
+          duration, gain: gainPropName ? gain : null, binning, frame_type: frameType, save: saveSubs,
           dither: buildDitherConfig() ?? null,
         })
         setLooping(true)

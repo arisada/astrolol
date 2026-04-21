@@ -27,7 +27,7 @@ class DitherConfig(BaseModel):
 
 class ExposureRequest(BaseModel):
     duration: float = Field(gt=0, description="Exposure duration in seconds")
-    gain: int = Field(default=0, ge=0)
+    gain: int | None = Field(default=None, ge=0, description="None = leave driver gain unchanged")
     binning: int = Field(default=1, ge=1, le=4)
     frame_type: str = Field(default="light", description="light | dark | flat | bias")
     count: int | None = Field(

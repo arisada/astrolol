@@ -77,7 +77,7 @@ export interface DitherConfig {
 
 export interface ExposureRequest {
   duration: number
-  gain?: number
+  gain?: number | null
   binning?: number
   frame_type?: FrameType
   count?: number | null

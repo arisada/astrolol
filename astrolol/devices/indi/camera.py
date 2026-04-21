@@ -115,7 +115,7 @@ class IndiCamera:
             )
 
         # Set gain if supported (best-effort)
-        if params.gain != 0:
+        if params.gain is not None:
             try:
                 await self._client.set_number(
                     self._device_name,
