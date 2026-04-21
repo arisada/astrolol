@@ -202,7 +202,11 @@ function CameraPanel({
 
   // Persisted settings
   const [duration, setDuration] = useLocalStorage('imaging.duration', 5)
-  const [gain, setGain] = useLocalStorage('imaging.gain', 0)
+  // Gain is NOT persisted in localStorage — it lives in the driver.
+  // On load we read the driver's current CCD_GAIN; on blur we write back.
+  const [gain, setGain] = useState(0)
+  const [gainPropName, setGainPropName] = useState<string | null>(null)
+  const [gainElemName, setGainElemName] = useState<string | null>(null)
   const [binning, setBinning] = useLocalStorage<number>('imaging.binning', 1)
   const [frameType, setFrameType] = useLocalStorage<FrameType>('imaging.frameType', 'light')
   const [saveSubs, setSaveSubs] = useLocalStorage('imaging.saveSubs', true)
@@ -238,10 +242,11 @@ function CameraPanel({
             if (w.min != null) setGainMin(w.min as number)
             if (w.max != null) setGainMax(w.max as number)
             if (w.step != null && (w.step as number) > 0) setGainStep(w.step as number)
-            // Do NOT sync the device's current gain into the UI — the user's
-            // persisted value (localStorage) is the source of truth for what
-            // they want to shoot with.  Overwriting it here caused the gain to
-            // reset to whatever the driver last had (e.g. 200) on every load.
+            // Initialise from the driver's current value — this is the
+            // single source of truth for gain, not localStorage.
+            if (typeof w.value === 'number') setGain(w.value)
+            setGainPropName(p.name)
+            setGainElemName(w.name ?? null)
             break
           }
         }
@@ -267,10 +272,22 @@ function CameraPanel({
     return undefined
   }
 
+  // Write the gain value to the driver when the user commits (blur / Enter).
+  // The exposure request always sends gain=0 ("don't change") so the driver
+  // keeps whatever was last set here.
+  const commitGain = async (value: number) => {
+    if (!gainPropName || !gainElemName) return
+    try {
+      await api.devices.setProperty(deviceId, gainPropName, { values: { [gainElemName]: value } })
+    } catch (e) {
+      setError(`Gain: ${(e as Error).message}`)
+    }
+  }
+
   const expose = async () => {
     setError(null)
     try {
-      await api.imager.expose(deviceId, { duration, gain, binning, frame_type: frameType, save: saveSubs })
+      await api.imager.expose(deviceId, { duration, gain: 0, binning, frame_type: frameType, save: saveSubs })
     } catch (e) { setError((e as Error).message) }
   }
 
@@ -290,7 +307,7 @@ function CameraPanel({
         setLooping(false)
       } else {
         await api.imager.startLoop(deviceId, {
-          duration, gain, binning, frame_type: frameType, save: saveSubs,
+          duration, gain: 0, binning, frame_type: frameType, save: saveSubs,
           dither: buildDitherConfig() ?? null,
         })
         setLooping(true)
@@ -371,6 +388,8 @@ function CameraPanel({
           <Input
             type="number" min={gainMin} max={gainMax} step={gainStep} value={gain}
             onChange={(e) => setGain(Math.max(gainMin, Math.min(gainMax, parseInt(e.target.value) || 0)))}
+            onBlur={(e) => commitGain(Math.max(gainMin, Math.min(gainMax, parseInt(e.target.value) || 0)))}
+            onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
           />
         </div>
 
