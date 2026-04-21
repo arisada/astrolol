@@ -45,6 +45,10 @@ MINIMAL_CSV = "\n".join([
     _row(Name="NGC9999", Type="NonEx", RA="00:00:00.00", Dec="+00:00:00.0"),
     # Duplicate entry — must be skipped
     _row(Name="IC0001", Type="Dup",  RA="00:08:27.60", Dec="+27:42:50.0"),
+    # NED-suffix row — must not crash (real OpenNGC rows like "IC 0080 NED01")
+    _row(Name="IC0080 NED01", Type="G", RA="00:32:00.00", Dec="+00:00:00.0"),
+    # Letter-suffix row — must not crash (real OpenNGC rows like "IC 0186A")
+    _row(Name="IC0186A", Type="G", RA="00:39:00.00", Dec="+00:00:00.0"),
 ])
 
 
@@ -82,7 +86,7 @@ def test_status_populated(client: TestClient) -> None:
     assert resp.status_code == 200
     data = resp.json()
     assert data["ready"] is True
-    assert data["object_count"] == 3   # NonEx + Dup are skipped
+    assert data["object_count"] == 5   # NonEx + Dup are skipped; NED/letter-suffix rows load fine
     assert data["last_updated"] is not None
     assert data["syncing"] is False
 

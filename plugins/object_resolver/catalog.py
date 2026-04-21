@@ -5,6 +5,7 @@ import asyncio
 import csv
 import io
 import math
+import re
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
@@ -60,16 +61,16 @@ def _parse_dec(s: str) -> float:
 def _normalize_name(raw: str) -> str:
     """NGC0224 → 'NGC 224', IC0001 → 'IC 1'.
 
-    Some OpenNGC rows have suffixes like 'IC 0080 NED01' (duplicate nuclei
-    or components of the same object).  We keep only the primary number and
-    discard the suffix so they still resolve to the canonical name.
+    Some OpenNGC rows have suffixes like 'IC 0080 NED01' (space-separated
+    component tag) or 'IC 0186A' (letter suffix).  We extract only the
+    leading digits so they resolve to the canonical name.
     """
     if raw.startswith("NGC"):
-        num_str = raw[3:].strip().split()[0]
-        return f"NGC {int(num_str)}"
+        m = re.match(r'(\d+)', raw[3:].strip())
+        return f"NGC {int(m.group(1))}" if m else raw
     if raw.startswith("IC"):
-        num_str = raw[2:].strip().split()[0]
-        return f"IC {int(num_str)}"
+        m = re.match(r'(\d+)', raw[2:].strip())
+        return f"IC {int(m.group(1))}" if m else raw
     return raw
 
 
@@ -215,11 +216,15 @@ class ObjectCatalog:
             aliases: set[str] = {primary_name, raw_name}
 
             if raw_name.startswith("NGC"):
-                n = int(raw_name[3:])
-                aliases.update({f"NGC {n}", f"NGC{n}"})
+                m = re.match(r'(\d+)', raw_name[3:].strip())
+                if m:
+                    n = int(m.group(1))
+                    aliases.update({f"NGC {n}", f"NGC{n}"})
             elif raw_name.startswith("IC"):
-                n = int(raw_name[2:])
-                aliases.update({f"IC {n}", f"IC{n}"})
+                m = re.match(r'(\d+)', raw_name[2:].strip())
+                if m:
+                    n = int(m.group(1))
+                    aliases.update({f"IC {n}", f"IC{n}"})
 
             messier = (row.get("M") or "").strip()
             if messier:
