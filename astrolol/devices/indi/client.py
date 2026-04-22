@@ -55,13 +55,19 @@ class IndiClient(IPyClient):
         super().__init__(indihost=host, indiport=port)
         self.host = host
         self.port = port
-        # Enable BLOBs by default.  indipyclient's default is "Never", which
-        # means defBLOBVector announcements (including cameras that came up
-        # before our client connected) auto-send enableBLOB("Never") and the
-        # server never forwards image data.  Setting "Also" here ensures every
-        # defBLOBVector announcement immediately enables BLOB reception — which
-        # must be set before asyncrun() is called per the indipyclient docs.
+        # Keep enableBLOBdefault = "Also" so that every defBLOBVector announcement
+        # gets an immediate enableBLOB reply.  This is required for cameras that are
+        # already loaded in indiserver before our client connects — without it,
+        # indipyclient's "Never" default means the server never sends image data.
+        # We then selectively suppress BLOBs for devices we don't manage (see rxevent).
         self.enableBLOBdefault = "Also"
+        # Set of INDI device names for which we explicitly want to receive BLOBs
+        # (populated by enable_blob()).  Any device NOT in this set has its BLOBs
+        # suppressed by rxevent() immediately after defBLOBVector is announced.
+        # This prevents unmanaged devices (e.g. a PHD2 guide camera sharing the same
+        # indiserver) from flooding our single TCP connection with guide frames and
+        # blocking delivery of our own camera images.
+        self._blob_enabled_devices: set[str] = set()
         # Asyncio primitives are created in connect() so they bind to the
         # event loop that is actually running at connection time.  Creating
         # them here would bind them to whatever loop happens to be current
@@ -128,6 +134,21 @@ class IndiClient(IPyClient):
         if isinstance(event, indi_events.setBLOBVector):
             key = (event.devicename, event.vectorname)
             self._blob_versions[key] = self._blob_versions.get(key, 0) + 1
+
+        if isinstance(event, indi_events.defBLOBVector):
+            # indipyclient already sent enableBLOB("Also") via resend_enableBLOB()
+            # because enableBLOBdefault = "Also".  If this device is NOT one of
+            # our managed imaging cameras, immediately override with "Never" so
+            # its BLOBs (e.g. PHD2 guide frames) don't flood our TCP connection
+            # and block delivery of images from our own cameras.
+            # enable_blob() adds a device to _blob_enabled_devices; it is called
+            # by IndiCamera.connect() for every camera we actually manage.
+            if event.devicename not in self._blob_enabled_devices:
+                await self.send_enableBLOB("Never", event.devicename)
+                logger.debug(
+                    "indi.blob_suppressed_unmanaged",
+                    device=event.devicename,
+                )
 
         if isinstance(event, indi_events.Message) and event.message:
             if event.devicename:
@@ -370,6 +391,12 @@ class IndiClient(IPyClient):
         await self.send_newVector(device_name, prop_name, members=values)
 
     async def enable_blob(self, device_name: str) -> None:
+        """Enable BLOB reception for a managed imaging camera.
+
+        Registers the device so that rxevent() does not suppress its BLOBs
+        when the next defBLOBVector arrives (e.g. after a driver restart).
+        """
+        self._blob_enabled_devices.add(device_name)
         await self.send_enableBLOB("Also", device_name)
 
     # ------------------------------------------------------------------
