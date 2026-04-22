@@ -128,7 +128,19 @@ async def activate_profile(profile_id: str, request: Request) -> ActivationResul
             connected.append(DeviceResult(device_id=device_id, role=pd.role))
             continue
         try:
-            await device_manager.connect(pd.config)
+            # Strip pre_connect_props when activating a saved profile so that stale
+            # or over-broad property overrides don't clobber driver-managed state
+            # (e.g. alignment data, calibration parameters).  INDI drivers restore
+            # their own configuration from ~/.indi/ at startup — let them do so.
+            #
+            # TODO: replace with a proper per-device allowlist of properties that are
+            # safe to push on each session (e.g. DEVICE_PORT).  Until then, any
+            # pre-connect overrides must be set manually through the INDI properties
+            # panel; INDI will then persist them in its own config.
+            config = pd.config.model_copy(
+                update={"params": {**pd.config.params, "pre_connect_props": None}}
+            )
+            await device_manager.connect(config)
             connected.append(DeviceResult(device_id=device_id, role=pd.role))
         except Exception as exc:
             failed.append(DeviceResult(device_id=device_id, role=pd.role, error=str(exc)))

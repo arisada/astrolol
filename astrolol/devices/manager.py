@@ -190,6 +190,18 @@ class DeviceManager:
         if entry.state == DeviceState.CONNECTED:
             raise DeviceAlreadyConnectedError(f"Device '{device_id}' is already connected.")
 
+        # Clear pre_connect_props before reconnecting so that stale or over-broad
+        # property overrides don't clobber driver-managed state (e.g. alignment data).
+        # INDI drivers keep their in-memory state while indiserver is running and
+        # restore from ~/.indi/ after a restart — let them manage their own config.
+        #
+        # TODO: replace with a proper per-device allowlist of properties that are
+        # safe to push on each session (e.g. DEVICE_PORT).  Until then, any
+        # pre-connect overrides must be set manually through the INDI properties
+        # panel; INDI will then persist them in its own config.
+        if hasattr(entry.instance, "_pre_connect_props"):
+            entry.instance._pre_connect_props = None
+
         log = logger.bind(device_id=device_id, kind=entry.config.kind)
         await self._publish_state_change(entry.config, DeviceState.DISCONNECTED, DeviceState.CONNECTING)
         log.info("device.connecting")
