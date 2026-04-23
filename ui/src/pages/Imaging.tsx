@@ -155,7 +155,8 @@ function DurationStepper({ value, onChange }: { value: number; onChange: (v: num
 
 // ── Image Viewer ──────────────────────────────────────────────────────────────
 
-function ImageViewer({ histoAuto }: { histoAuto: boolean }) {
+function ImageViewer() {
+  const [histoAuto, setHistoAuto] = useLocalStorage('imaging.histoAuto', true)
   const image = useStore((s) => s.latestImage)
   const previewUrl = image
     ? (histoAuto || !image.previewUrlLinear ? image.previewUrl : image.previewUrlLinear)
@@ -173,6 +174,17 @@ function ImageViewer({ histoAuto }: { histoAuto: boolean }) {
           <div className="absolute bottom-2 left-2 text-xs text-slate-400 bg-black/60 px-2 py-1 rounded">
             {image!.deviceId} · {image!.width}×{image!.height} · {image!.duration}s
           </div>
+          <button
+            onClick={() => setHistoAuto(!histoAuto)}
+            title="Toggle histogram stretch"
+            className={`absolute top-2 right-2 text-xs px-2 py-0.5 rounded border transition-colors bg-black/60 ${
+              histoAuto
+                ? 'border-accent text-accent'
+                : 'border-surface-border text-slate-500'
+            }`}
+          >
+            {histoAuto ? 'Auto' : 'Linear'}
+          </button>
         </>
       ) : (
         <div className="text-slate-600 text-sm flex flex-col items-center gap-2">
@@ -190,26 +202,26 @@ const FRAME_TYPES: FrameType[] = ['light', 'dark', 'flat', 'bias']
 const BINNINGS = [1, 2, 3, 4]
 
 function CameraPanel({
-  deviceId, onSettings, histoAuto, onHistoAuto,
+  deviceId, name, onSettings,
 }: {
   deviceId: string
+  name: string
   onSettings: (id: string) => void
-  histoAuto: boolean
-  onHistoAuto: (v: boolean) => void
 }) {
+  const p = `imaging.${deviceId}` // per-camera localStorage prefix
   const imagerBusy = useStore((s) => s.imagerBusy)
   const busy = imagerBusy[deviceId] ?? false
 
-  // Persisted settings
-  const [duration, setDuration] = useLocalStorage('imaging.duration', 5)
+  // Persisted settings (keyed per camera so two cameras don't clobber each other)
+  const [duration, setDuration] = useLocalStorage(`${p}.duration`, 5)
   // Gain is NOT persisted in localStorage — it lives in the driver.
   // On load we read the driver's current CCD_GAIN; on blur we write back.
   const [gain, setGain] = useState(0)
   const [gainPropName, setGainPropName] = useState<string | null>(null)
   const [gainElemName, setGainElemName] = useState<string | null>(null)
-  const [binning, setBinning] = useLocalStorage<number>('imaging.binning', 1)
-  const [frameType, setFrameType] = useLocalStorage<FrameType>('imaging.frameType', 'light')
-  const [saveSubs, setSaveSubs] = useLocalStorage('imaging.saveSubs', true)
+  const [binning, setBinning] = useLocalStorage<number>(`${p}.binning`, 1)
+  const [frameType, setFrameType] = useLocalStorage<FrameType>(`${p}.frameType`, 'light')
+  const [saveSubs, setSaveSubs] = useLocalStorage(`${p}.saveSubs`, true)
 
   const [gainMin, setGainMin] = useState(0)
   const [gainMax, setGainMax] = useState(65535)
@@ -218,12 +230,12 @@ function CameraPanel({
   const [error, setError] = useState<string | null>(null)
 
   // Dither settings (persisted)
-  const [ditherFrames, setDitherFrames] = useLocalStorage<string>('imaging.ditherFrames', '')
-  const [ditherMinutes, setDitherMinutes] = useLocalStorage<string>('imaging.ditherMinutes', '')
+  const [ditherFrames, setDitherFrames] = useLocalStorage<string>(`${p}.ditherFrames`, '')
+  const [ditherMinutes, setDitherMinutes] = useLocalStorage<string>(`${p}.ditherMinutes`, '')
 
   // Camera hardware status (temperature, cooler)
   const [cameraStatus, setCameraStatus] = useState<CameraStatus | null>(null)
-  const [targetTemp, setTargetTemp] = useLocalStorage<string>('imaging.targetTemp', '')
+  const [targetTemp, setTargetTemp] = useLocalStorage<string>(`${p}.targetTemp`, '')
 
   useEffect(() => {
     if (!deviceId) return
@@ -334,7 +346,7 @@ function CameraPanel({
   const hasCooler = cameraStatus?.temperature != null
 
   return (
-    <Panel title="Camera" deviceId={deviceId} onSettings={onSettings}>
+    <Panel title={name} deviceId={deviceId} onSettings={onSettings}>
       <div className="flex flex-col gap-3">
 
         {/* Temperature */}
@@ -407,24 +419,11 @@ function CameraPanel({
           </div>
         </div>
 
-        {/* Save subs + histogram toggle */}
-        <div className="flex items-center justify-between">
-          <label className="flex items-center gap-2 cursor-pointer select-none">
-            <input type="checkbox" checked={saveSubs} onChange={(e) => setSaveSubs(e.target.checked)} className="accent-accent" />
-            <span className="text-xs text-slate-300">Save subs</span>
-          </label>
-          <button
-            onClick={() => onHistoAuto(!histoAuto)}
-            title="Toggle histogram stretch"
-            className={`text-xs px-2 py-0.5 rounded border transition-colors ${
-              histoAuto
-                ? 'border-accent text-accent bg-accent/10'
-                : 'border-surface-border text-slate-500'
-            }`}
-          >
-            {histoAuto ? 'Auto' : 'Linear'}
-          </button>
-        </div>
+        {/* Save subs */}
+        <label className="flex items-center gap-2 cursor-pointer select-none">
+          <input type="checkbox" checked={saveSubs} onChange={(e) => setSaveSubs(e.target.checked)} className="accent-accent" />
+          <span className="text-xs text-slate-300">Save subs</span>
+        </label>
 
         {/* Guiding / dither */}
         <div className="border-t border-surface-border pt-2 flex flex-col gap-2">
@@ -613,62 +612,78 @@ function EventLog() {
 export function Imaging() {
   const connectedDevices = useStore((s) => s.connectedDevices)
 
-  // Persisted histogram mode
-  const [histoAuto, setHistoAuto] = useLocalStorage('imaging.histoAuto', true)
-
   // INDI properties panel state
   const [propertiesDeviceId, setPropertiesDeviceId] = useState<string | null>(null)
   const openProperties = useCallback((id: string) => {
     setPropertiesDeviceId((prev) => (prev === id ? null : id))
   }, [])
 
-  // Resolve devices — camera is the anchor
-  const camera = connectedDevices.find((d) => d.kind === 'camera') ?? null
+  const cameras = connectedDevices.filter((d) => d.kind === 'camera')
 
-  // Find focuser: prefer companion of camera, else first connected
-  const focuser = camera
-    ? (connectedDevices.find((d) => d.kind === 'focuser' && camera.companions.includes(d.device_id))
-      ?? connectedDevices.find((d) => d.kind === 'focuser') ?? null)
-    : null
-
-  // Find filter wheel: prefer companion of camera, else first connected
-  const filterWheel = camera
-    ? (connectedDevices.find((d) => d.kind === 'filter_wheel' && camera.companions.includes(d.device_id))
-      ?? connectedDevices.find((d) => d.kind === 'filter_wheel') ?? null)
-    : null
+  // Track which focusers/filter wheels are claimed as companions so we can
+  // show unclaimed ones once at the bottom rather than repeating or hiding them.
+  const claimedFocuserIds = new Set(
+    cameras.flatMap((cam) =>
+      connectedDevices
+        .filter((d) => d.kind === 'focuser' && cam.companions.includes(d.device_id))
+        .map((d) => d.device_id),
+    ),
+  )
+  const claimedFilterWheelIds = new Set(
+    cameras.flatMap((cam) =>
+      connectedDevices
+        .filter((d) => d.kind === 'filter_wheel' && cam.companions.includes(d.device_id))
+        .map((d) => d.device_id),
+    ),
+  )
+  const unclaimedFocuser =
+    connectedDevices.find((d) => d.kind === 'focuser' && !claimedFocuserIds.has(d.device_id)) ?? null
+  const unclaimedFilterWheel =
+    connectedDevices.find((d) => d.kind === 'filter_wheel' && !claimedFilterWheelIds.has(d.device_id)) ?? null
 
   return (
     <>
     <div className="flex h-full">
       {/* Image viewer */}
       <div className="flex-1 flex flex-col min-w-0">
-        <ImageViewer histoAuto={histoAuto} />
+        <ImageViewer />
         <EventLog />
       </div>
 
-      {/* Right sidebar */}
+      {/* Right sidebar — one panel group per camera */}
       <aside className="w-64 shrink-0 border-l border-surface-border overflow-y-auto bg-surface-raised">
-        {camera === null ? (
+        {cameras.length === 0 ? (
           <div className="p-4 text-xs text-slate-500">No camera connected.</div>
         ) : (
           <>
-            <CameraPanel
-              deviceId={camera.device_id}
-              onSettings={openProperties}
-              histoAuto={histoAuto}
-              onHistoAuto={setHistoAuto}
-            />
-            {focuser && (
-              <FocuserPanel
-                deviceId={focuser.device_id}
-                onSettings={openProperties}
-              />
+            {cameras.map((cam) => {
+              const focuser = connectedDevices.find(
+                (d) => d.kind === 'focuser' && cam.companions.includes(d.device_id),
+              ) ?? null
+              const filterWheel = connectedDevices.find(
+                (d) => d.kind === 'filter_wheel' && cam.companions.includes(d.device_id),
+              ) ?? null
+              return (
+                <div key={cam.device_id}>
+                  <CameraPanel
+                    deviceId={cam.device_id}
+                    name={cam.driver_name ?? cam.device_id}
+                    onSettings={openProperties}
+                  />
+                  {focuser && (
+                    <FocuserPanel deviceId={focuser.device_id} onSettings={openProperties} />
+                  )}
+                  {filterWheel && (
+                    <FilterWheelPanel deviceId={filterWheel.device_id} onSettings={openProperties} />
+                  )}
+                </div>
+              )
+            })}
+            {unclaimedFocuser && (
+              <FocuserPanel deviceId={unclaimedFocuser.device_id} onSettings={openProperties} />
             )}
-            {filterWheel && (
-              <FilterWheelPanel
-                deviceId={filterWheel.device_id}
-                onSettings={openProperties}
-              />
+            {unclaimedFilterWheel && (
+              <FilterWheelPanel deviceId={unclaimedFilterWheel.device_id} onSettings={openProperties} />
             )}
           </>
         )}
