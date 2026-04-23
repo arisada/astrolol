@@ -31,6 +31,7 @@ export function App() {
           <Route path="/equipment" element={<Equipment />} />
           <Route path="/profiles" element={<Profiles />} />
           <Route path="/imaging" element={<Imaging />} />
+          <Route path="/imaging/:deviceId" element={<Imaging />} />
           <Route path="/mount" element={<Mount />} />
           <Route path="/logs" element={<Logs />} />
           <Route path="/options" element={<Options />} />

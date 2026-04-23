@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useParams } from 'react-router-dom'
 import {
   Camera, ChevronDown, ChevronUp, Crosshair, Play, Settings, Square, StopCircle, Thermometer,
 } from 'lucide-react'
@@ -610,6 +611,7 @@ function EventLog() {
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export function Imaging() {
+  const { deviceId } = useParams<{ deviceId?: string }>()
   const connectedDevices = useStore((s) => s.connectedDevices)
 
   // INDI properties panel state
@@ -618,28 +620,21 @@ export function Imaging() {
     setPropertiesDeviceId((prev) => (prev === id ? null : id))
   }, [])
 
-  const cameras = connectedDevices.filter((d) => d.kind === 'camera')
+  const camera = deviceId
+    ? (connectedDevices.find((d) => d.device_id === deviceId && d.kind === 'camera') ?? null)
+    : null
 
-  // Track which focusers/filter wheels are claimed as companions so we can
-  // show unclaimed ones once at the bottom rather than repeating or hiding them.
-  const claimedFocuserIds = new Set(
-    cameras.flatMap((cam) =>
-      connectedDevices
-        .filter((d) => d.kind === 'focuser' && cam.companions.includes(d.device_id))
-        .map((d) => d.device_id),
-    ),
-  )
-  const claimedFilterWheelIds = new Set(
-    cameras.flatMap((cam) =>
-      connectedDevices
-        .filter((d) => d.kind === 'filter_wheel' && cam.companions.includes(d.device_id))
-        .map((d) => d.device_id),
-    ),
-  )
-  const unclaimedFocuser =
-    connectedDevices.find((d) => d.kind === 'focuser' && !claimedFocuserIds.has(d.device_id)) ?? null
-  const unclaimedFilterWheel =
-    connectedDevices.find((d) => d.kind === 'filter_wheel' && !claimedFilterWheelIds.has(d.device_id)) ?? null
+  // Find focuser: prefer companion of camera, else first connected
+  const focuser = camera
+    ? (connectedDevices.find((d) => d.kind === 'focuser' && camera.companions.includes(d.device_id))
+      ?? connectedDevices.find((d) => d.kind === 'focuser') ?? null)
+    : null
+
+  // Find filter wheel: prefer companion of camera, else first connected
+  const filterWheel = camera
+    ? (connectedDevices.find((d) => d.kind === 'filter_wheel' && camera.companions.includes(d.device_id))
+      ?? connectedDevices.find((d) => d.kind === 'filter_wheel') ?? null)
+    : null
 
   return (
     <>
@@ -650,40 +645,22 @@ export function Imaging() {
         <EventLog />
       </div>
 
-      {/* Right sidebar — one panel group per camera */}
+      {/* Right sidebar */}
       <aside className="w-64 shrink-0 border-l border-surface-border overflow-y-auto bg-surface-raised">
-        {cameras.length === 0 ? (
+        {camera === null ? (
           <div className="p-4 text-xs text-slate-500">No camera connected.</div>
         ) : (
           <>
-            {cameras.map((cam) => {
-              const focuser = connectedDevices.find(
-                (d) => d.kind === 'focuser' && cam.companions.includes(d.device_id),
-              ) ?? null
-              const filterWheel = connectedDevices.find(
-                (d) => d.kind === 'filter_wheel' && cam.companions.includes(d.device_id),
-              ) ?? null
-              return (
-                <div key={cam.device_id}>
-                  <CameraPanel
-                    deviceId={cam.device_id}
-                    name={cam.driver_name ?? cam.device_id}
-                    onSettings={openProperties}
-                  />
-                  {focuser && (
-                    <FocuserPanel deviceId={focuser.device_id} onSettings={openProperties} />
-                  )}
-                  {filterWheel && (
-                    <FilterWheelPanel deviceId={filterWheel.device_id} onSettings={openProperties} />
-                  )}
-                </div>
-              )
-            })}
-            {unclaimedFocuser && (
-              <FocuserPanel deviceId={unclaimedFocuser.device_id} onSettings={openProperties} />
+            <CameraPanel
+              deviceId={camera.device_id}
+              name={camera.driver_name ?? camera.device_id}
+              onSettings={openProperties}
+            />
+            {focuser && (
+              <FocuserPanel deviceId={focuser.device_id} onSettings={openProperties} />
             )}
-            {unclaimedFilterWheel && (
-              <FilterWheelPanel deviceId={unclaimedFilterWheel.device_id} onSettings={openProperties} />
+            {filterWheel && (
+              <FilterWheelPanel deviceId={filterWheel.device_id} onSettings={openProperties} />
             )}
           </>
         )}

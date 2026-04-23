@@ -8,6 +8,7 @@ export function Sidebar() {
   const hasMounts   = useStore((s) => s.connectedDevices.some((d) => d.kind === 'mount' && d.state === 'connected'))
   const hasError    = useStore((s) => s.lastError !== null)
   const enabledPlugins = useStore((s) => s.pluginInfos.filter((p) => p.enabled))
+  const cameras     = useStore((s) => s.connectedDevices.filter((d) => d.kind === 'camera' && d.state === 'connected'))
 
   const pluginNavItems = enabledPlugins
     .map((p) => {
@@ -17,11 +18,21 @@ export function Sidebar() {
     })
     .filter(Boolean) as { to: string; icon: typeof Cpu; label: string; badge?: boolean }[]
 
+  // One sidebar entry per connected camera; fall back to a static entry when none
+  const cameraNavItems: { to: string; icon: typeof Camera; label: string; badge?: boolean }[] =
+    cameras.length > 0
+      ? cameras.map((cam) => ({
+          to: `/imaging/${cam.device_id}`,
+          icon: Camera,
+          label: cam.driver_name ?? cam.device_id,
+        }))
+      : [{ to: '/imaging', icon: Camera, label: 'Imaging' }]
+
   const navItems = [
     { to: '/equipment', icon: Cpu,        label: 'Equipment' },
     { to: '/profiles',  icon: BookOpen,   label: 'Profiles'  },
     ...(hasMounts ? [{ to: '/mount', icon: Telescope, label: 'Mount' }] : []),
-    { to: '/imaging',   icon: Camera,     label: 'Imaging'   },
+    ...cameraNavItems,
     ...pluginNavItems,
     { to: '/logs',      icon: ScrollText, label: 'Logs', badge: hasError },
     { to: '/options',   icon: Settings,   label: 'Options'   },
@@ -54,7 +65,7 @@ export function Sidebar() {
                 <span className="absolute -top-1 -right-1 w-2 h-2 rounded-full bg-status-error" />
               )}
             </div>
-            <span className="hidden lg:block">{label}</span>
+            <span className="hidden lg:block truncate">{label}</span>
           </NavLink>
         ))}
       </nav>
