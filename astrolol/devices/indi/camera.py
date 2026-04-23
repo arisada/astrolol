@@ -42,7 +42,7 @@ class IndiCamera:
         images_dir: Path | None = None,
         *,
         pre_connect_props: dict | None = None,
-        exposure_timeout_extra: float = 30.0,
+        exposure_timeout_extra: float = 60.0,
     ) -> None:
         self._device_name = device_name
         self._client = client
