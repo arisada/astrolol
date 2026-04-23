@@ -652,15 +652,16 @@ export function Imaging() {
         ) : (
           <>
             <CameraPanel
+              key={camera.device_id}
               deviceId={camera.device_id}
               name={camera.driver_name ?? camera.device_id}
               onSettings={openProperties}
             />
             {focuser && (
-              <FocuserPanel deviceId={focuser.device_id} onSettings={openProperties} />
+              <FocuserPanel key={focuser.device_id} deviceId={focuser.device_id} onSettings={openProperties} />
             )}
             {filterWheel && (
-              <FilterWheelPanel deviceId={filterWheel.device_id} onSettings={openProperties} />
+              <FilterWheelPanel key={filterWheel.device_id} deviceId={filterWheel.device_id} onSettings={openProperties} />
             )}
           </>
         )}
