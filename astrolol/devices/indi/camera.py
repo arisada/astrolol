@@ -63,7 +63,6 @@ class IndiCamera:
                 self._device_name,
                 pre_connect_props=self._pre_connect_props,
             )
-            await self._client.enable_blob(self._device_name)
             self._state = DeviceState.CONNECTED
         except Exception:
             self._state = DeviceState.ERROR
@@ -129,16 +128,24 @@ class IndiCamera:
                     error=str(exc),
                 )
 
-        # Trigger exposure
-        await self._client.set_number(
-            self._device_name,
-            "CCD_EXPOSURE",
-            {"CCD_EXPOSURE_VALUE": params.duration},
-        )
+        # Enable BLOBs for this camera only for the duration of this exposure.
+        # "Never" is the default; keeping BLOBs off between exposures prevents
+        # unmanaged devices (e.g. a PHD2 guide camera) from ever sending frames
+        # to us and blocking delivery of our own images.
+        await self._client.enable_blob(self._device_name)
+        try:
+            # Trigger exposure
+            await self._client.set_number(
+                self._device_name,
+                "CCD_EXPOSURE",
+                {"CCD_EXPOSURE_VALUE": params.duration},
+            )
 
-        # Wait for BLOB (image data) — arrives on the CCD1 property
-        timeout = params.duration + self._exposure_timeout_extra
-        blob = await self._client.wait_for_blob(self._device_name, "CCD1", timeout=timeout)
+            # Wait for BLOB (image data) — arrives on the CCD1 property
+            timeout = params.duration + self._exposure_timeout_extra
+            blob = await self._client.wait_for_blob(self._device_name, "CCD1", timeout=timeout)
+        finally:
+            await self._client.disable_blob(self._device_name)
 
         # Save to FITS
         self._images_dir.mkdir(parents=True, exist_ok=True)
