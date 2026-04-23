@@ -156,9 +156,9 @@ function DurationStepper({ value, onChange }: { value: number; onChange: (v: num
 
 // ── Image Viewer ──────────────────────────────────────────────────────────────
 
-function ImageViewer() {
+function ImageViewer({ deviceId }: { deviceId: string | undefined }) {
   const [histoAuto, setHistoAuto] = useLocalStorage('imaging.histoAuto', true)
-  const image = useStore((s) => s.latestImage)
+  const image = useStore((s) => deviceId ? (s.latestImages[deviceId] ?? null) : null)
   const previewUrl = image
     ? (histoAuto || !image.previewUrlLinear ? image.previewUrl : image.previewUrlLinear)
     : null
@@ -173,7 +173,7 @@ function ImageViewer() {
             className="max-w-full max-h-full object-contain"
           />
           <div className="absolute bottom-2 left-2 text-xs text-slate-400 bg-black/60 px-2 py-1 rounded">
-            {image!.deviceId} · {image!.width}×{image!.height} · {image!.duration}s
+            {image!.width}×{image!.height} · {image!.duration}s
           </div>
           <button
             onClick={() => setHistoAuto(!histoAuto)}
@@ -641,7 +641,7 @@ export function Imaging() {
     <div className="flex h-full">
       {/* Image viewer */}
       <div className="flex-1 flex flex-col min-w-0">
-        <ImageViewer />
+        <ImageViewer deviceId={deviceId} />
         <EventLog />
       </div>
 

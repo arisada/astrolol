@@ -50,8 +50,8 @@ interface AppState {
   filterWheelStatuses: Record<string, FilterWheelStatus>
 
   // Imager
-  latestImage: LatestImage | null
-  imagerBusy: Record<string, boolean>  // device_id -> is busy
+  latestImages: Record<string, LatestImage>  // device_id -> latest image for that camera
+  imagerBusy: Record<string, boolean>        // device_id -> is busy
 
   // Event log
   log: LogEntry[]
@@ -95,7 +95,7 @@ export const useStore = create<AppState>((set, get) => ({
   focuserStatuses: {},
   cameraStatuses: {},
   filterWheelStatuses: {},
-  latestImage: null,
+  latestImages: {},
   imagerBusy: {},
   log: [],
   lastError: null,
@@ -171,19 +171,22 @@ export const useStore = create<AppState>((set, get) => ({
       case 'imager.exposure_completed': {
         const filename = event.preview_path.split('/').pop()!
         const filenameLinear = event.preview_path_linear?.split('/').pop() ?? null
-        set({
+        set((s) => ({
           imagerBusy: { ...state.imagerBusy, [event.device_id]: false },
-          latestImage: {
-            previewUrl: `/imager/images/${filename}`,
-            previewUrlLinear: filenameLinear ? `/imager/images/${filenameLinear}` : null,
-            fitsPath: event.fits_path,
-            deviceId: event.device_id,
-            width: event.width,
-            height: event.height,
-            duration: event.duration,
+          latestImages: {
+            ...s.latestImages,
+            [event.device_id]: {
+              previewUrl: `/imager/images/${filename}`,
+              previewUrlLinear: filenameLinear ? `/imager/images/${filenameLinear}` : null,
+              fitsPath: event.fits_path,
+              deviceId: event.device_id,
+              width: event.width,
+              height: event.height,
+              duration: event.duration,
+            },
           },
           log, lastError,
-        })
+        }))
         break
       }
       case 'imager.loop_stopped':
