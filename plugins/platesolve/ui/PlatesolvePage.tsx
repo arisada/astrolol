@@ -457,7 +457,7 @@ function Section({ title, children, action }: {
 
 export function PlatesolvePage() {
   const connectedDevices = useStore((s) => s.connectedDevices)
-  const latestImage      = useStore((s) => s.latestImage)
+  const latestImages     = useStore((s) => s.latestImages)
   const solveJobsMap     = useStore((s) => s.solveJobs)
   const mergeSolveJobs   = useStore((s) => s.mergeSolveJobs)
 
@@ -466,6 +466,7 @@ export function PlatesolvePage() {
     'platesolve.cameraId', cameras[0]?.device_id ?? ''
   )
   const camera = cameras.find((d) => d.device_id === selectedCameraId) ?? cameras[0] ?? null
+  const latestImage = camera ? (latestImages[camera.device_id] ?? null) : null
 
   const mount = connectedDevices.find((d) => d.kind === 'mount') ?? null
 
