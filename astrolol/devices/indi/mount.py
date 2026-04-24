@@ -167,18 +167,12 @@ class IndiMount:
         self._is_tracking = enabled
 
     async def get_status(self) -> MountStatus:
-        # Required properties — wait briefly for them to arrive after connect.
-        ra_jnow: float | None = None
-        dec_jnow: float | None = None
-        try:
-            ra_jnow = await self._client.get_number(
-                self._device_name, "EQUATORIAL_EOD_COORD", "RA"
-            )
-            dec_jnow = await self._client.get_number(
-                self._device_name, "EQUATORIAL_EOD_COORD", "DEC"
-            )
-        except Exception:
-            pass
+        ra_jnow: float | None = self._client.get_number_nowait(
+            self._device_name, "EQUATORIAL_EOD_COORD", "RA"
+        )
+        dec_jnow: float | None = self._client.get_number_nowait(
+            self._device_name, "EQUATORIAL_EOD_COORD", "DEC"
+        )
 
         tracking = self._client.get_switch_state_nowait(
             self._device_name, "TELESCOPE_TRACK_STATE", "TRACK_ON"
