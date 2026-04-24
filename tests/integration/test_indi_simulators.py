@@ -286,18 +286,16 @@ async def test_camera_ping(camera):
 
 @pytest.fixture(scope="module")
 async def camera_local(_shared_server, tmp_path_factory):
-    """IndiCamera configured with UPLOAD_LOCAL mode."""
+    """IndiCamera used for local-upload tests (upload mode set per-exposure)."""
     from astrolol.devices.indi.client import IndiClient
     from astrolol.devices.indi.camera import IndiCamera
     images_dir = tmp_path_factory.mktemp("local_cam_images")
-    upload_dir = tmp_path_factory.mktemp("local_cam_upload")
     client = IndiClient(host="localhost", port=_SHARED_PORT)
     await client.connect()
     cam = IndiCamera(
         device_name="CCD Simulator",
         client=client,
         images_dir=images_dir,
-        local_upload_dir=upload_dir,
     )
     await cam.connect()
     yield cam
@@ -305,19 +303,29 @@ async def camera_local(_shared_server, tmp_path_factory):
     await client.disconnect()
 
 
-async def test_camera_local_upload_expose(camera_local):
+async def test_camera_local_upload_expose(camera_local, tmp_path_factory):
     """Local upload mode: driver writes file directly; blob data is empty."""
     from astrolol.devices.base.models import ExposureParams
-    image = await camera_local.expose(ExposureParams(duration=0.1))
+    upload_dir = tmp_path_factory.mktemp("lu_expose")
+    await camera_local.set_upload_local(upload_dir)
+    try:
+        image = await camera_local.expose(ExposureParams(duration=0.1))
+    finally:
+        await camera_local.restore_upload_client()
     assert image.fits_path.endswith(".fits")
     assert Path(image.fits_path).exists()
     assert Path(image.fits_path).stat().st_size > 0
 
 
-async def test_camera_local_upload_fits_valid(camera_local):
+async def test_camera_local_upload_fits_valid(camera_local, tmp_path_factory):
     from astrolol.devices.base.models import ExposureParams
     from astropy.io import fits
-    image = await camera_local.expose(ExposureParams(duration=0.1))
+    upload_dir = tmp_path_factory.mktemp("lu_valid")
+    await camera_local.set_upload_local(upload_dir)
+    try:
+        image = await camera_local.expose(ExposureParams(duration=0.1))
+    finally:
+        await camera_local.restore_upload_client()
     with fits.open(image.fits_path) as hdul:
         assert len(hdul) > 0
 
@@ -325,6 +333,11 @@ async def test_camera_local_upload_fits_valid(camera_local):
 async def test_camera_local_upload_filename_contains_device(camera_local, tmp_path_factory):
     """The file written by the driver includes the device name in its path/name."""
     from astrolol.devices.base.models import ExposureParams
-    image = await camera_local.expose(ExposureParams(duration=0.1))
+    upload_dir = tmp_path_factory.mktemp("lu_name")
+    await camera_local.set_upload_local(upload_dir)
+    try:
+        image = await camera_local.expose(ExposureParams(duration=0.1))
+    finally:
+        await camera_local.restore_upload_client()
     # UPLOAD_PREFIX is set to the sanitised device name; verify it appears in the path
     assert "CCD_Simulator" in image.fits_path

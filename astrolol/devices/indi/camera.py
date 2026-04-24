@@ -44,7 +44,6 @@ class IndiCamera:
         *,
         pre_connect_props: dict | None = None,
         exposure_timeout_extra: float = 60.0,
-        local_upload_dir: Path | None = None,
     ) -> None:
         self._device_name = device_name
         self._client = client
@@ -53,7 +52,6 @@ class IndiCamera:
         self._exposure_timeout_extra = exposure_timeout_extra
         self._state = DeviceState.DISCONNECTED
         self._image_counter = 0
-        self._local_upload_dir = local_upload_dir
 
     # ------------------------------------------------------------------
     # ICamera protocol
@@ -66,8 +64,6 @@ class IndiCamera:
                 self._device_name,
                 pre_connect_props=self._pre_connect_props,
             )
-            if self._local_upload_dir is not None:
-                await self._configure_local_upload()
             self._state = DeviceState.CONNECTED
         except Exception:
             self._state = DeviceState.ERROR
@@ -299,12 +295,15 @@ class IndiCamera:
         except Exception:
             return None
 
-    async def _configure_local_upload(self) -> None:
-        """Configure the INDI driver to write images to local filesystem (UPLOAD_LOCAL mode)."""
-        upload_dir = self._local_upload_dir
-        assert upload_dir is not None
+    async def set_upload_local(self, upload_dir: Path) -> None:
+        """Switch the INDI driver to UPLOAD_LOCAL mode for the next exposure.
+
+        The driver will write the FITS file directly to *upload_dir* instead of
+        sending it as a base64 BLOB over TCP.  Call restore_upload_client() after
+        the exposure so other INDI clients (e.g. PHD2 guide camera) continue to
+        receive BLOBs normally.
+        """
         upload_dir.mkdir(parents=True, exist_ok=True)
-        # Use device name in prefix so files from different cameras are unambiguous
         safe_name = re.sub(r"[^\w.-]", "_", self._device_name)
         prefix = f"{safe_name}_"
         try:
@@ -325,6 +324,19 @@ class IndiCamera:
         except Exception as exc:
             logger.warning(
                 "indi.camera_local_upload_failed",
+                device=self._device_name,
+                error=str(exc),
+            )
+
+    async def restore_upload_client(self) -> None:
+        """Restore UPLOAD_MODE to CLIENT after a local-mode exposure."""
+        try:
+            await self._client.set_switch(
+                self._device_name, "UPLOAD_MODE", ["UPLOAD_CLIENT"]
+            )
+        except Exception as exc:
+            logger.warning(
+                "indi.camera_upload_restore_failed",
                 device=self._device_name,
                 error=str(exc),
             )

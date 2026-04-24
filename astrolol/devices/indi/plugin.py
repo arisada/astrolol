@@ -151,7 +151,7 @@ class IndiConnectionManager:
             self._ref_count = 0
 
 
-def _make_camera_class(manager: IndiConnectionManager, local_upload_dir: Path | None = None):
+def _make_camera_class(manager: IndiConnectionManager):
     """Return an IndiCamera subclass that uses the shared manager."""
     from astrolol.devices.indi.camera import IndiCamera
 
@@ -167,8 +167,7 @@ def _make_camera_class(manager: IndiConnectionManager, local_upload_dir: Path | 
             if device_baud_rate and "DEVICE_BAUD_RATE" not in props:
                 props["DEVICE_BAUD_RATE"] = {"on_elements": [device_baud_rate]}
             super().__init__(device_name=device_name, client=manager.client,
-                             pre_connect_props=props or None,
-                             local_upload_dir=local_upload_dir)
+                             pre_connect_props=props or None)
             self._executable = executable
 
         async def connect(self) -> None:
@@ -380,13 +379,12 @@ class IndiPlugin:
     def register_devices(self, registry: DeviceRegistry) -> None:
         try:
             run_dir = getattr(registry, "indi_run_dir", Path("/tmp/astrolol"))
-            local_upload_dir = getattr(registry, "indi_local_upload_dir", None)
             manager = IndiConnectionManager(run_dir=run_dir)
         except RuntimeError as exc:
             logger.warning("indi.plugin_skipped", reason=str(exc))
             return
 
-        registry.register_camera("indi_camera", _make_camera_class(manager, local_upload_dir))
+        registry.register_camera("indi_camera", _make_camera_class(manager))
         registry.register_mount("indi_mount", _make_mount_class(manager))
         registry.register_focuser("indi_focuser", _make_focuser_class(manager))
         registry.register_filter_wheel("indi_filter_wheel", _make_filter_wheel_class(manager))

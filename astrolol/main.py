@@ -102,8 +102,7 @@ def create_app() -> FastAPI:
     user_settings = profile_store.get_user_settings()
 
     pm = build_plugin_manager()
-    local_upload_dir = Path(user_settings.indi_local_upload_dir) if user_settings.indi_local_upload else None
-    registry = build_registry(pm, indi_run_dir=Path(user_settings.indi_run_dir), indi_local_upload_dir=local_upload_dir)
+    registry = build_registry(pm, indi_run_dir=Path(user_settings.indi_run_dir))
     event_bus = EventBus()
     event_bus_forwarder.set_bus(event_bus)  # bridge structlog → EventBus
     device_manager = DeviceManager(registry=registry, event_bus=event_bus)

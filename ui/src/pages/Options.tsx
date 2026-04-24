@@ -296,7 +296,7 @@ export function Options() {
         </Row>
         <Row
           label="Local image transfer"
-          hint="Driver writes FITS directly to disk — eliminates base64 encoding over TCP. Requires restart."
+          hint="Driver writes FITS directly to disk — eliminates base64 encoding over TCP."
         >
           <Toggle value={indiLocalUpload} onChange={persistIndiLocalUpload} />
         </Row>

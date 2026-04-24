@@ -265,6 +265,19 @@ class ImagerManager:
         )
         log.info("imager.exposing")
 
+        # Switch to UPLOAD_LOCAL mode if configured — read live so no restart needed.
+        # The mode is restored to CLIENT immediately after the exposure so other
+        # INDI clients (e.g. PHD2 guide camera) keep receiving BLOBs normally.
+        _local_upload_dir: Path | None = None
+        if self._profile_store is not None:
+            _ucfg = self._profile_store.get_user_settings()
+            if _ucfg.indi_local_upload:
+                _local_upload_dir = Path(_ucfg.indi_local_upload_dir)
+        _set_upload_local = getattr(camera, "set_upload_local", None)
+        _restore_upload_client = getattr(camera, "restore_upload_client", None)
+        if _local_upload_dir is not None and _set_upload_local is not None:
+            await _set_upload_local(_local_upload_dir)
+
         try:
             image = await camera.expose(params)
         except Exception as exc:
@@ -273,6 +286,9 @@ class ImagerManager:
             await self._event_bus.publish(ExposureFailed(device_id=device_id, reason=reason))
             log.error("imager.exposure_failed", error=reason)
             raise
+        finally:
+            if _local_upload_dir is not None and _restore_upload_client is not None:
+                await _restore_upload_client()
 
         fits_path = Path(image.fits_path)
         self._images_dir.mkdir(parents=True, exist_ok=True)
