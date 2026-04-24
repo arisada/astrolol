@@ -1159,7 +1159,7 @@ class Device(_ParentDevice):
             elif root.tag == "getProperties":
                 return events.getProperties(root, self, self._client)
             else:
-                raise ParseException("Unrecognised tag received")
+                raise ParseException(f"Unrecognised tag received: {root.tag}")
         except ParseException:
             raise
         except Exception:
