@@ -73,6 +73,10 @@ class IndiClient(IPyClient):
         self._connected: asyncio.Event | None = None
         self._task: asyncio.Task[None] | None = None
         self._blob_versions: dict[tuple[str, str], int] = {}
+        # LOCAL upload mode: indiserver sends a Message "Image saved to /path" instead
+        # of forwarding the setBLOBVector.  We parse that message and store the path here
+        # so IndiCamera.expose() can retrieve it via wait_for_local_image().
+        self._local_image_paths: dict[str, Path] = {}  # device_name → path
 
     def set_debug_level(self, level: int) -> None:
         """Set INDI protocol debug verbosity (0=off, 1=tags, 2=full XML).
@@ -133,6 +137,13 @@ class IndiClient(IPyClient):
         if isinstance(event, indi_events.Message) and event.message:
             if event.devicename:
                 logger.info("indi.message", device=event.devicename, message=event.message)
+                # In LOCAL upload mode indiserver does not forward setBLOBVector to clients;
+                # instead it sends a Message "... Image saved to /path".  Parse it here so
+                # wait_for_local_image() can return the path without polling.
+                if "Image saved to " in event.message:
+                    path_str = event.message.split("Image saved to ", 1)[1].strip()
+                    if path_str:
+                        self._local_image_paths[event.devicename] = Path(path_str)
             else:
                 logger.info("indi.message", message=event.message)
 
@@ -401,6 +412,25 @@ class IndiClient(IPyClient):
             path_str = first.membervalue.decode().strip()
             return BlobData(data=b"", format=first.blobformat, local_path=Path(path_str))
         return BlobData(data=first.membervalue, format=first.blobformat)
+
+    def clear_local_image_path(self, device_name: str) -> None:
+        """Discard any stale LOCAL-mode image path for a device before starting a new exposure."""
+        self._local_image_paths.pop(device_name, None)
+
+    async def wait_for_local_image(self, device_name: str, timeout: float) -> Path:
+        """Wait for a LOCAL-mode image to be reported via the INDI Message channel.
+
+        indiserver does not forward setBLOBVector to clients in UPLOAD_LOCAL mode.
+        Instead it emits a device Message "... Image saved to /path".  This method
+        waits for that message (parsed by rxevent) and returns the file path.
+        Call clear_local_image_path() before triggering the exposure so that stale
+        messages from a previous exposure cannot satisfy this wait.
+        """
+        await self._wait_cond(
+            lambda: device_name in self._local_image_paths,
+            timeout=timeout,
+        )
+        return self._local_image_paths.pop(device_name)
 
     async def wait_prop_not_busy(
         self, device_name: str, prop_name: str, timeout: float = 120.0

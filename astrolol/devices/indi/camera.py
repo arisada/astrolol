@@ -52,6 +52,7 @@ class IndiCamera:
         self._exposure_timeout_extra = exposure_timeout_extra
         self._state = DeviceState.DISCONNECTED
         self._image_counter = 0
+        self._current_upload_dir: Path | None = None  # set while UPLOAD_LOCAL is active
 
     # ------------------------------------------------------------------
     # ICamera protocol
@@ -129,32 +130,33 @@ class IndiCamera:
                     error=str(exc),
                 )
 
-        # Enable BLOBs for this camera only for the duration of this exposure.
-        # "Never" is the default; keeping BLOBs off between exposures prevents
-        # unmanaged devices (e.g. a PHD2 guide camera) from ever sending frames
-        # to us and blocking delivery of our own images.
-        await self._client.enable_blob(self._device_name)
-        try:
-            # Trigger exposure
+        timeout = params.duration + self._exposure_timeout_extra
+
+        if self._current_upload_dir is not None:
+            # LOCAL upload mode: indiserver writes the FITS to disk and sends a
+            # device Message "... Image saved to /path" instead of forwarding the
+            # setBLOBVector.  Clear any stale path before triggering so we can't
+            # accidentally pick up a result from a previous exposure.
+            self._client.clear_local_image_path(self._device_name)
             await self._client.set_number(
                 self._device_name,
                 "CCD_EXPOSURE",
                 {"CCD_EXPOSURE_VALUE": params.duration},
             )
-
-            # Wait for BLOB (image data) — arrives on the CCD1 property
-            timeout = params.duration + self._exposure_timeout_extra
-            blob = await self._client.wait_for_blob(self._device_name, "CCD1", timeout=timeout)
-        finally:
-            # workaround for race in multi cam setups
-            # await self._client.disable_blob(self._device_name)
-            pass
-
-        if blob.local_path is not None:
-            # LOCAL mode: driver already wrote the FITS to disk
-            fits_path = blob.local_path
+            fits_path = await self._client.wait_for_local_image(self._device_name, timeout=timeout)
         else:
-            # CLIENT mode: save blob data received over the network
+            # CLIENT mode: enable BLOBs for this camera only for the duration of
+            # this exposure.  "Never" is the default; keeping BLOBs off between
+            # exposures prevents unmanaged devices (e.g. a PHD2 guide camera) from
+            # ever sending frames to us and blocking delivery of our own images.
+            await self._client.enable_blob(self._device_name)
+            await self._client.set_number(
+                self._device_name,
+                "CCD_EXPOSURE",
+                {"CCD_EXPOSURE_VALUE": params.duration},
+            )
+            blob = await self._client.wait_for_blob(self._device_name, "CCD1", timeout=timeout)
+            # Save blob data received over the network to disk
             self._images_dir.mkdir(parents=True, exist_ok=True)
             self._image_counter += 1
             fits_path = self._images_dir / f"frame_{self._image_counter:06d}.fits"
@@ -315,6 +317,7 @@ class IndiCamera:
             await self._client.set_switch(
                 self._device_name, "UPLOAD_MODE", ["UPLOAD_LOCAL"]
             )
+            self._current_upload_dir = upload_dir
             logger.info(
                 "indi.camera_local_upload_enabled",
                 device=self._device_name,
@@ -330,6 +333,7 @@ class IndiCamera:
 
     async def restore_upload_client(self) -> None:
         """Restore UPLOAD_MODE to CLIENT after a local-mode exposure."""
+        self._current_upload_dir = None
         try:
             await self._client.set_switch(
                 self._device_name, "UPLOAD_MODE", ["UPLOAD_CLIENT"]
