@@ -145,7 +145,9 @@ class IndiCamera:
             timeout = params.duration + self._exposure_timeout_extra
             blob = await self._client.wait_for_blob(self._device_name, "CCD1", timeout=timeout)
         finally:
-            await self._client.disable_blob(self._device_name)
+            # workaround for race in multi cam setups
+            # await self._client.disable_blob(self._device_name)
+            pass
 
         # Save to FITS
         self._images_dir.mkdir(parents=True, exist_ok=True)
