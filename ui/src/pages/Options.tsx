@@ -132,6 +132,10 @@ export function Options() {
   // INDI run dir
   const [indiRunDir, setIndiRunDir] = useState('/tmp/astrolol')
 
+  // INDI local upload mode
+  const [indiLocalUpload, setIndiLocalUpload] = useState(false)
+  const [indiLocalUploadDir, setIndiLocalUploadDir] = useState('/tmp/astrolol_upload')
+
   // Stop INDI status
   const [indiStopStatus, setIndiStopStatus] = useState<'idle' | 'stopping' | 'stopped' | 'error'>('idle')
 
@@ -148,6 +152,8 @@ export function Options() {
         setSaveDir(s.save_dir_template)
         setSaveFilename(s.save_filename_template)
         setIndiRunDir(s.indi_run_dir)
+        setIndiLocalUpload(s.indi_local_upload ?? false)
+        setIndiLocalUploadDir(s.indi_local_upload_dir ?? '/tmp/astrolol_upload')
       })
       .catch(() => { /* backend may not be running */ })
   }, [])
@@ -161,7 +167,22 @@ export function Options() {
         save_dir_template: saveDir,
         save_filename_template: saveFilename,
         indi_run_dir: indiRunDir,
+        indi_local_upload: indiLocalUpload,
+        indi_local_upload_dir: indiLocalUploadDir,
       })
+      setSaveStatus('saved')
+      setTimeout(() => setSaveStatus('idle'), 2000)
+    } catch {
+      setSaveStatus('error')
+    }
+  }
+
+  const persistIndiLocalUpload = async (v: boolean) => {
+    setIndiLocalUpload(v)
+    setSaveStatus('saving')
+    try {
+      const current = await api.settings.get()
+      await api.settings.put({ ...current, indi_local_upload: v, indi_local_upload_dir: indiLocalUploadDir })
       setSaveStatus('saved')
       setTimeout(() => setSaveStatus('idle'), 2000)
     } catch {
@@ -273,6 +294,25 @@ export function Options() {
             className="w-48 font-mono text-xs"
           />
         </Row>
+        <Row
+          label="Local image transfer"
+          hint="Driver writes FITS directly to disk — eliminates base64 encoding over TCP. Requires restart."
+        >
+          <Toggle value={indiLocalUpload} onChange={persistIndiLocalUpload} />
+        </Row>
+        {indiLocalUpload && (
+          <Row
+            label="Upload directory"
+            hint="Shared directory where the driver saves images"
+          >
+            <TextInput
+              value={indiLocalUploadDir}
+              onChange={setIndiLocalUploadDir}
+              onBlur={persistSaveSettings}
+              className="w-48 font-mono text-xs"
+            />
+          </Row>
+        )}
 
         {/* Advanced — hidden by default */}
         <div>

@@ -90,6 +90,8 @@ export interface UserSettings {
   save_filename_template: string
   enabled_plugins: string[]
   indi_run_dir: string
+  indi_local_upload: boolean
+  indi_local_upload_dir: string
   plugin_settings: Record<string, Record<string, unknown>>
 }
 
