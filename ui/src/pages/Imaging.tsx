@@ -156,8 +156,7 @@ function DurationStepper({ value, onChange }: { value: number; onChange: (v: num
 
 // ── Image Viewer ──────────────────────────────────────────────────────────────
 
-function ImageViewer({ deviceId }: { deviceId: string | undefined }) {
-  const [histoAuto, setHistoAuto] = useLocalStorage('imaging.histoAuto', true)
+function ImageViewer({ deviceId, histoAuto }: { deviceId: string | undefined; histoAuto: boolean }) {
   const image = useStore((s) => deviceId ? (s.latestImages[deviceId] ?? null) : null)
   const previewUrl = image
     ? (histoAuto || !image.previewUrlLinear ? image.previewUrl : image.previewUrlLinear)
@@ -175,17 +174,6 @@ function ImageViewer({ deviceId }: { deviceId: string | undefined }) {
           <div className="absolute bottom-2 left-2 text-xs text-slate-400 bg-black/60 px-2 py-1 rounded">
             {image!.width}×{image!.height} · {image!.duration}s
           </div>
-          <button
-            onClick={() => setHistoAuto(!histoAuto)}
-            title="Toggle histogram stretch"
-            className={`absolute top-2 right-2 text-xs px-2 py-0.5 rounded border transition-colors bg-black/60 ${
-              histoAuto
-                ? 'border-accent text-accent'
-                : 'border-surface-border text-slate-500'
-            }`}
-          >
-            {histoAuto ? 'Auto' : 'Linear'}
-          </button>
         </>
       ) : (
         <div className="text-slate-600 text-sm flex flex-col items-center gap-2">
@@ -203,11 +191,13 @@ const FRAME_TYPES: FrameType[] = ['light', 'dark', 'flat', 'bias']
 const BINNINGS = [1, 2, 3, 4]
 
 function CameraPanel({
-  deviceId, name, onSettings,
+  deviceId, name, onSettings, histoAuto, onHistoAuto,
 }: {
   deviceId: string
   name: string
   onSettings: (id: string) => void
+  histoAuto: boolean
+  onHistoAuto: (v: boolean) => void
 }) {
   const p = `imaging.${deviceId}` // per-camera localStorage prefix
   const imagerBusy = useStore((s) => s.imagerBusy)
@@ -420,10 +410,14 @@ function CameraPanel({
           </div>
         </div>
 
-        {/* Save subs */}
+        {/* Save subs + stretch mode */}
         <label className="flex items-center gap-2 cursor-pointer select-none">
           <input type="checkbox" checked={saveSubs} onChange={(e) => setSaveSubs(e.target.checked)} className="accent-accent" />
           <span className="text-xs text-slate-300">Save subs</span>
+        </label>
+        <label className="flex items-center gap-2 cursor-pointer select-none">
+          <input type="checkbox" checked={histoAuto} onChange={(e) => onHistoAuto(e.target.checked)} className="accent-accent" />
+          <span className="text-xs text-slate-300">Auto stretch</span>
         </label>
 
         {/* Guiding / dither */}
@@ -614,6 +608,21 @@ export function Imaging() {
   const { deviceId } = useParams<{ deviceId?: string }>()
   const connectedDevices = useStore((s) => s.connectedDevices)
 
+  // histoAuto is lifted here so CameraPanel (toggle) and ImageViewer (display)
+  // share the same value. useEffect re-reads localStorage when the camera changes
+  // because Imaging is not remounted on navigation between /imaging/:deviceId routes.
+  const histoAutoKey = `imaging.${deviceId ?? '_'}.histoAuto`
+  const [histoAuto, setHistoAutoRaw] = useState<boolean>(() => {
+    try { const s = localStorage.getItem(histoAutoKey); return s !== null ? JSON.parse(s) : true } catch { return true }
+  })
+  useEffect(() => {
+    try { const s = localStorage.getItem(histoAutoKey); setHistoAutoRaw(s !== null ? JSON.parse(s) : true) } catch { setHistoAutoRaw(true) }
+  }, [histoAutoKey])
+  const setHistoAuto = useCallback((v: boolean) => {
+    setHistoAutoRaw(v)
+    try { localStorage.setItem(histoAutoKey, JSON.stringify(v)) } catch {}
+  }, [histoAutoKey])
+
   // INDI properties panel state
   const [propertiesDeviceId, setPropertiesDeviceId] = useState<string | null>(null)
   const openProperties = useCallback((id: string) => {
@@ -641,7 +650,7 @@ export function Imaging() {
     <div className="flex h-full">
       {/* Image viewer */}
       <div className="flex-1 flex flex-col min-w-0">
-        <ImageViewer deviceId={deviceId} />
+        <ImageViewer deviceId={deviceId} histoAuto={histoAuto} />
         <EventLog />
       </div>
 
@@ -656,6 +665,8 @@ export function Imaging() {
               deviceId={camera.device_id}
               name={camera.driver_name ?? camera.device_id}
               onSettings={openProperties}
+              histoAuto={histoAuto}
+              onHistoAuto={setHistoAuto}
             />
             {focuser && (
               <FocuserPanel key={focuser.device_id} deviceId={focuser.device_id} onSettings={openProperties} />
