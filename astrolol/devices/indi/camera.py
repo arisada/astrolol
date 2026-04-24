@@ -13,6 +13,7 @@ INDI CCD properties used:
 from __future__ import annotations
 
 import asyncio
+import re
 from pathlib import Path
 
 import structlog
@@ -43,6 +44,7 @@ class IndiCamera:
         *,
         pre_connect_props: dict | None = None,
         exposure_timeout_extra: float = 60.0,
+        local_upload_dir: Path | None = None,
     ) -> None:
         self._device_name = device_name
         self._client = client
@@ -51,6 +53,7 @@ class IndiCamera:
         self._exposure_timeout_extra = exposure_timeout_extra
         self._state = DeviceState.DISCONNECTED
         self._image_counter = 0
+        self._local_upload_dir = local_upload_dir
 
     # ------------------------------------------------------------------
     # ICamera protocol
@@ -63,6 +66,8 @@ class IndiCamera:
                 self._device_name,
                 pre_connect_props=self._pre_connect_props,
             )
+            if self._local_upload_dir is not None:
+                await self._configure_local_upload()
             self._state = DeviceState.CONNECTED
         except Exception:
             self._state = DeviceState.ERROR
@@ -149,16 +154,18 @@ class IndiCamera:
             # await self._client.disable_blob(self._device_name)
             pass
 
-        # Save to FITS
-        self._images_dir.mkdir(parents=True, exist_ok=True)
-        self._image_counter += 1
-        fits_path = self._images_dir / f"frame_{self._image_counter:06d}.fits"
-
-        def _save() -> None:
-            with open(fits_path, "wb") as f:
-                f.write(blob.data)
-
-        await asyncio.to_thread(_save)
+        if blob.local_path is not None:
+            # LOCAL mode: driver already wrote the FITS to disk
+            fits_path = blob.local_path
+        else:
+            # CLIENT mode: save blob data received over the network
+            self._images_dir.mkdir(parents=True, exist_ok=True)
+            self._image_counter += 1
+            fits_path = self._images_dir / f"frame_{self._image_counter:06d}.fits"
+            def _save() -> None:
+                with open(fits_path, "wb") as f:
+                    f.write(blob.data)
+            await asyncio.to_thread(_save)
 
         # Read dimensions from CCD_INFO (best-effort)
         width, height = await self._read_dimensions()
@@ -291,3 +298,33 @@ class IndiCamera:
             return float(await self._client.get_number(self._device_name, "CCD_INFO", "CCD_PIXEL_SIZE"))
         except Exception:
             return None
+
+    async def _configure_local_upload(self) -> None:
+        """Configure the INDI driver to write images to local filesystem (UPLOAD_LOCAL mode)."""
+        upload_dir = self._local_upload_dir
+        assert upload_dir is not None
+        upload_dir.mkdir(parents=True, exist_ok=True)
+        # Use device name in prefix so files from different cameras are unambiguous
+        safe_name = re.sub(r"[^\w.-]", "_", self._device_name)
+        prefix = f"{safe_name}_"
+        try:
+            await self._client.set_text(
+                self._device_name,
+                "UPLOAD_SETTINGS",
+                {"UPLOAD_DIR": str(upload_dir), "UPLOAD_PREFIX": prefix},
+            )
+            await self._client.set_switch(
+                self._device_name, "UPLOAD_MODE", ["UPLOAD_LOCAL"]
+            )
+            logger.info(
+                "indi.camera_local_upload_enabled",
+                device=self._device_name,
+                upload_dir=str(upload_dir),
+                prefix=prefix,
+            )
+        except Exception as exc:
+            logger.warning(
+                "indi.camera_local_upload_failed",
+                device=self._device_name,
+                error=str(exc),
+            )

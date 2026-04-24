@@ -34,9 +34,10 @@ def build_plugin_manager() -> pluggy.PluginManager:
     return pm
 
 
-def build_registry(pm: pluggy.PluginManager, indi_run_dir: Optional[Path] = None) -> DeviceRegistry:
+def build_registry(pm: pluggy.PluginManager, indi_run_dir: Optional[Path] = None, indi_local_upload_dir: Optional[Path] = None) -> DeviceRegistry:
     registry = DeviceRegistry()
     registry.indi_run_dir = indi_run_dir or Path("/tmp/astrolol")
+    registry.indi_local_upload_dir = indi_local_upload_dir  # None means CLIENT mode
     pm.hook.register_devices(registry=registry)
     logger.info("devices.registered", available=registry.all_keys())
     return registry
