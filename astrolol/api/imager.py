@@ -7,7 +7,8 @@ from pydantic import BaseModel
 from astrolol.core.errors import DeviceNotFoundError, DeviceKindError
 from astrolol.devices.base.models import CameraStatus
 from astrolol.imaging.imager import ImagerManager
-from astrolol.imaging.models import ExposureRequest, ExposureResult, ImagerStatus
+from astrolol.imaging.models import ExposureRequest, ExposureResult, ImagerDeviceSettings, ImagerStatus
+from astrolol.profiles.store import ProfileStore
 
 router = APIRouter(prefix="/imager", tags=["imager"])
 
@@ -97,6 +98,24 @@ async def set_cooler(device_id: str, body: SetCoolerRequest, request: Request) -
         raise HTTPException(status_code=404, detail=str(exc))
     except Exception as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@router.get("/{device_id}/settings", response_model=ImagerDeviceSettings)
+async def get_device_settings(device_id: str, request: Request) -> ImagerDeviceSettings:
+    """Return persisted imager settings for a specific camera (defaults if not yet saved)."""
+    store: ProfileStore = request.app.state.profile_store
+    raw = store.get_user_settings().imager_settings.get(device_id, {})
+    return ImagerDeviceSettings(**raw)
+
+
+@router.put("/{device_id}/settings", response_model=ImagerDeviceSettings)
+async def put_device_settings(device_id: str, body: ImagerDeviceSettings, request: Request) -> ImagerDeviceSettings:
+    """Persist imager settings for a specific camera."""
+    store: ProfileStore = request.app.state.profile_store
+    current = store.get_user_settings()
+    new_map = {**current.imager_settings, device_id: body.model_dump()}
+    store.update_user_settings(current.model_copy(update={"imager_settings": new_map}))
+    return body
 
 
 @router.get("/images/{filename}")

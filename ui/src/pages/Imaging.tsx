@@ -5,12 +5,12 @@ import {
 } from 'lucide-react'
 import { api } from '@/api/client'
 import { useStore } from '@/store'
-import type { CameraStatus, DitherConfig, FilterWheelStatus, FrameType } from '@/api/types'
+import type { CameraStatus, DitherConfig, FilterWheelStatus, FrameType, ImagerDeviceSettings } from '@/api/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { DevicePropertiesPanel } from '@/components/DevicePropertiesPanel'
 
-// ── localStorage persistence ──────────────────────────────────────────────────
+// ── localStorage persistence (focuser step only) ──────────────────────────────
 
 function useLocalStorage<T>(key: string, initial: T): [T, (v: T) => void] {
   const [value, setValue] = useState<T>(() => {
@@ -26,6 +26,17 @@ function useLocalStorage<T>(key: string, initial: T): [T, (v: T) => void] {
     try { localStorage.setItem(key, JSON.stringify(v)) } catch { /* storage full */ }
   }, [key])
   return [value, set]
+}
+
+const DEFAULT_IMAGER_SETTINGS: ImagerDeviceSettings = {
+  duration: 5,
+  binning: 1,
+  frame_type: 'light',
+  save_subs: true,
+  dither_frames: '',
+  dither_minutes: '',
+  histo_auto: true,
+  target_temp: '',
 }
 
 // ── Exposure duration helpers ─────────────────────────────────────────────────
@@ -76,8 +87,8 @@ function Panel({
 }
 
 function PillGroup<T extends string>({
-  options, value, onChange, label,
-}: { options: T[]; value: T; onChange: (v: T) => void; label: string }) {
+  options, value, onChange, label, formatLabel,
+}: { options: T[]; value: T; onChange: (v: T) => void; label: string; formatLabel?: (v: T) => string }) {
   return (
     <div className="flex flex-col gap-1">
       <span className="text-xs text-slate-400">{label}</span>
@@ -93,11 +104,28 @@ function PillGroup<T extends string>({
                 : 'border-surface-border text-slate-400 hover:border-slate-500 hover:text-slate-300'
               }`}
           >
-            {o}
+            {formatLabel ? formatLabel(o) : o}
           </button>
         ))}
       </div>
     </div>
+  )
+}
+
+function TogglePill({ label, value, onChange }: { label: string; value: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <button
+      type="button"
+      onClick={() => onChange(!value)}
+      className={`flex items-center justify-between w-full px-2 py-0.5 text-xs rounded border transition-colors
+        ${value
+          ? 'border-accent text-accent bg-accent/10'
+          : 'border-surface-border text-slate-400 hover:border-slate-500 hover:text-slate-300'
+        }`}
+    >
+      <span>{label}</span>
+      <span className="text-slate-500">{value ? 'ON' : 'OFF'}</span>
+    </button>
   )
 }
 
@@ -191,45 +219,50 @@ const FRAME_TYPES: FrameType[] = ['light', 'dark', 'flat', 'bias']
 const BINNINGS = [1, 2, 3, 4]
 
 function CameraPanel({
-  deviceId, name, onSettings, histoAuto, onHistoAuto,
+  deviceId, name, onSettings, onHistoAutoChange,
 }: {
   deviceId: string
   name: string
   onSettings: (id: string) => void
-  histoAuto: boolean
-  onHistoAuto: (v: boolean) => void
+  onHistoAutoChange: (v: boolean) => void
 }) {
-  const p = `imaging.${deviceId}` // per-camera localStorage prefix
   const imagerBusy = useStore((s) => s.imagerBusy)
   const busy = imagerBusy[deviceId] ?? false
 
-  // Persisted settings (keyed per camera so two cameras don't clobber each other)
-  const [duration, setDuration] = useLocalStorage(`${p}.duration`, 5)
-  // Gain is NOT persisted in localStorage — it lives in the driver.
-  // On load we read the driver's current CCD_GAIN; on blur we write back.
+  // Server-persisted settings — loaded on mount, saved on each change
+  const [settings, setSettingsState] = useState<ImagerDeviceSettings>(DEFAULT_IMAGER_SETTINGS)
+  const settingsRef = useRef(settings)
+  settingsRef.current = settings
+
+  const patchSettings = useCallback((patch: Partial<ImagerDeviceSettings>) => {
+    const next = { ...settingsRef.current, ...patch }
+    setSettingsState(next)
+    api.imager.putSettings(deviceId, next).catch(() => {})
+  }, [deviceId])
+
+  // Gain lives in the driver, not in persisted settings.
   const [gain, setGain] = useState(0)
   const [gainPropName, setGainPropName] = useState<string | null>(null)
   const [gainElemName, setGainElemName] = useState<string | null>(null)
-  const [binning, setBinning] = useLocalStorage<number>(`${p}.binning`, 1)
-  const [frameType, setFrameType] = useLocalStorage<FrameType>(`${p}.frameType`, 'light')
-  const [saveSubs, setSaveSubs] = useLocalStorage(`${p}.saveSubs`, true)
-
   const [gainMin, setGainMin] = useState(0)
   const [gainMax, setGainMax] = useState(65535)
   const [gainStep, setGainStep] = useState(1)
   const [looping, setLooping] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // Dither settings (persisted)
-  const [ditherFrames, setDitherFrames] = useLocalStorage<string>(`${p}.ditherFrames`, '')
-  const [ditherMinutes, setDitherMinutes] = useLocalStorage<string>(`${p}.ditherMinutes`, '')
-
   // Camera hardware status (temperature, cooler)
   const [cameraStatus, setCameraStatus] = useState<CameraStatus | null>(null)
-  const [targetTemp, setTargetTemp] = useLocalStorage<string>(`${p}.targetTemp`, '')
 
   useEffect(() => {
     if (!deviceId) return
+
+    // Load persisted settings from server
+    api.imager.getSettings(deviceId)
+      .then((s) => {
+        setSettingsState(s)
+        onHistoAutoChange(s.histo_auto)
+      })
+      .catch(() => {})
 
     // Sync loop state from server on mount so Stop button is always reachable
     api.imager.status(deviceId)
@@ -245,8 +278,6 @@ function CameraPanel({
             if (w.min != null) setGainMin(w.min as number)
             if (w.max != null) setGainMax(w.max as number)
             if (w.step != null && (w.step as number) > 0) setGainStep(w.step as number)
-            // Initialise from the driver's current value — this is the
-            // single source of truth for gain, not localStorage.
             if (typeof w.value === 'number') setGain(w.value)
             setGainPropName(p.name)
             setGainElemName(w.name ?? null)
@@ -268,16 +299,13 @@ function CameraPanel({
   }, [deviceId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const buildDitherConfig = (): DitherConfig | undefined => {
-    const frames = parseInt(ditherFrames)
-    const minutes = parseFloat(ditherMinutes)
+    const frames = parseInt(settings.dither_frames)
+    const minutes = parseFloat(settings.dither_minutes)
     if (!isNaN(frames) && frames > 0) return { every_frames: frames }
     if (!isNaN(minutes) && minutes > 0) return { every_minutes: minutes }
     return undefined
   }
 
-  // Write the gain value to the driver when the user commits (blur / Enter).
-  // The exposure request always sends gain=0 ("don't change") so the driver
-  // keeps whatever was last set here.
   const commitGain = async (value: number) => {
     if (!gainPropName || !gainElemName) return
     try {
@@ -290,7 +318,10 @@ function CameraPanel({
   const expose = async () => {
     setError(null)
     try {
-      await api.imager.expose(deviceId, { duration, gain: gainPropName ? gain : null, binning, frame_type: frameType, save: saveSubs })
+      await api.imager.expose(deviceId, {
+        duration: settings.duration, gain: gainPropName ? gain : null,
+        binning: settings.binning, frame_type: settings.frame_type as FrameType, save: settings.save_subs,
+      })
     } catch (e) { setError((e as Error).message) }
   }
 
@@ -310,7 +341,8 @@ function CameraPanel({
         setLooping(false)
       } else {
         await api.imager.startLoop(deviceId, {
-          duration, gain: gainPropName ? gain : null, binning, frame_type: frameType, save: saveSubs,
+          duration: settings.duration, gain: gainPropName ? gain : null,
+          binning: settings.binning, frame_type: settings.frame_type as FrameType, save: settings.save_subs,
           dither: buildDitherConfig() ?? null,
         })
         setLooping(true)
@@ -319,7 +351,7 @@ function CameraPanel({
   }
 
   const setCooler = async (enabled: boolean) => {
-    const temp = parseFloat(targetTemp)
+    const temp = parseFloat(settings.target_temp)
     try {
       await api.imager.setCooler(deviceId, enabled, !isNaN(temp) ? temp : undefined)
       setCameraStatus((s) => s ? { ...s, cooler_on: enabled } : s)
@@ -327,7 +359,7 @@ function CameraPanel({
   }
 
   const applyTemp = async () => {
-    const temp = parseFloat(targetTemp)
+    const temp = parseFloat(settings.target_temp)
     if (isNaN(temp)) return
     try {
       await api.imager.setCooler(deviceId, cameraStatus?.cooler_on ?? true, temp)
@@ -366,21 +398,22 @@ function CameraPanel({
               <div className="flex gap-1.5">
                 <Input
                   type="number" step="0.5" placeholder="Target °C"
-                  value={targetTemp}
-                  onChange={(e) => setTargetTemp(e.target.value)}
+                  value={settings.target_temp}
+                  onChange={(e) => patchSettings({ target_temp: e.target.value })}
                   className="flex-1 text-xs"
                 />
-                <Button size="sm" variant="outline" onClick={applyTemp} disabled={!targetTemp}>Set</Button>
+                <Button size="sm" variant="outline" onClick={applyTemp} disabled={!settings.target_temp}>Set</Button>
               </div>
             )}
           </div>
         )}
 
         {/* Frame type */}
-        <PillGroup options={FRAME_TYPES} value={frameType} onChange={setFrameType} label="Frame type" />
+        <PillGroup options={FRAME_TYPES} value={settings.frame_type as FrameType}
+          onChange={(v) => patchSettings({ frame_type: v })} label="Frame type" />
 
         {/* Duration stepper */}
-        <DurationStepper value={duration} onChange={setDuration} />
+        <DurationStepper value={settings.duration} onChange={(v) => patchSettings({ duration: v })} />
 
         {/* Gain */}
         <div className="flex flex-col gap-1">
@@ -397,28 +430,21 @@ function CameraPanel({
         </div>
 
         {/* Binning */}
-        <div className="flex flex-col gap-1">
-          <span className="text-xs text-slate-400">Binning</span>
-          <div className="flex gap-1">
-            {BINNINGS.map((b) => (
-              <button key={b} type="button" onClick={() => setBinning(b)}
-                className={`px-2 py-0.5 text-xs rounded border transition-colors
-                  ${binning === b ? 'border-accent text-accent bg-accent/10' : 'border-surface-border text-slate-400 hover:border-slate-500 hover:text-slate-300'}`}>
-                {b}×{b}
-              </button>
-            ))}
-          </div>
-        </div>
+        <PillGroup
+          options={BINNINGS.map(String) as string[]}
+          value={String(settings.binning)}
+          onChange={(v) => patchSettings({ binning: parseInt(v) })}
+          label="Binning"
+          formatLabel={(v) => `${v}×${v}`}
+        />
 
         {/* Save subs + stretch mode */}
-        <label className="flex items-center gap-2 cursor-pointer select-none">
-          <input type="checkbox" checked={saveSubs} onChange={(e) => setSaveSubs(e.target.checked)} className="accent-accent" />
-          <span className="text-xs text-slate-300">Save subs</span>
-        </label>
-        <label className="flex items-center gap-2 cursor-pointer select-none">
-          <input type="checkbox" checked={histoAuto} onChange={(e) => onHistoAuto(e.target.checked)} className="accent-accent" />
-          <span className="text-xs text-slate-300">Auto stretch</span>
-        </label>
+        <div className="flex flex-col gap-1.5">
+          <TogglePill label="Save subs" value={settings.save_subs}
+            onChange={(v) => patchSettings({ save_subs: v })} />
+          <TogglePill label="Auto stretch" value={settings.histo_auto}
+            onChange={(v) => { patchSettings({ histo_auto: v }); onHistoAutoChange(v) }} />
+        </div>
 
         {/* Guiding / dither */}
         <div className="border-t border-surface-border pt-2 flex flex-col gap-2">
@@ -430,8 +456,8 @@ function CameraPanel({
             <span className="text-xs text-slate-400 shrink-0">Dither every</span>
             <Input
               type="number" min="1" step="1" placeholder="—"
-              value={ditherFrames}
-              onChange={(e) => { setDitherFrames(e.target.value); if (e.target.value) setDitherMinutes('') }}
+              value={settings.dither_frames}
+              onChange={(e) => patchSettings({ dither_frames: e.target.value, dither_minutes: e.target.value ? '' : settings.dither_minutes })}
               className="w-14 text-xs text-center"
             />
             <span className="text-xs text-slate-400 shrink-0">frames</span>
@@ -440,8 +466,8 @@ function CameraPanel({
             <span className="text-xs text-slate-400 shrink-0">Dither every</span>
             <Input
               type="number" min="0.1" step="0.5" placeholder="—"
-              value={ditherMinutes}
-              onChange={(e) => { setDitherMinutes(e.target.value); if (e.target.value) setDitherFrames('') }}
+              value={settings.dither_minutes}
+              onChange={(e) => patchSettings({ dither_minutes: e.target.value, dither_frames: e.target.value ? '' : settings.dither_frames })}
               className="w-14 text-xs text-center"
             />
             <span className="text-xs text-slate-400 shrink-0">minutes</span>
@@ -608,20 +634,9 @@ export function Imaging() {
   const { deviceId } = useParams<{ deviceId?: string }>()
   const connectedDevices = useStore((s) => s.connectedDevices)
 
-  // histoAuto is lifted here so CameraPanel (toggle) and ImageViewer (display)
-  // share the same value. useEffect re-reads localStorage when the camera changes
-  // because Imaging is not remounted on navigation between /imaging/:deviceId routes.
-  const histoAutoKey = `imaging.${deviceId ?? '_'}.histoAuto`
-  const [histoAuto, setHistoAutoRaw] = useState<boolean>(() => {
-    try { const s = localStorage.getItem(histoAutoKey); return s !== null ? JSON.parse(s) : true } catch { return true }
-  })
-  useEffect(() => {
-    try { const s = localStorage.getItem(histoAutoKey); setHistoAutoRaw(s !== null ? JSON.parse(s) : true) } catch { setHistoAutoRaw(true) }
-  }, [histoAutoKey])
-  const setHistoAuto = useCallback((v: boolean) => {
-    setHistoAutoRaw(v)
-    try { localStorage.setItem(histoAutoKey, JSON.stringify(v)) } catch {}
-  }, [histoAutoKey])
+  // histoAuto is lifted here so ImageViewer can read it.
+  // CameraPanel sets it via onHistoAutoChange when it loads or toggles.
+  const [histoAuto, setHistoAuto] = useState(true)
 
   // INDI properties panel state
   const [propertiesDeviceId, setPropertiesDeviceId] = useState<string | null>(null)
@@ -665,8 +680,7 @@ export function Imaging() {
               deviceId={camera.device_id}
               name={camera.driver_name ?? camera.device_id}
               onSettings={openProperties}
-              histoAuto={histoAuto}
-              onHistoAuto={setHistoAuto}
+              onHistoAutoChange={setHistoAuto}
             />
             {focuser && (
               <FocuserPanel key={focuser.device_id} deviceId={focuser.device_id} onSettings={openProperties} />

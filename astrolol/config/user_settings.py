@@ -19,6 +19,7 @@ class UserSettings(BaseModel):
     indi_local_upload_dir: str = "/tmp/astrolol_upload"
     low_memory_mode: bool = False
     plugin_settings: dict[str, dict] = {}     # opaque per-plugin settings, keyed by plugin id
+    imager_settings: dict[str, dict] = {}     # per-device imager settings, keyed by device_id
 
 
 class UserSettingsStore:

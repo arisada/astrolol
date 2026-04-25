@@ -55,3 +55,15 @@ class ExposureResult(BaseModel):
 class ImagerStatus(BaseModel):
     device_id: str
     state: ImagerState
+
+
+class ImagerDeviceSettings(BaseModel):
+    """Per-camera imager settings persisted server-side."""
+    duration: float = Field(default=5.0, gt=0)
+    binning: int = Field(default=1, ge=1, le=4)
+    frame_type: str = Field(default="light")
+    save_subs: bool = True
+    dither_frames: str = ""
+    dither_minutes: str = ""
+    histo_auto: bool = True
+    target_temp: str = ""

@@ -94,6 +94,18 @@ export interface UserSettings {
   indi_local_upload_dir: string
   low_memory_mode: boolean
   plugin_settings: Record<string, Record<string, unknown>>
+  imager_settings: Record<string, Record<string, unknown>>
+}
+
+export interface ImagerDeviceSettings {
+  duration: number
+  binning: number
+  frame_type: string
+  save_subs: boolean
+  dither_frames: string
+  dither_minutes: string
+  histo_auto: boolean
+  target_temp: string
 }
 
 // --- Per-plugin settings ---
