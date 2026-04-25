@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { AlertTriangle, Camera, ChevronDown, ChevronUp, Download, ScanSearch, Settings, X } from 'lucide-react'
+import { AlertTriangle, Camera, ChevronDown, ChevronUp, Download, ScanSearch, Settings, StopCircle, X } from 'lucide-react'
 import { api } from '@/api/client'
 import { useStore } from '@/store'
 import { Button } from '@/components/ui/button'
-import type { ConnectedDevice, DbStatus, PlatesolveSettings, SolveJob, SolveResult } from '@/api/types'
+import type { DbStatus, PlatesolveSettings, SolveJob, SolveResult } from '@/api/types'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -102,6 +102,7 @@ function DurationStepper({ value, onChange }: { value: number; onChange: (v: num
 function StatusBadge({ status }: { status: SolveJob['status'] }) {
   const styles: Record<SolveJob['status'], string> = {
     pending:   'bg-surface-border text-muted',
+    exposing:  'bg-amber-500/20 text-amber-400 animate-pulse',
     solving:   'bg-accent/20 text-accent animate-pulse',
     completed: 'bg-green-500/20 text-green-400',
     failed:    'bg-red-500/20 text-red-400',
@@ -410,8 +411,7 @@ function SolveLog() {
 
 // ── Image viewer ───────────────────────────────────────────────────────────────
 
-function ImageViewer() {
-  const image = useStore((s) => s.latestImage)
+function ImageViewer({ image }: { image: { previewUrl: string; width: number; height: number; duration: number } | null }) {
   return (
     <div className="flex-1 bg-black flex items-center justify-center relative min-h-0">
       {image ? (
@@ -479,11 +479,10 @@ export function PlatesolvePage() {
   const [dbStatus, setDbStatus]          = useState<DbStatus | null>(null)
   const [installing, setInstalling]      = useState(false)
 
-  const [error, setError]                     = useState<string | null>(null)
-  const [busy, setBusy]                       = useState(false)
-  const [activeSolveId, setActiveSolveId]     = useState<string | null>(null)
-  const pendingSolveRef                       = useRef(false)
-  const prevSolveStatusRef                    = useRef<string | undefined>(undefined)
+  const [error, setError]                 = useState<string | null>(null)
+  const [busy, setBusy]                   = useState(false)
+  const [activeSolveId, setActiveSolveId] = useState<string | null>(null)
+  const prevSolveStatusRef                = useRef<string | undefined>(undefined)
 
   useEffect(() => {
     api.plugins.getSettings<PlatesolveSettings>('platesolve')
@@ -494,17 +493,7 @@ export function PlatesolvePage() {
     api.platesolve.dbStatus().then(setDbStatus).catch(console.error)
   }, [])  // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Auto-launch solve once new image arrives.
-  // Depend on the latestImage object (new reference each exposure), not fitsPath
-  // (which is constant across exposures when save=false — same temp file path).
-  useEffect(() => {
-    if (!pendingSolveRef.current || !latestImage) return
-    pendingSolveRef.current = false
-    launchSolve(latestImage.fitsPath)
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [latestImage])
-
-  // React to solve completion
+  // React to solve completion via WebSocket-driven store updates
   const activeSolveJob = activeSolveId ? solveJobsMap[activeSolveId] : null
   useEffect(() => {
     if (!activeSolveJob) return
@@ -536,23 +525,6 @@ export function PlatesolvePage() {
     }
   }
 
-  const launchSolve = async (fitsPath: string) => {
-    if (!settings) return
-    setError(null)
-
-    try {
-      const job = await api.platesolve.solve({
-        fits_path: fitsPath,
-        radius: settings.astap_search_radius,
-      })
-      mergeSolveJobs([job])
-      setActiveSolveId(job.id)
-    } catch (e) {
-      setError((e as Error).message)
-      setBusy(false)
-    }
-  }
-
   const handleExposeAndSolve = async () => {
     if (!camera) return
     setError(null)
@@ -560,13 +532,25 @@ export function PlatesolvePage() {
     setActiveSolveId(null)
     prevSolveStatusRef.current = undefined
     try {
-      pendingSolveRef.current = true
-      await api.imager.expose(camera.device_id, { duration, binning, frame_type: 'light', save: false })
+      const job = await api.platesolve.exposeAndSolve({
+        device_id: camera.device_id,
+        duration,
+        binning,
+      })
+      mergeSolveJobs([job])
+      setActiveSolveId(job.id)
     } catch (e) {
-      pendingSolveRef.current = false
       setBusy(false)
       setError((e as Error).message)
     }
+  }
+
+  const handleHalt = async () => {
+    if (activeSolveId) {
+      try { await api.platesolve.cancel(activeSolveId) } catch { /* ignore */ }
+    }
+    setBusy(false)
+    setActiveSolveId(null)
   }
 
   const handleCancel = async (jobId: string) => {
@@ -599,7 +583,7 @@ export function PlatesolvePage() {
 
       {/* Centre: image + log */}
       <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
-        <ImageViewer />
+        <ImageViewer image={latestImage} />
         <SolveLog />
       </div>
 
@@ -705,6 +689,12 @@ export function PlatesolvePage() {
               ? (activeSolveJob?.status === 'solving' ? 'Solving…' : 'Exposing…')
               : 'Expose & Solve'}
           </Button>
+          {busy && (
+            <Button variant="danger" onClick={handleHalt} className="w-full">
+              <StopCircle size={14} className="mr-2" />
+              Halt
+            </Button>
+          )}
         </div>
 
         {/* Last result */}

@@ -221,6 +221,8 @@ export const api = {
   },
 
   platesolve: {
+    exposeAndSolve: (body: { device_id: string; duration: number; binning: number; gain?: number | null }) =>
+      request<SolveJob>('/plugins/platesolve/expose_and_solve', { method: 'POST', body: JSON.stringify(body) }),
     solve: (req: SolveRequest) =>
       request<SolveJob>('/plugins/platesolve/solve', { method: 'POST', body: JSON.stringify(req) }),
     jobs: () => request<SolveJob[]>('/plugins/platesolve/jobs'),

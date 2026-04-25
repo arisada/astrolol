@@ -26,7 +26,7 @@ class SolveResult(BaseModel):
     duration_ms: int = 0
 
 
-SolveJobStatus = Literal["pending", "solving", "completed", "failed", "cancelled"]
+SolveJobStatus = Literal["pending", "exposing", "solving", "completed", "failed", "cancelled"]
 
 
 class SolveJob(BaseModel):

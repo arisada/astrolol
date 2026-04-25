@@ -148,7 +148,7 @@ export interface DbStatus {
   db_path: string
 }
 
-export type SolveJobStatus = 'pending' | 'solving' | 'completed' | 'failed' | 'cancelled'
+export type SolveJobStatus = 'pending' | 'exposing' | 'solving' | 'completed' | 'failed' | 'cancelled'
 
 export interface SolveJob {
   id: string

@@ -9,7 +9,7 @@ from pathlib import Path
 import astropy.io.fits as astropy_fits
 import structlog
 from fastapi import APIRouter, HTTPException, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from astrolol.core.events.models import LogEvent
 from plugins.platesolve.models import SolveJob, SolveRequest
@@ -126,6 +126,33 @@ async def _enrich_request(req: SolveRequest, request: Request) -> SolveRequest:
             logger.warning("platesolve.hints_unavailable", reason=str(exc))
 
     return req
+
+
+class ExposeAndSolveRequest(BaseModel):
+    device_id: str
+    duration: float = Field(gt=0, description="Exposure duration in seconds")
+    binning: int = Field(default=1, ge=1, le=4)
+    gain: int | None = None
+
+
+@router.post("/expose_and_solve", status_code=201, response_model=SolveJob)
+async def expose_and_solve(body: ExposeAndSolveRequest, request: Request) -> SolveJob:
+    """Expose with the camera then immediately plate-solve the result.
+    Both phases run server-side; cancel the returned job to halt either phase."""
+    stub = SolveRequest(fits_path="(pending)")
+    enriched = await _enrich_request(stub, request)
+    return await _manager(request).expose_and_solve(
+        device_id=body.device_id,
+        imager_manager=request.app.state.imager_manager,
+        duration=body.duration,
+        binning=body.binning,
+        gain=body.gain,
+        ra_hint=enriched.ra_hint,
+        dec_hint=enriched.dec_hint,
+        radius=enriched.radius,
+        tolerance=enriched.tolerance,
+        fov=None,  # FOV not available until after exposure; astap auto-detects
+    )
 
 
 @router.post("/solve", status_code=201, response_model=SolveJob)

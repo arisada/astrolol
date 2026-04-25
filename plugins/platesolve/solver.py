@@ -9,6 +9,7 @@ import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
+from typing import Any
 from uuid import uuid4
 
 import structlog
@@ -156,9 +157,99 @@ class SolveManager:
             job.task.cancel()
         return True
 
+    async def expose_and_solve(
+        self,
+        device_id: str,
+        imager_manager: Any,
+        duration: float,
+        binning: int = 1,
+        gain: int | None = None,
+        ra_hint: float | None = None,
+        dec_hint: float | None = None,
+        radius: float = 30.0,
+        tolerance: float | None = None,
+        fov: float | None = None,
+    ) -> SolveJob:
+        """Expose with a camera then plate-solve the result in a single server-side operation."""
+        req = SolveRequest(
+            fits_path="(pending exposure)",
+            ra_hint=ra_hint,
+            dec_hint=dec_hint,
+            radius=radius,
+            tolerance=tolerance,
+            fov=fov,
+        )
+        job = _Job(
+            id=str(uuid4()),
+            request=req,
+            status="exposing",
+            created_at=_now(),
+        )
+        self._jobs[job.id] = job
+        job.task = asyncio.create_task(
+            self._run_expose_and_solve(job, device_id, imager_manager, duration, binning, gain),
+            name=f"platesolve_eas_{job.id[:8]}",
+        )
+        return job.to_model()
+
     # ------------------------------------------------------------------
     # Internal
     # ------------------------------------------------------------------
+
+    async def _run_expose_and_solve(
+        self,
+        job: _Job,
+        device_id: str,
+        imager_manager: Any,
+        duration: float,
+        binning: int,
+        gain: int | None,
+    ) -> None:
+        from astrolol.imaging.models import ExposureRequest as ImgExposureRequest
+
+        t0 = time.monotonic()
+        await self._event_bus.publish(
+            PlatesolveStarted(solve_id=job.id, fits_path="(exposing)")
+        )
+        try:
+            # ── Step 1: expose ────────────────────────────────────────────────
+            exp_req = ImgExposureRequest(duration=duration, binning=binning, gain=gain, save=False)
+            exposure_result = await imager_manager.expose(device_id, exp_req)
+            job.request = job.request.model_copy(update={"fits_path": exposure_result.fits_path})
+
+            # ── Step 2: solve ─────────────────────────────────────────────────
+            job.status = "solving"
+            result = await self._solve(job.request, job.id)
+            duration_ms = int((time.monotonic() - t0) * 1000)
+            result = result.model_copy(update={"duration_ms": duration_ms})
+            job.status = "completed"
+            job.result = result
+            job.completed_at = _now()
+            logger.info(
+                "platesolve.completed",
+                solve_id=job.id, ra=result.ra, dec=result.dec, duration_ms=duration_ms,
+            )
+            await self._event_bus.publish(PlatesolveCompleted(solve_id=job.id, **result.model_dump()))
+
+        except asyncio.CancelledError:
+            if job.status == "exposing":
+                try:
+                    await imager_manager.halt(device_id)
+                except Exception:
+                    pass
+            job.status = "cancelled"
+            job.completed_at = _now()
+            logger.info("platesolve.cancelled", solve_id=job.id)
+            await self._event_bus.publish(PlatesolveCancelled(solve_id=job.id))
+            raise
+        except Exception as exc:
+            job.status = "failed"
+            job.error = str(exc)
+            job.completed_at = _now()
+            logger.warning("platesolve.failed", solve_id=job.id, error=str(exc))
+            await self._event_bus.publish(PlatesolveFailed(solve_id=job.id, reason=str(exc)))
+        finally:
+            self._prune()
 
     async def _run(self, job: _Job) -> None:
         job.status = "solving"
