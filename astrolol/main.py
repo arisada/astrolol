@@ -56,7 +56,7 @@ def create_app() -> FastAPI:
                 try:
                     await plugin.startup()
                 except Exception as exc:
-                    logger.error("plugin.startup_failed", plugin_id=plugin_id, error=str(exc))
+                    logger.error("plugin.startup_failed", plugin_id=plugin_id, error=str(exc), exc_info=True)
 
         store: ProfileStore = app.state.profile_store
         last_id = store.get_last_active_id()
@@ -92,7 +92,7 @@ def create_app() -> FastAPI:
                 try:
                     await plugin.shutdown()
                 except Exception as exc:
-                    logger.error("plugin.shutdown_failed", plugin_id=plugin_id, error=str(exc))
+                    logger.error("plugin.shutdown_failed", plugin_id=plugin_id, error=str(exc), exc_info=True)
 
     app = FastAPI(title="astrolol", version="0.1.0", lifespan=lifespan)
 

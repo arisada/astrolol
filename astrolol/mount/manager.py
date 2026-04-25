@@ -288,7 +288,7 @@ class MountManager:
             await self._event_bus.publish(
                 MountOperationFailed(device_id=device_id, operation="slew", reason=str(exc))
             )
-            logger.error("mount.slew_error", device_id=device_id, error=str(exc))
+            logger.error("mount.slew_error", device_id=device_id, error=str(exc), exc_info=True)
         finally:
             ctrl._active_task = None
 
@@ -313,7 +313,7 @@ class MountManager:
             await self._event_bus.publish(
                 MountOperationFailed(device_id=device_id, operation="meridian_flip", reason=str(exc))
             )
-            logger.error("mount.meridian_flip_error", device_id=device_id, error=str(exc))
+            logger.error("mount.meridian_flip_error", device_id=device_id, error=str(exc), exc_info=True)
         finally:
             ctrl._active_task = None
 
@@ -336,6 +336,6 @@ class MountManager:
             await self._event_bus.publish(
                 MountOperationFailed(device_id=device_id, operation="park", reason=str(exc))
             )
-            logger.error("mount.park_error", device_id=device_id, error=str(exc))
+            logger.error("mount.park_error", device_id=device_id, error=str(exc), exc_info=True)
         finally:
             ctrl._active_task = None

@@ -103,4 +103,4 @@ def setup_plugins(
             plugin.setup(app, ctx)
             logger.info("plugin.setup_ok", plugin_id=plugin_id, name=plugin.manifest.name)
         except Exception as exc:
-            logger.error("plugin.setup_failed", plugin_id=plugin_id, error=str(exc))
+            logger.error("plugin.setup_failed", plugin_id=plugin_id, error=str(exc), exc_info=True)

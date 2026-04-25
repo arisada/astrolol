@@ -121,6 +121,6 @@ class FocuserManager:
         except asyncio.TimeoutError:
             logger.error("focuser.move_timeout", device_id=device_id)
         except Exception as exc:
-            logger.error("focuser.move_error", device_id=device_id, error=str(exc))
+            logger.error("focuser.move_error", device_id=device_id, error=str(exc), exc_info=True)
         finally:
             ctrl._active_task = None

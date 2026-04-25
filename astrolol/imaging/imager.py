@@ -407,7 +407,7 @@ class ImagerManager:
             raise
         except Exception as exc:
             imager.state = ImagerState.ERROR
-            logger.error("imager.loop_error", device_id=imager.device_id, error=str(exc))
+            logger.error("imager.loop_error", device_id=imager.device_id, error=str(exc), exc_info=True)
         finally:
             if imager.state not in (ImagerState.ERROR,):
                 imager.state = ImagerState.IDLE
