@@ -101,6 +101,10 @@ def create_app() -> FastAPI:
     profile_store = ProfileStore(_settings.profiles_file)
     user_settings = profile_store.get_user_settings()
 
+    # Wire up the global memory-pressure guard so it reads the live setting.
+    from astrolol.core import mem_guard as _mem_guard_mod
+    _mem_guard_mod.configure(lambda: profile_store.get_user_settings().low_memory_mode)
+
     pm = build_plugin_manager()
     registry = build_registry(pm, indi_run_dir=Path(user_settings.indi_run_dir))
     event_bus = EventBus()

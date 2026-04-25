@@ -17,6 +17,7 @@ class UserSettings(BaseModel):
     indi_run_dir: str = "/tmp/astrolol"       # directory for INDI FIFO and state file
     indi_local_upload: bool = False
     indi_local_upload_dir: str = "/tmp/astrolol_upload"
+    low_memory_mode: bool = False
     plugin_settings: dict[str, dict] = {}     # opaque per-plugin settings, keyed by plugin id
 
 

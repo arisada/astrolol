@@ -92,6 +92,7 @@ export interface UserSettings {
   indi_run_dir: string
   indi_local_upload: boolean
   indi_local_upload_dir: string
+  low_memory_mode: boolean
   plugin_settings: Record<string, Record<string, unknown>>
 }
 

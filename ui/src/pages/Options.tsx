@@ -136,6 +136,9 @@ export function Options() {
   const [indiLocalUpload, setIndiLocalUpload] = useState(false)
   const [indiLocalUploadDir, setIndiLocalUploadDir] = useState('/tmp/astrolol_upload')
 
+  // Low memory mode
+  const [lowMemoryMode, setLowMemoryMode] = useState(false)
+
   // Stop INDI status
   const [indiStopStatus, setIndiStopStatus] = useState<'idle' | 'stopping' | 'stopped' | 'error'>('idle')
 
@@ -154,6 +157,7 @@ export function Options() {
         setIndiRunDir(s.indi_run_dir)
         setIndiLocalUpload(s.indi_local_upload ?? false)
         setIndiLocalUploadDir(s.indi_local_upload_dir ?? '/tmp/astrolol_upload')
+        setLowMemoryMode(s.low_memory_mode ?? false)
       })
       .catch(() => { /* backend may not be running */ })
   }, [])
@@ -169,7 +173,21 @@ export function Options() {
         indi_run_dir: indiRunDir,
         indi_local_upload: indiLocalUpload,
         indi_local_upload_dir: indiLocalUploadDir,
+        low_memory_mode: lowMemoryMode,
       })
+      setSaveStatus('saved')
+      setTimeout(() => setSaveStatus('idle'), 2000)
+    } catch {
+      setSaveStatus('error')
+    }
+  }
+
+  const persistLowMemoryMode = async (v: boolean) => {
+    setLowMemoryMode(v)
+    setSaveStatus('saving')
+    try {
+      const current = await api.settings.get()
+      await api.settings.put({ ...current, low_memory_mode: v })
       setSaveStatus('saved')
       setTimeout(() => setSaveStatus('idle'), 2000)
     } catch {
@@ -368,6 +386,12 @@ export function Options() {
                   <option value={1}>Tags only</option>
                   <option value={2}>Full XML</option>
                 </select>
+              </Row>
+              <Row
+                label="Low memory mode"
+                hint="Serialise image processing and plate solving. Use on Raspberry Pi or other memory-constrained hardware to avoid OOM kills."
+              >
+                <Toggle value={lowMemoryMode} onChange={persistLowMemoryMode} />
               </Row>
             </div>
           )}

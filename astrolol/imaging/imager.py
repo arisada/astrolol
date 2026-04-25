@@ -21,6 +21,7 @@ from astrolol.core.events import (
 )
 from astrolol.devices.base.models import ExposureParams
 from astrolol.devices.manager import DeviceManager
+from astrolol.core.mem_guard import mem_guard
 from astrolol.imaging.models import DitherConfig, ExposureRequest, ExposureResult, ImagerState, ImagerStatus
 from astrolol.imaging.preview import fits_to_jpeg, fits_to_jpeg_linear
 
@@ -329,12 +330,20 @@ class ImagerManager:
             except Exception:
                 logger.warning("imager.temp_move_failed", src=str(fits_path), dst=str(tmp_fits))
 
-        # Generate two previews (auto-stretch + linear) — both live in images_dir
+        # Generate two previews (auto-stretch + linear) — both live in images_dir.
+        # Each call is individually wrapped in mem_guard so that when low-memory
+        # mode is active the global Semaphore(1) serialises them (and any other
+        # guarded work such as astap_cli) across all cameras.
         preview_path = self._preview_path(fits_path.stem, self._images_dir, suffix="auto")
         preview_path_linear = self._preview_path(fits_path.stem, self._images_dir, suffix="linear")
+
+        async def _preview(fn, dst: Path) -> None:
+            async with mem_guard():
+                await asyncio.to_thread(fn, fits_path, dst, settings.jpeg_quality)
+
         await asyncio.gather(
-            asyncio.to_thread(fits_to_jpeg, fits_path, preview_path, settings.jpeg_quality),
-            asyncio.to_thread(fits_to_jpeg_linear, fits_path, preview_path_linear, settings.jpeg_quality),
+            _preview(fits_to_jpeg, preview_path),
+            _preview(fits_to_jpeg_linear, preview_path_linear),
         )
 
         result = ExposureResult(

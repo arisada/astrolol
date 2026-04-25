@@ -14,6 +14,7 @@ from uuid import uuid4
 import structlog
 
 from astrolol.core.events import EventBus
+from astrolol.core.mem_guard import mem_guard
 from plugins.platesolve.events import (
     PlatesolveCancelled,
     PlatesolveCompleted,
@@ -201,6 +202,11 @@ class SolveManager:
 
     async def _solve(self, req: SolveRequest, job_id: str) -> SolveResult:
         """Copy the FITS to a temp dir, run astap_cli, stream progress, parse WCS."""
+        async with mem_guard():
+            return await self._solve_inner(req, job_id)
+
+    async def _solve_inner(self, req: SolveRequest, job_id: str) -> SolveResult:
+        """Inner solve — called under the mem_guard context."""
         with tempfile.TemporaryDirectory() as tmpdir:
             tmp_fits = Path(tmpdir) / "solve.fits"
             await asyncio.to_thread(shutil.copy2, req.fits_path, str(tmp_fits))
