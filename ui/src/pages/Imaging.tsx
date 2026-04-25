@@ -68,7 +68,7 @@ function Panel({
   children: React.ReactNode
 }) {
   return (
-    <div className="border-b border-surface-border p-4">
+    <div className="mx-3 my-2.5 border border-surface-border rounded-lg p-3">
       <div className="flex items-center justify-between mb-3">
         <h3 className="text-xs font-medium text-slate-500 uppercase tracking-wider">{title}</h3>
         {deviceId && onSettings && (
@@ -449,28 +449,28 @@ function CameraPanel({
         {/* Guiding / dither */}
         <div className="border-t border-surface-border pt-2 flex flex-col gap-2">
           <div className="flex items-center gap-1.5">
-            <Crosshair size={10} className="text-slate-500" />
-            <span className="text-xs text-slate-500 uppercase tracking-wider">Guiding</span>
+            <Crosshair size={12} className="text-slate-500" />
+            <span className="text-xs text-slate-500 uppercase tracking-wider">Guiding / Dither</span>
           </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-400 shrink-0">Dither every</span>
-            <Input
-              type="number" min="1" step="1" placeholder="—"
-              value={settings.dither_frames}
-              onChange={(e) => patchSettings({ dither_frames: e.target.value, dither_minutes: e.target.value ? '' : settings.dither_minutes })}
-              className="w-14 text-xs text-center"
-            />
-            <span className="text-xs text-slate-400 shrink-0">frames</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-400 shrink-0">Dither every</span>
-            <Input
-              type="number" min="0.1" step="0.5" placeholder="—"
-              value={settings.dither_minutes}
-              onChange={(e) => patchSettings({ dither_minutes: e.target.value, dither_frames: e.target.value ? '' : settings.dither_frames })}
-              className="w-14 text-xs text-center"
-            />
-            <span className="text-xs text-slate-400 shrink-0">minutes</span>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="flex flex-col gap-1">
+              <span className="text-xs text-slate-400">Every N frames</span>
+              <Input
+                type="number" min="1" step="1" placeholder="—"
+                value={settings.dither_frames}
+                onChange={(e) => patchSettings({ dither_frames: e.target.value, dither_minutes: e.target.value ? '' : settings.dither_minutes })}
+                className="text-xs text-center"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <span className="text-xs text-slate-400">Every N minutes</span>
+              <Input
+                type="number" min="0.1" step="0.5" placeholder="—"
+                value={settings.dither_minutes}
+                onChange={(e) => patchSettings({ dither_minutes: e.target.value, dither_frames: e.target.value ? '' : settings.dither_frames })}
+                className="text-xs text-center"
+              />
+            </div>
           </div>
         </div>
 
@@ -670,7 +670,7 @@ export function Imaging() {
       </div>
 
       {/* Right sidebar */}
-      <aside className="w-64 shrink-0 border-l border-surface-border overflow-y-auto bg-surface-raised">
+      <aside className="w-64 shrink-0 border-l border-surface-border overflow-y-auto bg-surface-raised py-1">
         {camera === null ? (
           <div className="p-4 text-xs text-slate-500">No camera connected.</div>
         ) : (
