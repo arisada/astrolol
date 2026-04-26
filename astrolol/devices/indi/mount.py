@@ -34,8 +34,14 @@ def _to_jnow(coord: SkyCoord) -> SkyCoord:
     return coord.transform_to(FK5(equinox=Time.now()))
 
 
-def _jnow_to_icrs(ra_hours: float, dec_deg: float) -> SkyCoord:
-    """Convert INDI JNow RA (hours) + Dec (degrees) to an ICRS SkyCoord."""
+def _jnow_to_icrs(ra_hours: float, dec_deg: float) -> SkyCoord | None:
+    """Convert INDI JNow RA (hours) + Dec (degrees) to an ICRS SkyCoord.
+
+    Returns None if the coordinates are out of range (e.g. mount parked at a
+    mechanical limit where the driver reports dec > 90°).
+    """
+    if not (-90.0 <= dec_deg <= 90.0):
+        return None
     return SkyCoord(
         ra=ra_hours * u.hourangle,
         dec=dec_deg * u.deg,
@@ -219,8 +225,9 @@ class IndiMount:
         dec: float | None = None
         if ra_jnow is not None and dec_jnow is not None:
             icrs = _jnow_to_icrs(ra_jnow, dec_jnow)
-            ra = icrs.ra.hour
-            dec = icrs.dec.deg
+            if icrs is not None:
+                ra = icrs.ra.hour
+                dec = icrs.dec.deg
 
         return MountStatus(
             state=self._state,
