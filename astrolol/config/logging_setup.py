@@ -35,7 +35,11 @@ def setup_logging(log_file: Path | None = None) -> None:
         structlog.stdlib.add_logger_name,
         structlog.processors.TimeStamper(fmt="iso", utc=True),
         structlog.processors.StackInfoRenderer(),
-        structlog.processors.format_exc_info,
+        # format_exc_info is intentionally omitted here.
+        # ConsoleRenderer handles exc_info natively (pretty / rich output).
+        # JSONRenderer needs it as a string, so it is added to the json_formatter
+        # chain below.  Including it in shared_processors causes a UserWarning
+        # from ConsoleRenderer about duplicate formatting.
     ]
 
     structlog.configure(
@@ -62,6 +66,7 @@ def setup_logging(log_file: Path | None = None) -> None:
     json_formatter = structlog.stdlib.ProcessorFormatter(
         processors=[
             structlog.stdlib.ProcessorFormatter.remove_processors_meta,
+            structlog.processors.format_exc_info,  # stringify exc_info before JSON serialisation
             structlog.processors.JSONRenderer(),
         ],
         foreign_pre_chain=shared_processors,
