@@ -228,6 +228,14 @@ class IndiMount:
             if icrs is not None:
                 ra = icrs.ra.hour
                 dec = icrs.dec.deg
+            else:
+                logger.warning(
+                    "mount.invalid_coords",
+                    device=self._device_name,
+                    ra_jnow=ra_jnow,
+                    dec_jnow=dec_jnow,
+                    reason="dec out of range ±90°, coordinates suppressed",
+                )
 
         return MountStatus(
             state=self._state,
