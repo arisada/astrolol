@@ -52,6 +52,8 @@ interface AppState {
   // Imager
   latestImages: Record<string, LatestImage>  // device_id -> latest image for that camera
   imagerBusy: Record<string, boolean>        // device_id -> is busy
+  imagerLooping: Record<string, boolean>     // device_id -> loop is running
+  imagerExposures: Record<string, { startedAt: number; duration: number } | null>  // for countdown
 
   // Event log
   log: LogEntry[]
@@ -75,6 +77,7 @@ interface AppState {
   setCameraStatus: (deviceId: string, status: CameraStatus) => void
   setFocuserStatus: (deviceId: string, status: FocuserStatus) => void
   setFilterWheelStatus: (deviceId: string, status: FilterWheelStatus) => void
+  setMountStatus: (deviceId: string, status: MountStatus) => void
   applyEvent: (event: AstrolollEvent) => void
   clearLastError: () => void
   setPluginInfos: (infos: PluginInfo[]) => void
@@ -97,6 +100,8 @@ export const useStore = create<AppState>((set, get) => ({
   filterWheelStatuses: {},
   latestImages: {},
   imagerBusy: {},
+  imagerLooping: {},
+  imagerExposures: {},
   log: [],
   lastError: null,
   pluginInfos: [],
@@ -121,6 +126,8 @@ export const useStore = create<AppState>((set, get) => ({
     set((s) => ({ focuserStatuses: { ...s.focuserStatuses, [deviceId]: status } })),
   setFilterWheelStatus: (deviceId, status) =>
     set((s) => ({ filterWheelStatuses: { ...s.filterWheelStatuses, [deviceId]: status } })),
+  setMountStatus: (deviceId, status) =>
+    set((s) => ({ mountStatuses: { ...s.mountStatuses, [deviceId]: status } })),
 
   applyEvent: (event) => {
     const state = get()
@@ -165,7 +172,11 @@ export const useStore = create<AppState>((set, get) => ({
         break
       }
       case 'imager.exposure_started': {
-        set({ imagerBusy: { ...state.imagerBusy, [event.device_id]: true }, log, lastError })
+        set({
+          imagerBusy: { ...state.imagerBusy, [event.device_id]: true },
+          imagerExposures: { ...state.imagerExposures, [event.device_id]: { startedAt: Date.now(), duration: event.duration } },
+          log, lastError,
+        })
         break
       }
       case 'imager.exposure_completed': {
@@ -173,6 +184,7 @@ export const useStore = create<AppState>((set, get) => ({
         const filenameLinear = event.preview_path_linear?.split('/').pop() ?? null
         set((s) => ({
           imagerBusy: { ...state.imagerBusy, [event.device_id]: false },
+          imagerExposures: { ...state.imagerExposures, [event.device_id]: null },
           latestImages: {
             ...s.latestImages,
             [event.device_id]: {
@@ -189,17 +201,116 @@ export const useStore = create<AppState>((set, get) => ({
         }))
         break
       }
-      case 'imager.loop_stopped':
+      case 'imager.loop_started': {
+        set({ imagerLooping: { ...state.imagerLooping, [event.device_id]: true }, log, lastError })
+        break
+      }
+      case 'imager.loop_stopped': {
+        set({
+          imagerBusy: { ...state.imagerBusy, [event.device_id]: false },
+          imagerLooping: { ...state.imagerLooping, [event.device_id]: false },
+          imagerExposures: { ...state.imagerExposures, [event.device_id]: null },
+          log, lastError,
+        })
+        break
+      }
       case 'imager.exposure_failed': {
-        set({ imagerBusy: { ...state.imagerBusy, [event.device_id]: false }, log, lastError })
+        set({
+          imagerBusy: { ...state.imagerBusy, [event.device_id]: false },
+          imagerExposures: { ...state.imagerExposures, [event.device_id]: null },
+          log, lastError,
+        })
+        break
+      }
+      case 'mount.slew_started': {
+        set((s) => {
+          const cur = s.mountStatuses[event.device_id]
+          return {
+            mountStatuses: cur ? { ...s.mountStatuses, [event.device_id]: { ...cur, is_slewing: true } } : s.mountStatuses,
+            log, lastError,
+          }
+        })
         break
       }
       case 'mount.slew_completed':
-      case 'mount.slew_aborted':
-      case 'mount.parked':
-      case 'mount.unparked':
-      case 'mount.operation_failed': {
+      case 'mount.slew_aborted': {
+        set((s) => {
+          const cur = s.mountStatuses[event.device_id]
+          return {
+            mountStatuses: cur ? { ...s.mountStatuses, [event.device_id]: { ...cur, is_slewing: false } } : s.mountStatuses,
+            log, lastError,
+          }
+        })
+        break
+      }
+      case 'mount.parked': {
+        set((s) => {
+          const cur = s.mountStatuses[event.device_id]
+          return {
+            mountStatuses: cur ? { ...s.mountStatuses, [event.device_id]: { ...cur, is_parked: true, is_slewing: false, is_tracking: false } } : s.mountStatuses,
+            log, lastError,
+          }
+        })
+        break
+      }
+      case 'mount.unparked': {
+        set((s) => {
+          const cur = s.mountStatuses[event.device_id]
+          return {
+            mountStatuses: cur ? { ...s.mountStatuses, [event.device_id]: { ...cur, is_parked: false } } : s.mountStatuses,
+            log, lastError,
+          }
+        })
+        break
+      }
+      case 'mount.tracking_changed': {
+        set((s) => {
+          const cur = s.mountStatuses[event.device_id]
+          return {
+            mountStatuses: cur ? { ...s.mountStatuses, [event.device_id]: { ...cur, is_tracking: event.tracking } } : s.mountStatuses,
+            log, lastError,
+          }
+        })
+        break
+      }
+      case 'mount.meridian_flip_started': {
+        set((s) => {
+          const cur = s.mountStatuses[event.device_id]
+          return {
+            mountStatuses: cur ? { ...s.mountStatuses, [event.device_id]: { ...cur, is_slewing: true } } : s.mountStatuses,
+            log, lastError,
+          }
+        })
+        break
+      }
+      case 'mount.meridian_flip_completed': {
+        set((s) => {
+          const cur = s.mountStatuses[event.device_id]
+          return {
+            mountStatuses: cur ? { ...s.mountStatuses, [event.device_id]: { ...cur, is_slewing: false } } : s.mountStatuses,
+            log, lastError,
+          }
+        })
+        break
+      }
+      case 'mount.operation_failed':
+      case 'mount.target_set': {
         set({ log, lastError })
+        break
+      }
+      case 'focuser.move_started': {
+        set((s) => ({
+          focuserStatuses: {
+            ...s.focuserStatuses,
+            [event.device_id]: {
+              state: 'busy',
+              position: s.focuserStatuses[event.device_id]?.position ?? null,
+              is_moving: true,
+              temperature: s.focuserStatuses[event.device_id]?.temperature ?? null,
+            },
+          },
+          log, lastError,
+        }))
         break
       }
       case 'focuser.move_completed':

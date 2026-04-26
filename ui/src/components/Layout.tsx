@@ -1,7 +1,9 @@
 import { Outlet } from 'react-router-dom'
 import { X } from 'lucide-react'
 import { Sidebar } from './Sidebar'
+import { StatusBar } from './StatusBar'
 import { useEvents } from '@/hooks/useEvents'
+import { useStatusPolling } from '@/hooks/useStatusPolling'
 import { useStore } from '@/store'
 
 function ErrorToast() {
@@ -34,14 +36,18 @@ function ErrorToast() {
 }
 
 export function Layout() {
-  useEvents() // connect WebSocket once at the top level
+  useEvents()         // connect WebSocket once at the top level
+  useStatusPolling()  // poll device statuses globally
 
   return (
-    <div className="flex h-screen bg-surface text-slate-200 overflow-hidden">
-      <Sidebar />
-      <main className="flex-1 overflow-auto">
-        <Outlet />
-      </main>
+    <div className="flex flex-col h-screen bg-surface text-slate-200 overflow-hidden">
+      <StatusBar />
+      <div className="flex flex-1 min-h-0">
+        <Sidebar />
+        <main className="flex-1 overflow-auto">
+          <Outlet />
+        </main>
+      </div>
       <ErrorToast />
     </div>
   )
