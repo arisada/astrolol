@@ -393,6 +393,17 @@ export interface MountMeridianFlipCompletedEvent extends BaseEvent { type: 'moun
 export interface FocuserMoveStartedEvent extends BaseEvent { type: 'focuser.move_started'; device_id: string; target_position: number }
 export interface FocuserMoveCompletedEvent extends BaseEvent { type: 'focuser.move_completed'; device_id: string; position: number }
 export interface FocuserHaltedEvent extends BaseEvent { type: 'focuser.halted'; device_id: string; position: number | null }
+/** High-frequency: fired on every ABS_FOCUS_POSITION driver update. Not written to the log. */
+export interface FocuserPositionUpdatedEvent extends BaseEvent { type: 'focuser.position_updated'; device_id: string; position: number }
+/** High-frequency: fired at most 1 Hz when EQUATORIAL_EOD_COORD changes. Not written to the log. */
+export interface MountCoordsUpdatedEvent extends BaseEvent {
+  type: 'mount.coords_updated'
+  device_id: string
+  ra: number | null       // ICRS J2000 decimal hours
+  dec: number | null      // ICRS J2000 decimal degrees
+  ra_jnow: number | null  // JNow decimal hours (raw driver value)
+  dec_jnow: number | null // JNow decimal degrees
+}
 
 export interface LogEvent extends BaseEvent { type: 'log'; level: string; component: string; message: string }
 
@@ -436,7 +447,9 @@ export type AstrolollEvent =
   | MountSlewStartedEvent | MountSlewCompletedEvent | MountSlewAbortedEvent
   | MountParkedEvent | MountUnparkedEvent | MountTrackingChangedEvent | MountOperationFailedEvent
   | MountMeridianFlipStartedEvent | MountMeridianFlipCompletedEvent | MountTargetSetEvent
+  | MountCoordsUpdatedEvent
   | FocuserMoveStartedEvent | FocuserMoveCompletedEvent | FocuserHaltedEvent
+  | FocuserPositionUpdatedEvent
   | Phd2ConnectedEvent | Phd2DisconnectedEvent | Phd2StateChangedEvent
   | Phd2GuideStepEvent | Phd2SettledEvent
   | PlatesolveStartedEvent | PlatesolveCompletedEvent | PlatesolveFailedEvent | PlatesolveCancelledEvent

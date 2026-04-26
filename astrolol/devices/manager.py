@@ -16,6 +16,8 @@ from astrolol.core.events import (
     DeviceDisconnected,
     DeviceStateChanged,
     EventBus,
+    FocuserPositionUpdated,
+    MountCoordsUpdated,
 )
 from astrolol.devices.base import ICamera, IFocuser, IFilterWheel, IMount, IRotator
 from astrolol.devices.base.models import DeviceState
@@ -111,6 +113,31 @@ class DeviceManager:
             config, DeviceState.CONNECTING, DeviceState.CONNECTED
         )
         log.info("device.connected")
+
+        # Wire real-time property listeners for adapters that support them.
+        # Duck-typed so non-INDI adapters (FakeMount, FakeFocuser, etc.) are unaffected.
+        _device_id = config.device_id
+        _bus = self.event_bus
+        if hasattr(instance, "set_position_listener"):
+            def _on_position(pos: int, _did: str = _device_id) -> None:
+                asyncio.create_task(
+                    _bus.publish(FocuserPositionUpdated(device_id=_did, position=pos))
+                )
+            instance.set_position_listener(_on_position)
+
+        if hasattr(instance, "set_coords_listener"):
+            def _on_coords(
+                ra: float | None, dec: float | None,
+                ra_jnow: float | None, dec_jnow: float | None,
+                _did: str = _device_id,
+            ) -> None:
+                asyncio.create_task(
+                    _bus.publish(MountCoordsUpdated(
+                        device_id=_did, ra=ra, dec=dec,
+                        ra_jnow=ra_jnow, dec_jnow=dec_jnow,
+                    ))
+                )
+            instance.set_coords_listener(_on_coords)
 
         # Companion discovery — only for primary devices (not companions themselves)
         if entry.primary_id is None and self.registry.companion_discoverer is not None:

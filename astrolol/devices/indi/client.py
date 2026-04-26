@@ -16,9 +16,10 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections import defaultdict
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 import structlog
 from indipyclient import IPyClient
@@ -73,10 +74,32 @@ class IndiClient(IPyClient):
         self._connected: asyncio.Event | None = None
         self._task: asyncio.Task[None] | None = None
         self._blob_versions: dict[tuple[str, str], int] = {}
+        # Property listeners: (device_name, prop_name) → [callback, ...]
+        # Callbacks are called (with no arguments) whenever that property changes.
+        # Adapters register listeners in connect() and remove them in disconnect().
+        self._prop_listeners: dict[tuple[str, str], list[Callable[[], None]]] = defaultdict(list)
         # LOCAL upload mode: indiserver sends a Message "Image saved to /path" instead
         # of forwarding the setBLOBVector.  We parse that message and store the path here
         # so IndiCamera.expose() can retrieve it via wait_for_local_image().
         self._local_image_paths: dict[str, Path] = {}  # device_name → path
+
+    # ------------------------------------------------------------------
+    # Property listeners
+    # ------------------------------------------------------------------
+
+    def add_prop_listener(self, device_name: str, prop_name: str, cb: Callable[[], None]) -> None:
+        """Register a no-argument callback fired whenever (device_name, prop_name) changes."""
+        key = (device_name, prop_name)
+        if cb not in self._prop_listeners[key]:
+            self._prop_listeners[key].append(cb)
+
+    def remove_prop_listener(self, device_name: str, prop_name: str, cb: Callable[[], None]) -> None:
+        """Remove a previously registered property listener (no-op if not registered)."""
+        key = (device_name, prop_name)
+        try:
+            self._prop_listeners[key].remove(cb)
+        except ValueError:
+            pass
 
     def set_debug_level(self, level: int) -> None:
         """Set INDI protocol debug verbosity (0=off, 1=tags, 2=full XML).
@@ -150,6 +173,22 @@ class IndiClient(IPyClient):
         if self._cond is not None:
             async with self._cond:
                 self._cond.notify_all()
+
+        # Dispatch property listeners for any set*Vector event (excludes BLOBs and
+        # system events so high-volume image data never triggers position callbacks).
+        if not isinstance(
+            event,
+            (indi_events.setBLOBVector, indi_events.Message,
+             indi_events.ConnectionMade, indi_events.ConnectionLost),
+        ):
+            device = getattr(event, "devicename", None)
+            vector = getattr(event, "vectorname", None)
+            if device and vector:
+                for cb in list(self._prop_listeners.get((device, vector), [])):
+                    try:
+                        cb()
+                    except Exception:
+                        logger.debug("indi.prop_listener_error", device=device, prop=vector)
 
     # ------------------------------------------------------------------
     # Internal helpers

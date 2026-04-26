@@ -141,6 +141,48 @@ export const useStore = create<AppState>((set, get) => ({
       return
     }
 
+    if (event.type === 'focuser.position_updated') {
+      set((s) => ({
+        focuserStatuses: {
+          ...s.focuserStatuses,
+          [event.device_id]: {
+            state: s.focuserStatuses[event.device_id]?.state ?? 'connected',
+            position: event.position,
+            is_moving: s.focuserStatuses[event.device_id]?.is_moving ?? false,
+            temperature: s.focuserStatuses[event.device_id]?.temperature ?? null,
+          },
+        },
+      }))
+      return
+    }
+
+    if (event.type === 'mount.coords_updated') {
+      set((s) => {
+        const cur = s.mountStatuses[event.device_id]
+        return {
+          mountStatuses: {
+            ...s.mountStatuses,
+            [event.device_id]: {
+              state: cur?.state ?? 'connected',
+              ra: event.ra,
+              dec: event.dec,
+              ra_jnow: event.ra_jnow,
+              dec_jnow: event.dec_jnow,
+              alt: cur?.alt ?? null,
+              az: cur?.az ?? null,
+              is_tracking: cur?.is_tracking ?? false,
+              is_parked: cur?.is_parked ?? false,
+              is_slewing: cur?.is_slewing ?? false,
+              pier_side: cur?.pier_side ?? null,
+              hour_angle: cur?.hour_angle ?? null,
+              lst: cur?.lst ?? null,
+            },
+          },
+        }
+      })
+      return
+    }
+
     const eventId = (event as { id: string }).id
     // Dedup: history replay and brief dual-connection windows can send the same event twice
     if (state.log.some((e) => e.id === eventId)) return

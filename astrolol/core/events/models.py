@@ -180,6 +180,26 @@ class FocuserHalted(BaseEvent):
     position: int | None = None
 
 
+class FocuserPositionUpdated(BaseEvent):
+    """High-frequency event: fired on every ABS_FOCUS_POSITION update from the driver.
+    Not written to the event log — used only for real-time UI state updates."""
+    type: Literal["focuser.position_updated"] = "focuser.position_updated"
+    device_id: str
+    position: int
+
+
+class MountCoordsUpdated(BaseEvent):
+    """High-frequency event: fired at most 1 Hz when EQUATORIAL_EOD_COORD changes.
+    Not written to the event log — used for real-time RA/Dec in the UI and plugins
+    (e.g. Stellarium sync)."""
+    type: Literal["mount.coords_updated"] = "mount.coords_updated"
+    device_id: str
+    ra: float | None       # ICRS J2000 decimal hours
+    dec: float | None      # ICRS J2000 decimal degrees
+    ra_jnow: float | None  # JNow decimal hours (raw driver value)
+    dec_jnow: float | None # JNow decimal degrees (raw driver value)
+
+
 # --- Filter Wheel events ---
 
 class FilterWheelFilterChanged(BaseEvent):

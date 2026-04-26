@@ -14,6 +14,9 @@ INDI telescope properties used:
 """
 from __future__ import annotations
 
+import time
+from typing import Callable
+
 import structlog
 from astropy.coordinates import FK5, SkyCoord
 from astropy.time import Time
@@ -54,6 +57,10 @@ class IndiMount:
 
     ADAPTER_KEY = "indi_mount"
 
+    # Minimum interval between coords-updated events (seconds).  Prevents a
+    # chatty driver (e.g. 5 Hz updates) from flooding WebSocket clients.
+    _COORDS_RATE_LIMIT = 1.0
+
     def __init__(self, device_name: str, client: IndiClient, pre_connect_props: dict | None = None) -> None:
         self._device_name = device_name
         self._client = client
@@ -61,6 +68,44 @@ class IndiMount:
         self._state = DeviceState.DISCONNECTED
         self._is_parked = False
         self._is_tracking = False
+        self._on_coords_cb: Callable[[float | None, float | None, float | None, float | None], None] | None = None
+        self._last_coords_publish: float = 0.0
+
+    def set_coords_listener(
+        self,
+        cb: Callable[[float | None, float | None, float | None, float | None], None] | None,
+    ) -> None:
+        """Set (or clear) a callback invoked at most once per second with (ra, dec, ra_jnow, dec_jnow).
+
+        ra / dec are ICRS J2000 (hours / degrees); ra_jnow / dec_jnow are the raw
+        JNow values from the driver.  Any value may be None when the driver reports
+        an out-of-range coordinate (e.g. dec > 90° while parked).
+
+        Called by DeviceManager after a successful connect().
+        """
+        self._on_coords_cb = cb
+
+    def _handle_coords(self) -> None:
+        """Property listener — called by IndiClient whenever EQUATORIAL_EOD_COORD changes."""
+        if self._on_coords_cb is None:
+            return
+        now = time.monotonic()
+        if now - self._last_coords_publish < self._COORDS_RATE_LIMIT:
+            return
+        self._last_coords_publish = now
+
+        ra_jnow = self._client.get_number_nowait(self._device_name, "EQUATORIAL_EOD_COORD", "RA")
+        dec_jnow = self._client.get_number_nowait(self._device_name, "EQUATORIAL_EOD_COORD", "DEC")
+        if ra_jnow is None or dec_jnow is None:
+            return
+
+        icrs = _jnow_to_icrs(ra_jnow, dec_jnow)
+        ra = icrs.ra.hour if icrs is not None else None
+        dec = icrs.dec.deg if icrs is not None else None
+        try:
+            self._on_coords_cb(ra, dec, ra_jnow, dec_jnow)
+        except Exception:
+            pass
 
     # ------------------------------------------------------------------
     # IMount protocol
@@ -77,8 +122,12 @@ class IndiMount:
         except Exception:
             self._state = DeviceState.ERROR
             raise
+        self._last_coords_publish = 0.0  # reset rate-limiter on fresh connect
+        self._client.remove_prop_listener(self._device_name, "EQUATORIAL_EOD_COORD", self._handle_coords)
+        self._client.add_prop_listener(self._device_name, "EQUATORIAL_EOD_COORD", self._handle_coords)
 
     async def disconnect(self) -> None:
+        self._client.remove_prop_listener(self._device_name, "EQUATORIAL_EOD_COORD", self._handle_coords)
         try:
             await self._client.disconnect_device(self._device_name)
         finally:

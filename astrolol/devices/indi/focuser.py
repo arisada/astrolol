@@ -8,6 +8,8 @@ INDI focuser properties used:
 """
 from __future__ import annotations
 
+from typing import Callable
+
 import structlog
 
 from astrolol.devices.base.models import DeviceState, FocuserStatus
@@ -28,6 +30,31 @@ class IndiFocuser:
         self._client = client
         self._pre_connect_props = pre_connect_props
         self._state = DeviceState.DISCONNECTED
+        self._on_position_cb: Callable[[int], None] | None = None
+
+    def set_position_listener(self, cb: Callable[[int], None] | None) -> None:
+        """Set (or clear) a callback invoked on every ABS_FOCUS_POSITION update.
+
+        Called by DeviceManager after a successful connect() so position changes
+        can be forwarded to the EventBus without coupling the adapter to it directly.
+        """
+        self._on_position_cb = cb
+
+    def _handle_position(self) -> None:
+        """Property listener — called by IndiClient whenever ABS_FOCUS_POSITION changes."""
+        if self._on_position_cb is None:
+            return
+        v = self._client._get_vector(self._device_name, "ABS_FOCUS_POSITION")
+        if v is None:
+            return
+        try:
+            pos = int(v.getfloatvalue("FOCUS_ABSOLUTE_POSITION"))
+        except Exception:
+            return
+        try:
+            self._on_position_cb(pos)
+        except Exception:
+            pass
 
     # ------------------------------------------------------------------
     # IFocuser protocol
@@ -44,8 +71,13 @@ class IndiFocuser:
         except Exception:
             self._state = DeviceState.ERROR
             raise
+        # Register position listener after successful connect.
+        # Remove any stale registration first to guard against reconnects.
+        self._client.remove_prop_listener(self._device_name, "ABS_FOCUS_POSITION", self._handle_position)
+        self._client.add_prop_listener(self._device_name, "ABS_FOCUS_POSITION", self._handle_position)
 
     async def disconnect(self) -> None:
+        self._client.remove_prop_listener(self._device_name, "ABS_FOCUS_POSITION", self._handle_position)
         try:
             await self._client.disconnect_device(self._device_name)
         finally:
