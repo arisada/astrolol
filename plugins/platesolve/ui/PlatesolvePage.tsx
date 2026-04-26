@@ -483,13 +483,31 @@ export function PlatesolvePage() {
   const [busy, setBusy]                   = useState(false)
   const [activeSolveId, setActiveSolveId] = useState<string | null>(null)
   const prevSolveStatusRef                = useRef<string | undefined>(undefined)
+  // True only when the current page instance initiated the solve; prevents
+  // auto-sync/slew from firing when navigating back to an already-running job.
+  const initiatedInSessionRef             = useRef(false)
 
   useEffect(() => {
     api.plugins.getSettings<PlatesolveSettings>('platesolve')
       .then(s => setSettings({ ...DEFAULT_PLATESOLVE_SETTINGS, ...s }))
       .catch(console.error)
 
-    api.platesolve.jobs().then(mergeSolveJobs).catch(console.error)
+    api.platesolve.jobs().then(jobs => {
+      mergeSolveJobs(jobs)
+      // Restore busy state if a solve was running before we navigated away.
+      const active = jobs.find(
+        (j) => j.status === 'pending' || j.status === 'exposing' || j.status === 'solving'
+      )
+      if (active) {
+        setActiveSolveId(active.id)
+        setBusy(true)
+        // Seed the ref with the current status so the status-watching effect
+        // doesn't treat the first render as a transition.
+        prevSolveStatusRef.current = active.status
+        initiatedInSessionRef.current = false
+      }
+    }).catch(console.error)
+
     api.platesolve.dbStatus().then(setDbStatus).catch(console.error)
   }, [])  // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -501,7 +519,12 @@ export function PlatesolvePage() {
     prevSolveStatusRef.current = activeSolveJob.status
     if (prev === activeSolveJob.status) return
     if (activeSolveJob.status === 'completed' && activeSolveJob.result) {
-      handlePostSolve(activeSolveJob.result)
+      // Only auto-sync/slew when this page instance actually started the solve.
+      if (initiatedInSessionRef.current) {
+        handlePostSolve(activeSolveJob.result)
+      } else {
+        setBusy(false)
+      }
     } else if (activeSolveJob.status === 'failed') {
       setError(activeSolveJob.error ?? 'Solve failed')
       setBusy(false)
@@ -531,6 +554,7 @@ export function PlatesolvePage() {
     setBusy(true)
     setActiveSolveId(null)
     prevSolveStatusRef.current = undefined
+    initiatedInSessionRef.current = true
     try {
       const job = await api.platesolve.exposeAndSolve({
         device_id: camera.device_id,
