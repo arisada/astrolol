@@ -10,6 +10,29 @@ export interface AutofocusRunningState {
 }
 
 const MAX_LOG_ENTRIES = 1000
+
+// ---------------------------------------------------------------------------
+// Plugin event handler registry (module-level — no React overhead)
+// Handler: (event, currentPluginState) → newPluginState | undefined
+//   undefined  = no state change
+//   null       = clear plugin state
+//   anything else = new plugin state
+// ---------------------------------------------------------------------------
+
+type PluginEventHandler = (event: AstrolollEvent, pluginState: unknown) => unknown
+
+const _pluginHandlers = new Map<string, Map<string, PluginEventHandler>>()
+
+export function registerPluginEventHandlers(
+  pluginId: string,
+  handlers: Partial<Record<string, PluginEventHandler>>,
+) {
+  const map = _pluginHandlers.get(pluginId) ?? new Map<string, PluginEventHandler>()
+  for (const [eventType, handler] of Object.entries(handlers)) {
+    if (handler) map.set(eventType, handler)
+  }
+  _pluginHandlers.set(pluginId, map)
+}
 const MAX_GUIDE_STEPS = 500   // keep a large buffer; graph slices client-side
 
 export interface LogEntry {
@@ -79,8 +102,8 @@ interface AppState {
   // Plate solving — keyed by job id for O(1) updates
   solveJobs: Record<string, SolveJob>
 
-  // Autofocus — live progress for status bar (null when idle)
-  autofocusRunning: AutofocusRunningState | null
+  // Plugin-owned state slices — keyed by plugin id
+  pluginStates: Record<string, unknown>
 
   // Actions
   setWsConnected: (v: boolean) => void
@@ -119,7 +142,7 @@ export const useStore = create<AppState>((set, get) => ({
   phd2Status: null,
   phd2GuidePoints: [],
   solveJobs: {},
-  autofocusRunning: null,
+  pluginStates: {},
 
   setWsConnected: (v) => set({ wsConnected: v }),
   clearLastError: () => set({ lastError: null }),
@@ -467,6 +490,19 @@ export const useStore = create<AppState>((set, get) => ({
       case 'phd2.settled':
       default:
         set({ log, lastError })
+    }
+
+    // Dispatch to plugin-registered event handlers
+    const pluginUpdates: Record<string, unknown> = {}
+    for (const [pluginId, handlers] of _pluginHandlers) {
+      const handler = handlers.get(event.type)
+      if (handler) {
+        const newState = handler(event, state.pluginStates[pluginId])
+        if (newState !== undefined) pluginUpdates[pluginId] = newState
+      }
+    }
+    if (Object.keys(pluginUpdates).length > 0) {
+      set((s) => ({ pluginStates: { ...s.pluginStates, ...pluginUpdates } }))
     }
   },
 }))

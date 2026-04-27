@@ -10,12 +10,15 @@ export interface PluginRegistryEntry {
   icon: LucideIcon
   label: string
   Component: ComponentType
+  /** Optional status-bar chip rendered while the plugin is active. */
+  StatusChip?: ComponentType
 }
 
 // Eagerly import all plugin index files.  Vite resolves this glob at build time.
+// Side-effects in each index.ts (e.g. registerPluginEventHandlers) run here.
 const modules = import.meta.glob('@plugins/*/ui/index.ts', { eager: true }) as Record<
   string,
-  { default: { icon: LucideIcon; label: string; Component: ComponentType } }
+  { default: { icon: LucideIcon; label: string; Component: ComponentType; StatusChip?: ComponentType } }
 >
 
 // Build the registry by extracting the plugin ID from each module path.
@@ -23,14 +26,17 @@ const modules = import.meta.glob('@plugins/*/ui/index.ts', { eager: true }) as R
 const PLUGIN_REGISTRY: Record<string, PluginRegistryEntry> = {}
 
 for (const [path, mod] of Object.entries(modules)) {
-  // Extract <id> from the path string
   const match = path.match(/\/([^/]+)\/ui\/index\.ts$/)
   if (!match) continue
   const id = match[1]
-  const { icon, label, Component } = mod.default
-  PLUGIN_REGISTRY[id] = { to: `/${id}`, icon, label, Component }
+  const { icon, label, Component, StatusChip } = mod.default
+  PLUGIN_REGISTRY[id] = { to: `/${id}`, icon, label, Component, StatusChip }
 }
 
 export function getPluginEntry(id: string): PluginRegistryEntry | undefined {
   return PLUGIN_REGISTRY[id]
+}
+
+export function getAllPluginEntries(): PluginRegistryEntry[] {
+  return Object.values(PLUGIN_REGISTRY)
 }

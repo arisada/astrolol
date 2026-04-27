@@ -6,6 +6,7 @@
 import { useEffect, useState } from 'react'
 import { Wifi, WifiOff } from 'lucide-react'
 import { useStore } from '@/store'
+import { getAllPluginEntries } from '@/plugin-registry'
 import type { ConnectedDevice } from '@/api/types'
 
 // ---------------------------------------------------------------------------
@@ -203,6 +204,9 @@ export function StatusBar() {
       {filterWheels.map((d) => <FilterWheelChip key={d.device_id} device={d} />)}
       <Phd2Chip />
       <SolveChip />
+      {getAllPluginEntries().map((entry) =>
+        entry.StatusChip ? <entry.StatusChip key={entry.to} /> : null,
+      )}
 
       {/* Spacer */}
       <div className="flex-1" />
