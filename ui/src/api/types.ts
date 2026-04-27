@@ -123,6 +123,58 @@ export interface PlatesolveSettings {
   pixel_size_um: number | null
 }
 
+// ── Autofocus ─────────────────────────────────────────────────────────────────
+
+export interface AutofocusConfig {
+  camera_id: string
+  focuser_id: string
+  step_size?: number
+  num_steps?: number
+  exposure_time?: number
+  binning?: number
+  gain?: number | null
+  filter_slot?: number | null
+}
+
+export interface StarInfo {
+  x: number
+  y: number
+  fwhm: number
+}
+
+export interface FocusDataPoint {
+  step: number
+  position: number
+  fwhm: number
+  star_count: number
+}
+
+export interface CurveFit {
+  a: number
+  b: number
+  c: number
+  optimal_position: number
+}
+
+export type AutofocusRunStatus = 'running' | 'completed' | 'failed' | 'aborted'
+
+export interface AutofocusRun {
+  id: string
+  config: AutofocusConfig
+  status: AutofocusRunStatus
+  current_step: number
+  total_steps: number
+  data_points: FocusDataPoint[]
+  curve_fit: CurveFit | null
+  optimal_position: number | null
+  error: string | null
+  started_at: string
+  completed_at: string | null
+  latest_stars: StarInfo[]
+  image_width: number | null
+  image_height: number | null
+}
+
 // --- Plate solving ---
 
 export interface SolveRequest {
@@ -421,6 +473,30 @@ export interface Phd2GuideStepEvent extends BaseEvent {
 }
 export interface Phd2SettledEvent extends BaseEvent { type: 'phd2.settled'; error: string | null }
 
+export interface AutofocusStartedEvent extends BaseEvent {
+  type: 'autofocus.started'
+  run_id: string
+  camera_id: string
+  focuser_id: string
+  total_steps: number
+}
+export interface AutofocusDataPointEvent extends BaseEvent {
+  type: 'autofocus.data_point'
+  run_id: string
+  step: number
+  total_steps: number
+  position: number
+  fwhm: number
+  star_count: number
+}
+export interface AutofocusCompletedEvent extends BaseEvent {
+  type: 'autofocus.completed'
+  run_id: string
+  optimal_position: number
+}
+export interface AutofocusAbortedEvent extends BaseEvent { type: 'autofocus.aborted'; run_id: string }
+export interface AutofocusFailedEvent extends BaseEvent { type: 'autofocus.failed'; run_id: string; reason: string }
+
 export interface PlatesolveStartedEvent extends BaseEvent {
   type: 'platesolve.started'
   solve_id: string
@@ -453,4 +529,6 @@ export type AstrolollEvent =
   | Phd2ConnectedEvent | Phd2DisconnectedEvent | Phd2StateChangedEvent
   | Phd2GuideStepEvent | Phd2SettledEvent
   | PlatesolveStartedEvent | PlatesolveCompletedEvent | PlatesolveFailedEvent | PlatesolveCancelledEvent
+  | AutofocusStartedEvent | AutofocusDataPointEvent | AutofocusCompletedEvent
+  | AutofocusAbortedEvent | AutofocusFailedEvent
   | LogEvent

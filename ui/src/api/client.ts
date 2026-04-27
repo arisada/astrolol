@@ -1,5 +1,7 @@
 import type {
   ActivationResult,
+  AutofocusConfig,
+  AutofocusRun,
   CameraStatus,
   CoordFrame,
   ConnectedDevice,
@@ -230,6 +232,14 @@ export const api = {
     cancel: (jobId: string) => request<void>(`/plugins/platesolve/${jobId}/cancel`, { method: 'DELETE' }),
     dbStatus: () => request<DbStatus>('/plugins/platesolve/db_status'),
     installDb: () => request<{ status: string }>('/plugins/platesolve/install_db', { method: 'POST' }),
+  },
+
+  autofocus: {
+    start: (config: AutofocusConfig) =>
+      request<AutofocusRun>('/plugins/autofocus/start', { method: 'POST', body: JSON.stringify(config) }),
+    abort: () => request<void>('/plugins/autofocus/abort', { method: 'POST' }),
+    run: () => request<AutofocusRun>('/plugins/autofocus/run'),
+    previewUrl: (step: number) => `/plugins/autofocus/run/preview/${step}`,
   },
 
   focuser: {

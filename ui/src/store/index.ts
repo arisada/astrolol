@@ -1,6 +1,14 @@
 import { create } from 'zustand'
 import type { AstrolollEvent, CameraStatus, ConnectedDevice, FilterWheelStatus, FocuserStatus, MountStatus, Phd2Status, PluginInfo, SolveJob, SolveResult } from '@/api/types'
 
+// Autofocus running state (for the status bar chip)
+export interface AutofocusRunningState {
+  runId: string
+  step: number
+  totalSteps: number
+  fwhm: number | null
+}
+
 const MAX_LOG_ENTRIES = 1000
 const MAX_GUIDE_STEPS = 500   // keep a large buffer; graph slices client-side
 
@@ -71,6 +79,9 @@ interface AppState {
   // Plate solving — keyed by job id for O(1) updates
   solveJobs: Record<string, SolveJob>
 
+  // Autofocus — live progress for status bar (null when idle)
+  autofocusRunning: AutofocusRunningState | null
+
   // Actions
   setWsConnected: (v: boolean) => void
   setConnectedDevices: (devices: ConnectedDevice[]) => void
@@ -108,6 +119,7 @@ export const useStore = create<AppState>((set, get) => ({
   phd2Status: null,
   phd2GuidePoints: [],
   solveJobs: {},
+  autofocusRunning: null,
 
   setWsConnected: (v) => set({ wsConnected: v }),
   clearLastError: () => set({ lastError: null }),
@@ -433,6 +445,25 @@ export const useStore = create<AppState>((set, get) => ({
         })
         break
       }
+      case 'autofocus.started': {
+        set({ autofocusRunning: { runId: event.run_id, step: 0, totalSteps: event.total_steps, fwhm: null }, log, lastError })
+        break
+      }
+      case 'autofocus.data_point': {
+        set((s) => ({
+          autofocusRunning: s.autofocusRunning
+            ? { ...s.autofocusRunning, step: event.step, totalSteps: event.total_steps, fwhm: event.fwhm }
+            : { runId: event.run_id, step: event.step, totalSteps: event.total_steps, fwhm: event.fwhm },
+          log, lastError,
+        }))
+        break
+      }
+      case 'autofocus.completed':
+      case 'autofocus.aborted':
+      case 'autofocus.failed': {
+        set({ autofocusRunning: null, log, lastError })
+        break
+      }
       case 'phd2.settled':
       default:
         set({ log, lastError })
@@ -472,6 +503,11 @@ function eventSummary(event: AstrolollEvent): string {
     case 'platesolve.completed': return `Plate solve done: RA ${(event.ra / 15).toFixed(4)}h Dec ${event.dec.toFixed(4)}° (${event.duration_ms}ms)`
     case 'platesolve.failed': return `Plate solve failed: ${event.reason}`
     case 'platesolve.cancelled': return `Plate solve cancelled`
+    case 'autofocus.started': return `Autofocus started (${event.total_steps} steps)`
+    case 'autofocus.data_point': return `AF step ${event.step}/${event.total_steps}: pos ${event.position}, FWHM ${event.fwhm.toFixed(2)}px (${event.star_count} stars)`
+    case 'autofocus.completed': return `Autofocus complete — optimal position: ${event.optimal_position}`
+    case 'autofocus.aborted': return `Autofocus aborted`
+    case 'autofocus.failed': return `Autofocus failed: ${event.reason}`
     default: return (event as { type: string }).type
   }
 }
