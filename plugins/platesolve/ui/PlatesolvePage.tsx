@@ -3,7 +3,8 @@ import { AlertTriangle, Camera, ChevronDown, ChevronUp, Download, ScanSearch, Se
 import { api } from '@/api/client'
 import { useStore } from '@/store'
 import { Button } from '@/components/ui/button'
-import type { DbStatus, PlatesolveSettings, SolveJob, SolveResult } from '@/api/types'
+import * as plateSolveApi from './api'
+import type { DbStatus, PlatesolveSettings, SolveJob, SolveResult, PlateSolvePluginState } from './api'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -217,8 +218,6 @@ function JobRow({ job, onCancel }: { job: SolveJob; onCancel: (id: string) => vo
 
 // ── Settings panel ─────────────────────────────────────────────────────────────
 
-// Numeric input that keeps a raw string while typing and only commits a
-// parsed value on blur, so the user can freely delete and retype digits.
 function NumericInput({ value, onChange, placeholder, allowNull }: {
   value: number | null
   onChange: (v: number | null) => void
@@ -231,7 +230,7 @@ function NumericInput({ value, onChange, placeholder, allowNull }: {
   const commit = () => {
     if (raw.trim() === '') {
       if (allowNull) { onChange(null); return }
-      setRaw(value != null ? String(value) : '')  // revert
+      setRaw(value != null ? String(value) : '')
       return
     }
     const n = parseFloat(raw)
@@ -257,7 +256,7 @@ function SettingsPanel({ settings, onChange }: { settings: PlatesolveSettings; o
 
   const save = async () => {
     setSaving(true)
-    try { onChange(await api.plugins.putSettings<PlatesolveSettings>('platesolve', local)) } catch { /* ignore */ } finally { setSaving(false) }
+    try { onChange(await plateSolveApi.putSettings(local)) } catch { /* ignore */ } finally { setSaving(false) }
   }
 
   const inp = (value: string, fn: (v: string) => void, placeholder?: string) => (
@@ -337,7 +336,7 @@ function SolveLog() {
   const log = useStore((s) => s.log.filter((e) => e.component === 'platesolve'))
   const containerRef  = useRef<HTMLDivElement>(null)
   const atBottomRef   = useRef(false)
-  const [height, setHeight] = useState(300) // ~h-28
+  const [height, setHeight] = useState(300)
   const dragStart     = useRef<{ y: number; h: number } | null>(null)
 
   const onScroll = () => {
@@ -346,7 +345,6 @@ function SolveLog() {
     atBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 24
   }
 
-  // Scroll to bottom on mount
   useEffect(() => {
     const el = containerRef.current
     if (!el) return
@@ -354,7 +352,6 @@ function SolveLog() {
     atBottomRef.current = true
   }, [])
 
-  // Auto-scroll when new messages arrive, if already at the bottom
   useEffect(() => {
     const el = containerRef.current
     if (!el || !atBottomRef.current) return
@@ -366,7 +363,7 @@ function SolveLog() {
     dragStart.current = { y: e.clientY, h: height }
     const onMove = (ev: MouseEvent) => {
       if (!dragStart.current) return
-      const delta = dragStart.current.y - ev.clientY   // drag up → taller
+      const delta = dragStart.current.y - ev.clientY
       setHeight(Math.max(64, dragStart.current.h + delta))
     }
     const onUp = () => {
@@ -380,7 +377,6 @@ function SolveLog() {
 
   return (
     <div className="shrink-0 border-t border-surface-border" style={{ height }}>
-      {/* Drag handle */}
       <div
         onMouseDown={onDragMouseDown}
         className="h-1.5 cursor-ns-resize bg-surface-border hover:bg-accent/50 active:bg-accent transition-colors"
@@ -432,9 +428,6 @@ function ImageViewer({ image }: { image: { previewUrl: string; width: number; he
   )
 }
 
-// ── FOV calculator ─────────────────────────────────────────────────────────────
-
-
 // ── Sidebar section wrapper ────────────────────────────────────────────────────
 
 function Section({ title, children, action }: {
@@ -458,8 +451,7 @@ function Section({ title, children, action }: {
 export function PlatesolvePage() {
   const connectedDevices = useStore((s) => s.connectedDevices)
   const latestImages     = useStore((s) => s.latestImages)
-  const solveJobsMap     = useStore((s) => s.solveJobs)
-  const mergeSolveJobs   = useStore((s) => s.mergeSolveJobs)
+  const solveJobsMap     = useStore((s) => (s.pluginStates['platesolve'] as PlateSolvePluginState | null)?.jobs ?? {})
 
   const cameras = connectedDevices.filter((d) => d.kind === 'camera')
   const [selectedCameraId, setSelectedCameraId] = useLocalStorage<string>(
@@ -488,27 +480,31 @@ export function PlatesolvePage() {
   const initiatedInSessionRef             = useRef(false)
 
   useEffect(() => {
-    api.plugins.getSettings<PlatesolveSettings>('platesolve')
+    plateSolveApi.getSettings()
       .then(s => setSettings({ ...DEFAULT_PLATESOLVE_SETTINGS, ...s }))
       .catch(console.error)
 
-    api.platesolve.jobs().then(jobs => {
-      mergeSolveJobs(jobs)
+    plateSolveApi.jobs().then(loadedJobs => {
+      // Seed plugin state with jobs fetched on mount
+      useStore.setState((s) => {
+        const cur = (s.pluginStates['platesolve'] as PlateSolvePluginState | null) ?? { jobs: {} }
+        const merged = { ...cur.jobs }
+        for (const job of loadedJobs) merged[job.id] = job
+        return { pluginStates: { ...s.pluginStates, platesolve: { ...cur, jobs: merged } } }
+      })
       // Restore busy state if a solve was running before we navigated away.
-      const active = jobs.find(
+      const active = loadedJobs.find(
         (j) => j.status === 'pending' || j.status === 'exposing' || j.status === 'solving'
       )
       if (active) {
         setActiveSolveId(active.id)
         setBusy(true)
-        // Seed the ref with the current status so the status-watching effect
-        // doesn't treat the first render as a transition.
         prevSolveStatusRef.current = active.status
         initiatedInSessionRef.current = false
       }
     }).catch(console.error)
 
-    api.platesolve.dbStatus().then(setDbStatus).catch(console.error)
+    plateSolveApi.dbStatus().then(setDbStatus).catch(console.error)
   }, [])  // eslint-disable-line react-hooks/exhaustive-deps
 
   // React to solve completion via WebSocket-driven store updates
@@ -519,7 +515,6 @@ export function PlatesolvePage() {
     prevSolveStatusRef.current = activeSolveJob.status
     if (prev === activeSolveJob.status) return
     if (activeSolveJob.status === 'completed' && activeSolveJob.result) {
-      // Only auto-sync/slew when this page instance actually started the solve.
       if (initiatedInSessionRef.current) {
         handlePostSolve(activeSolveJob.result)
       } else {
@@ -556,12 +551,15 @@ export function PlatesolvePage() {
     prevSolveStatusRef.current = undefined
     initiatedInSessionRef.current = true
     try {
-      const job = await api.platesolve.exposeAndSolve({
+      const job = await plateSolveApi.exposeAndSolve({
         device_id: camera.device_id,
         duration,
         binning,
       })
-      mergeSolveJobs([job])
+      useStore.setState((s) => {
+        const cur = (s.pluginStates['platesolve'] as PlateSolvePluginState | null) ?? { jobs: {} }
+        return { pluginStates: { ...s.pluginStates, platesolve: { ...cur, jobs: { ...cur.jobs, [job.id]: job } } } }
+      })
       setActiveSolveId(job.id)
     } catch (e) {
       setBusy(false)
@@ -571,22 +569,22 @@ export function PlatesolvePage() {
 
   const handleHalt = async () => {
     if (activeSolveId) {
-      try { await api.platesolve.cancel(activeSolveId) } catch { /* ignore */ }
+      try { await plateSolveApi.cancel(activeSolveId) } catch { /* ignore */ }
     }
     setBusy(false)
     setActiveSolveId(null)
   }
 
   const handleCancel = async (jobId: string) => {
-    try { await api.platesolve.cancel(jobId) } catch (e) { setError((e as Error).message) }
+    try { await plateSolveApi.cancel(jobId) } catch (e) { setError((e as Error).message) }
   }
 
   const handleInstallDb = async () => {
     setInstalling(true)
     try {
-      await api.platesolve.installDb()
+      await plateSolveApi.installDb()
       setTimeout(() => {
-        api.platesolve.dbStatus().then(setDbStatus).catch(console.error)
+        plateSolveApi.dbStatus().then(setDbStatus).catch(console.error)
         setInstalling(false)
       }, 3000)
     } catch (e) {
@@ -600,7 +598,6 @@ export function PlatesolvePage() {
     (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
   )
   const lastCompleted = jobs.find((j) => j.status === 'completed' && j.result)
-
 
   return (
     <div className="flex h-full overflow-hidden">
