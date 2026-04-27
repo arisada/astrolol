@@ -216,6 +216,7 @@ def create_app() -> FastAPI:
                 "version": p.manifest.version,
                 "description": p.manifest.description,
                 "enabled": p.manifest.id in enabled,
+                "nav_order": p.manifest.nav_order,
             }
             for p in discovered.values()
         ]

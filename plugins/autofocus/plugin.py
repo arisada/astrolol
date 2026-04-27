@@ -19,6 +19,7 @@ class AutofocusPlugin:
             "Takes exposures at several focuser positions, measures median star FWHM via "
             "photutils, fits a parabola, and moves to the computed optimal focus position."
         ),
+        nav_order=21,
     )
 
     def __init__(self) -> None:

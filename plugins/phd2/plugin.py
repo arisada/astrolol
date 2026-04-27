@@ -21,6 +21,7 @@ class Phd2Plugin:
             "PHD2 autoguider integration — live connection status, guiding metrics, "
             "guide graph, and configurable automatic dithering between frames."
         ),
+        nav_order=10,
     )
 
     def __init__(self) -> None:

@@ -23,6 +23,7 @@ class PluginManifest:
     version: str
     description: str = ""
     requires: list[str] = field(default_factory=list)  # IDs of plugins this one depends on
+    nav_order: int = 0                   # sidebar sort key — lower = higher in the list
 
 
 @dataclass

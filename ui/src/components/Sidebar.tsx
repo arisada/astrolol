@@ -11,6 +11,8 @@ export function Sidebar() {
   const cameras     = useStore((s) => s.connectedDevices.filter((d) => d.kind === 'camera' && d.state === 'connected'))
 
   const pluginNavItems = enabledPlugins
+    .slice()
+    .sort((a, b) => a.nav_order - b.nav_order)
     .map((p) => {
       const entry = getPluginEntry(p.id)
       if (!entry) return null

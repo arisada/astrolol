@@ -230,6 +230,7 @@ export interface PluginInfo {
   version: string
   description: string
   enabled: boolean
+  nav_order: number
 }
 
 export interface CameraStatus {

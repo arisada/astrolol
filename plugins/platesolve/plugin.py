@@ -22,6 +22,7 @@ class PlatesolvePlugin:
             "pointing coordinates (RA/Dec), field rotation, and pixel scale. "
             "Supports concurrent solves and cancellation."
         ),
+        nav_order=20,
     )
 
     def __init__(self) -> None:
