@@ -125,6 +125,18 @@ export interface PlatesolveSettings {
 
 // ── Autofocus ─────────────────────────────────────────────────────────────────
 
+export type FitAlgo = 'parabola' | 'hyperbola'
+
+export interface AutofocusSettings {
+  step_size: number
+  num_steps: number
+  exposure_time: number
+  binning: number
+  gain: number | null
+  filter_slot: number | null
+  fit_algo: FitAlgo
+}
+
 export interface AutofocusConfig {
   camera_id: string
   focuser_id: string
@@ -134,6 +146,7 @@ export interface AutofocusConfig {
   binning?: number
   gain?: number | null
   filter_slot?: number | null
+  fit_algo?: FitAlgo
 }
 
 export interface StarInfo {

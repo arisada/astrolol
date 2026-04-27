@@ -21,7 +21,7 @@ from astrolol.config.settings import settings
 from astrolol.core.events import EventBus
 from astrolol.devices.base.models import ExposureParams
 from astrolol.devices.manager import DeviceManager
-from plugins.autofocus.algorithms import fit_parabola
+from plugins.autofocus.algorithms import fit_hyperbola, fit_parabola
 from plugins.autofocus.models import (
     AutofocusAbortedEvent,
     AutofocusCompletedEvent,
@@ -40,6 +40,48 @@ logger = structlog.get_logger()
 
 _MOVE_TIMEOUT = 120.0   # seconds to wait for a single focuser move
 _EXPOSE_TIMEOUT = 300.0  # seconds to wait for a single exposure
+
+
+def _annotate_preview(
+    jpeg_path: str,
+    stars: list[dict],
+    fits_w: int,
+    fits_h: int,
+) -> None:
+    """Draw green circles on the JPEG for each detected star.
+
+    Star coordinates are in FITS pixel space; the JPEG may have been
+    downscaled by fits_to_jpeg, so we apply the same scale factor.
+    """
+    from PIL import Image, ImageDraw
+    img = Image.open(jpeg_path)
+    jpeg_w, jpeg_h = img.size
+    sx = jpeg_w / fits_w if fits_w else 1.0
+    sy = jpeg_h / fits_h if fits_h else 1.0
+    draw = ImageDraw.Draw(img)
+    for star in stars:
+        cx = star["x"] * sx
+        cy = star["y"] * sy
+        r  = star["fwhm"] * max(sx, sy) * 2.5
+        draw.ellipse([cx - r, cy - r, cx + r, cy + r], outline="#00ff00", width=2)
+    img.save(jpeg_path, format="JPEG", quality=90)
+
+
+def _read_fits_shape(fits_path: str) -> tuple[int, int]:
+    """Return (width, height) by reading the FITS header directly."""
+    try:
+        from astropy.io import fits
+        with fits.open(fits_path) as hdul:
+            data = hdul[0].data
+            if data is None:
+                return 0, 0
+            # Shape is (..., H, W) in numpy convention
+            shape = data.shape
+            while len(shape) > 2:
+                shape = shape[1:]
+            return int(shape[1]), int(shape[0])  # (width, height)
+    except Exception:
+        return 0, 0
 
 
 class AutofocusEngine:
@@ -139,7 +181,22 @@ class AutofocusEngine:
                 )
                 image = await asyncio.wait_for(camera.expose(params), timeout=_EXPOSE_TIMEOUT)
 
-                # 3. Generate preview JPEG
+                # Always derive dimensions from the FITS file itself so that
+                # binning and subframe settings are reflected correctly.
+                fits_w, fits_h = await asyncio.to_thread(_read_fits_shape, image.fits_path)
+                run.image_width = fits_w or None
+                run.image_height = fits_h or None
+
+                # 3. Detect stars and measure FWHM
+                logger.info("autofocus.detecting_stars", step=run.current_step)
+                fwhm, star_count, raw_stars = await detect_stars(image.fits_path)
+
+                run.latest_stars = [StarInfo(x=s["x"], y=s["y"], fwhm=s["fwhm"]) for s in raw_stars]
+
+                # 4. Generate preview JPEG with star circles burned in.
+                # Done AFTER star detection so circles are always in the final
+                # file.  _preview_paths is registered here too, so the API
+                # endpoint never serves a circle-free version.
                 preview_path = str(preview_dir / f"step_{run.current_step:02d}.jpg")
                 try:
                     from astrolol.imaging.preview import fits_to_jpeg
@@ -149,19 +206,17 @@ class AutofocusEngine:
                         Path(preview_path),
                         settings.jpeg_quality,
                     )
+                    if raw_stars:
+                        await asyncio.to_thread(
+                            _annotate_preview,
+                            preview_path,
+                            raw_stars,
+                            fits_w,
+                            fits_h,
+                        )
                     self._preview_paths[run.current_step] = preview_path
                 except Exception as exc:
                     logger.warning("autofocus.preview_failed", step=run.current_step, error=str(exc))
-                    # Keep fits path as fallback (won't be JPEG-servable but doesn't crash)
-                    self._preview_paths[run.current_step] = image.fits_path
-
-                # 4. Detect stars and measure FWHM
-                logger.info("autofocus.detecting_stars", step=run.current_step)
-                fwhm, star_count, raw_stars = await detect_stars(image.fits_path)
-
-                run.latest_stars = [StarInfo(x=s["x"], y=s["y"], fwhm=s["fwhm"]) for s in raw_stars]
-                run.image_width = image.width
-                run.image_height = image.height
 
                 dp = FocusDataPoint(
                     step=run.current_step,
@@ -194,15 +249,18 @@ class AutofocusEngine:
             # ── Move to optimal position ───────────────────────────────────────
             self._refit_curve(run)
 
+            valid = [dp for dp in run.data_points if dp.fwhm > 0 and dp.star_count > 0]
+            if not valid:
+                raise RuntimeError(
+                    "No stars detected at any focuser position. "
+                    "Check exposure time, focus range, or star detection threshold."
+                )
+
             if run.curve_fit is not None:
                 optimal_position = max(0, round(run.curve_fit.optimal_position))
             else:
                 # No valid parabola — use the position with the lowest FWHM
-                valid = [dp for dp in run.data_points if dp.fwhm > 0]
-                if valid:
-                    optimal_position = min(valid, key=lambda dp: dp.fwhm).position
-                else:
-                    optimal_position = start_pos
+                optimal_position = min(valid, key=lambda dp: dp.fwhm).position
 
             run.optimal_position = optimal_position
             logger.info("autofocus.moving_to_optimal", position=optimal_position)
@@ -235,7 +293,8 @@ class AutofocusEngine:
         valid = [(dp.position, dp.fwhm) for dp in run.data_points if dp.fwhm > 0]
         if len(valid) < 3:
             return
-        result = fit_parabola([p for p, _ in valid], [f for _, f in valid])
+        fit_fn = fit_hyperbola if run.config.fit_algo == "hyperbola" else fit_parabola
+        result = fit_fn([p for p, _ in valid], [f for _, f in valid])
         if result is not None:
             a, b, c, optimal = result
             run.curve_fit = CurveFit(a=a, b=b, c=c, optimal_position=optimal)

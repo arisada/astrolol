@@ -1,14 +1,6 @@
 import { create } from 'zustand'
 import type { AstrolollEvent, CameraStatus, ConnectedDevice, FilterWheelStatus, FocuserStatus, MountStatus, Phd2Status, PluginInfo, SolveJob, SolveResult } from '@/api/types'
 
-// Autofocus running state (for the status bar chip)
-export interface AutofocusRunningState {
-  runId: string
-  step: number
-  totalSteps: number
-  fwhm: number | null
-}
-
 const MAX_LOG_ENTRIES = 1000
 
 // ---------------------------------------------------------------------------
@@ -466,25 +458,6 @@ export const useStore = create<AppState>((set, get) => ({
           const job: SolveJob = { ...existing, status: 'cancelled', completed_at: event.timestamp }
           return { solveJobs: { ...s.solveJobs, [event.solve_id]: job }, log, lastError }
         })
-        break
-      }
-      case 'autofocus.started': {
-        set({ autofocusRunning: { runId: event.run_id, step: 0, totalSteps: event.total_steps, fwhm: null }, log, lastError })
-        break
-      }
-      case 'autofocus.data_point': {
-        set((s) => ({
-          autofocusRunning: s.autofocusRunning
-            ? { ...s.autofocusRunning, step: event.step, totalSteps: event.total_steps, fwhm: event.fwhm }
-            : { runId: event.run_id, step: event.step, totalSteps: event.total_steps, fwhm: event.fwhm },
-          log, lastError,
-        }))
-        break
-      }
-      case 'autofocus.completed':
-      case 'autofocus.aborted':
-      case 'autofocus.failed': {
-        set({ autofocusRunning: null, log, lastError })
         break
       }
       case 'phd2.settled':

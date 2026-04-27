@@ -1,22 +1,22 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { ChevronDown, ChevronUp, Focus, StopCircle } from 'lucide-react'
 import { api } from '@/api/client'
+import * as autofocusApi from './api'
 import { useStore } from '@/store'
 import { Button } from '@/components/ui/button'
 import type {
   AutofocusConfig,
   AutofocusRun,
+  AutofocusSettings,
   CurveFit,
   FilterWheelStatus,
+  FitAlgo,
   FocusDataPoint,
-  StarInfo,
 } from '@/api/types'
 
 // ── Exposure duration stepper ─────────────────────────────────────────────────
 
-const EXPOSURE_STEPS = [
-  0.5, 1, 1.5, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20, 30,
-]
+const EXPOSURE_STEPS = [0.5, 1, 1.5, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20, 30]
 
 function fmtDuration(s: number): string {
   return s < 1 ? `${Math.round(s * 1000)} ms` : `${s} s`
@@ -45,10 +45,12 @@ function UCurveChart({
   dataPoints,
   curveFit,
   optimal,
+  fitAlgo,
 }: {
   dataPoints: FocusDataPoint[]
   curveFit: CurveFit | null
   optimal: number | null
+  fitAlgo: FitAlgo
 }) {
   const W = 260, H = 150
   const pad = { t: 8, r: 10, b: 24, l: 34 }
@@ -75,133 +77,74 @@ function UCurveChart({
   const toX = (pos: number) => pad.l + ((pos - minX) / rangeX) * cw
   const toY = (fwhm: number) => pad.t + (1 - fwhm / maxY) * ch
 
-  // Fitted parabola — sampled at 80 points across the range
+  // Fitted curve — sampled at 80 points across the range
   let curvePath = ''
   if (curveFit) {
+    const { a, b, c } = curveFit
     const pts = Array.from({ length: 80 }, (_, i) => {
       const x = minX + (i / 79) * rangeX
-      const y = curveFit.a * x * x + curveFit.b * x + curveFit.c
+      const y = fitAlgo === 'hyperbola'
+        ? Math.sqrt(Math.max(0, a * x * x + b * x + c))
+        : a * x * x + b * x + c
       if (y < 0 || y > maxY * 1.1) return null
       return `${toX(x).toFixed(1)},${toY(y).toFixed(1)}`
     }).filter(Boolean)
     if (pts.length >= 2) curvePath = `M ${pts.join(' L ')}`
   }
 
-  // Optimal position — only if inside the sampled range
   const showOptimal =
     optimal !== null && optimal >= minX - rangeX * 0.05 && optimal <= maxX + rangeX * 0.05
 
-  // Y axis labels: 0, midpoint, max (one decimal)
   const yLabels = [maxY, maxY / 2, 0]
 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} className="block">
-      {/* Background */}
       <rect x={pad.l} y={pad.t} width={cw} height={ch} fill="#0f1623" stroke="#1e293b" strokeWidth={0.5} />
 
-      {/* Y grid lines + labels */}
       {yLabels.map((fwhm, i) => (
         <g key={i}>
-          <line
-            x1={pad.l} y1={toY(fwhm)} x2={pad.l + cw} y2={toY(fwhm)}
-            stroke="#1e293b" strokeWidth={0.5}
-          />
+          <line x1={pad.l} y1={toY(fwhm)} x2={pad.l + cw} y2={toY(fwhm)} stroke="#1e293b" strokeWidth={0.5} />
           <text x={pad.l - 3} y={toY(fwhm) + 3} textAnchor="end" fill="#475569" fontSize={7}>
             {fwhm === 0 ? '0' : fwhm.toFixed(1)}
           </text>
         </g>
       ))}
 
-      {/* Y axis label (rotated) */}
-      <text
-        x={7} y={pad.t + ch / 2}
-        textAnchor="middle" fill="#475569" fontSize={7}
-        transform={`rotate(-90 7 ${pad.t + ch / 2})`}
-      >FWHM px</text>
+      <text x={7} y={pad.t + ch / 2} textAnchor="middle" fill="#475569" fontSize={7}
+        transform={`rotate(-90 7 ${pad.t + ch / 2})`}>FWHM px</text>
 
-      {/* X axis ticks — up to 5 evenly-spaced positions */}
       {Array.from({ length: Math.min(5, positions.length) }, (_, i) => {
         const pos = rangeX === 0
           ? minX
           : Math.round(minX + (i / (Math.min(5, positions.length) - 1 || 1)) * rangeX)
         return (
           <g key={i}>
-            <line
-              x1={toX(pos)} y1={pad.t + ch} x2={toX(pos)} y2={pad.t + ch + 3}
-              stroke="#334155" strokeWidth={0.5}
-            />
-            <text x={toX(pos)} y={H - 4} textAnchor="middle" fill="#475569" fontSize={6.5}>
-              {pos}
-            </text>
+            <line x1={toX(pos)} y1={pad.t + ch} x2={toX(pos)} y2={pad.t + ch + 3} stroke="#334155" strokeWidth={0.5} />
+            <text x={toX(pos)} y={H - 4} textAnchor="middle" fill="#475569" fontSize={6.5}>{pos}</text>
           </g>
         )
       })}
 
-      {/* Fitted curve */}
       {curvePath && (
         <path d={curvePath} stroke="#f87171" fill="none" strokeWidth={1.5} strokeLinejoin="round" />
       )}
 
-      {/* Optimal position line */}
       {showOptimal && (
-        <line
-          x1={toX(optimal!)} y1={pad.t} x2={toX(optimal!)} y2={pad.t + ch}
-          stroke="#4ade80" strokeWidth={1} strokeDasharray="3,2"
-        />
+        <line x1={toX(optimal!)} y1={pad.t} x2={toX(optimal!)} y2={pad.t + ch}
+          stroke="#4ade80" strokeWidth={1} strokeDasharray="3,2" />
       )}
 
-      {/* Data points */}
-      {dataPoints
-        .filter((dp) => dp.fwhm > 0)
-        .map((dp, i) => (
-          <circle
-            key={i}
-            cx={toX(dp.position)} cy={toY(dp.fwhm)}
-            r={3} fill="#60a5fa" stroke="#1d4ed8" strokeWidth={0.5}
-          />
-        ))}
+      {dataPoints.filter((dp) => dp.fwhm > 0).map((dp, i) => (
+        <circle key={i} cx={toX(dp.position)} cy={toY(dp.fwhm)}
+          r={3} fill="#60a5fa" stroke="#1d4ed8" strokeWidth={0.5} />
+      ))}
     </svg>
   )
 }
 
-// ── Star overlay image panel ──────────────────────────────────────────────────
-
-function StarOverlayImage({
-  src,
-  stars,
-  imageWidth,
-  imageHeight,
-}: {
-  src: string
-  stars: StarInfo[]
-  imageWidth: number
-  imageHeight: number
-}) {
-  return (
-    <div className="relative w-full h-full">
-      <img src={src} alt="Focus step" className="w-full h-full object-contain" />
-      <svg
-        className="absolute inset-0 w-full h-full"
-        viewBox={`0 0 ${imageWidth} ${imageHeight}`}
-        preserveAspectRatio="xMidYMid meet"
-        style={{ pointerEvents: 'none' }}
-      >
-        {stars.map((star, i) => (
-          <circle
-            key={i}
-            cx={star.x}
-            cy={star.y}
-            r={star.fwhm * 2.5}
-            fill="none"
-            stroke="lime"
-            strokeWidth={1.2}
-            opacity={0.75}
-          />
-        ))}
-      </svg>
-    </div>
-  )
-}
+// ── Preview image panel ───────────────────────────────────────────────────────
+// Star circles are burned into the JPEG server-side after detection,
+// so no SVG overlay is needed here.
 
 // ── Sidebar section wrapper ───────────────────────────────────────────────────
 
@@ -230,45 +173,65 @@ function RunBadge({ status }: { status: AutofocusRun['status'] }) {
   )
 }
 
+// ── Default settings ──────────────────────────────────────────────────────────
+
+const DEFAULT_SETTINGS: AutofocusSettings = {
+  step_size: 100,
+  num_steps: 5,
+  exposure_time: 2.0,
+  binning: 1,
+  gain: null,
+  filter_slot: null,
+  fit_algo: 'parabola',
+}
+
 // ── Main page component ───────────────────────────────────────────────────────
 
 export function AutofocusPage() {
   const connectedDevices = useStore((s) => s.connectedDevices)
 
-  const cameras = connectedDevices.filter((d) => d.kind === 'camera')
-  const focusers = connectedDevices.filter((d) => d.kind === 'focuser')
+  const cameras      = connectedDevices.filter((d) => d.kind === 'camera')
+  const focusers     = connectedDevices.filter((d) => d.kind === 'focuser')
   const filterWheels = connectedDevices.filter((d) => d.kind === 'filter_wheel')
 
   // ── Configuration state ────────────────────────────────────────────────────
-  const [cameraId, setCameraId] = useState<string>('')
+  const [cameraId,  setCameraId]  = useState<string>('')
   const [focuserId, setFocuserId] = useState<string>('')
-  const [stepSize, setStepSize] = useState(100)
-  const [numSteps, setNumSteps] = useState(5)
-  const [exposureTime, setExposureTime] = useState(2.0)
-  const [binning, setBinning] = useState(1)
-  const [gain, setGain] = useState<string>('')
-  const [filterSlot, setFilterSlot] = useState<string>('')
+  const [settings, setSettings]   = useState<AutofocusSettings>(DEFAULT_SETTINGS)
   const [filterWheelStatus, setFilterWheelStatus] = useState<FilterWheelStatus | null>(null)
+  const settingsLoadedRef = useRef(false)
+
+  // Helper to patch a single settings key
+  const patchSettings = useCallback(<K extends keyof AutofocusSettings>(key: K, value: AutofocusSettings[K]) => {
+    setSettings((s) => ({ ...s, [key]: value }))
+  }, [])
 
   // ── Run state ──────────────────────────────────────────────────────────────
-  const [run, setRun] = useState<AutofocusRun | null>(null)
+  const [run, setRun]   = useState<AutofocusRun | null>(null)
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  // preview image: which step to show (null = latest)
   const [previewStep, setPreviewStep] = useState<number | null>(null)
-  const [previewKey, setPreviewKey] = useState(0) // force img reload
+  const [previewKey,  setPreviewKey]  = useState(0)
 
-  // Auto-select first available device when connected devices change
+  // ── Load persisted settings on mount ──────────────────────────────────────
+  useEffect(() => {
+    if (settingsLoadedRef.current) return
+    settingsLoadedRef.current = true
+    autofocusApi.getSettings()
+      .then((s) => setSettings(s))
+      .catch(() => {/* use defaults */})
+  }, [])
+
+  // Auto-select first available device when devices change
   useEffect(() => {
     if (!cameraId && cameras.length > 0) setCameraId(cameras[0].device_id)
-  }, [cameras]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [cameras])  // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!focuserId && focusers.length > 0) setFocuserId(focusers[0].device_id)
-  }, [focusers]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [focusers])  // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Fetch filter wheel status for filter names
   useEffect(() => {
     if (filterWheels.length === 0) return
     api.filterWheel.status(filterWheels[0].device_id)
@@ -281,7 +244,7 @@ export function AutofocusPage() {
 
   const fetchRun = useCallback(async () => {
     try {
-      const r = await api.autofocus.run()
+      const r = await autofocusApi.run()
       setRun(r)
       if (r.status !== 'running') {
         setBusy(false)
@@ -290,14 +253,12 @@ export function AutofocusPage() {
       } else {
         setPreviewKey((k) => k + 1)
       }
-    } catch {
-      // 404 = no run yet — ignore
-    }
+    } catch { /* 404 = no run yet */ }
   }, [])
 
   // Restore state on mount if a run is already active
   useEffect(() => {
-    api.autofocus.run().then((r) => {
+    autofocusApi.run().then((r) => {
       setRun(r)
       if (r.status === 'running') {
         setBusy(true)
@@ -309,53 +270,42 @@ export function AutofocusPage() {
 
   // ── Actions ────────────────────────────────────────────────────────────────
   const handleStart = useCallback(async () => {
-    if (!cameraId || !focuserId) {
-      setError('Camera and focuser must be connected.')
-      return
-    }
+    if (!cameraId || !focuserId) { setError('Camera and focuser must be connected.'); return }
     setError(null)
     setBusy(true)
     setRun(null)
     setPreviewStep(null)
 
+    // Persist settings before starting
+    autofocusApi.putSettings(settings).catch(() => {})
+
     const config: AutofocusConfig = {
       camera_id: cameraId,
       focuser_id: focuserId,
-      step_size: stepSize,
-      num_steps: numSteps,
-      exposure_time: exposureTime,
-      binning,
-      gain: gain ? parseInt(gain, 10) : null,
-      filter_slot: filterSlot ? parseInt(filterSlot, 10) : null,
+      ...settings,
     }
 
     try {
-      const r = await api.autofocus.start(config)
+      const r = await autofocusApi.start(config)
       setRun(r)
       pollRef.current = setInterval(fetchRun, 1500)
     } catch (err) {
       setBusy(false)
       setError(err instanceof Error ? err.message : 'Failed to start autofocus')
     }
-  }, [cameraId, focuserId, stepSize, numSteps, exposureTime, binning, gain, filterSlot, fetchRun])
+  }, [cameraId, focuserId, settings, fetchRun])
 
   const handleAbort = useCallback(async () => {
-    try {
-      await api.autofocus.abort()
-      await fetchRun()
-    } catch {
-      setBusy(false)
-    }
+    try { await autofocusApi.abort(); await fetchRun() }
+    catch { setBusy(false) }
   }, [fetchRun])
 
   // ── Derived display values ─────────────────────────────────────────────────
-  const displayStep = previewStep ?? (run?.current_step ?? null)
-  const previewUrl = displayStep ? `${api.autofocus.previewUrl(displayStep)}?k=${previewKey}` : null
-  const displayStars = displayStep && displayStep === run?.current_step
-    ? (run?.latest_stars ?? [])
-    : []
-  const imgW = run?.image_width ?? 1
-  const imgH = run?.image_height ?? 1
+  // Use the last *completed* data point — run.current_step is set at the
+  // start of each iteration before exposure/preview are ready.
+  const lastDp      = run?.data_points.length ? run.data_points[run.data_points.length - 1] : null
+  const displayStep = previewStep ?? lastDp?.step ?? null
+  const previewUrl  = displayStep ? `${autofocusApi.previewUrl(displayStep)}?k=${previewKey}` : null
 
   const bestDataPoint = run?.data_points.filter((d) => d.fwhm > 0).reduce(
     (best, dp) => (!best || dp.fwhm < best.fwhm ? dp : best), null as FocusDataPoint | null,
@@ -369,13 +319,8 @@ export function AutofocusPage() {
 
       {/* ── Left: image preview ── */}
       <div className="flex-1 flex flex-col items-center justify-center bg-black min-w-0 relative">
-        {previewUrl && run?.image_width ? (
-          <StarOverlayImage
-            src={previewUrl}
-            stars={displayStars}
-            imageWidth={imgW}
-            imageHeight={imgH}
-          />
+        {previewUrl ? (
+          <img src={previewUrl} alt="Focus step" className="max-w-full max-h-full object-contain" />
         ) : (
           <div className="flex flex-col items-center gap-3 text-slate-600">
             <Focus size={48} strokeWidth={1} />
@@ -444,13 +389,30 @@ export function AutofocusPage() {
         <Section title="V-Curve">
           <div className="flex flex-col gap-3">
 
+            {/* Algorithm selector */}
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-slate-400">Fit algorithm</label>
+              <div className="flex gap-1">
+                {(['parabola', 'hyperbola'] as FitAlgo[]).map((algo) => (
+                  <button key={algo} type="button" onClick={() => patchSettings('fit_algo', algo)}
+                    className={`flex-1 py-0.5 text-xs rounded border capitalize transition-colors ${
+                      settings.fit_algo === algo
+                        ? 'border-accent text-accent bg-accent/10'
+                        : 'border-surface-border text-slate-400 hover:border-slate-500 hover:text-slate-300'
+                    }`}>
+                    {algo}
+                  </button>
+                ))}
+              </div>
+            </div>
+
             {/* Step size */}
             <div className="flex flex-col gap-1">
               <label className="text-xs text-slate-400">Step size</label>
               <div className="flex items-center gap-1">
                 <input
-                  type="number" min={1} value={stepSize}
-                  onChange={(e) => setStepSize(Math.max(1, parseInt(e.target.value, 10) || 1))}
+                  type="number" min={1} value={settings.step_size}
+                  onChange={(e) => patchSettings('step_size', Math.max(1, parseInt(e.target.value, 10) || 1))}
                   className="flex-1 bg-surface-overlay border border-surface-border rounded px-2 py-1 text-xs text-slate-200 font-mono focus:outline-none focus:ring-1 focus:ring-accent"
                 />
                 <span className="text-xs text-slate-500">steps</span>
@@ -460,15 +422,15 @@ export function AutofocusPage() {
             {/* Steps each side */}
             <div className="flex flex-col gap-1">
               <label className="text-xs text-slate-400">
-                Steps each side — <span className="text-slate-300">{numSteps * 2 + 1} total</span>
+                Steps each side — <span className="text-slate-300">{settings.num_steps * 2 + 1} total</span>
               </label>
               <div className="flex items-center gap-2">
                 <input
-                  type="range" min={3} max={15} value={numSteps}
-                  onChange={(e) => setNumSteps(parseInt(e.target.value, 10))}
+                  type="range" min={3} max={15} value={settings.num_steps}
+                  onChange={(e) => patchSettings('num_steps', parseInt(e.target.value, 10))}
                   className="flex-1 accent-accent h-1"
                 />
-                <span className="text-xs text-slate-300 w-4 text-center">{numSteps}</span>
+                <span className="text-xs text-slate-300 w-4 text-center">{settings.num_steps}</span>
               </div>
             </div>
           </div>
@@ -479,16 +441,16 @@ export function AutofocusPage() {
           <div className="flex flex-col gap-3">
             <div className="flex flex-col gap-1">
               <label className="text-xs text-slate-400">Duration</label>
-              <DurationStepper value={exposureTime} onChange={setExposureTime} />
+              <DurationStepper value={settings.exposure_time} onChange={(v) => patchSettings('exposure_time', v)} />
             </div>
 
             <div className="flex flex-col gap-1">
               <label className="text-xs text-slate-400">Binning</label>
               <div className="flex gap-1">
                 {BINNINGS.map((b) => (
-                  <button key={b} type="button" onClick={() => setBinning(b)}
+                  <button key={b} type="button" onClick={() => patchSettings('binning', b)}
                     className={`px-2 py-0.5 text-xs rounded border transition-colors ${
-                      binning === b
+                      settings.binning === b
                         ? 'border-accent text-accent bg-accent/10'
                         : 'border-surface-border text-slate-400 hover:border-slate-500 hover:text-slate-300'
                     }`}>
@@ -502,20 +464,18 @@ export function AutofocusPage() {
               <label className="text-xs text-slate-400">Gain <span className="text-slate-600">(optional)</span></label>
               <input
                 type="number" min={0} placeholder="driver default"
-                value={gain}
-                onChange={(e) => setGain(e.target.value)}
+                value={settings.gain ?? ''}
+                onChange={(e) => patchSettings('gain', e.target.value ? parseInt(e.target.value, 10) : null)}
                 className="w-full bg-surface-overlay border border-surface-border rounded px-2 py-1 text-xs text-slate-200 font-mono placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-accent"
               />
             </div>
 
             {filterWheels.length > 0 && (
               <div className="flex flex-col gap-1">
-                <label className="text-xs text-slate-400">
-                  Filter <span className="text-slate-600">(optional)</span>
-                </label>
+                <label className="text-xs text-slate-400">Filter <span className="text-slate-600">(optional)</span></label>
                 <select
-                  value={filterSlot}
-                  onChange={(e) => setFilterSlot(e.target.value)}
+                  value={settings.filter_slot ?? ''}
+                  onChange={(e) => patchSettings('filter_slot', e.target.value ? parseInt(e.target.value, 10) : null)}
                   className="w-full rounded bg-surface-overlay border border-surface-border px-2 py-1.5 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-accent"
                 >
                   <option value="">Keep current</option>
@@ -565,22 +525,19 @@ export function AutofocusPage() {
                 <RunBadge status={run.status} />
               </div>
 
-              {/* Progress bar */}
               {run.total_steps > 0 && (
                 <div className="h-1.5 bg-surface-overlay rounded-full overflow-hidden">
                   <div
                     className={`h-full rounded-full transition-all duration-500 ${
                       run.status === 'completed' ? 'bg-green-500' :
-                      run.status === 'failed' ? 'bg-red-500' :
-                      run.status === 'aborted' ? 'bg-slate-500' :
-                      'bg-accent'
+                      run.status === 'failed'    ? 'bg-red-500'   :
+                      run.status === 'aborted'   ? 'bg-slate-500' : 'bg-accent'
                     }`}
                     style={{ width: `${(run.current_step / run.total_steps) * 100}%` }}
                   />
                 </div>
               )}
 
-              {/* Latest data point info */}
               {run.data_points.length > 0 && (() => {
                 const latest = run.data_points[run.data_points.length - 1]
                 return (
@@ -597,26 +554,20 @@ export function AutofocusPage() {
                 )
               })()}
 
-              {run.error && (
-                <p className="text-xs text-red-400 break-words">{run.error}</p>
-              )}
+              {run.error && <p className="text-xs text-red-400 break-words">{run.error}</p>}
             </div>
           </Section>
         )}
 
-        {/* U-curve chart */}
+        {/* V-curve chart */}
         {run && run.data_points.length > 0 && (
           <Section title="V-Curve">
             <UCurveChart
               dataPoints={run.data_points}
               curveFit={run.curve_fit}
               optimal={run.optimal_position}
+              fitAlgo={run.config.fit_algo ?? 'parabola'}
             />
-            {run.curve_fit && (
-              <p className="text-[10px] text-slate-500 mt-1 text-center">
-                Fit: y = {run.curve_fit.a.toExponential(2)}x² + …
-              </p>
-            )}
           </Section>
         )}
 
@@ -632,9 +583,6 @@ export function AutofocusPage() {
                 <div className="text-xs text-slate-500">
                   Best FWHM: <span className="text-slate-300 font-mono">{bestDataPoint.fwhm.toFixed(2)} px</span>
                   {' '}at {bestDataPoint.position}
-                  {run.curve_fit && Math.abs(run.curve_fit.optimal_position - bestDataPoint.position) > 5 && (
-                    <span className="text-slate-600"> (parabola min: {Math.round(run.curve_fit.optimal_position)})</span>
-                  )}
                 </div>
               )}
             </div>

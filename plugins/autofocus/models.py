@@ -18,6 +18,19 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+# ── Persistent UI settings (stored in plugin_settings['autofocus']) ────────────
+
+class AutofocusSettings(BaseModel):
+    """User-facing parameters persisted across page visits."""
+    step_size: int = Field(default=100, gt=0)
+    num_steps: int = Field(default=5, ge=3, le=15)
+    exposure_time: float = Field(default=2.0, gt=0)
+    binning: int = Field(default=1, ge=1, le=4)
+    gain: int | None = None
+    filter_slot: int | None = None
+    fit_algo: Literal["parabola", "hyperbola"] = "parabola"
+
+
 # ── Configuration ─────────────────────────────────────────────────────────────
 
 class AutofocusConfig(BaseModel):
@@ -29,6 +42,7 @@ class AutofocusConfig(BaseModel):
     binning: int = Field(default=1, ge=1, le=4)
     gain: int | None = None
     filter_slot: int | None = Field(default=None, description="Filter slot to select before run (None = keep current)")
+    fit_algo: Literal["parabola", "hyperbola"] = "parabola"
 
 
 # ── Result types ──────────────────────────────────────────────────────────────
