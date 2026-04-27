@@ -1,7 +1,8 @@
 import { create } from 'zustand'
-import type { AstrolollEvent, CameraStatus, ConnectedDevice, FilterWheelStatus, FocuserStatus, MountStatus, Phd2Status, PluginInfo, SolveJob, SolveResult } from '@/api/types'
+import type { AstrolollEvent, CameraStatus, ConnectedDevice, FilterWheelStatus, FocuserStatus, MountStatus, PluginInfo } from '@/api/types'
 
 const MAX_LOG_ENTRIES = 1000
+
 
 // ---------------------------------------------------------------------------
 // Plugin event handler registry (module-level — no React overhead)
@@ -14,6 +15,9 @@ const MAX_LOG_ENTRIES = 1000
 type PluginEventHandler = (event: AstrolollEvent, pluginState: unknown) => unknown
 
 const _pluginHandlers = new Map<string, Map<string, PluginEventHandler>>()
+// Silent event types bypass the log and dedup — used for high-frequency events
+// such as phd2.guide_step. Registered by plugins via registerSilentEventTypes.
+const _silentEventTypes = new Set<string>()
 
 export function registerPluginEventHandlers(
   pluginId: string,
@@ -25,7 +29,10 @@ export function registerPluginEventHandlers(
   }
   _pluginHandlers.set(pluginId, map)
 }
-const MAX_GUIDE_STEPS = 500   // keep a large buffer; graph slices client-side
+
+export function registerSilentEventTypes(...types: string[]) {
+  types.forEach((t) => _silentEventTypes.add(t))
+}
 
 export interface LogEntry {
   id: string
@@ -50,13 +57,6 @@ export interface LastError {
   message: string
   timestamp: string
   eventType: string
-}
-
-export interface GuidePoint {
-  frame: number
-  ra: number
-  dec: number
-  ts: string  // ISO timestamp from the guide_step event
 }
 
 interface AppState {
@@ -87,13 +87,6 @@ interface AppState {
   // Plugin metadata from /plugins endpoint
   pluginInfos: PluginInfo[]
 
-  // PHD2 guiding
-  phd2Status: Phd2Status | null
-  phd2GuidePoints: GuidePoint[]
-
-  // Plate solving — keyed by job id for O(1) updates
-  solveJobs: Record<string, SolveJob>
-
   // Plugin-owned state slices — keyed by plugin id
   pluginStates: Record<string, unknown>
 
@@ -107,8 +100,6 @@ interface AppState {
   applyEvent: (event: AstrolollEvent) => void
   clearLastError: () => void
   setPluginInfos: (infos: PluginInfo[]) => void
-  setPhd2Status: (status: Phd2Status) => void
-  mergeSolveJobs: (jobs: SolveJob[]) => void
 }
 
 // Event types that represent errors and should set lastError
@@ -131,20 +122,11 @@ export const useStore = create<AppState>((set, get) => ({
   log: [],
   lastError: null,
   pluginInfos: [],
-  phd2Status: null,
-  phd2GuidePoints: [],
-  solveJobs: {},
   pluginStates: {},
 
   setWsConnected: (v) => set({ wsConnected: v }),
   clearLastError: () => set({ lastError: null }),
   setPluginInfos: (infos) => set({ pluginInfos: infos }),
-  setPhd2Status: (status) => set({ phd2Status: status }),
-  mergeSolveJobs: (jobs) => set((s) => {
-    const merged = { ...s.solveJobs }
-    jobs.forEach((j) => { merged[j.id] = j })
-    return { solveJobs: merged }
-  }),
 
   setConnectedDevices: (devices) => set({ connectedDevices: devices }),
   setCameraStatus: (deviceId, status) =>
@@ -159,12 +141,19 @@ export const useStore = create<AppState>((set, get) => ({
   applyEvent: (event) => {
     const state = get()
 
-    // High-frequency data events — update state only, never write to the log
-    if (event.type === 'phd2.guide_step') {
-      const point: GuidePoint = { frame: event.frame, ra: event.ra_dist, dec: event.dec_dist, ts: event.timestamp }
-      set((s) => ({
-        phd2GuidePoints: [...s.phd2GuidePoints, point].slice(-MAX_GUIDE_STEPS),
-      }))
+    // Silent events — dispatch to plugin handlers, skip log and dedup entirely
+    if (_silentEventTypes.has(event.type)) {
+      const pluginUpdates: Record<string, unknown> = {}
+      for (const [pluginId, handlers] of _pluginHandlers) {
+        const handler = handlers.get(event.type)
+        if (handler) {
+          const newState = handler(event, get().pluginStates[pluginId])
+          if (newState !== undefined) pluginUpdates[pluginId] = newState
+        }
+      }
+      if (Object.keys(pluginUpdates).length > 0) {
+        set((s) => ({ pluginStates: { ...s.pluginStates, ...pluginUpdates } }))
+      }
       return
     }
 
@@ -406,60 +395,8 @@ export const useStore = create<AppState>((set, get) => ({
         set({ log, lastError })
         break
       }
-      case 'phd2.connected': {
-        set({ phd2Status: { connected: true, state: 'Unknown', rms_ra: null, rms_dec: null, rms_total: null, pixel_scale: null, star_snr: null, is_dithering: false, debug_enabled: false }, log, lastError })
-        break
-      }
-      case 'phd2.disconnected': {
-        set({ phd2Status: { connected: false, state: 'Disconnected', rms_ra: null, rms_dec: null, rms_total: null, pixel_scale: null, star_snr: null, is_dithering: false, debug_enabled: false }, phd2GuidePoints: [], log, lastError })
-        break
-      }
-      case 'phd2.state_changed': {
-        set((s) => ({ phd2Status: s.phd2Status ? { ...s.phd2Status, state: event.state } : null, log, lastError }))
-        break
-      }
-      case 'platesolve.started': {
-        set((s) => {
-          const existing = s.solveJobs[event.solve_id]
-          const job: SolveJob = existing
-            ? { ...existing, status: 'solving' }
-            : { id: event.solve_id, status: 'solving', request: { fits_path: event.fits_path }, created_at: event.timestamp }
-          return { solveJobs: { ...s.solveJobs, [event.solve_id]: job }, log, lastError }
-        })
-        break
-      }
-      case 'platesolve.completed': {
-        set((s) => {
-          const existing = s.solveJobs[event.solve_id]
-          if (!existing) return { log, lastError }
-          const result: SolveResult = {
-            ra: event.ra, dec: event.dec, rotation: event.rotation,
-            pixel_scale: event.pixel_scale, field_w: event.field_w,
-            field_h: event.field_h, duration_ms: event.duration_ms,
-          }
-          const job: SolveJob = { ...existing, status: 'completed', result, completed_at: event.timestamp }
-          return { solveJobs: { ...s.solveJobs, [event.solve_id]: job }, log, lastError }
-        })
-        break
-      }
-      case 'platesolve.failed': {
-        set((s) => {
-          const existing = s.solveJobs[event.solve_id]
-          if (!existing) return { log, lastError }
-          const job: SolveJob = { ...existing, status: 'failed', error: event.reason, completed_at: event.timestamp }
-          return { solveJobs: { ...s.solveJobs, [event.solve_id]: job }, log, lastError }
-        })
-        break
-      }
-      case 'platesolve.cancelled': {
-        set((s) => {
-          const existing = s.solveJobs[event.solve_id]
-          if (!existing) return { log, lastError }
-          const job: SolveJob = { ...existing, status: 'cancelled', completed_at: event.timestamp }
-          return { solveJobs: { ...s.solveJobs, [event.solve_id]: job }, log, lastError }
-        })
-        break
-      }
+
+
       case 'phd2.settled':
       default:
         set({ log, lastError })

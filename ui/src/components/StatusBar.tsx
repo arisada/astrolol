@@ -47,7 +47,7 @@ function useCountdown(exposure: { startedAt: number; duration: number } | null |
 // Chip primitives
 // ---------------------------------------------------------------------------
 
-type ChipVariant = 'green' | 'amber' | 'red' | 'blue' | 'violet' | 'slate'
+export type ChipVariant = 'green' | 'amber' | 'red' | 'blue' | 'violet' | 'slate'
 
 const chipClasses: Record<ChipVariant, string> = {
   green:  'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
@@ -58,7 +58,7 @@ const chipClasses: Record<ChipVariant, string> = {
   slate:  'bg-slate-700/50  text-slate-400  border-slate-600/40',
 }
 
-function Chip({
+export function Chip({
   label,
   status,
   variant,
@@ -145,39 +145,6 @@ function FilterWheelChip({ device }: { device: ConnectedDevice }) {
   return <Chip label={shortName(device)} status="Rotating" variant="amber" pulse />
 }
 
-function Phd2Chip() {
-  const phd2 = useStore((s) => s.phd2Status)
-  if (!phd2?.connected) return null
-
-  const state = phd2.state ?? ''
-  const rms = phd2.rms_total
-
-  if (state === 'Guiding') {
-    const rmsStr = rms !== null ? ` ${rms.toFixed(2)}"` : ''
-    return <Chip label="PHD2" status={`Guiding${rmsStr}`} variant="green" />
-  }
-  if (state === 'Calibrating') {
-    return <Chip label="PHD2" status="Calibrating" variant="amber" pulse />
-  }
-  if (phd2.is_dithering) {
-    return <Chip label="PHD2" status="Dithering" variant="amber" pulse />
-  }
-  if (state && state !== 'Stopped' && state !== 'Disconnected' && state !== 'Unknown') {
-    return <Chip label="PHD2" status={state} variant="slate" />
-  }
-  return <Chip label="PHD2" status="Connected" variant="slate" />
-}
-
-function SolveChip() {
-  const jobs = useStore((s) => s.solveJobs)
-  const active = Object.values(jobs).find(
-    (j) => j.status === 'exposing' || j.status === 'solving',
-  )
-  if (!active) return null
-  const label = active.status === 'exposing' ? 'Exposing…' : 'Solving…'
-  return <Chip label="Plate solve" status={label} variant="violet" pulse />
-}
-
 // ---------------------------------------------------------------------------
 // Status bar
 // ---------------------------------------------------------------------------
@@ -202,8 +169,6 @@ export function StatusBar() {
       {cameras.map((d)      => <CoolerChip      key={`cool-${d.device_id}`} device={d} />)}
       {focusers.map((d)     => <FocuserChip     key={d.device_id} device={d} />)}
       {filterWheels.map((d) => <FilterWheelChip key={d.device_id} device={d} />)}
-      <Phd2Chip />
-      <SolveChip />
       {getAllPluginEntries().map((entry) =>
         entry.StatusChip ? <entry.StatusChip key={entry.to} /> : null,
       )}

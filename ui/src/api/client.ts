@@ -3,7 +3,6 @@ import type {
   CameraStatus,
   CoordFrame,
   ConnectedDevice,
-  DbStatus,
   DeviceConfig,
   DeviceProperty,
   DriverEntry,
@@ -17,12 +16,9 @@ import type {
   LoadDriverResponse,
   MountStatus,
   MountTarget,
-  Phd2Status,
   PluginInfo,
   Profile,
   SetPropertyRequest,
-  SolveJob,
-  SolveRequest,
   TrackingMode,
   UserSettings,
 } from './types'
@@ -194,42 +190,6 @@ export const api = {
     getSettings: <T>(pluginId: string) => request<T>(`/plugins/${pluginId}/settings`),
     putSettings: <T>(pluginId: string, body: T) =>
       request<T>(`/plugins/${pluginId}/settings`, { method: 'PUT', body: JSON.stringify(body) }),
-  },
-
-  phd2: {
-    connect: () => request<void>('/plugins/phd2/connect', { method: 'POST' }),
-    disconnect: () => request<void>('/plugins/phd2/disconnect', { method: 'POST' }),
-    status: () => request<Phd2Status>('/plugins/phd2/status'),
-    guide: (settlePixels?: number, settleTime?: number, settleTimeout?: number, recalibrate?: boolean) =>
-      request<void>('/plugins/phd2/guide', {
-        method: 'POST',
-        body: JSON.stringify({
-          settle: { pixels: settlePixels ?? 1.5, time: settleTime ?? 10, timeout: settleTimeout ?? 60 },
-          recalibrate: recalibrate ?? false,
-        }),
-      }),
-    stop: () => request<void>('/plugins/phd2/stop', { method: 'POST' }),
-    dither: (pixels?: number, raOnly?: boolean) =>
-      request<void>('/plugins/phd2/dither', {
-        method: 'POST',
-        body: JSON.stringify({ pixels: pixels ?? 5.0, ra_only: raOnly ?? false }),
-      }),
-    pause: () => request<void>('/plugins/phd2/pause', { method: 'POST' }),
-    resume: () => request<void>('/plugins/phd2/resume', { method: 'POST' }),
-    setDebug: (enabled: boolean) =>
-      request<void>('/plugins/phd2/debug', { method: 'POST', body: JSON.stringify({ enabled }) }),
-  },
-
-  platesolve: {
-    exposeAndSolve: (body: { device_id: string; duration: number; binning: number; gain?: number | null }) =>
-      request<SolveJob>('/plugins/platesolve/expose_and_solve', { method: 'POST', body: JSON.stringify(body) }),
-    solve: (req: SolveRequest) =>
-      request<SolveJob>('/plugins/platesolve/solve', { method: 'POST', body: JSON.stringify(req) }),
-    jobs: () => request<SolveJob[]>('/plugins/platesolve/jobs'),
-    status: (jobId: string) => request<SolveJob>(`/plugins/platesolve/${jobId}/status`),
-    cancel: (jobId: string) => request<void>(`/plugins/platesolve/${jobId}/cancel`, { method: 'DELETE' }),
-    dbStatus: () => request<DbStatus>('/plugins/platesolve/db_status'),
-    installDb: () => request<{ status: string }>('/plugins/platesolve/install_db', { method: 'POST' }),
   },
 
   focuser: {

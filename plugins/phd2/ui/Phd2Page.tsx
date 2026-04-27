@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { Crosshair, Pause, Play, Settings, Square, Target, Wifi, WifiOff } from 'lucide-react'
-import { api } from '@/api/client'
 import { useStore } from '@/store'
-import type { GuidePoint } from '@/store'
-import type { Phd2Settings } from '@/api/types'
 import { Button } from '@/components/ui/button'
+import type { Phd2Settings } from '@/api/types'
+import * as phd2Api from './api'
+import type { GuidePoint, Phd2PluginState } from './api'
+import { DEFAULT_PHD2_STATE } from './api'
 
 // ── Graph constants ────────────────────────────────────────────────────────────
 
@@ -246,9 +247,8 @@ function Phd2EventLog() {
 // TODO: audit Connect/Disconnect button style against Equipment page for consistency
 
 export function Phd2Page() {
-  const allGuidePoints = useStore((s) => s.phd2GuidePoints)
-  const status         = useStore((s) => s.phd2Status)
-  const setPhd2Status  = useStore((s) => s.setPhd2Status)
+  const allGuidePoints = useStore((s) => (s.pluginStates['phd2'] as Phd2PluginState | null)?.guidePoints ?? [])
+  const status         = useStore((s) => (s.pluginStates['phd2'] as Phd2PluginState | null)?.status ?? null)
 
   const [error, setError] = useState<string | null>(null)
   const [showSettings, setShowSettings] = useState(false)
@@ -257,13 +257,13 @@ export function Phd2Page() {
   const [phd2Settings, setPhd2Settings] = useState<Phd2Settings>({ host: 'localhost', port: 4400 })
   const [settingsSaving, setSettingsSaving] = useState(false)
   useEffect(() => {
-    api.plugins.getSettings<Phd2Settings>('phd2')
+    phd2Api.getSettings()
       .then((s) => setPhd2Settings({ host: s.host ?? 'localhost', port: s.port ?? 4400 }))
       .catch(() => {})
   }, [])
   const savePhd2Settings = async () => {
     setSettingsSaving(true)
-    try { await api.plugins.putSettings('phd2', phd2Settings) } catch { /* ignore */ } finally { setSettingsSaving(false) }
+    try { await phd2Api.putSettings(phd2Settings) } catch { /* ignore */ } finally { setSettingsSaving(false) }
   }
 
   // UI preferences persisted via localStorage (graph display only — not server state)
@@ -289,14 +289,19 @@ export function Phd2Page() {
   // Poll /phd2/status every 3 s to get RMS values (not emitted via WS)
   useEffect(() => {
     const poll = () => {
-      api.phd2.status()
-        .then((s) => setPhd2Status(s))
+      phd2Api.status()
+        .then((newStatus) => {
+          useStore.setState((s) => {
+            const cur = (s.pluginStates['phd2'] as Phd2PluginState | null) ?? DEFAULT_PHD2_STATE
+            return { pluginStates: { ...s.pluginStates, phd2: { ...cur, status: newStatus } } }
+          })
+        })
         .catch(() => {})
     }
     poll()
     const id = setInterval(poll, 3_000)
     return () => clearInterval(id)
-  }, [setPhd2Status])
+  }, [])
 
   const act = async (fn: () => Promise<void>) => {
     setError(null)
@@ -307,7 +312,7 @@ export function Phd2Page() {
     const next = !debugEnabled
     setDebugEnabled(next)   // optimistic
     try {
-      await api.phd2.setDebug(next)
+      await phd2Api.setDebug(next)
     } catch (e) {
       setDebugEnabled(!next)  // revert on error
       setError((e as Error).message)
@@ -344,7 +349,7 @@ export function Phd2Page() {
           <Button
             size="sm"
             variant={connected ? 'danger' : 'outline'}
-            onClick={() => act(connected ? api.phd2.disconnect : api.phd2.connect)}
+            onClick={() => act(connected ? phd2Api.disconnect : phd2Api.connect)}
           >
             {connected
               ? <><WifiOff size={12} className="mr-1" /> Disconnect</>
@@ -447,7 +452,7 @@ export function Phd2Page() {
         <div className="flex gap-2 flex-wrap">
           <Button
             size="sm"
-            onClick={() => act(() => api.phd2.guide())}
+            onClick={() => act(() => phd2Api.guide())}
             disabled={!connected || (guiding && !paused)}
           >
             <Play size={12} className="mr-1" /> Guide
@@ -456,7 +461,7 @@ export function Phd2Page() {
           <Button
             size="sm"
             variant="outline"
-            onClick={() => act(paused ? api.phd2.resume : api.phd2.pause)}
+            onClick={() => act(paused ? phd2Api.resume : phd2Api.pause)}
             disabled={!connected || (!guiding && !paused)}
           >
             {paused
@@ -468,7 +473,7 @@ export function Phd2Page() {
           <Button
             size="sm"
             variant="danger"
-            onClick={() => act(api.phd2.stop)}
+            onClick={() => act(phd2Api.stop)}
             disabled={!connected || (!guiding && !paused)}
           >
             <Square size={12} className="mr-1" /> Stop
@@ -477,7 +482,7 @@ export function Phd2Page() {
           <Button
             size="sm"
             variant="outline"
-            onClick={() => act(() => api.phd2.dither())}
+            onClick={() => act(() => phd2Api.dither())}
             disabled={!connected || !guiding || dithering}
             title={dithering ? 'Dither already in progress' : 'Dither once'}
           >
