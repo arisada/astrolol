@@ -10,6 +10,14 @@ from pydantic import BaseModel
 logger = structlog.get_logger()
 
 
+class MountDeviceSettings(BaseModel):
+    """Per-mount automation settings, persisted under UserSettings.mount_settings[device_id]."""
+    auto_park_enabled: bool = False
+    auto_park_time: str | None = None          # "HH:MM" in local 24 h time
+    auto_flip_enabled: bool = False
+    auto_flip_ha_hours: float = 1.0            # hour angle threshold in decimal hours
+
+
 class UserSettings(BaseModel):
     save_dir_template: str = "~/astrolol_pictures/%D"
     save_filename_template: str = "%F_%C_%Es_%Gg"
@@ -20,6 +28,7 @@ class UserSettings(BaseModel):
     low_memory_mode: bool = False
     plugin_settings: dict[str, dict] = {}     # opaque per-plugin settings, keyed by plugin id
     imager_settings: dict[str, dict] = {}     # per-device imager settings, keyed by device_id
+    mount_settings: dict[str, dict] = {}      # per-device mount settings, keyed by device_id
 
 
 class UserSettingsStore:

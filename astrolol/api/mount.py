@@ -5,15 +5,21 @@ import astropy.units as u
 from astropy.coordinates import FK5, SkyCoord
 from astropy.time import Time
 
+from astrolol.config.user_settings import MountDeviceSettings
 from astrolol.core.errors import DeviceKindError, DeviceNotFoundError
 from astrolol.devices.base.models import MountStatus, Target, TrackingMode
 from astrolol.mount.manager import MountManager
+from astrolol.profiles.store import ProfileStore
 
 router = APIRouter(prefix="/mount", tags=["mount"])
 
 
 def _manager(request: Request) -> MountManager:
     return request.app.state.mount_manager
+
+
+def _store(request: Request) -> ProfileStore:
+    return request.app.state.profile_store
 
 
 class TrackingRequest(BaseModel):
@@ -186,3 +192,23 @@ async def stop_move(device_id: str, request: Request) -> None:
         await _manager(request).stop_move(device_id)
     except (DeviceNotFoundError, DeviceKindError) as exc:
         raise HTTPException(status_code=404, detail=str(exc))
+
+
+@router.get("/{device_id}/settings", response_model=MountDeviceSettings)
+async def get_mount_settings(device_id: str, request: Request) -> MountDeviceSettings:
+    """Return automation settings for this mount (defaults if never saved)."""
+    raw = _store(request).get_user_settings().mount_settings.get(device_id, {})
+    return MountDeviceSettings(**raw)
+
+
+@router.put("/{device_id}/settings", response_model=MountDeviceSettings)
+async def put_mount_settings(
+    device_id: str, body: MountDeviceSettings, request: Request
+) -> MountDeviceSettings:
+    """Persist automation settings and (re)start the automation loop."""
+    store = _store(request)
+    current = store.get_user_settings()
+    updated = {**current.mount_settings, device_id: body.model_dump()}
+    store.update_user_settings(current.model_copy(update={"mount_settings": updated}))
+    _manager(request).start_automation(device_id)
+    return body

@@ -72,6 +72,7 @@ def create_app() -> FastAPI:
                             await app.state.mount_manager.push_site_data(
                                 pd.config.device_id, profile.location
                             )
+                            app.state.mount_manager.start_automation(pd.config.device_id)
                     except Exception as exc:
                         logger.warning(
                             "startup.device_connect_failed",
@@ -111,7 +112,7 @@ def create_app() -> FastAPI:
     event_bus_forwarder.set_bus(event_bus)  # bridge structlog → EventBus
     device_manager = DeviceManager(registry=registry, event_bus=event_bus)
     imager_manager = ImagerManager(device_manager=device_manager, event_bus=event_bus, profile_store=profile_store)
-    mount_manager = MountManager(device_manager=device_manager, event_bus=event_bus)
+    mount_manager = MountManager(device_manager=device_manager, event_bus=event_bus, profile_store=profile_store)
     focuser_manager = FocuserManager(device_manager=device_manager, event_bus=event_bus)
     filter_wheel_manager = FilterWheelManager(device_manager=device_manager, event_bus=event_bus)
 

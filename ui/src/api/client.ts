@@ -3,6 +3,7 @@ import type {
   CameraStatus,
   CoordFrame,
   ConnectedDevice,
+  MountDeviceSettings,
   DeviceConfig,
   DeviceProperty,
   DriverEntry,
@@ -148,6 +149,13 @@ export const api = {
       }),
     stopMove: (deviceId: string) =>
       request<void>(`/mount/${deviceId}/move`, { method: 'DELETE' }),
+    getSettings: (deviceId: string) =>
+      request<MountDeviceSettings>(`/mount/${deviceId}/settings`),
+    putSettings: (deviceId: string, body: MountDeviceSettings) =>
+      request<MountDeviceSettings>(`/mount/${deviceId}/settings`, {
+        method: 'PUT',
+        body: JSON.stringify(body),
+      }),
   },
 
   profiles: {

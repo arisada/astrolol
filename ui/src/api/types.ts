@@ -40,6 +40,13 @@ export interface MountTarget {
 
 export type CoordFrame = 'icrs' | 'jnow'
 
+export interface MountDeviceSettings {
+  auto_park_enabled: boolean
+  auto_park_time: string | null   // "HH:MM" local 24 h
+  auto_flip_enabled: boolean
+  auto_flip_ha_hours: number      // decimal hours
+}
+
 export interface MountStatus {
   state: DeviceState
   ra: number | null       // ICRS (J2000) decimal hours (0–24)

@@ -4,6 +4,7 @@ from datetime import datetime, timezone
 
 import structlog
 
+from astrolol.config.user_settings import MountDeviceSettings
 from astrolol.core.events import (
     EventBus,
     MountMeridianFlipCompleted,
@@ -24,6 +25,7 @@ from astropy.coordinates import SkyCoord
 from astrolol.devices.base.models import MountStatus, Target, TrackingMode
 from astrolol.devices.manager import DeviceManager
 from astrolol.profiles.models import ObserverLocation
+from astrolol.profiles.store import ProfileStore
 
 logger = structlog.get_logger()
 
@@ -46,11 +48,24 @@ class MountController:
         return self._active_task is not None and not self._active_task.done()
 
 
+_AUTOMATION_INTERVAL = 30  # seconds between automation checks
+
+
 class MountManager:
-    def __init__(self, device_manager: DeviceManager, event_bus: EventBus) -> None:
+    def __init__(
+        self,
+        device_manager: DeviceManager,
+        event_bus: EventBus,
+        profile_store: ProfileStore | None = None,
+    ) -> None:
         self._device_manager = device_manager
         self._event_bus = event_bus
+        self._profile_store = profile_store
         self._controllers: dict[str, MountController] = {}
+        # Automation
+        self._automation_tasks: dict[str, asyncio.Task] = {}
+        self._auto_flip_triggered: set[str] = set()       # device_ids that flipped this transit
+        self._auto_park_last: dict[str, tuple[int, int]] = {}  # device_id → (h, m) last parked
 
     # --- Public API ---
 
@@ -250,6 +265,80 @@ class MountManager:
     async def get_status(self, device_id: str) -> MountStatus:
         mount = self._device_manager.get_mount(device_id)
         return await mount.get_status()
+
+    # --- Automation ---
+
+    def _get_mount_settings(self, device_id: str) -> MountDeviceSettings:
+        if self._profile_store is None:
+            return MountDeviceSettings()
+        raw = self._profile_store.get_user_settings().mount_settings.get(device_id, {})
+        return MountDeviceSettings(**raw)
+
+    def start_automation(self, device_id: str) -> None:
+        """Start the automation loop for *device_id* — idempotent, safe to call repeatedly."""
+        task = self._automation_tasks.get(device_id)
+        if task is not None and not task.done():
+            return
+        self._automation_tasks[device_id] = asyncio.create_task(
+            self._automation_loop(device_id),
+            name=f"mount_automation_{device_id}",
+        )
+        logger.info("mount.automation_started", device_id=device_id)
+
+    async def _automation_loop(self, device_id: str) -> None:
+        while True:
+            await asyncio.sleep(_AUTOMATION_INTERVAL)
+            try:
+                await self._check_automation(device_id)
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                logger.warning("mount.automation_error", device_id=device_id, error=str(exc))
+
+    async def _check_automation(self, device_id: str) -> None:
+        cfg = self._get_mount_settings(device_id)
+        now = datetime.now()
+
+        # ── Auto-park at configured local time ────────────────────────────────
+        if cfg.auto_park_enabled and cfg.auto_park_time:
+            try:
+                th, tm = (int(x) for x in cfg.auto_park_time.split(":"))
+            except ValueError:
+                logger.warning("mount.automation_bad_park_time", device_id=device_id, value=cfg.auto_park_time)
+            else:
+                if now.hour == th and now.minute == tm:
+                    last = self._auto_park_last.get(device_id)
+                    if last != (th, tm):
+                        self._auto_park_last[device_id] = (th, tm)
+                        ctrl = self._get_or_create(device_id)
+                        if not ctrl.is_busy:
+                            logger.info("mount.auto_park_triggered", device_id=device_id, time=cfg.auto_park_time)
+                            await self.park(device_id)
+
+        # ── Auto meridian flip when HA exceeds threshold ──────────────────────
+        if cfg.auto_flip_enabled:
+            try:
+                status = await self.get_status(device_id)
+            except Exception:
+                return
+            ha = status.hour_angle
+            if ha is None:
+                return
+            # Reset flip guard once the mount is clearly east of the meridian
+            if ha < -0.5:
+                self._auto_flip_triggered.discard(device_id)
+            # Trigger flip when HA crosses the threshold
+            if ha >= cfg.auto_flip_ha_hours and device_id not in self._auto_flip_triggered:
+                self._auto_flip_triggered.add(device_id)
+                ctrl = self._get_or_create(device_id)
+                if not ctrl.is_busy:
+                    logger.info(
+                        "mount.auto_flip_triggered",
+                        device_id=device_id,
+                        ha=round(ha, 3),
+                        threshold=cfg.auto_flip_ha_hours,
+                    )
+                    await self.meridian_flip(device_id)
 
     # --- Internal ---
 

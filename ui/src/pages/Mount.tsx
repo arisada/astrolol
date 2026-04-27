@@ -3,7 +3,7 @@ import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Crosshair, RefreshCw, Rotate
 import { api } from '@/api/client'
 import { useStore } from '@/store'
 import type { LogEntry } from '@/store'
-import type { CoordFrame, MountStatus, TrackingMode } from '@/api/types'
+import type { CoordFrame, MountDeviceSettings, MountStatus, TrackingMode } from '@/api/types'
 import { Button } from '@/components/ui/button'
 import { DmsInput } from '@/components/ui/dms-input'
 import { StateBadge } from '@/components/ui/badge'
@@ -66,6 +66,28 @@ function fmtDec(d: number | null | undefined): string {
   const min = Math.floor(mf)
   const sec = Math.round((mf - min) * 60)
   return `${sign}${String(deg).padStart(2, '0')}° ${String(min).padStart(2, '0')}' ${String(sec).padStart(2, '0')}"`
+}
+
+// ---------------------------------------------------------------------------
+// Helpers for HH:MM ↔ decimal-hours conversion (used for HA threshold)
+// ---------------------------------------------------------------------------
+
+function hoursToHHMM(h: number): string {
+  const hours = Math.floor(Math.max(0, h))
+  const mins  = Math.round((h - hours) * 60)
+  return `${String(hours).padStart(2, '0')}:${String(mins).padStart(2, '0')}`
+}
+
+function hhmmToHours(hhmm: string): number {
+  const [h, m] = hhmm.split(':').map(Number)
+  return (h || 0) + (m || 0) / 60
+}
+
+const DEFAULT_MOUNT_SETTINGS: MountDeviceSettings = {
+  auto_park_enabled: false,
+  auto_park_time: null,
+  auto_flip_enabled: false,
+  auto_flip_ha_hours: 1.0,
 }
 
 // ---------------------------------------------------------------------------
@@ -158,6 +180,20 @@ function MountControls({ deviceId }: { deviceId: string }) {
   const [targetJnow, setTargetJnow] = useState(false)      // Target section: default J2000
   const [error, setError] = useState<string | null>(null)
   const movingRef = useRef(false)
+
+  const [mountSettings, setMountSettings] = useState<MountDeviceSettings>(DEFAULT_MOUNT_SETTINGS)
+
+  // Load mount settings on first render
+  useEffect(() => {
+    api.mount.getSettings(deviceId)
+      .then(setMountSettings)
+      .catch(() => {/* use defaults */})
+  }, [deviceId])
+
+  const saveMountSettings = useCallback((updated: MountDeviceSettings) => {
+    setMountSettings(updated)
+    api.mount.putSettings(deviceId, updated).catch(() => {})
+  }, [deviceId])
 
   useEffect(() => {
     let alive = true
@@ -370,6 +406,24 @@ function MountControls({ deviceId }: { deviceId: string }) {
             </Button>
             {isParked && <span className="text-xs text-slate-500">Mount is parked.</span>}
           </div>
+          <label className="flex items-center gap-2 flex-wrap">
+            <input
+              type="checkbox"
+              className="accent-accent"
+              checked={mountSettings.auto_park_enabled}
+              onChange={(e) => saveMountSettings({ ...mountSettings, auto_park_enabled: e.target.checked })}
+            />
+            <span className="text-xs text-slate-400">Park automatically at</span>
+            <input
+              type="time"
+              disabled={!mountSettings.auto_park_enabled}
+              value={mountSettings.auto_park_time ?? '23:00'}
+              onChange={(e) => saveMountSettings({ ...mountSettings, auto_park_time: e.target.value })}
+              className="rounded border border-surface-border bg-surface-overlay px-2 py-0.5 text-xs text-slate-200 font-mono
+                focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-40 disabled:cursor-not-allowed"
+            />
+            <span className="text-xs text-slate-600">local time</span>
+          </label>
         </Section>
 
         {/* Meridian */}
@@ -399,6 +453,23 @@ function MountControls({ deviceId }: { deviceId: string }) {
               <span className="text-xs text-yellow-700">Slew to target before flipping</span>
             )}
           </div>
+          <label className="flex items-center gap-2 flex-wrap">
+            <input
+              type="checkbox"
+              className="accent-accent"
+              checked={mountSettings.auto_flip_enabled}
+              onChange={(e) => saveMountSettings({ ...mountSettings, auto_flip_enabled: e.target.checked })}
+            />
+            <span className="text-xs text-slate-400">Flip automatically when HA &gt;</span>
+            <input
+              type="time"
+              disabled={!mountSettings.auto_flip_enabled}
+              value={hoursToHHMM(mountSettings.auto_flip_ha_hours)}
+              onChange={(e) => saveMountSettings({ ...mountSettings, auto_flip_ha_hours: hhmmToHours(e.target.value) })}
+              className="rounded border border-surface-border bg-surface-overlay px-2 py-0.5 text-xs text-slate-200 font-mono
+                focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-40 disabled:cursor-not-allowed"
+            />
+          </label>
         </Section>
 
         {/* Nudge */}
