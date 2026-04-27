@@ -12,6 +12,7 @@ import type {
   FilterWheelStatus,
   FitAlgo,
   FocusDataPoint,
+  FocusMetric,
 } from '@/api/types'
 
 // ── Exposure duration stepper ─────────────────────────────────────────────────
@@ -46,11 +47,13 @@ function UCurveChart({
   curveFit,
   optimal,
   fitAlgo,
+  metric,
 }: {
   dataPoints: FocusDataPoint[]
   curveFit: CurveFit | null
   optimal: number | null
   fitAlgo: FitAlgo
+  metric: FocusMetric
 }) {
   const W = 260, H = 150
   const pad = { t: 8, r: 10, b: 24, l: 34 }
@@ -111,7 +114,7 @@ function UCurveChart({
       ))}
 
       <text x={7} y={pad.t + ch / 2} textAnchor="middle" fill="#475569" fontSize={7}
-        transform={`rotate(-90 7 ${pad.t + ch / 2})`}>FWHM px</text>
+        transform={`rotate(-90 7 ${pad.t + ch / 2})`}>{metric === 'hfd' ? 'HFD px' : 'FWHM px'}</text>
 
       {Array.from({ length: Math.min(5, positions.length) }, (_, i) => {
         const pos = rangeX === 0
@@ -183,6 +186,7 @@ const DEFAULT_SETTINGS: AutofocusSettings = {
   gain: null,
   filter_slot: null,
   fit_algo: 'parabola',
+  metric: 'fwhm',
 }
 
 // ── Main page component ───────────────────────────────────────────────────────
@@ -335,7 +339,7 @@ export function AutofocusPage() {
               <button
                 key={dp.step}
                 onClick={() => setPreviewStep(dp.step)}
-                title={`Step ${dp.step}: pos ${dp.position}, FWHM ${dp.fwhm.toFixed(2)}`}
+                title={`Step ${dp.step}: pos ${dp.position}, ${(run.config.metric ?? 'fwhm').toUpperCase()} ${dp.fwhm.toFixed(2)}`}
                 className={`flex-none text-[10px] px-1.5 py-0.5 rounded transition-colors ${
                   (previewStep ?? run.current_step) === dp.step
                     ? 'bg-accent text-white'
@@ -388,6 +392,23 @@ export function AutofocusPage() {
         {/* V-curve configuration */}
         <Section title="V-Curve">
           <div className="flex flex-col gap-3">
+
+            {/* Metric selector */}
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-slate-400">Sharpness metric</label>
+              <div className="flex gap-1">
+                {(['fwhm', 'hfd'] as FocusMetric[]).map((m) => (
+                  <button key={m} type="button" onClick={() => patchSettings('metric', m)}
+                    className={`flex-1 py-0.5 text-xs rounded border uppercase transition-colors ${
+                      settings.metric === m
+                        ? 'border-accent text-accent bg-accent/10'
+                        : 'border-surface-border text-slate-400 hover:border-slate-500 hover:text-slate-300'
+                    }`}>
+                    {m}
+                  </button>
+                ))}
+              </div>
+            </div>
 
             {/* Algorithm selector */}
             <div className="flex flex-col gap-1">
@@ -540,11 +561,12 @@ export function AutofocusPage() {
 
               {run.data_points.length > 0 && (() => {
                 const latest = run.data_points[run.data_points.length - 1]
+                const metricLabel = (run.config.metric ?? 'fwhm').toUpperCase()
                 return (
                   <div className="text-xs text-slate-400 space-y-0.5">
                     <div>Position: <span className="text-slate-200 font-mono">{latest.position}</span></div>
                     <div>
-                      FWHM:{' '}
+                      {metricLabel}:{' '}
                       <span className={`font-mono ${latest === bestDataPoint ? 'text-green-400' : 'text-slate-200'}`}>
                         {latest.fwhm > 0 ? `${latest.fwhm.toFixed(2)} px` : '—'}
                       </span>
@@ -567,6 +589,7 @@ export function AutofocusPage() {
               curveFit={run.curve_fit}
               optimal={run.optimal_position}
               fitAlgo={run.config.fit_algo ?? 'parabola'}
+              metric={run.config.metric ?? 'fwhm'}
             />
           </Section>
         )}
@@ -581,7 +604,7 @@ export function AutofocusPage() {
               </div>
               {bestDataPoint && (
                 <div className="text-xs text-slate-500">
-                  Best FWHM: <span className="text-slate-300 font-mono">{bestDataPoint.fwhm.toFixed(2)} px</span>
+                  Best {(run.config.metric ?? 'fwhm').toUpperCase()}: <span className="text-slate-300 font-mono">{bestDataPoint.fwhm.toFixed(2)} px</span>
                   {' '}at {bestDataPoint.position}
                 </div>
               )}

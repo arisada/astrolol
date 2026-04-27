@@ -1,7 +1,10 @@
-"""Star detection and FWHM measurement using photutils.
+"""Star detection and FWHM / HFD measurement using photutils.
 
 Uses IRAFStarFinder which returns measured FWHM per source directly,
-without requiring a separate PSF-fitting step.
+without requiring a separate PSF-fitting step.  When metric="hfd" the
+returned value is the Half-Flux Diameter computed via a growing circular
+aperture (the aperture radius at which 50 % of the total enclosed flux
+is reached, doubled).
 """
 from __future__ import annotations
 
@@ -10,20 +13,54 @@ import structlog
 
 logger = structlog.get_logger()
 
+Metric = str  # "fwhm" | "hfd"
 
-async def detect_stars(fits_path: str) -> tuple[float, int, list[dict]]:
-    """Detect stars in a FITS image and measure their FWHM.
 
-    Returns ``(median_fwhm_pixels, star_count, star_list)`` where each entry
-    in ``star_list`` is a dict with ``x``, ``y``, ``fwhm`` keys (pixel coords).
+async def detect_stars(fits_path: str, metric: Metric = "fwhm") -> tuple[float, int, list[dict]]:
+    """Detect stars in a FITS image and measure their sharpness.
+
+    Returns ``(median_value, star_count, star_list)`` where each entry in
+    ``star_list`` has ``x``, ``y``, ``fwhm`` keys (pixel coords; ``fwhm``
+    always holds the FWHM regardless of metric, used for preview annotation).
+
+    When *metric* is ``"hfd"``, the first return value is the median HFD
+    across all detected stars instead of the median FWHM.
+
     Returns ``(0.0, 0, [])`` when no stars are detected.
-
     Runs in a thread pool to avoid blocking the event loop.
     """
-    return await asyncio.to_thread(_detect_sync, fits_path)
+    return await asyncio.to_thread(_detect_sync, fits_path, metric)
 
 
-def _detect_sync(fits_path: str) -> tuple[float, int, list[dict]]:
+def _compute_hfd(data: "np.ndarray", x: float, y: float, max_radius: float = 20.0) -> float:  # type: ignore[name-defined]
+    """Return the Half-Flux Diameter for a star centred at (x, y).
+
+    Grows a circular aperture until it encloses 50 % of the total flux
+    measured within *max_radius*.  Returns 0.0 if the flux is non-positive.
+    """
+    import numpy as np
+    from photutils.aperture import CircularAperture, aperture_photometry
+
+    pos = [(x, y)]
+    total_ap = CircularAperture(pos, r=max_radius)
+    total_flux = float(aperture_photometry(data, total_ap)["aperture_sum"][0])
+    if total_flux <= 0:
+        return 0.0
+
+    half = 0.5 * total_flux
+    lo, hi = 0.5, max_radius
+    for _ in range(20):  # bisection — 20 iterations → < 0.002 px error
+        mid = (lo + hi) / 2.0
+        ap = CircularAperture(pos, r=mid)
+        flux = float(aperture_photometry(data, ap)["aperture_sum"][0])
+        if flux < half:
+            lo = mid
+        else:
+            hi = mid
+    return 2.0 * ((lo + hi) / 2.0)  # diameter
+
+
+def _detect_sync(fits_path: str, metric: Metric = "fwhm") -> tuple[float, int, list[dict]]:
     try:
         import numpy as np
         from astropy.io import fits
@@ -127,4 +164,15 @@ def _detect_sync(fits_path: str) -> tuple[float, int, list[dict]]:
         }
         for s in sources
     ]
+
+    if metric == "hfd":
+        hfds = np.array([
+            _compute_hfd(data - median, s["x"], s["y"])
+            for s in stars
+        ])
+        valid_hfds = hfds[hfds > 0]
+        if len(valid_hfds) == 0:
+            return 0.0, 0, []
+        return float(np.median(valid_hfds)), len(stars), stars
+
     return median_fwhm, len(stars), stars

@@ -187,9 +187,9 @@ class AutofocusEngine:
                 run.image_width = fits_w or None
                 run.image_height = fits_h or None
 
-                # 3. Detect stars and measure FWHM
-                logger.info("autofocus.detecting_stars", step=run.current_step)
-                fwhm, star_count, raw_stars = await detect_stars(image.fits_path)
+                # 3. Detect stars and measure sharpness (FWHM or HFD)
+                logger.info("autofocus.detecting_stars", step=run.current_step, metric=config.metric)
+                fwhm, star_count, raw_stars = await detect_stars(image.fits_path, metric=config.metric)
 
                 run.latest_stars = [StarInfo(x=s["x"], y=s["y"], fwhm=s["fwhm"]) for s in raw_stars]
 
@@ -242,7 +242,8 @@ class AutofocusEngine:
                     "autofocus.data_point",
                     step=run.current_step,
                     position=position,
-                    fwhm=round(fwhm, 2),
+                    metric=config.metric,
+                    value=round(fwhm, 2),
                     stars=star_count,
                 )
 

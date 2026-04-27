@@ -29,6 +29,7 @@ class AutofocusSettings(BaseModel):
     gain: int | None = None
     filter_slot: int | None = None
     fit_algo: Literal["parabola", "hyperbola"] = "parabola"
+    metric: Literal["fwhm", "hfd"] = "fwhm"
 
 
 # ── Configuration ─────────────────────────────────────────────────────────────
@@ -43,6 +44,7 @@ class AutofocusConfig(BaseModel):
     gain: int | None = None
     filter_slot: int | None = Field(default=None, description="Filter slot to select before run (None = keep current)")
     fit_algo: Literal["parabola", "hyperbola"] = "parabola"
+    metric: Literal["fwhm", "hfd"] = "fwhm"
 
 
 # ── Result types ──────────────────────────────────────────────────────────────

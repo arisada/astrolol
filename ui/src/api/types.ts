@@ -126,6 +126,7 @@ export interface PlatesolveSettings {
 // ── Autofocus ─────────────────────────────────────────────────────────────────
 
 export type FitAlgo = 'parabola' | 'hyperbola'
+export type FocusMetric = 'fwhm' | 'hfd'
 
 export interface AutofocusSettings {
   step_size: number
@@ -135,6 +136,7 @@ export interface AutofocusSettings {
   gain: number | null
   filter_slot: number | null
   fit_algo: FitAlgo
+  metric: FocusMetric
 }
 
 export interface AutofocusConfig {
@@ -147,6 +149,7 @@ export interface AutofocusConfig {
   gain?: number | null
   filter_slot?: number | null
   fit_algo?: FitAlgo
+  metric?: FocusMetric
 }
 
 export interface StarInfo {
