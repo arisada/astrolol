@@ -23,10 +23,12 @@ from astrolol.api.filter_wheel import router as filter_wheel_router
 from astrolol.api.focuser import router as focuser_router
 from astrolol.api.imager import router as imager_router
 from astrolol.api.indi import router as indi_router
+from astrolol.api.inventory import router as inventory_router
 from astrolol.api.mount import router as mount_router
 from astrolol.api.profiles import router as profiles_router
 from astrolol.api.properties import router as properties_router
 from astrolol.api.settings import router as settings_router
+from astrolol.equipment.store import EquipmentStore
 from astrolol.profiles.store import ProfileStore
 from astrolol.app import build_plugin_manager, build_registry, discover_plugins, setup_plugins
 from astrolol.core.events import EventBus
@@ -100,6 +102,7 @@ def create_app() -> FastAPI:
     from astrolol.config.settings import settings as _settings
 
     profile_store = ProfileStore(_settings.profiles_file)
+    equipment_store = EquipmentStore(_settings.inventory_file)
     user_settings = profile_store.get_user_settings()
 
     # Wire up the global memory-pressure guard so it reads the live setting.
@@ -125,6 +128,7 @@ def create_app() -> FastAPI:
     app.state.focuser_manager = focuser_manager
     app.state.filter_wheel_manager = filter_wheel_manager
     app.state.profile_store = profile_store
+    app.state.equipment_store = equipment_store
     app.state.active_profile = None
 
     # Feature plugins — discover all, set up enabled ones
@@ -145,6 +149,7 @@ def create_app() -> FastAPI:
     app.include_router(devices_router)
     app.include_router(properties_router)
     app.include_router(profiles_router)
+    app.include_router(inventory_router)
     app.include_router(imager_router)
     app.include_router(mount_router)
     app.include_router(focuser_router)

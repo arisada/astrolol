@@ -6,6 +6,7 @@ from uuid import uuid4
 from pydantic import BaseModel, Field
 
 from astrolol.devices.config import DeviceConfig
+from astrolol.equipment.models import ProfileNode
 
 
 class ObserverLocation(BaseModel):
@@ -32,3 +33,7 @@ class Profile(BaseModel):
     location: ObserverLocation | None = None
     telescope: Telescope | None = None
     devices: list[ProfileDevice] = []
+    roots: list[ProfileNode] = Field(
+        default=[],
+        description="Equipment tree roots referencing inventory items by UUID.",
+    )
