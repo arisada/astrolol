@@ -1,4 +1,4 @@
-import { ScanSearch } from 'lucide-react'
+import { MapPinned } from 'lucide-react'
 import { PlatesolvePage } from './PlatesolvePage'
 import { PlatesolveChip } from './PlatesolveChip'
 import { registerPluginEventHandlers } from '@/store'
@@ -54,7 +54,7 @@ registerPluginEventHandlers('platesolve', {
 })
 
 export default {
-  icon: ScanSearch,
+  icon: MapPinned,
   label: 'Plate Solving',
   Component: PlatesolvePage,
   StatusChip: PlatesolveChip,

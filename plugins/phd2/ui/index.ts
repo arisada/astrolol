@@ -1,4 +1,4 @@
-import { Crosshair } from 'lucide-react'
+import { Sparkles } from 'lucide-react'
 import { Phd2Page } from './Phd2Page'
 import { Phd2Chip } from './Phd2Chip'
 import { registerPluginEventHandlers, registerSilentEventTypes } from '@/store'
@@ -44,7 +44,7 @@ registerPluginEventHandlers('phd2', {
 registerSilentEventTypes('phd2.guide_step')
 
 export default {
-  icon: Crosshair,
+  icon: Sparkles,
   label: 'Guiding',
   Component: Phd2Page,
   StatusChip: Phd2Chip,
