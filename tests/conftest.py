@@ -63,6 +63,9 @@ class FakeCamera:
     async def set_cooler(self, enabled: bool, target_temperature: float | None) -> None:
         pass
 
+    async def push_scope_info(self, focal_length: float, aperture: float) -> None:
+        self.scope_info = (focal_length, aperture)
+
     async def ping(self) -> bool:
         return self.connected
 
@@ -165,6 +168,9 @@ class FakeMount:
             pier_side=self._pier_side,
             hour_angle=self._hour_angle,
         )
+
+    async def set_location(self, lat: float, lon: float, alt: float) -> None:
+        self.location = (lat, lon, alt)
 
     async def ping(self) -> bool:
         return self.connected

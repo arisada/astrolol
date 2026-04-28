@@ -4,8 +4,11 @@ from __future__ import annotations
 import pytest
 from httpx import ASGITransport, AsyncClient
 
+from astrolol.api.profiles import _apply_tree_context
+from astrolol.equipment.models import CameraItem, MountItem, OTAItem, SiteItem
+from astrolol.equipment.store import EquipmentStore
 from astrolol.main import create_app
-from astrolol.profiles.models import Profile, ObserverLocation, Telescope
+from astrolol.profiles.models import Profile, ObserverLocation, ProfileNode, Telescope
 from astrolol.profiles.store import ProfileStore
 from tests.conftest import FakeCamera, FakeMount, FakeFocuser
 
@@ -303,3 +306,128 @@ async def test_api_deactivate_disconnects_devices(client):
         await c.delete("/profiles/active")
         connected = await c.get("/devices/connected")
     assert connected.json() == []
+
+
+# ===========================================================================
+# Tree-context propagation (_apply_tree_context)
+# ===========================================================================
+
+
+@pytest.fixture
+def inv_store(tmp_path):
+    return EquipmentStore(tmp_path / "inventory.json")
+
+
+def _fake_device_manager(entries: dict):
+    """Minimal stand-in for DeviceManager._devices."""
+    class _Entry:
+        def __init__(self, kind, device_name, instance):
+            self.config = type("cfg", (), {
+                "kind": kind,
+                "params": {"device_name": device_name},
+            })()
+            self.instance = instance
+
+    class _DM:
+        def __init__(self):
+            self._devices = {k: v for k, v in entries.items()}
+
+    dm = _DM()
+    dm._devices = {k: _Entry(*v) for k, v in entries.items()}
+    return dm
+
+
+@pytest.mark.asyncio
+async def test_tree_context_pushes_location_to_mount(inv_store):
+    site = inv_store.create(SiteItem(
+        name="Backyard", latitude=48.85, longitude=2.35, altitude=35.0,
+    ))
+    mount_item = inv_store.create(MountItem(
+        name="EQ6-R", indi_device_name="EQ6-R Mount",
+    ))
+
+    fake_mount = FakeMount()
+    dm = _fake_device_manager({"mount1": ("mount", "EQ6-R Mount", fake_mount)})
+
+    roots = [ProfileNode(item_id=site.id, children=[
+        ProfileNode(item_id=mount_item.id),
+    ])]
+    await _apply_tree_context(roots, inv_store, dm)
+
+    assert hasattr(fake_mount, "location")
+    assert fake_mount.location == (48.85, 2.35, 35.0)
+
+
+@pytest.mark.asyncio
+async def test_tree_context_pushes_scope_info_to_camera(inv_store):
+    ota = inv_store.create(OTAItem(
+        name="RedCat 51", focal_length=250.0, aperture=51.0,
+    ))
+    cam_item = inv_store.create(CameraItem(
+        name="ASI2600", indi_device_name="ZWO CCD ASI2600MC Pro",
+    ))
+
+    fake_camera = FakeCamera()
+    dm = _fake_device_manager({"cam1": ("camera", "ZWO CCD ASI2600MC Pro", fake_camera)})
+
+    roots = [ProfileNode(item_id=ota.id, children=[
+        ProfileNode(item_id=cam_item.id),
+    ])]
+    await _apply_tree_context(roots, inv_store, dm)
+
+    assert hasattr(fake_camera, "scope_info")
+    assert fake_camera.scope_info == (250.0, 51.0)
+
+
+@pytest.mark.asyncio
+async def test_tree_context_propagates_through_mount(inv_store):
+    """site → mount → ota → camera: scope info still reaches camera."""
+    site = inv_store.create(SiteItem(
+        name="Backyard", latitude=48.85, longitude=2.35, altitude=35.0,
+    ))
+    mount_item = inv_store.create(MountItem(name="EQ6-R", indi_device_name="EQ6-R Mount"))
+    ota = inv_store.create(OTAItem(name="OTA", focal_length=500.0, aperture=80.0))
+    cam_item = inv_store.create(CameraItem(name="Cam", indi_device_name="ZWO CCD ASI294MC Pro"))
+
+    fake_mount = FakeMount()
+    fake_camera = FakeCamera()
+    dm = _fake_device_manager({
+        "mount1": ("mount", "EQ6-R Mount", fake_mount),
+        "cam1": ("camera", "ZWO CCD ASI294MC Pro", fake_camera),
+    })
+
+    roots = [ProfileNode(item_id=site.id, children=[
+        ProfileNode(item_id=mount_item.id, children=[
+            ProfileNode(item_id=ota.id, children=[
+                ProfileNode(item_id=cam_item.id),
+            ]),
+        ]),
+    ])]
+    await _apply_tree_context(roots, inv_store, dm)
+
+    assert fake_mount.location == (48.85, 2.35, 35.0)
+    assert fake_camera.scope_info == (500.0, 80.0)
+
+
+@pytest.mark.asyncio
+async def test_tree_context_missing_inventory_item_skipped(inv_store):
+    """A node whose item_id is missing from inventory is silently skipped."""
+    roots = [ProfileNode(item_id="no-such-id")]
+    dm = _fake_device_manager({})
+    # Should not raise
+    await _apply_tree_context(roots, inv_store, dm)
+
+
+@pytest.mark.asyncio
+async def test_tree_context_no_matching_device_is_noop(inv_store):
+    """If the inventory item has no matching connected device, nothing breaks."""
+    mount_item = inv_store.create(MountItem(name="EQ6-R", indi_device_name="EQ6-R Mount"))
+    site = inv_store.create(SiteItem(
+        name="Backyard", latitude=48.85, longitude=2.35, altitude=35.0,
+    ))
+    dm = _fake_device_manager({})  # no devices connected
+
+    roots = [ProfileNode(item_id=site.id, children=[
+        ProfileNode(item_id=mount_item.id),
+    ])]
+    await _apply_tree_context(roots, inv_store, dm)  # should not raise

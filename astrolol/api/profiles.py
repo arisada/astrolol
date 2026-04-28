@@ -1,10 +1,15 @@
 from __future__ import annotations
 
+import structlog
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
-from astrolol.profiles.models import Profile
+from astrolol.equipment.models import EquipmentItem, OTAItem, SiteItem
+from astrolol.equipment.store import EquipmentStore
+from astrolol.profiles.models import Profile, ProfileNode
 from astrolol.profiles.store import ProfileStore
+
+logger = structlog.get_logger()
 
 router = APIRouter(prefix="/profiles", tags=["profiles"])
 
@@ -86,6 +91,92 @@ async def delete_profile(profile_id: str, request: Request) -> None:
 
 
 # ---------------------------------------------------------------------------
+# Tree-context propagation
+# ---------------------------------------------------------------------------
+
+def _find_device_by_indi_name(device_manager, kind: str, indi_device_name: str):
+    """Return the adapter instance for a connected device matching kind + INDI device name."""
+    for entry in device_manager._devices.values():
+        if entry.config.kind == kind:
+            if entry.config.params.get("device_name") == indi_device_name:
+                return entry.instance
+    return None
+
+
+async def _apply_tree_context(
+    nodes: list[ProfileNode],
+    equipment_store: EquipmentStore,
+    device_manager,
+    *,
+    site: SiteItem | None = None,
+    ota: OTAItem | None = None,
+) -> None:
+    """Walk the equipment tree and push context-derived values to INDI devices.
+
+    Propagates downward:
+    - SiteItem  → sets GEOGRAPHIC_COORD on any mount in its subtree
+    - OTAItem   → sets SCOPE_INFO on any camera in its subtree
+    """
+    for node in nodes:
+        try:
+            item: EquipmentItem = equipment_store.get(node.item_id)
+        except KeyError:
+            logger.warning("profile.tree_item_missing", item_id=node.item_id)
+            continue
+
+        current_site = site
+        current_ota = ota
+
+        if item.type == "site":
+            current_site = item  # type: ignore[assignment]
+
+        elif item.type == "mount" and current_site is not None:
+            indi_name = getattr(item, "indi_device_name", None)
+            if indi_name:
+                mount = _find_device_by_indi_name(device_manager, "mount", indi_name)
+                if mount is not None and hasattr(mount, "set_location"):
+                    try:
+                        await mount.set_location(
+                            current_site.latitude,
+                            current_site.longitude,
+                            current_site.altitude,
+                        )
+                    except Exception as exc:
+                        logger.warning(
+                            "profile.push_location_failed",
+                            device=indi_name, error=str(exc),
+                        )
+
+        elif item.type == "ota":
+            current_ota = item  # type: ignore[assignment]
+
+        elif item.type == "camera" and current_ota is not None:
+            indi_name = getattr(item, "indi_device_name", None)
+            if indi_name:
+                camera = _find_device_by_indi_name(device_manager, "camera", indi_name)
+                if camera is not None and hasattr(camera, "push_scope_info"):
+                    try:
+                        await camera.push_scope_info(
+                            current_ota.focal_length,
+                            current_ota.aperture,
+                        )
+                    except Exception as exc:
+                        logger.warning(
+                            "profile.push_scope_info_failed",
+                            device=indi_name, error=str(exc),
+                        )
+
+        # Recurse into children, propagating the updated context
+        await _apply_tree_context(
+            node.children,
+            equipment_store,
+            device_manager,
+            site=current_site,
+            ota=current_ota,
+        )
+
+
+# ---------------------------------------------------------------------------
 # Activation
 # ---------------------------------------------------------------------------
 
@@ -144,5 +235,13 @@ async def activate_profile(profile_id: str, request: Request) -> ActivationResul
             connected.append(DeviceResult(device_id=device_id, role=pd.role))
         except Exception as exc:
             failed.append(DeviceResult(device_id=device_id, role=pd.role, error=str(exc)))
+
+    # Push context from inventory tree (site → mount location, OTA → camera scope info)
+    equipment_store: EquipmentStore | None = getattr(request.app.state, "equipment_store", None)
+    if equipment_store is not None and profile.roots:
+        try:
+            await _apply_tree_context(profile.roots, equipment_store, device_manager)
+        except Exception as exc:
+            logger.warning("profile.tree_context_failed", error=str(exc))
 
     return ActivationResult(profile_id=profile_id, connected=connected, failed=failed)
