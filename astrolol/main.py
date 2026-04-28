@@ -114,7 +114,7 @@ def create_app() -> FastAPI:
     event_bus = EventBus()
     event_bus_forwarder.set_bus(event_bus)  # bridge structlog → EventBus
     device_manager = DeviceManager(registry=registry, event_bus=event_bus)
-    imager_manager = ImagerManager(device_manager=device_manager, event_bus=event_bus, profile_store=profile_store)
+    imager_manager = ImagerManager(device_manager=device_manager, event_bus=event_bus, profile_store=profile_store, equipment_store=equipment_store)
     mount_manager = MountManager(device_manager=device_manager, event_bus=event_bus, profile_store=profile_store)
     focuser_manager = FocuserManager(device_manager=device_manager, event_bus=event_bus)
     filter_wheel_manager = FilterWheelManager(device_manager=device_manager, event_bus=event_bus)

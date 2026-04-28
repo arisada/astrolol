@@ -66,6 +66,9 @@ class FakeCamera:
     async def push_scope_info(self, focal_length: float, aperture: float) -> None:
         self.scope_info = (focal_length, aperture)
 
+    async def push_telescope_coord(self, ra_jnow: float, dec_jnow: float) -> None:
+        self.telescope_coord = (ra_jnow, dec_jnow)
+
     async def ping(self) -> bool:
         return self.connected
 

@@ -176,6 +176,113 @@ async def _apply_tree_context(
         )
 
 
+async def _push_live_context(
+    nodes: list[ProfileNode],
+    equipment_store: EquipmentStore,
+    device_manager,
+    *,
+    mount_adapter=None,
+) -> None:
+    """Walk the equipment tree and push live mount coordinates to cameras.
+
+    Called before each exposure so the camera's TELESCOPE_EOD_COORD INDI
+    property matches the mount's actual pointing when the shutter opens.
+    Also returns the first mount adapter found (for the caller to use as
+    a coord snapshot for FITS header patching).
+
+    Propagates downward: a mount node sets the current mount adapter in
+    context; any camera in its subtree receives the coordinate push.
+    """
+    for node in nodes:
+        try:
+            item: EquipmentItem = equipment_store.get(node.item_id)
+        except KeyError:
+            await _push_live_context(
+                node.children, equipment_store, device_manager,
+                mount_adapter=mount_adapter,
+            )
+            continue
+
+        current_mount = mount_adapter
+
+        if item.type == "mount":
+            indi_name = getattr(item, "indi_device_name", None)
+            if indi_name:
+                adapter = _find_device_by_indi_name(device_manager, "mount", indi_name)
+                if adapter is not None:
+                    current_mount = adapter
+
+        elif item.type == "camera" and current_mount is not None:
+            indi_name = getattr(item, "indi_device_name", None)
+            if indi_name:
+                camera = _find_device_by_indi_name(device_manager, "camera", indi_name)
+                if camera is not None and hasattr(camera, "push_telescope_coord"):
+                    try:
+                        status = await current_mount.get_status()
+                        await camera.push_telescope_coord(
+                            status.ra_jnow, status.dec_jnow
+                        )
+                    except Exception as exc:
+                        logger.warning(
+                            "profile.push_telescope_coord_failed",
+                            device=indi_name, error=str(exc),
+                        )
+
+        await _push_live_context(
+            node.children, equipment_store, device_manager,
+            mount_adapter=current_mount,
+        )
+
+
+def _find_mount_for_camera(
+    nodes: list[ProfileNode],
+    equipment_store: EquipmentStore,
+    device_manager,
+    camera_indi_name: str,
+    *,
+    mount_adapter=None,
+):
+    """Return the mount adapter that is an ancestor of the given camera in the tree.
+
+    Used by the imager to resolve the mount coord snapshot for FITS patching when
+    profile.devices is empty (tree-only profiles).  Returns None if not found.
+    """
+    for node in nodes:
+        try:
+            item: EquipmentItem = equipment_store.get(node.item_id)
+        except KeyError:
+            result = _find_mount_for_camera(
+                node.children, equipment_store, device_manager,
+                camera_indi_name, mount_adapter=mount_adapter,
+            )
+            if result is not None:
+                return result
+            continue
+
+        current_mount = mount_adapter
+
+        if item.type == "mount":
+            indi_name = getattr(item, "indi_device_name", None)
+            if indi_name:
+                adapter = _find_device_by_indi_name(device_manager, "mount", indi_name)
+                if adapter is not None:
+                    current_mount = adapter
+
+        elif item.type == "camera":
+            indi_name = getattr(item, "indi_device_name", None)
+            if indi_name == camera_indi_name and current_mount is not None:
+                return current_mount
+
+        result = _find_mount_for_camera(
+            node.children, equipment_store, device_manager,
+            camera_indi_name, mount_adapter=current_mount,
+        )
+        if result is not None:
+            return result
+
+    return None
+
+
 # ---------------------------------------------------------------------------
 # Activation
 # ---------------------------------------------------------------------------

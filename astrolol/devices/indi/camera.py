@@ -249,6 +249,32 @@ class IndiCamera:
                 error=str(exc),
             )
 
+    async def push_telescope_coord(self, ra_jnow: float, dec_jnow: float) -> None:
+        """Push current mount pointing to the camera's TELESCOPE_EOD_COORD property.
+
+        Called before each exposure so the camera's internal FITS writer records the
+        correct pointing coordinates.  Best-effort: silently skipped if the driver
+        does not expose this property.
+        """
+        try:
+            await self._client.set_number(
+                self._device_name,
+                "TELESCOPE_EOD_COORD",
+                {"RA": ra_jnow, "DEC": dec_jnow},
+            )
+            logger.debug(
+                "indi.camera_telescope_coord_pushed",
+                device=self._device_name,
+                ra_jnow=ra_jnow,
+                dec_jnow=dec_jnow,
+            )
+        except Exception as exc:
+            logger.debug(
+                "indi.camera_telescope_coord_skipped",
+                device=self._device_name,
+                error=str(exc),
+            )
+
     async def set_cooler(self, enabled: bool, target_temperature: float | None) -> None:
         """Enable/disable the cooler and optionally set the target temperature."""
         try:

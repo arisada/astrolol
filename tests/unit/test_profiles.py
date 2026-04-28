@@ -4,7 +4,7 @@ from __future__ import annotations
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from astrolol.api.profiles import _apply_tree_context
+from astrolol.api.profiles import _apply_tree_context, _push_live_context, _find_mount_for_camera
 from astrolol.equipment.models import CameraItem, MountItem, OTAItem, SiteItem
 from astrolol.equipment.store import EquipmentStore
 from astrolol.main import create_app
@@ -431,3 +431,107 @@ async def test_tree_context_no_matching_device_is_noop(inv_store):
         ProfileNode(item_id=mount_item.id),
     ])]
     await _apply_tree_context(roots, inv_store, dm)  # should not raise
+
+
+# ===========================================================================
+# Live context propagation (_push_live_context, _find_mount_for_camera)
+# ===========================================================================
+
+
+@pytest.mark.asyncio
+async def test_push_live_context_sends_coords_to_camera(inv_store):
+    """mount → camera: live RA/Dec pushed to camera's push_telescope_coord."""
+    mount_item = inv_store.create(MountItem(name="EQ6-R", indi_device_name="EQ6-R Mount"))
+    cam_item = inv_store.create(CameraItem(name="ASI2600", indi_device_name="ZWO CCD ASI2600MC Pro"))
+
+    fake_mount = FakeMount()
+    fake_mount._ra = 5.5
+    fake_mount._dec = -20.0
+    fake_camera = FakeCamera()
+    dm = _fake_device_manager({
+        "mount1": ("mount", "EQ6-R Mount", fake_mount),
+        "cam1": ("camera", "ZWO CCD ASI2600MC Pro", fake_camera),
+    })
+
+    roots = [ProfileNode(item_id=mount_item.id, children=[
+        ProfileNode(item_id=cam_item.id),
+    ])]
+    await _push_live_context(roots, inv_store, dm)
+
+    assert hasattr(fake_camera, "telescope_coord")
+    ra_jnow, dec_jnow = fake_camera.telescope_coord
+    # Values should be close to what FakeMount.get_status() returns (JNow coords)
+    assert abs(ra_jnow - 5.5) < 0.1
+    assert abs(dec_jnow - (-20.0)) < 0.1
+
+
+@pytest.mark.asyncio
+async def test_push_live_context_no_camera_without_mount(inv_store):
+    """A camera with no mount ancestor does not receive a coord push."""
+    cam_item = inv_store.create(CameraItem(name="ASI2600", indi_device_name="ZWO CCD ASI2600MC Pro"))
+
+    fake_camera = FakeCamera()
+    dm = _fake_device_manager({
+        "cam1": ("camera", "ZWO CCD ASI2600MC Pro", fake_camera),
+    })
+
+    roots = [ProfileNode(item_id=cam_item.id)]
+    await _push_live_context(roots, inv_store, dm)
+
+    assert not hasattr(fake_camera, "telescope_coord")
+
+
+@pytest.mark.asyncio
+async def test_push_live_context_missing_item_skipped(inv_store):
+    """A node with a missing inventory item does not prevent the rest from running."""
+    mount_item = inv_store.create(MountItem(name="EQ6-R", indi_device_name="EQ6-R Mount"))
+    cam_item = inv_store.create(CameraItem(name="ASI2600", indi_device_name="ZWO CCD ASI2600MC Pro"))
+
+    fake_mount = FakeMount()
+    fake_camera = FakeCamera()
+    dm = _fake_device_manager({
+        "mount1": ("mount", "EQ6-R Mount", fake_mount),
+        "cam1": ("camera", "ZWO CCD ASI2600MC Pro", fake_camera),
+    })
+
+    roots = [
+        ProfileNode(item_id="no-such-id"),
+        ProfileNode(item_id=mount_item.id, children=[ProfileNode(item_id=cam_item.id)]),
+    ]
+    await _push_live_context(roots, inv_store, dm)  # should not raise
+    assert hasattr(fake_camera, "telescope_coord")
+
+
+def test_find_mount_for_camera_returns_adapter(inv_store):
+    """_find_mount_for_camera finds the ancestor mount for a given camera INDI name."""
+    mount_item = inv_store.create(MountItem(name="EQ6-R", indi_device_name="EQ6-R Mount"))
+    cam_item = inv_store.create(CameraItem(name="ASI2600", indi_device_name="ZWO CCD ASI2600MC Pro"))
+
+    fake_mount = FakeMount()
+    dm = _fake_device_manager({"mount1": ("mount", "EQ6-R Mount", fake_mount)})
+
+    roots = [ProfileNode(item_id=mount_item.id, children=[ProfileNode(item_id=cam_item.id)])]
+    result = _find_mount_for_camera(roots, inv_store, dm, "ZWO CCD ASI2600MC Pro")
+    assert result is fake_mount
+
+
+def test_find_mount_for_camera_returns_none_when_no_ancestor(inv_store):
+    """Returns None if the camera has no mount ancestor in the tree."""
+    cam_item = inv_store.create(CameraItem(name="ASI2600", indi_device_name="ZWO CCD ASI2600MC Pro"))
+    dm = _fake_device_manager({})
+
+    roots = [ProfileNode(item_id=cam_item.id)]
+    result = _find_mount_for_camera(roots, inv_store, dm, "ZWO CCD ASI2600MC Pro")
+    assert result is None
+
+
+def test_find_mount_for_camera_wrong_name_returns_none(inv_store):
+    """Returns None when asked for a camera INDI name that is not in the tree."""
+    mount_item = inv_store.create(MountItem(name="EQ6-R", indi_device_name="EQ6-R Mount"))
+    cam_item = inv_store.create(CameraItem(name="ASI2600", indi_device_name="ZWO CCD ASI2600MC Pro"))
+    fake_mount = FakeMount()
+    dm = _fake_device_manager({"mount1": ("mount", "EQ6-R Mount", fake_mount)})
+
+    roots = [ProfileNode(item_id=mount_item.id, children=[ProfileNode(item_id=cam_item.id)])]
+    result = _find_mount_for_camera(roots, inv_store, dm, "Some Other Camera")
+    assert result is None
