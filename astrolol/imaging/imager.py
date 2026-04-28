@@ -27,6 +27,7 @@ from astrolol.imaging.models import DitherConfig, ExposureRequest, ExposureResul
 from astrolol.imaging.preview import fits_to_jpeg, fits_to_jpeg_linear
 
 if TYPE_CHECKING:
+    from astrolol.equipment.store import EquipmentStore
     from astrolol.profiles.models import Profile
     from astrolol.profiles.store import ProfileStore
 
@@ -118,6 +119,7 @@ class ImagerManager:
         event_bus: EventBus,
         images_dir: Path | None = None,
         profile_store: "ProfileStore | None" = None,
+        equipment_store: "EquipmentStore | None" = None,
     ) -> None:
         self._device_manager = device_manager
         self._event_bus = event_bus
@@ -125,6 +127,7 @@ class ImagerManager:
         self._imagers: dict[str, CameraImager] = {}
         self._active_profile: "Profile | None" = None
         self._profile_store = profile_store
+        self._equipment_store = equipment_store
         self._save_counters: dict[str, int] = {}
         self._last_stats: dict[str, ImageStats] = {}
         # Optional dither hook set by the PHD2 plugin on startup.
@@ -271,6 +274,32 @@ class ImagerManager:
                     coord = status.skycoord
                 except Exception:
                     pass  # mount not connected or query failed — skip RA/DEC
+
+            # Tree-based fallback: find mount adapter for this camera via equipment tree
+            if coord is None and profile.roots and self._equipment_store is not None:
+                try:
+                    from astrolol.api.profiles import _find_mount_for_camera
+                    indi_name = getattr(camera, "_device_name", None)
+                    if indi_name:
+                        mount_adapter = _find_mount_for_camera(
+                            profile.roots, self._equipment_store, self._device_manager, indi_name
+                        )
+                        if mount_adapter is not None:
+                            status = await mount_adapter.get_status()
+                            coord = status.skycoord
+                except Exception:
+                    pass
+
+        # Push live mount coordinates to the camera's TELESCOPE_EOD_COORD property
+        # so the camera's internal FITS writer records correct pointing.
+        if profile is not None and profile.roots and self._equipment_store is not None:
+            try:
+                from astrolol.api.profiles import _push_live_context
+                await _push_live_context(
+                    profile.roots, self._equipment_store, self._device_manager
+                )
+            except Exception:
+                pass  # best-effort — never block an exposure
 
         imager.state = ImagerState.EXPOSING
         await self._event_bus.publish(
