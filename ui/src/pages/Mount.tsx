@@ -1,9 +1,9 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Crosshair, RefreshCw, RotateCw, Settings, StopCircle } from 'lucide-react'
 import { api } from '@/api/client'
 import { useStore } from '@/store'
 import type { LogEntry } from '@/store'
-import type { CoordFrame, MountDeviceSettings, MountStatus, TrackingMode } from '@/api/types'
+import type { CoordFrame, DeviceProperty, MountDeviceSettings, MountStatus, TrackingMode } from '@/api/types'
 import { Button } from '@/components/ui/button'
 import { DmsInput } from '@/components/ui/dms-input'
 import { StateBadge } from '@/components/ui/badge'
@@ -13,12 +13,17 @@ import { DevicePropertiesPanel } from '@/components/DevicePropertiesPanel'
 // Constants
 // ---------------------------------------------------------------------------
 
-const MOVE_RATES = [
+const DEFAULT_MOVE_RATES = [
   { label: 'Guide',   rate: 'guide'     },
   { label: 'Center',  rate: 'centering' },
   { label: 'Find',    rate: 'find'      },
   { label: 'Max',     rate: 'max'       },
-] as const
+]
+
+/** Extract rate options from a TELESCOPE_SLEW_RATE switch property. */
+function slewRatesFromProperty(prop: DeviceProperty): { label: string; rate: string }[] {
+  return prop.widgets.map((w) => ({ label: String(w.label || w.name), rate: String(w.name) }))
+}
 
 const TRACKING_MODES: { label: string; mode: TrackingMode }[] = [
   { label: 'Sidereal', mode: 'sidereal' },
@@ -182,13 +187,25 @@ function MountControls({ deviceId }: { deviceId: string }) {
   const movingRef = useRef(false)
 
   const [mountSettings, setMountSettings] = useState<MountDeviceSettings>(DEFAULT_MOUNT_SETTINGS)
+  const [slewRateProp, setSlewRateProp] = useState<DeviceProperty | null>(null)
 
-  // Load mount settings on first render
+  // Load mount settings and slew rate property on first render
   useEffect(() => {
     api.mount.getSettings(deviceId)
       .then(setMountSettings)
       .catch(() => {/* use defaults */})
+    api.devices.properties(deviceId)
+      .then((props) => {
+        const prop = props.find((p) => p.name === 'TELESCOPE_SLEW_RATE')
+        setSlewRateProp(prop ?? null)
+      })
+      .catch(() => {/* fall back to defaults */})
   }, [deviceId])
+
+  const moveRates = useMemo(
+    () => slewRateProp ? slewRatesFromProperty(slewRateProp) : DEFAULT_MOVE_RATES,
+    [slewRateProp],
+  )
 
   const saveMountSettings = useCallback((updated: MountDeviceSettings) => {
     setMountSettings(updated)
@@ -222,8 +239,9 @@ function MountControls({ deviceId }: { deviceId: string }) {
   const handleMoveStart = useCallback(async (direction: string) => {
     if (movingRef.current) return
     movingRef.current = true
-    await act(() => api.mount.startMove(deviceId, direction, MOVE_RATES[rateIdx].rate))
-  }, [deviceId, rateIdx, act])
+    const rate = moveRates[Math.min(rateIdx, moveRates.length - 1)]?.rate ?? 'centering'
+    await act(() => api.mount.startMove(deviceId, direction, rate))
+  }, [deviceId, rateIdx, moveRates, act])
 
   const handleMoveStop = useCallback(async () => {
     if (!movingRef.current) return
@@ -481,7 +499,7 @@ function MountControls({ deviceId }: { deviceId: string }) {
               value={rateIdx}
               onChange={(e) => setRateIdx(parseInt(e.target.value))}
             >
-              {MOVE_RATES.map((s, i) => <option key={s.label} value={i}>{s.label}</option>)}
+              {moveRates.map((s, i) => <option key={s.rate} value={i}>{s.label}</option>)}
             </select>
             <span className="text-xs text-slate-600 ml-2">Hold to move, release to stop</span>
           </div>

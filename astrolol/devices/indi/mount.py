@@ -336,9 +336,10 @@ class IndiMount:
         """Start continuous motion. Call stop_move() to halt.
 
         direction: "N" | "S" | "E" | "W"
-        rate:      "guide" | "centering" | "find" | "max"
+        rate:      "guide" | "centering" | "find" | "max"  (shorthand aliases),
+                   or a raw INDI element name like "SLEW_GUIDE" (passed through as-is)
         """
-        indi_rate = self._SLEW_RATE_ELEMENTS.get(rate, "SLEW_CENTERING")
+        indi_rate = self._SLEW_RATE_ELEMENTS.get(rate, rate)
         try:
             await self._client.set_switch(self._device_name, "TELESCOPE_SLEW_RATE", [indi_rate])
         except Exception:
