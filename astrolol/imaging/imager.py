@@ -392,22 +392,24 @@ class ImagerManager:
             _preview(fits_to_jpeg_linear, preview_path_linear),
         )
 
-        # Build ImageStats from histogram data and optional star analysis.
+        # Build ImageStats from histogram data.
+        # NOTE: per-frame star analysis (FWHM/star count) is disabled — too expensive
+        # for low-memory hardware (Raspberry Pi). Re-enable by uncommenting below and
+        # restoring the fwhm/star_count fields in the ImageStats call.
+        #
+        # if self._star_analyzer_fn is not None:
+        #     try:
+        #         fwhm, star_count = await self._star_analyzer_fn(str(fits_path))
+        #         if star_count == 0:
+        #             fwhm = None
+        #     except Exception:
+        #         logger.warning("imager.star_analysis_failed", device_id=device_id)
         stats: ImageStats | None = None
         if isinstance(preview_stats_raw, dict):
-            fwhm: float | None = None
-            star_count = 0
-            if self._star_analyzer_fn is not None:
-                try:
-                    fwhm, star_count = await self._star_analyzer_fn(str(fits_path))
-                    if star_count == 0:
-                        fwhm = None
-                except Exception:
-                    logger.warning("imager.star_analysis_failed", device_id=device_id)
             stats = ImageStats(
                 **preview_stats_raw,
-                fwhm=fwhm,
-                star_count=star_count,
+                fwhm=None,
+                star_count=0,
             )
             self._last_stats[device_id] = stats
 
