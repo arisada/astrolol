@@ -3,6 +3,7 @@ import type {
   CameraStatus,
   CoordFrame,
   ConnectedDevice,
+  EquipmentItem,
   MountDeviceSettings,
   DeviceConfig,
   DeviceProperty,
@@ -200,6 +201,15 @@ export const api = {
     getSettings: <T>(pluginId: string) => request<T>(`/plugins/${pluginId}/settings`),
     putSettings: <T>(pluginId: string, body: T) =>
       request<T>(`/plugins/${pluginId}/settings`, { method: 'PUT', body: JSON.stringify(body) }),
+  },
+
+  inventory: {
+    list: () => request<EquipmentItem[]>('/inventory'),
+    create: (item: Omit<EquipmentItem, 'id'>) =>
+      request<EquipmentItem>('/inventory', { method: 'POST', body: JSON.stringify(item) }),
+    update: (item: EquipmentItem) =>
+      request<EquipmentItem>(`/inventory/${item.id}`, { method: 'PUT', body: JSON.stringify(item) }),
+    delete: (id: string) => request<void>(`/inventory/${id}`, { method: 'DELETE' }),
   },
 
   focuser: {

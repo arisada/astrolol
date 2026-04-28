@@ -298,6 +298,64 @@ export interface ImagerStatus {
   state: 'idle' | 'exposing' | 'looping' | 'error'
 }
 
+// --- Equipment inventory ---
+
+export type EquipmentItemType =
+  | 'site' | 'mount' | 'ota' | 'camera'
+  | 'filter_wheel' | 'focuser' | 'rotator' | 'gps'
+
+interface BaseEquipmentItem { id: string; name: string }
+
+export interface SiteEquipmentItem extends BaseEquipmentItem {
+  type: 'site'
+  latitude: number
+  longitude: number
+  altitude: number
+  timezone: string
+}
+export interface MountEquipmentItem extends BaseEquipmentItem {
+  type: 'mount'
+  indi_driver: string | null
+  indi_device_name: string | null
+}
+export interface OTAEquipmentItem extends BaseEquipmentItem {
+  type: 'ota'
+  focal_length: number
+  aperture: number
+}
+export interface CameraEquipmentItem extends BaseEquipmentItem {
+  type: 'camera'
+  indi_driver: string | null
+  indi_device_name: string | null
+  pixel_size_um: number | null
+}
+export interface FilterWheelEquipmentItem extends BaseEquipmentItem {
+  type: 'filter_wheel'
+  indi_driver: string | null
+  indi_device_name: string | null
+  filter_names: string[]
+}
+export interface FocuserEquipmentItem extends BaseEquipmentItem {
+  type: 'focuser'
+  indi_driver: string | null
+  indi_device_name: string | null
+}
+export interface RotatorEquipmentItem extends BaseEquipmentItem {
+  type: 'rotator'
+  indi_driver: string | null
+  indi_device_name: string | null
+}
+export interface GpsEquipmentItem extends BaseEquipmentItem {
+  type: 'gps'
+  indi_driver: string | null
+  indi_device_name: string | null
+}
+
+export type EquipmentItem =
+  | SiteEquipmentItem | MountEquipmentItem | OTAEquipmentItem
+  | CameraEquipmentItem | FilterWheelEquipmentItem | FocuserEquipmentItem
+  | RotatorEquipmentItem | GpsEquipmentItem
+
 // --- Equipment profiles ---
 
 export interface ObserverLocation {
@@ -320,12 +378,19 @@ export interface ProfileDevice {
   config: DeviceConfig
 }
 
+export interface ProfileNode {
+  item_id: string
+  role: string | null
+  children: ProfileNode[]
+}
+
 export interface Profile {
   id: string
   name: string
   location?: ObserverLocation
   telescope?: Telescope
   devices: ProfileDevice[]
+  roots: ProfileNode[]
 }
 
 export interface DeviceResult {

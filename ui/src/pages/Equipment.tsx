@@ -1,7 +1,14 @@
-import { useEffect, useState } from 'react'
-import { Camera, ChevronLeft, CircleDot, Crosshair, FilterIcon, Link2, Plug, PlugZap, RefreshCw, Telescope, Trash2 } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import {
+  Camera, ChevronLeft, CircleDot, Crosshair, Filter as FilterIcon,
+  Focus, Globe, Link2, MapPin, Pencil, Plug, PlugZap, Plus, RefreshCw,
+  Telescope, Trash2, Wind,
+} from 'lucide-react'
 import { api } from '@/api/client'
-import type { ConnectedDevice, DeviceKind, DeviceProperty, DriverEntry, PreConnectProps } from '@/api/types'
+import type {
+  ConnectedDevice, DeviceKind, DeviceProperty, DriverEntry,
+  EquipmentItem, EquipmentItemType, PreConnectProps,
+} from '@/api/types'
 import { useStore } from '@/store'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -592,12 +599,421 @@ function DeviceRow({
 }
 
 // ---------------------------------------------------------------------------
+// Inventory helpers
+// ---------------------------------------------------------------------------
+
+const ITEM_TYPE_LABELS: Record<EquipmentItemType, string> = {
+  site: 'Observation Site',
+  mount: 'Mount',
+  ota: 'Telescope / OTA',
+  camera: 'Camera',
+  filter_wheel: 'Filter Wheel',
+  focuser: 'Focuser',
+  rotator: 'Rotator',
+  gps: 'GPS',
+}
+
+function ItemTypeIcon({ type, size = 16 }: { type: EquipmentItemType; size?: number }) {
+  if (type === 'site') return <MapPin size={size} />
+  if (type === 'mount') return <Telescope size={size} />
+  if (type === 'ota') return <Crosshair size={size} />
+  if (type === 'camera') return <Camera size={size} />
+  if (type === 'filter_wheel') return <FilterIcon size={size} />
+  if (type === 'focuser') return <Focus size={size} />
+  if (type === 'rotator') return <CircleDot size={size} />
+  if (type === 'gps') return <Globe size={size} />
+  return <Wind size={size} />
+}
+
+function itemSubtitle(item: EquipmentItem): string {
+  if (item.type === 'site') return `${item.latitude.toFixed(4)}° / ${item.longitude.toFixed(4)}° — ${item.altitude} m`
+  if (item.type === 'ota') return `${item.focal_length} mm  f/${(item.focal_length / item.aperture).toFixed(1)}`
+  if (item.type === 'camera' && item.pixel_size_um) return `${item.indi_device_name ?? item.indi_driver ?? ''}  ·  ${item.pixel_size_um} µm`
+  if ('indi_device_name' in item) return item.indi_device_name ?? item.indi_driver ?? ''
+  return ''
+}
+
+// ---------------------------------------------------------------------------
+// Inventory form
+// ---------------------------------------------------------------------------
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function emptyForm(type: EquipmentItemType): Omit<EquipmentItem, 'id'> {
+  const r: Record<string, any> = { type, name: '' }
+  if (type === 'site') Object.assign(r, { latitude: 0, longitude: 0, altitude: 0, timezone: 'UTC' })
+  else if (type === 'ota') Object.assign(r, { focal_length: 500, aperture: 80 })
+  else if (type === 'camera') Object.assign(r, { indi_driver: null, indi_device_name: null, pixel_size_um: null })
+  else if (type === 'filter_wheel') Object.assign(r, { indi_driver: null, indi_device_name: null, filter_names: [] })
+  else Object.assign(r, { indi_driver: null, indi_device_name: null })
+  return r as Omit<EquipmentItem, 'id'>
+}
+
+type FieldValue = string | number | null | string[]
+
+function FieldRow({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      <label className="text-xs text-slate-500">{label}</label>
+      {children}
+    </div>
+  )
+}
+
+function ItemForm({
+  initial,
+  onSave,
+  onCancel,
+}: {
+  initial: EquipmentItem | Omit<EquipmentItem, 'id'>
+  onSave: (item: EquipmentItem | Omit<EquipmentItem, 'id'>) => Promise<void>
+  onCancel: () => void
+}) {
+  const [form, setForm] = useState<EquipmentItem | Omit<EquipmentItem, 'id'>>(initial)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const nameRef = useRef<HTMLInputElement>(null)
+
+  useEffect(() => { nameRef.current?.focus() }, [])
+
+  const set = (key: string, value: FieldValue) =>
+    setForm((prev) => ({ ...prev, [key]: value }))
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setSaving(true)
+    setError(null)
+    try {
+      await onSave(form)
+    } catch (err) {
+      setError((err as Error).message)
+      setSaving(false)
+    }
+  }
+
+  const type = form.type as EquipmentItemType
+
+  return (
+    <form
+      onSubmit={handleSubmit}
+      className="bg-surface-raised border border-surface-border rounded p-4 flex flex-col gap-4"
+    >
+      <div className="flex items-center gap-2 text-xs font-medium text-slate-400 uppercase tracking-wider">
+        <ItemTypeIcon type={type} size={13} />
+        {ITEM_TYPE_LABELS[type]}
+      </div>
+
+      <FieldRow label="Name">
+        <input
+          ref={nameRef}
+          required
+          value={(form as {name: string}).name}
+          onChange={(e) => set('name', e.target.value)}
+          placeholder="e.g. EQ6-R Pro"
+          className="bg-surface border border-surface-border rounded px-3 py-1.5 text-sm text-slate-200
+            focus:outline-none focus:ring-1 focus:ring-accent w-full"
+        />
+      </FieldRow>
+
+      {/* INDI fields — for all INDI device types */}
+      {type !== 'site' && type !== 'ota' && (
+        <>
+          <FieldRow label="INDI driver">
+            <input
+              value={(form as { indi_driver: string | null }).indi_driver ?? ''}
+              onChange={(e) => set('indi_driver', e.target.value || null)}
+              placeholder="e.g. indi_eqmod_telescope"
+              className="bg-surface border border-surface-border rounded px-3 py-1.5 text-sm text-slate-200
+                focus:outline-none focus:ring-1 focus:ring-accent w-full"
+            />
+          </FieldRow>
+          <FieldRow label="INDI device name">
+            <input
+              value={(form as { indi_device_name: string | null }).indi_device_name ?? ''}
+              onChange={(e) => set('indi_device_name', e.target.value || null)}
+              placeholder="Announced by driver, e.g. EQ6 Mount"
+              className="bg-surface border border-surface-border rounded px-3 py-1.5 text-sm text-slate-200
+                focus:outline-none focus:ring-1 focus:ring-accent w-full"
+            />
+          </FieldRow>
+        </>
+      )}
+
+      {/* Site fields */}
+      {type === 'site' && (
+        <>
+          <div className="grid grid-cols-2 gap-3">
+            <FieldRow label="Latitude (°)">
+              <input
+                type="number" step="0.0001" min="-90" max="90"
+                value={(form as { latitude: number }).latitude}
+                onChange={(e) => set('latitude', parseFloat(e.target.value) || 0)}
+                className="bg-surface border border-surface-border rounded px-3 py-1.5 text-sm text-slate-200
+                  focus:outline-none focus:ring-1 focus:ring-accent w-full"
+              />
+            </FieldRow>
+            <FieldRow label="Longitude (°)">
+              <input
+                type="number" step="0.0001" min="-180" max="180"
+                value={(form as { longitude: number }).longitude}
+                onChange={(e) => set('longitude', parseFloat(e.target.value) || 0)}
+                className="bg-surface border border-surface-border rounded px-3 py-1.5 text-sm text-slate-200
+                  focus:outline-none focus:ring-1 focus:ring-accent w-full"
+              />
+            </FieldRow>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <FieldRow label="Altitude (m)">
+              <input
+                type="number" step="1"
+                value={(form as { altitude: number }).altitude}
+                onChange={(e) => set('altitude', parseFloat(e.target.value) || 0)}
+                className="bg-surface border border-surface-border rounded px-3 py-1.5 text-sm text-slate-200
+                  focus:outline-none focus:ring-1 focus:ring-accent w-full"
+              />
+            </FieldRow>
+            <FieldRow label="Timezone">
+              <input
+                value={(form as { timezone: string }).timezone}
+                onChange={(e) => set('timezone', e.target.value)}
+                placeholder="UTC"
+                className="bg-surface border border-surface-border rounded px-3 py-1.5 text-sm text-slate-200
+                  focus:outline-none focus:ring-1 focus:ring-accent w-full"
+              />
+            </FieldRow>
+          </div>
+        </>
+      )}
+
+      {/* OTA fields */}
+      {type === 'ota' && (
+        <div className="grid grid-cols-2 gap-3">
+          <FieldRow label="Focal length (mm)">
+            <input
+              type="number" step="1" min="0"
+              value={(form as { focal_length: number }).focal_length}
+              onChange={(e) => set('focal_length', parseFloat(e.target.value) || 0)}
+              className="bg-surface border border-surface-border rounded px-3 py-1.5 text-sm text-slate-200
+                focus:outline-none focus:ring-1 focus:ring-accent w-full"
+            />
+          </FieldRow>
+          <FieldRow label="Aperture (mm)">
+            <input
+              type="number" step="1" min="0"
+              value={(form as { aperture: number }).aperture}
+              onChange={(e) => set('aperture', parseFloat(e.target.value) || 0)}
+              className="bg-surface border border-surface-border rounded px-3 py-1.5 text-sm text-slate-200
+                focus:outline-none focus:ring-1 focus:ring-accent w-full"
+            />
+          </FieldRow>
+        </div>
+      )}
+
+      {/* Camera extra field */}
+      {type === 'camera' && (
+        <FieldRow label="Pixel size (µm)">
+          <input
+            type="number" step="0.01" min="0"
+            value={(form as { pixel_size_um: number | null }).pixel_size_um ?? ''}
+            onChange={(e) => set('pixel_size_um', e.target.value ? parseFloat(e.target.value) : null)}
+            placeholder="e.g. 3.76"
+            className="bg-surface border border-surface-border rounded px-3 py-1.5 text-sm text-slate-200
+              focus:outline-none focus:ring-1 focus:ring-accent w-40"
+          />
+        </FieldRow>
+      )}
+
+      {/* Filter wheel extra field */}
+      {type === 'filter_wheel' && (
+        <FieldRow label="Filter names (comma-separated)">
+          <input
+            value={(form as { filter_names: string[] }).filter_names.join(', ')}
+            onChange={(e) =>
+              set('filter_names', e.target.value.split(',').map((s) => s.trim()).filter(Boolean))
+            }
+            placeholder="L, R, G, B, Ha, OIII, SII"
+            className="bg-surface border border-surface-border rounded px-3 py-1.5 text-sm text-slate-200
+              focus:outline-none focus:ring-1 focus:ring-accent w-full"
+          />
+        </FieldRow>
+      )}
+
+      {error && (
+        <p className="text-xs text-status-error bg-status-error/10 rounded px-3 py-2">{error}</p>
+      )}
+
+      <div className="flex gap-2">
+        <Button type="submit" disabled={saving}>
+          {saving ? 'Saving…' : 'Save'}
+        </Button>
+        <Button type="button" variant="ghost" onClick={onCancel}>
+          Cancel
+        </Button>
+      </div>
+    </form>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Inventory section
+// ---------------------------------------------------------------------------
+
+function InventorySection() {
+  const [items, setItems] = useState<EquipmentItem[]>([])
+  const [creating, setCreating] = useState<EquipmentItemType | null>(null)
+  const [editing, setEditing] = useState<string | null>(null)  // item id
+  const [showTypeMenu, setShowTypeMenu] = useState(false)
+
+  const load = () => api.inventory.list().then(setItems).catch(console.error)
+  useEffect(() => { load() }, [])
+
+  const handleCreate = async (item: EquipmentItem | Omit<EquipmentItem, 'id'>) => {
+    await api.inventory.create(item as Omit<EquipmentItem, 'id'>)
+    setCreating(null)
+    load()
+  }
+
+  const handleUpdate = async (item: EquipmentItem | Omit<EquipmentItem, 'id'>) => {
+    await api.inventory.update(item as EquipmentItem)
+    setEditing(null)
+    load()
+  }
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Remove this item from inventory?')) return
+    await api.inventory.delete(id)
+    if (editing === id) setEditing(null)
+    load()
+  }
+
+  // Group items by type for display
+  const grouped = items.reduce<Partial<Record<EquipmentItemType, EquipmentItem[]>>>((acc, item) => {
+    const t = item.type as EquipmentItemType
+    if (!acc[t]) acc[t] = []
+    acc[t]!.push(item)
+    return acc
+  }, {})
+
+  const allTypes: EquipmentItemType[] = ['site', 'mount', 'ota', 'camera', 'filter_wheel', 'focuser', 'rotator', 'gps']
+
+  return (
+    <div className="flex flex-col gap-6">
+      {/* Add button */}
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-slate-500">
+          {items.length === 0 ? 'Your equipment inventory is empty.' : `${items.length} item${items.length !== 1 ? 's' : ''}`}
+        </p>
+        <div className="relative">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setShowTypeMenu((v) => !v)}
+          >
+            <Plus size={14} className="mr-1.5" />
+            Add equipment
+          </Button>
+          {showTypeMenu && (
+            <div className="absolute right-0 top-full mt-1 z-10 bg-surface border border-surface-border rounded shadow-lg min-w-44">
+              {allTypes.map((t) => (
+                <button
+                  key={t}
+                  className="flex items-center gap-2 w-full px-3 py-2 text-sm text-slate-300
+                    hover:bg-surface-raised transition-colors text-left"
+                  onClick={() => {
+                    setCreating(t)
+                    setEditing(null)
+                    setShowTypeMenu(false)
+                  }}
+                >
+                  <ItemTypeIcon type={t} size={13} />
+                  {ITEM_TYPE_LABELS[t]}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Create form */}
+      {creating && (
+        <ItemForm
+          initial={emptyForm(creating)}
+          onSave={handleCreate}
+          onCancel={() => setCreating(null)}
+        />
+      )}
+
+      {/* Item list grouped by type */}
+      {allTypes.map((type) => {
+        const group = grouped[type]
+        if (!group?.length) return null
+        return (
+          <div key={type}>
+            <h3 className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+              <ItemTypeIcon type={type} size={11} />
+              {ITEM_TYPE_LABELS[type]}
+            </h3>
+            <div className="flex flex-col gap-2">
+              {group.map((item) => (
+                <div key={item.id}>
+                  {editing === item.id ? (
+                    <ItemForm
+                      initial={item}
+                      onSave={handleUpdate}
+                      onCancel={() => setEditing(null)}
+                    />
+                  ) : (
+                    <div className="flex items-center justify-between bg-surface-raised border border-surface-border rounded px-4 py-3 group">
+                      <div>
+                        <p className="text-sm font-medium text-slate-200">{item.name}</p>
+                        {itemSubtitle(item) && (
+                          <p className="text-xs text-slate-500 mt-0.5">{itemSubtitle(item)}</p>
+                        )}
+                      </div>
+                      <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => { setEditing(item.id); setCreating(null) }}
+                          title="Edit"
+                        >
+                          <Pencil size={13} className="text-slate-400" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleDelete(item.id)}
+                          title="Delete"
+                        >
+                          <Trash2 size={13} className="text-slate-500" />
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )
+      })}
+
+      {items.length === 0 && !creating && (
+        <p className="text-sm text-slate-600 text-center py-8">
+          Click "Add equipment" to build your inventory.
+        </p>
+      )}
+    </div>
+  )
+}
+
+// ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
 
 export function Equipment() {
   const connectedDevices = useStore((s) => s.connectedDevices)
   const setConnectedDevices = useStore((s) => s.setConnectedDevices)
+
+  const [activeTab, setActiveTab] = useState<'connections' | 'inventory'>('connections')
 
   const [step, setStep] = useState<WizardStep>('type')
   const [selectedKind, setSelectedKind] = useState<DeviceKind>('camera')
@@ -734,12 +1150,38 @@ export function Equipment() {
   return (
     <>
     <div className="p-6 max-w-3xl">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-4">
         <h1 className="text-lg font-semibold text-slate-100">Equipment</h1>
-        <Button variant="ghost" size="icon" onClick={refresh} title="Refresh">
-          <RefreshCw size={15} />
-        </Button>
+        {activeTab === 'connections' && (
+          <Button variant="ghost" size="icon" onClick={refresh} title="Refresh">
+            <RefreshCw size={15} />
+          </Button>
+        )}
       </div>
+
+      {/* Tab switcher */}
+      <div className="flex gap-1 mb-6 border-b border-surface-border">
+        {(['connections', 'inventory'] as const).map((tab) => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className={[
+              'px-4 py-2 text-sm capitalize transition-colors border-b-2 -mb-px',
+              activeTab === tab
+                ? 'border-accent text-slate-100'
+                : 'border-transparent text-slate-500 hover:text-slate-300',
+            ].join(' ')}
+          >
+            {tab}
+          </button>
+        ))}
+      </div>
+
+      {/* Inventory tab */}
+      {activeTab === 'inventory' && <InventorySection />}
+
+      {/* Connections tab */}
+      {activeTab === 'connections' && <>
 
       {/* Connected devices */}
       <section className="mb-8">
@@ -842,6 +1284,7 @@ export function Equipment() {
           )}
         </div>
       </section>
+      </>}
     </div>
     {propertiesDeviceId && (
       <DevicePropertiesPanel

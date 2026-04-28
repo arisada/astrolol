@@ -165,7 +165,7 @@ function ProfileForm({ initial, onSave, onCancel }: ProfileFormProps) {
     setSaving(true)
     setError(null)
     try {
-      await onSave({ id: initial?.id, name, location, telescope, devices })
+      await onSave({ id: initial?.id, name, location, telescope, devices, roots: initial?.roots ?? [] })
     } catch (e) {
       setError((e as Error).message)
     } finally {
