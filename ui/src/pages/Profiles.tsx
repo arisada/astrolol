@@ -6,10 +6,10 @@ import {
   ChevronDown,
   ChevronRight,
   CircleDot,
+  Compass,
   Crosshair,
-  Filter as FilterIcon,
-  Focus,
   Globe,
+  LoaderPinwheel,
   MapPin,
   Minus,
   Plus,
@@ -22,67 +22,17 @@ import {
 import { api } from '@/api/client'
 import type {
   ActivationResult,
-  ConnectedDevice,
-  DeviceRole,
-  DriverEntry,
   EquipmentItem,
   EquipmentItemType,
-  ObserverLocation,
   Profile,
-  ProfileDevice,
   ProfileNode,
-  Telescope,
 } from '@/api/types'
 import { Button } from '@/components/ui/button'
-import { DmsInput } from '@/components/ui/dms-input'
 import { Input } from '@/components/ui/input'
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-const ROLE_LABELS: Record<DeviceRole, string> = {
-  camera: 'Camera',
-  mount: 'Mount',
-  focuser: 'Focuser',
-  filter_wheel: 'Filter Wheel',
-  rotator: 'Rotator',
-  indi: 'INDI Device',
-}
-
-const KIND_ADAPTER: Record<DeviceRole, string> = {
-  camera: 'indi_camera',
-  mount: 'indi_mount',
-  focuser: 'indi_focuser',
-  filter_wheel: 'indi_filter_wheel',
-  rotator: 'indi_rotator',
-  indi: 'indi_raw',
-}
-
-function emptyLocation(): ObserverLocation {
-  return { name: '', latitude: 0, longitude: 0, altitude: 0 }
-}
-
-function emptyTelescope(): Telescope {
-  return { name: '', focal_length: 0, aperture: 0 }
-}
-
-/** Format a decimal coordinate as a compact DMS string for display. */
-function fmtDms(decimal: number, mode: 'lat' | 'lon'): string {
-  const neg = decimal < 0
-  const abs = Math.abs(decimal)
-  const deg = Math.floor(abs)
-  const minFull = (abs - deg) * 60
-  const min = Math.floor(minFull)
-  const sec = Math.round((minFull - min) * 60)
-  const dir = mode === 'lat' ? (neg ? 'S' : 'N') : (neg ? 'W' : 'E')
-  return `${deg}°${String(min).padStart(2, '0')}'${String(sec).padStart(2, '0')}" ${dir}`
-}
-
-function fRatio(t: Telescope): string | null {
-  if (t.aperture <= 0) return null
-  return `f/${(t.focal_length / t.aperture).toFixed(1)}`
-}
 
 // ---------------------------------------------------------------------------
 // Equipment tree helpers
@@ -122,11 +72,11 @@ function usedIds(roots: ProfileNode[]): Set<string> {
 
 function ItemTypeIcon({ type, size = 13 }: { type: EquipmentItemType; size?: number }) {
   if (type === 'site') return <MapPin size={size} />
-  if (type === 'mount') return <TelescopeIcon size={size} />
-  if (type === 'ota') return <Crosshair size={size} />
+  if (type === 'mount') return <Compass size={size} />
+  if (type === 'ota') return <TelescopeIcon size={size} />
   if (type === 'camera') return <Camera size={size} />
-  if (type === 'filter_wheel') return <FilterIcon size={size} />
-  if (type === 'focuser') return <Focus size={size} />
+  if (type === 'filter_wheel') return <LoaderPinwheel size={size} />
+  if (type === 'focuser') return <Crosshair size={size} />
   if (type === 'rotator') return <CircleDot size={size} />
   if (type === 'gps') return <Globe size={size} />
   return <Wind size={size} />
@@ -412,68 +362,6 @@ function appendChildAtPath(node: ProfileNode, remainingPath: NodePath, child: Pr
 }
 
 // ---------------------------------------------------------------------------
-// DriverCombobox — searchable INDI driver picker
-// ---------------------------------------------------------------------------
-
-interface DriverComboboxProps {
-  role: DeviceRole
-  onSelect: (d: DriverEntry) => void
-}
-
-function DriverCombobox({ role, onSelect }: DriverComboboxProps) {
-  const [query, setQuery] = useState('')
-  const [drivers, setDrivers] = useState<DriverEntry[]>([])
-  const [open, setOpen] = useState(false)
-  const containerRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    api.indi.drivers(role).then(setDrivers).catch(() => {})
-  }, [role])
-
-  const filtered = query.trim()
-    ? drivers.filter(
-        (d) =>
-          d.label.toLowerCase().includes(query.toLowerCase()) ||
-          d.manufacturer.toLowerCase().includes(query.toLowerCase()),
-      )
-    : drivers
-
-  return (
-    <div ref={containerRef} className="relative">
-      <Input
-        value={query}
-        onChange={(e) => { setQuery(e.target.value); setOpen(true) }}
-        onFocus={() => setOpen(true)}
-        onBlur={() => setOpen(false)}
-        placeholder="Search driver catalog…"
-      />
-      {open && filtered.length > 0 && (
-        <ul className="absolute z-20 w-full mt-0.5 max-h-48 overflow-auto bg-surface-raised border border-surface-border rounded shadow-lg">
-          {filtered.slice(0, 40).map((d) => (
-            <li key={`${d.executable}:${d.device_name}`}>
-              <button
-                type="button"
-                className="w-full text-left px-3 py-1.5 text-xs hover:bg-accent/10 flex items-baseline gap-2"
-                onMouseDown={(e) => {
-                  // prevent input blur before click fires
-                  e.preventDefault()
-                  onSelect(d)
-                  setQuery(d.label)
-                  setOpen(false)
-                }}
-              >
-                <span className="text-slate-200">{d.label}</span>
-                <span className="text-slate-500 text-[11px]">{d.manufacturer}</span>
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
-    </div>
-  )
-}
-
-// ---------------------------------------------------------------------------
 // ProfileForm — create / edit
 // ---------------------------------------------------------------------------
 
@@ -485,27 +373,23 @@ interface ProfileFormProps {
 
 function ProfileForm({ initial, onSave, onCancel }: ProfileFormProps) {
   const [name, setName] = useState(initial?.name ?? '')
-  const [location, setLocation] = useState<ObserverLocation | undefined>(
-    initial?.location ?? undefined,
-  )
-  const [telescope, setTelescope] = useState<Telescope | undefined>(
-    initial?.telescope ?? undefined,
-  )
-  const [devices, setDevices] = useState<ProfileDevice[]>(initial?.devices ?? [])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [connected, setConnected] = useState<ConnectedDevice[]>([])
-
-  useEffect(() => {
-    api.devices.connected().then(setConnected).catch(() => {})
-  }, [])
 
   const handleSave = async () => {
     if (!name.trim()) { setError('Name is required.'); return }
     setSaving(true)
     setError(null)
     try {
-      await onSave({ id: initial?.id, name, location, telescope, devices, roots: initial?.roots ?? [] })
+      await onSave({
+        id: initial?.id,
+        name,
+        // Preserve legacy fields unchanged — they are managed through the equipment tree now
+        location: initial?.location,
+        telescope: initial?.telescope,
+        devices: initial?.devices ?? [],
+        roots: initial?.roots ?? [],
+      })
     } catch (e) {
       setError((e as Error).message)
     } finally {
@@ -513,40 +397,8 @@ function ProfileForm({ initial, onSave, onCancel }: ProfileFormProps) {
     }
   }
 
-  const updateDevice = (idx: number, patch: Partial<ProfileDevice>) =>
-    setDevices((ds) => ds.map((d, i) => (i === idx ? { ...d, ...patch } : d)))
-
-  const addDevice = (role: DeviceRole) =>
-    setDevices((ds) => [
-      ...ds,
-      {
-        role,
-        config: {
-          device_id: role,
-          kind: role,
-          adapter_key: KIND_ADAPTER[role],
-          params: { device_name: '', executable: '' },
-        },
-      },
-    ])
-
-  const removeDevice = (idx: number) => setDevices((ds) => ds.filter((_, i) => i !== idx))
-
-  const importConnected = async (idx: number, c: ConnectedDevice) => {
-    try {
-      const cfg = await api.devices.getConfig(c.device_id)
-      updateDevice(idx, { config: cfg })
-    } catch {
-      // Fallback if endpoint not available: fill what we know
-      updateDevice(idx, {
-        config: { ...devices[idx].config, device_id: c.device_id, adapter_key: c.adapter_key },
-      })
-    }
-  }
-
   return (
     <div className="flex flex-col gap-6">
-      {/* Name */}
       <div className="flex flex-col gap-1">
         <label className="text-xs text-slate-400">
           Profile name <span className="text-status-error">*</span>
@@ -555,267 +407,12 @@ function ProfileForm({ initial, onSave, onCancel }: ProfileFormProps) {
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="e.g. Backyard rig"
+          autoFocus
         />
+        <p className="text-xs text-slate-600">
+          Equipment (telescope, camera, site…) is managed through the equipment tree after the profile is created.
+        </p>
       </div>
-
-      {/* Location */}
-      <section>
-        <div className="flex items-center justify-between mb-2">
-          <h3 className="text-xs font-medium text-slate-400 uppercase tracking-wider">
-            Observer location
-          </h3>
-          {location ? (
-            <button
-              className="text-xs text-slate-500 hover:text-slate-300"
-              onClick={() => setLocation(undefined)}
-            >
-              Remove
-            </button>
-          ) : (
-            <Button
-              size="sm" variant="ghost" className="h-6 text-xs"
-              onClick={() => setLocation(emptyLocation())}
-            >
-              <Plus size={12} className="mr-1" /> Add
-            </Button>
-          )}
-        </div>
-        {location && (
-          <div className="flex flex-col gap-3 bg-surface border border-surface-border rounded p-3">
-            <div className="flex flex-col gap-1">
-              <label className="text-xs text-slate-500">Location name (optional)</label>
-              <Input
-                value={location.name}
-                onChange={(e) => setLocation({ ...location, name: e.target.value })}
-                placeholder="e.g. Backyard"
-              />
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-xs text-slate-500">Latitude</label>
-              <DmsInput
-                value={location.latitude}
-                onChange={(v) => setLocation({ ...location, latitude: v })}
-                mode="lat"
-              />
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-xs text-slate-500">Longitude</label>
-              <DmsInput
-                value={location.longitude}
-                onChange={(v) => setLocation({ ...location, longitude: v })}
-                mode="lon"
-              />
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-xs text-slate-500">Altitude (m)</label>
-              <Input
-                type="number"
-                value={location.altitude}
-                onChange={(e) =>
-                  setLocation({ ...location, altitude: parseFloat(e.target.value) || 0 })
-                }
-                placeholder="e.g. 35"
-                className="w-32"
-              />
-            </div>
-          </div>
-        )}
-      </section>
-
-      {/* Telescope */}
-      <section>
-        <div className="flex items-center justify-between mb-2">
-          <h3 className="text-xs font-medium text-slate-400 uppercase tracking-wider">
-            Telescope
-          </h3>
-          {telescope ? (
-            <button
-              className="text-xs text-slate-500 hover:text-slate-300"
-              onClick={() => setTelescope(undefined)}
-            >
-              Remove
-            </button>
-          ) : (
-            <Button
-              size="sm" variant="ghost" className="h-6 text-xs"
-              onClick={() => setTelescope(emptyTelescope())}
-            >
-              <Plus size={12} className="mr-1" /> Add
-            </Button>
-          )}
-        </div>
-        {telescope && (
-          <div className="grid grid-cols-2 gap-3 bg-surface border border-surface-border rounded p-3">
-            <div className="col-span-2 flex flex-col gap-1">
-              <label className="text-xs text-slate-500">Telescope name</label>
-              <Input
-                value={telescope.name}
-                onChange={(e) => setTelescope({ ...telescope, name: e.target.value })}
-                placeholder="e.g. Celestron EdgeHD 8"
-              />
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-xs text-slate-500">Focal length (mm)</label>
-              <Input
-                type="number"
-                value={telescope.focal_length}
-                onChange={(e) =>
-                  setTelescope({ ...telescope, focal_length: parseFloat(e.target.value) || 0 })
-                }
-                placeholder="e.g. 2032"
-              />
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-xs text-slate-500">Aperture (mm)</label>
-              <Input
-                type="number"
-                value={telescope.aperture}
-                onChange={(e) =>
-                  setTelescope({ ...telescope, aperture: parseFloat(e.target.value) || 0 })
-                }
-                placeholder="e.g. 203"
-              />
-            </div>
-            {telescope.aperture > 0 && (
-              <p className="col-span-2 text-xs text-slate-500">
-                f/{(telescope.focal_length / telescope.aperture).toFixed(1)}
-              </p>
-            )}
-          </div>
-        )}
-      </section>
-
-      {/* Devices */}
-      <section>
-        <div className="flex items-center justify-between mb-2">
-          <h3 className="text-xs font-medium text-slate-400 uppercase tracking-wider">
-            Devices
-          </h3>
-          <div className="flex gap-1">
-            {(['camera', 'mount', 'focuser'] as DeviceRole[]).map((role) => (
-              <Button
-                key={role}
-                size="sm" variant="ghost" className="h-6 text-xs"
-                onClick={() => addDevice(role)}
-              >
-                <Plus size={12} className="mr-1" /> {ROLE_LABELS[role]}
-              </Button>
-            ))}
-          </div>
-        </div>
-
-        {devices.length === 0 ? (
-          <p className="text-xs text-slate-600">
-            No devices — add a camera, mount, or focuser above.
-          </p>
-        ) : (
-          <div className="flex flex-col gap-3">
-            {devices.map((d, idx) => {
-              const matchingConnected = connected.filter((c) => c.kind === d.role)
-              return (
-                <div
-                  key={idx}
-                  className="flex flex-col gap-2 bg-surface border border-surface-border rounded p-3"
-                >
-                  {/* Role + driver picker + delete */}
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-medium text-slate-400 w-14 shrink-0">
-                      {ROLE_LABELS[d.role]}
-                    </span>
-                    <div className="flex-1">
-                      <DriverCombobox
-                        role={d.role}
-                        onSelect={(driver) =>
-                          updateDevice(idx, {
-                            config: {
-                              ...d.config,
-                              params: {
-                                ...d.config.params,
-                                device_name: driver.device_name,
-                                executable: driver.executable,
-                              },
-                            },
-                          })
-                        }
-                      />
-                    </div>
-                    <Button
-                      size="icon" variant="ghost"
-                      className="h-8 w-8 text-slate-500 hover:text-status-error shrink-0"
-                      onClick={() => removeDevice(idx)}
-                    >
-                      <Trash2 size={13} />
-                    </Button>
-                  </div>
-
-                  {/* Import from already-connected devices */}
-                  {matchingConnected.length > 0 && (
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="text-[11px] text-slate-600">From connected:</span>
-                      {matchingConnected.map((c) => (
-                        <button
-                          key={c.device_id}
-                          type="button"
-                          onClick={() => importConnected(idx, c)}
-                          className="text-[11px] px-2 py-0.5 rounded border border-surface-border hover:border-accent text-slate-400 hover:text-slate-200 transition-colors"
-                        >
-                          {c.device_id}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-
-                  {/* Editable fields */}
-                  <div className="grid grid-cols-3 gap-2">
-                    <div className="flex flex-col gap-1">
-                      <label className="text-xs text-slate-500">Device ID</label>
-                      <Input
-                        value={d.config.device_id ?? ''}
-                        onChange={(e) =>
-                          updateDevice(idx, {
-                            config: { ...d.config, device_id: e.target.value },
-                          })
-                        }
-                        placeholder={`e.g. main_${d.role}`}
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <label className="text-xs text-slate-500">INDI device name</label>
-                      <Input
-                        value={(d.config.params?.device_name as string) ?? ''}
-                        onChange={(e) =>
-                          updateDevice(idx, {
-                            config: {
-                              ...d.config,
-                              params: { ...d.config.params, device_name: e.target.value },
-                            },
-                          })
-                        }
-                        placeholder="e.g. ZWO CCD ASI294MC Pro"
-                      />
-                    </div>
-                    <div className="flex flex-col gap-1">
-                      <label className="text-xs text-slate-500">Driver executable</label>
-                      <Input
-                        value={(d.config.params?.executable as string) ?? ''}
-                        onChange={(e) =>
-                          updateDevice(idx, {
-                            config: {
-                              ...d.config,
-                              params: { ...d.config.params, executable: e.target.value },
-                            },
-                          })
-                        }
-                        placeholder="e.g. indi_asi_ccd"
-                      />
-                    </div>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        )}
-      </section>
 
       {error && (
         <p className="text-xs text-status-error bg-status-error/10 rounded px-3 py-2">{error}</p>
@@ -897,21 +494,14 @@ function ProfileCard({
   onDelete: () => void
   onTreeSave: (profileId: string, roots: ProfileNode[]) => Promise<void>
 }) {
-  const [expanded, setExpanded] = useState(false)
-  const ratio = profile.telescope ? fRatio(profile.telescope) : null
+  const [expanded, setExpanded] = useState(isActive)
 
+  const treeCount = (nodes: ProfileNode[]): number =>
+    nodes.reduce((n, node) => n + 1 + treeCount(node.children), 0)
+  const itemCount = treeCount(profile.roots)
   const summaryParts = [
-    profile.telescope?.name
-      ? `${profile.telescope.name}${ratio ? ` (${ratio})` : ''}`
-      : null,
-    profile.location?.name ||
-      (profile.location
-        ? `${fmtDms(profile.location.latitude, 'lat')}, ${fmtDms(profile.location.longitude, 'lon')}`
-        : null),
-    profile.devices.length > 0
-      ? `${profile.devices.length} device${profile.devices.length > 1 ? 's' : ''}`
-      : null,
-  ].filter(Boolean)
+    itemCount > 0 ? `${itemCount} item${itemCount !== 1 ? 's' : ''} in tree` : 'Empty tree',
+  ]
 
   return (
     <div
@@ -962,56 +552,12 @@ function ProfileCard({
       </div>
 
       {expanded && (
-        <div className="border-t border-surface-border px-4 py-3 grid grid-cols-2 gap-4 text-xs">
-          {profile.telescope && (
-            <div>
-              <p className="text-slate-500 uppercase tracking-wider mb-1">Telescope</p>
-              <p className="text-slate-200">{profile.telescope.name}</p>
-              <p className="text-slate-400">
-                {profile.telescope.focal_length} mm · ⌀{profile.telescope.aperture} mm
-                {ratio && <> · {ratio}</>}
-              </p>
-            </div>
-          )}
-          {profile.location && (
-            <div>
-              <p className="text-slate-500 uppercase tracking-wider mb-1">Location</p>
-              {profile.location.name && (
-                <p className="text-slate-200">{profile.location.name}</p>
-              )}
-              <p className="text-slate-400">
-                {fmtDms(profile.location.latitude, 'lat')}
-                {', '}
-                {fmtDms(profile.location.longitude, 'lon')}
-                {' · '}
-                {profile.location.altitude} m
-              </p>
-            </div>
-          )}
-          {profile.devices.length > 0 && (
-            <div className="col-span-2">
-              <p className="text-slate-500 uppercase tracking-wider mb-1">Devices</p>
-              <div className="flex flex-col gap-0.5">
-                {profile.devices.map((d, i) => (
-                  <span key={i} className="text-slate-300">
-                    <span className="text-slate-500">{ROLE_LABELS[d.role]}: </span>
-                    {d.config.device_id}
-                    {d.config.params?.device_name
-                      ? ` (${d.config.params.device_name})`
-                      : ''}
-                  </span>
-                ))}
-              </div>
-            </div>
-          )}
-          {/* Equipment tree */}
-          <div className="col-span-2 border-t border-surface-border pt-3">
-            <ProfileTreeEditor
-              profile={profile}
-              inventory={inventory}
-              onSave={(roots) => onTreeSave(profile.id, roots)}
-            />
-          </div>
+        <div className="border-t border-surface-border px-4 py-3">
+          <ProfileTreeEditor
+            profile={profile}
+            inventory={inventory}
+            onSave={(roots) => onTreeSave(profile.id, roots)}
+          />
         </div>
       )}
     </div>
@@ -1102,8 +648,7 @@ export function Profiles() {
         <div>
           <h1 className="text-lg font-semibold text-slate-100">Profiles</h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            Save your equipment configuration — telescope, location, and devices — for quick
-            re-use.
+            A profile is a name and an equipment tree. Activate it to connect devices.
           </p>
         </div>
         <Button onClick={() => setView('create')}>
