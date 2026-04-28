@@ -20,7 +20,7 @@ import { DevicePropertiesPanel } from '@/components/DevicePropertiesPanel'
 // Types & constants
 // ---------------------------------------------------------------------------
 
-type WizardStep = 'type' | 'manufacturer' | 'model' | 'confirm' | 'configure'
+type WizardStep = 'type' | 'manufacturer' | 'model' | 'loading' | 'manual' | 'configure'
 
 const DEVICE_ID_RE = /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/
 
@@ -189,83 +189,54 @@ function ModelStep({
   )
 }
 
-// Step 4 — confirm details and load driver
-function ConfirmStep({
+// Step for "Enter manually" — only needs executable; device name is discovered after loading
+function ManualStep({
   kind,
-  driver,
   onBack,
   onLoadDriver,
   loading,
   error,
 }: {
   kind: DeviceKind
-  driver: DriverEntry | null
   onBack: () => void
-  onLoadDriver: (deviceName: string, executable: string, deviceId: string) => void
+  onLoadDriver: (deviceName: string, executable: string) => void
   loading: boolean
   error: string | null
 }) {
-  const [deviceName, setDeviceName] = useState(driver?.device_name ?? '')
-  const [executable, setExecutable] = useState(driver?.executable ?? '')
-  const [deviceId, setDeviceId] = useState(() => suggestDeviceId(kind, driver))
-
-  const deviceIdInvalid = deviceId !== '' && !DEVICE_ID_RE.test(deviceId)
+  const [executable, setExecutable] = useState('')
+  const [deviceNameHint, setDeviceNameHint] = useState('')
 
   return (
     <div>
       <StepBack onClick={onBack} />
       <p className="text-xs text-slate-500 mb-4">
         <span className="text-slate-300 font-medium">{KIND_LABELS[kind]}</span>
-        {driver && (
-          <>
-            {' · '}
-            <span className="text-slate-300">{driver.manufacturer}</span>
-            {' · '}
-            <span className="text-slate-300">{driver.label}</span>
-          </>
-        )}
+        {' · '}Enter driver manually
       </p>
 
       <div className="flex flex-col gap-3">
         <div className="flex flex-col gap-1">
           <label className="text-xs text-slate-400">
-            INDI device name <span className="text-status-error">*</span>
-          </label>
-          <Input
-            placeholder="e.g. ZWO CCD ASI294MC Pro"
-            value={deviceName}
-            onChange={(e) => setDeviceName(e.target.value)}
-          />
-        </div>
-
-        <div className="flex flex-col gap-1">
-          <label className="text-xs text-slate-400">
-            Driver executable
-            {driver && <span className="ml-2 text-slate-600">(auto-filled from catalog)</span>}
+            Driver executable <span className="text-status-error">*</span>
           </label>
           <Input
             placeholder="e.g. indi_asi_ccd"
             value={executable}
             onChange={(e) => setExecutable(e.target.value)}
+            autoFocus
           />
         </div>
 
         <div className="flex flex-col gap-1">
           <label className="text-xs text-slate-400">
-            Device ID
-            <span className="ml-2 text-slate-600">(leave blank to use suggestion)</span>
+            INDI device name hint
+            <span className="ml-2 text-slate-600">(optional — leave blank to auto-discover)</span>
           </label>
           <Input
-            placeholder={suggestDeviceId(kind, driver) || 'auto-generated'}
-            value={deviceId}
-            onChange={(e) => setDeviceId(e.target.value)}
-            className={deviceIdInvalid ? 'border-status-error focus-visible:ring-status-error' : ''}
+            placeholder="e.g. ZWO CCD ASI294MC Pro"
+            value={deviceNameHint}
+            onChange={(e) => setDeviceNameHint(e.target.value)}
           />
-          {deviceIdInvalid && (
-            <p className="text-xs text-status-error">
-              Only letters, digits, hyphens, and underscores. Must start with a letter or digit (max 64 chars).
-            </p>
-          )}
         </div>
 
         {error && (
@@ -274,17 +245,13 @@ function ConfirmStep({
 
         <Button
           type="button"
-          disabled={!deviceName || loading || deviceIdInvalid}
+          disabled={!executable.trim() || loading}
           className="self-start"
-          onClick={() => onLoadDriver(deviceName, executable, deviceId)}
+          onClick={() => onLoadDriver(deviceNameHint.trim(), executable.trim())}
         >
           <Plug size={14} className="mr-2" />
           {loading ? 'Loading driver…' : 'Load driver'}
         </Button>
-
-        <p className="text-xs text-slate-600">
-          Loading the driver reads its available settings so you can configure them before connecting.
-        </p>
       </div>
     </div>
   )
@@ -402,7 +369,7 @@ function PropEditor({
   return null
 }
 
-// Step 5 — configure driver properties and connect
+// Step — configure driver properties and connect
 function ConfigureStep({
   kind,
   driver,
@@ -414,6 +381,10 @@ function ConfigureStep({
   connecting,
   error,
   discoveredDeviceNames = [],
+  selectedDeviceName,
+  onSelectDeviceName,
+  deviceId,
+  onDeviceIdChange,
 }: {
   kind: DeviceKind
   driver: DriverEntry | null
@@ -425,6 +396,10 @@ function ConfigureStep({
   connecting: boolean
   error: string | null
   discoveredDeviceNames?: string[]
+  selectedDeviceName: string
+  onSelectDeviceName: (name: string) => void
+  deviceId: string
+  onDeviceIdChange: (id: string) => void
 }) {
   // Only show writable properties that aren't CONNECTION itself
   const editable = properties.filter(
@@ -442,6 +417,8 @@ function ConfigureStep({
     onPreConnectPropsChange({ ...preConnectProps, [propName]: spec })
   }
 
+  const deviceIdInvalid = deviceId !== '' && !DEVICE_ID_RE.test(deviceId)
+
   return (
     <div>
       <StepBack onClick={onBack} />
@@ -453,13 +430,54 @@ function ConfigureStep({
             <span className="text-slate-300">{driver.label}</span>
           </>
         )}
-        {' · '}Configure before connecting
+        {' · '}Configure &amp; connect
       </p>
+
+      {/* Device name — show picker if multiple, plain label if one */}
+      <div className="flex flex-col gap-3 mb-4 pb-4 border-b border-surface-border">
+        <div className="flex flex-col gap-1">
+          <label className="text-xs text-slate-400">INDI device name</label>
+          {discoveredDeviceNames.length > 1 ? (
+            <select
+              value={selectedDeviceName}
+              onChange={(e) => onSelectDeviceName(e.target.value)}
+              className="bg-surface border border-surface-border rounded px-3 py-1.5 text-sm text-slate-200
+                focus:outline-none focus:ring-1 focus:ring-accent"
+            >
+              {discoveredDeviceNames.map((n) => (
+                <option key={n} value={n}>{n}</option>
+              ))}
+            </select>
+          ) : (
+            <p className="text-sm text-slate-200 bg-surface border border-surface-border rounded px-3 py-1.5">
+              {selectedDeviceName || <span className="text-slate-600 italic">discovering…</span>}
+            </p>
+          )}
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <label className="text-xs text-slate-400">
+            Device ID
+            <span className="ml-2 text-slate-600">(leave blank to auto-generate)</span>
+          </label>
+          <Input
+            placeholder={suggestDeviceId(kind, driver) || 'auto-generated'}
+            value={deviceId}
+            onChange={(e) => onDeviceIdChange(e.target.value)}
+            className={deviceIdInvalid ? 'border-status-error focus-visible:ring-status-error' : ''}
+          />
+          {deviceIdInvalid && (
+            <p className="text-xs text-status-error">
+              Only letters, digits, hyphens, and underscores. Must start with a letter or digit (max 64 chars).
+            </p>
+          )}
+        </div>
+      </div>
 
       {editable.length === 0 ? (
         <p className="text-sm text-slate-500 mb-4">No configurable properties. Click Connect to proceed.</p>
       ) : (
-        <div className="flex flex-col gap-6 mb-4 max-h-80 overflow-y-auto pr-1">
+        <div className="flex flex-col gap-6 mb-4 max-h-64 overflow-y-auto pr-1">
           {Object.entries(groups).map(([group, props]) => (
             <div key={group}>
               {group && (
@@ -484,30 +502,13 @@ function ConfigureStep({
         </div>
       )}
 
-      {discoveredDeviceNames.length > 1 && (
-        <div className="bg-amber-950/30 border border-amber-700/40 rounded px-3 py-2 mb-3">
-          <p className="text-xs text-amber-400 font-medium mb-1">
-            {discoveredDeviceNames.length} cameras found on this driver
-          </p>
-          <p className="text-xs text-amber-300/80 mb-2">
-            Connect will register the first one. Add the others by repeating
-            "Load driver" with each name below:
-          </p>
-          <ul className="flex flex-col gap-0.5">
-            {discoveredDeviceNames.map((name) => (
-              <li key={name} className="text-xs font-mono text-amber-200 select-all">{name}</li>
-            ))}
-          </ul>
-        </div>
-      )}
-
       {error && (
         <p className="text-xs text-status-error bg-status-error/10 rounded px-3 py-2 mb-3">{error}</p>
       )}
 
       <Button
         type="button"
-        disabled={connecting}
+        disabled={connecting || !selectedDeviceName || deviceIdInvalid}
         className="self-start"
         onClick={onConnect}
       >
@@ -1071,8 +1072,8 @@ export function Equipment() {
   const [pendingConnect, setPendingConnect] = useState<{
     deviceName: string
     executable: string
-    deviceId: string
   } | null>(null)
+  const [pendingDeviceId, setPendingDeviceId] = useState('')
   // All device names announced by the loaded driver (may be model-specific and/or multiple)
   const [discoveredDeviceNames, setDiscoveredDeviceNames] = useState<string[]>([])
 
@@ -1101,7 +1102,7 @@ export function Equipment() {
     setSelectedDriver(null)
     setError(null)
     if (manufacturer === null) {
-      setStep('confirm')
+      setStep('manual')
     } else {
       setStep('model')
     }
@@ -1110,17 +1111,24 @@ export function Equipment() {
   const handleSelectModel = (driver: DriverEntry) => {
     setSelectedDriver(driver)
     setError(null)
-    setStep('confirm')
+    // Auto-load: skip confirm step, device name comes from the catalog entry
+    handleLoadDriver(driver.device_name, driver.executable)
   }
 
   const handleBack = () => {
     setError(null)
     if (step === 'configure') {
-      setStep('confirm')
-    } else if (step === 'confirm' && selectedManufacturer === null) {
+      // Back from configure: return to model list (catalog) or manual entry
+      if (selectedManufacturer === null) {
+        setStep('manual')
+      } else {
+        setStep('model')
+      }
+    } else if (step === 'manual') {
       setStep('manufacturer')
-    } else if (step === 'confirm') {
-      setStep('model')
+    } else if (step === 'loading') {
+      // Can't really go back during loading; go to model list
+      setStep(selectedManufacturer === null ? 'manufacturer' : 'model')
     } else if (step === 'model') {
       setStep('manufacturer')
     } else {
@@ -1128,20 +1136,24 @@ export function Equipment() {
     }
   }
 
-  const handleLoadDriver = async (deviceName: string, executable: string, deviceId: string) => {
+  const handleLoadDriver = async (deviceName: string, executable: string) => {
     setError(null)
     setLoadingDriver(true)
+    setStep('loading')
     try {
       const result = await api.indi.loadDriver(executable, deviceName)
-      // Use the actual announced device name (may differ from catalog, e.g. "ZWO CCD ASI294MC Pro")
-      const resolvedName = result.device_names?.[0] ?? deviceName
-      setDiscoveredDeviceNames(result.device_names ?? [])
+      const names = result.device_names ?? []
+      const resolvedName = names[0] ?? deviceName
+      setDiscoveredDeviceNames(names)
       setDriverProperties(result.properties)
       setPreConnectProps({})
-      setPendingConnect({ deviceName: resolvedName, executable, deviceId })
+      setPendingConnect({ deviceName: resolvedName, executable })
+      setPendingDeviceId(suggestDeviceId(selectedKind, selectedDriver))
       setStep('configure')
     } catch (err) {
       setError((err as Error).message)
+      // Return to the appropriate step on error
+      setStep(selectedManufacturer === null ? 'manual' : 'model')
     } finally {
       setLoadingDriver(false)
     }
@@ -1153,7 +1165,7 @@ export function Equipment() {
     setConnecting(true)
     try {
       await api.devices.connect({
-        device_id: pendingConnect.deviceId || undefined,
+        device_id: pendingDeviceId || undefined,
         kind: selectedKind,
         adapter_key: KIND_ADAPTER[selectedKind],
         params: {
@@ -1275,7 +1287,7 @@ export function Equipment() {
       {/* Connect wizard */}
       <section>
         <h2 className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-3">
-          Connect device
+          Load driver
         </h2>
         <div className="bg-surface-raised border border-surface-border rounded p-4">
           {step === 'type' && (
@@ -1298,17 +1310,22 @@ export function Equipment() {
               onBack={handleBack}
             />
           )}
-          {step === 'confirm' && (
-            <ConfirmStep
+          {step === 'loading' && (
+            <div className="flex items-center gap-3 py-6 text-slate-400 text-sm">
+              <RefreshCw size={16} className="animate-spin shrink-0" />
+              Loading driver…
+            </div>
+          )}
+          {step === 'manual' && (
+            <ManualStep
               kind={selectedKind}
-              driver={selectedDriver}
               onBack={handleBack}
               onLoadDriver={handleLoadDriver}
               loading={loadingDriver}
               error={error}
             />
           )}
-          {step === 'configure' && (
+          {step === 'configure' && pendingConnect && (
             <ConfigureStep
               kind={selectedKind}
               driver={selectedDriver}
@@ -1320,6 +1337,10 @@ export function Equipment() {
               connecting={connecting}
               error={error}
               discoveredDeviceNames={discoveredDeviceNames}
+              selectedDeviceName={pendingConnect.deviceName}
+              onSelectDeviceName={(name) => setPendingConnect({ ...pendingConnect, deviceName: name })}
+              deviceId={pendingDeviceId}
+              onDeviceIdChange={setPendingDeviceId}
             />
           )}
         </div>
