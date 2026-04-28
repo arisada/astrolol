@@ -22,6 +22,9 @@ export interface PlatesolveSettings {
   astap_search_radius: number
   astap_tolerance: number
   pixel_size_um: number | null
+  exposure_duration: number
+  binning: number
+  after_solve: string   // 'nothing' | 'sync' | 'sync_slew'
 }
 
 export interface SolveRequest {

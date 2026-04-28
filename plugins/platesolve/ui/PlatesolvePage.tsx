@@ -44,6 +44,9 @@ const DEFAULT_PLATESOLVE_SETTINGS: PlatesolveSettings = {
   astap_search_radius: 30.0,
   astap_tolerance: 0.007,
   pixel_size_um: null,
+  exposure_duration: 5,
+  binning: 1,
+  after_solve: 'nothing',
 }
 
 // ── localStorage helpers ───────────────────────────────────────────────────────
@@ -462,11 +465,21 @@ export function PlatesolvePage() {
 
   const mount = connectedDevices.find((d) => d.kind === 'mount') ?? null
 
-  const [duration, setDuration] = useLocalStorage('platesolve.duration', 5)
-  const [binning,  setBinning]  = useLocalStorage('platesolve.binning', 1)
-  const [afterSolve, setAfterSolve] = useLocalStorage<AfterSolve>('platesolve.afterSolve', 'nothing')
-
   const [settings, setSettings]         = useState<PlatesolveSettings | null>(null)
+
+  // Exposure + post-solve settings are part of server-persisted PlatesolveSettings
+  // so all browsers see the same values.
+  const duration   = settings?.exposure_duration ?? DEFAULT_PLATESOLVE_SETTINGS.exposure_duration
+  const binning    = settings?.binning           ?? DEFAULT_PLATESOLVE_SETTINGS.binning
+  const afterSolve = (settings?.after_solve      ?? DEFAULT_PLATESOLVE_SETTINGS.after_solve) as AfterSolve
+
+  const patchSettings = useCallback((patch: Partial<PlatesolveSettings>) => {
+    setSettings((prev) => {
+      const next = { ...(prev ?? DEFAULT_PLATESOLVE_SETTINGS), ...patch }
+      plateSolveApi.putSettings(next).catch(() => {})
+      return next
+    })
+  }, [])
   const [showSettings, setShowSettings]  = useState(false)
   const [dbStatus, setDbStatus]          = useState<DbStatus | null>(null)
   const [installing, setInstalling]      = useState(false)
@@ -657,13 +670,13 @@ export function PlatesolvePage() {
         {/* Exposure */}
         <Section title="Exposure">
           <div className="flex flex-col gap-3">
-            <DurationStepper value={duration} onChange={setDuration} />
+            <DurationStepper value={duration} onChange={(v) => patchSettings({ exposure_duration: v })} />
 
             <div className="flex flex-col gap-1">
               <span className="text-xs text-slate-400">Binning</span>
               <div className="flex gap-1">
                 {BINNINGS.map((b) => (
-                  <button key={b} type="button" onClick={() => setBinning(b)}
+                  <button key={b} type="button" onClick={() => patchSettings({ binning: b })}
                     className={`px-2 py-0.5 text-xs rounded border transition-colors
                       ${binning === b
                         ? 'border-accent text-accent bg-accent/10'
@@ -687,7 +700,7 @@ export function PlatesolvePage() {
               return (
                 <label key={v} className="flex items-center gap-2 cursor-pointer select-none">
                   <input type="radio" name="afterSolve" value={v}
-                    checked={afterSolve === v} onChange={() => setAfterSolve(v)}
+                    checked={afterSolve === v} onChange={() => patchSettings({ after_solve: v })}
                     className="accent-accent" />
                   <span className={`text-xs ${afterSolve === v ? 'text-slate-200' : 'text-slate-400'}`}>
                     {labels[v]}
