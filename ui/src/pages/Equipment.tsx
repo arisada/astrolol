@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import {
   Camera, ChevronLeft, CircleDot, Compass, Crosshair, Focus, Globe,
-  Link2, LoaderPinwheel, MapPin, Pencil, Plug, PlugZap, Plus, RefreshCw,
+  Link2, LoaderPinwheel, MapPin, PackagePlus, Pencil, Plug, PlugZap, Plus, RefreshCw,
   Telescope, Trash2, Wind,
 } from 'lucide-react'
 import { DmsInput } from '@/components/ui/dms-input'
@@ -530,6 +530,7 @@ function DeviceRow({
   onDisconnect,
   onReconnect,
   onRemove,
+  onImport,
   isCompanion = false,
 }: {
   d: ConnectedDevice
@@ -538,6 +539,7 @@ function DeviceRow({
   onDisconnect: (id: string) => void
   onReconnect: (id: string) => void
   onRemove: (id: string) => void
+  onImport: () => void
   isCompanion?: boolean
 }) {
   return (
@@ -566,6 +568,14 @@ function DeviceRow({
       </div>
       <div className="flex items-center gap-2">
         <StateBadge state={d.state} />
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={(e) => { e.stopPropagation(); onImport() }}
+          title="Import to inventory"
+        >
+          <PackagePlus size={14} className="text-slate-400" />
+        </Button>
         {d.state === 'disconnected' ? (
           <Button
             variant="ghost"
@@ -898,11 +908,22 @@ function ItemForm({
 // Inventory section
 // ---------------------------------------------------------------------------
 
-function InventorySection() {
+function InventorySection({ importItem, onImportDone }: {
+  importItem?: Omit<EquipmentItem, 'id'> | null
+  onImportDone?: () => void
+}) {
   const [items, setItems] = useState<EquipmentItem[]>([])
-  const [creating, setCreating] = useState<EquipmentItemType | null>(null)
+  const [creating, setCreating] = useState<Omit<EquipmentItem, 'id'> | null>(null)
   const [editing, setEditing] = useState<string | null>(null)  // item id
   const [showTypeMenu, setShowTypeMenu] = useState(false)
+
+  useEffect(() => {
+    if (importItem) {
+      setCreating(importItem)
+      setEditing(null)
+      onImportDone?.()
+    }
+  }, [importItem]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const load = () => api.inventory.list().then(setItems).catch(console.error)
   useEffect(() => { load() }, [])
@@ -960,7 +981,7 @@ function InventorySection() {
                   className="flex items-center gap-2 w-full px-3 py-2 text-sm text-slate-300
                     hover:bg-surface-raised transition-colors text-left"
                   onClick={() => {
-                    setCreating(t)
+                    setCreating(emptyForm(t))
                     setEditing(null)
                     setShowTypeMenu(false)
                   }}
@@ -977,7 +998,7 @@ function InventorySection() {
       {/* Create form */}
       {creating && (
         <ItemForm
-          initial={emptyForm(creating)}
+          initial={creating}
           onSave={handleCreate}
           onCancel={() => setCreating(null)}
         />
@@ -1055,6 +1076,7 @@ export function Equipment() {
   const setConnectedDevices = useStore((s) => s.setConnectedDevices)
 
   const [activeTab, setActiveTab] = useState<'connections' | 'inventory'>('connections')
+  const [importItem, setImportItem] = useState<Omit<EquipmentItem, 'id'> | null>(null)
 
   const [step, setStep] = useState<WizardStep>('type')
   const [selectedKind, setSelectedKind] = useState<DeviceKind>('camera')
@@ -1183,6 +1205,49 @@ export function Equipment() {
     }
   }
 
+  const handleImportDevice = async (device: ConnectedDevice) => {
+    const typeMap: Partial<Record<DeviceKind, EquipmentItemType>> = {
+      camera: 'camera', mount: 'mount', focuser: 'focuser',
+      filter_wheel: 'filter_wheel', rotator: 'rotator',
+    }
+    const invType = typeMap[device.kind]
+    if (!invType) return
+
+    try {
+      const config = await api.devices.getConfig(device.device_id)
+      const deviceName = (config.params?.device_name as string) || device.device_id
+      const executable = (config.params?.executable as string) || null
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const item: Record<string, any> = {
+        type: invType,
+        name: deviceName,
+        indi_driver: executable,
+        indi_device_name: deviceName,
+      }
+
+      if (invType === 'filter_wheel') item.filter_names = []
+
+      if (invType === 'camera') {
+        item.pixel_size_um = null
+        // Opportunistically read CCD_INFO to pre-fill pixel size
+        try {
+          const props = await api.devices.properties(device.device_id)
+          const ccdInfo = props.find((p) => p.name === 'CCD_INFO')
+          const pixelWidget = ccdInfo?.widgets.find((w) => w.name === 'CCD_PIXEL_SIZE')
+          if (typeof pixelWidget?.value === 'number' && pixelWidget.value > 0) {
+            item.pixel_size_um = pixelWidget.value
+          }
+        } catch { /* properties unavailable — leave null */ }
+      }
+
+      setImportItem(item as Omit<EquipmentItem, 'id'>)
+      setActiveTab('inventory')
+    } catch (err) {
+      console.error('Import to inventory failed:', err)
+    }
+  }
+
   const handleDisconnect = async (deviceId: string) => {
     await api.devices.disconnect(deviceId).catch(console.error)
     refresh()
@@ -1230,7 +1295,12 @@ export function Equipment() {
       </div>
 
       {/* Inventory tab */}
-      {activeTab === 'inventory' && <InventorySection />}
+      {activeTab === 'inventory' && (
+        <InventorySection
+          importItem={importItem}
+          onImportDone={() => setImportItem(null)}
+        />
+      )}
 
       {/* Connections tab */}
       {activeTab === 'connections' && <>
@@ -1261,6 +1331,7 @@ export function Equipment() {
                       onDisconnect={handleDisconnect}
                       onReconnect={handleReconnect}
                       onRemove={handleRemove}
+                      onImport={() => handleImportDevice(primary)}
                     />
                     {companions.map((c: ConnectedDevice) => (
                       <div key={c.device_id} className="ml-6 flex flex-col gap-1">
@@ -1273,6 +1344,7 @@ export function Equipment() {
                           onDisconnect={handleDisconnect}
                           onReconnect={handleReconnect}
                           onRemove={handleRemove}
+                          onImport={() => handleImportDevice(c)}
                           isCompanion
                         />
                       </div>
