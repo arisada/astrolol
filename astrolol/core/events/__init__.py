@@ -1,6 +1,7 @@
 from astrolol.core.events.bus import EventBus
 from astrolol.core.events.models import (
     BaseEvent,
+    ImageStats,
     DeviceConnected,
     DeviceDisconnected,
     DeviceStateChanged,
@@ -32,6 +33,7 @@ from astrolol.core.events.models import (
 __all__ = [
     "EventBus",
     "BaseEvent",
+    "ImageStats",
     "DeviceConnected",
     "DeviceDisconnected",
     "DeviceStateChanged",

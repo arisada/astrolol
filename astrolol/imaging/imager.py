@@ -16,6 +16,7 @@ from astrolol.core.events import (
     ExposureCompleted,
     ExposureFailed,
     ExposureStarted,
+    ImageStats,
     LoopStarted,
     LoopStopped,
 )
@@ -125,9 +126,13 @@ class ImagerManager:
         self._active_profile: "Profile | None" = None
         self._profile_store = profile_store
         self._save_counters: dict[str, int] = {}
+        self._last_stats: dict[str, ImageStats] = {}
         # Optional dither hook set by the PHD2 plugin on startup.
         # Signature: async (config: DitherConfig) -> None
         self._dither_fn: Callable[[DitherConfig], Awaitable[None]] | None = None
+        # Optional star-analysis hook set by the autofocus plugin on startup.
+        # Signature: async (fits_path: str) -> tuple[float, int]  (fwhm, star_count)
+        self._star_analyzer_fn: Callable[[str], Awaitable[tuple[float, int]]] | None = None
 
     def set_context(self, profile: "Profile | None") -> None:
         """Called when a profile is activated or cleared."""
@@ -211,6 +216,18 @@ class ImagerManager:
 
     def all_statuses(self) -> list[ImagerStatus]:
         return [ImagerStatus(device_id=d, state=i.state) for d, i in self._imagers.items()]
+
+    def register_star_analyzer(
+        self, fn: Callable[[str], Awaitable[tuple[float, int]]]
+    ) -> None:
+        """Register a star-detection callback (set by the autofocus plugin).
+
+        fn(fits_path) → (median_fwhm, star_count)
+        """
+        self._star_analyzer_fn = fn
+
+    def get_last_stats(self, device_id: str) -> ImageStats | None:
+        return self._last_stats.get(device_id)
 
     # --- Internal ---
 
@@ -337,14 +354,33 @@ class ImagerManager:
         preview_path = self._preview_path(fits_path.stem, self._images_dir, suffix="auto")
         preview_path_linear = self._preview_path(fits_path.stem, self._images_dir, suffix="linear")
 
-        async def _preview(fn, dst: Path) -> None:
+        async def _preview(fn, dst: Path):
             async with mem_guard():
-                await asyncio.to_thread(fn, fits_path, dst, settings.jpeg_quality)
+                return await asyncio.to_thread(fn, fits_path, dst, settings.jpeg_quality)
 
-        await asyncio.gather(
+        preview_stats_raw, _ = await asyncio.gather(
             _preview(fits_to_jpeg, preview_path),
             _preview(fits_to_jpeg_linear, preview_path_linear),
         )
+
+        # Build ImageStats from histogram data and optional star analysis.
+        stats: ImageStats | None = None
+        if isinstance(preview_stats_raw, dict):
+            fwhm: float | None = None
+            star_count = 0
+            if self._star_analyzer_fn is not None:
+                try:
+                    fwhm, star_count = await self._star_analyzer_fn(str(fits_path))
+                    if star_count == 0:
+                        fwhm = None
+                except Exception:
+                    logger.warning("imager.star_analysis_failed", device_id=device_id)
+            stats = ImageStats(
+                **preview_stats_raw,
+                fwhm=fwhm,
+                star_count=star_count,
+            )
+            self._last_stats[device_id] = stats
 
         result = ExposureResult(
             device_id=device_id,
@@ -364,6 +400,7 @@ class ImagerManager:
                 duration=result.duration,
                 width=result.width,
                 height=result.height,
+                stats=stats,
             )
         )
         imager.state = ImagerState.IDLE

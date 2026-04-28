@@ -7,6 +7,7 @@ from pydantic import BaseModel
 from astrolol.core.errors import DeviceNotFoundError, DeviceKindError
 from astrolol.devices.base.models import CameraStatus
 from astrolol.imaging.imager import ImagerManager
+from astrolol.core.events import ImageStats
 from astrolol.imaging.models import ExposureRequest, ExposureResult, ImagerDeviceSettings, ImagerStatus
 from astrolol.profiles.store import ProfileStore
 
@@ -98,6 +99,15 @@ async def set_cooler(device_id: str, body: SetCoolerRequest, request: Request) -
         raise HTTPException(status_code=404, detail=str(exc))
     except Exception as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
+
+
+@router.get("/{device_id}/stats", response_model=ImageStats)
+async def get_stats(device_id: str, request: Request) -> ImageStats:
+    """Return statistics from the most recent exposure for this camera."""
+    stats = _imager(request).get_last_stats(device_id)
+    if stats is None:
+        raise HTTPException(status_code=404, detail="No statistics available yet")
+    return stats
 
 
 @router.get("/{device_id}/settings", response_model=ImagerDeviceSettings)

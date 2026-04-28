@@ -15,6 +15,19 @@ def _uid() -> str:
     return str(uuid4())
 
 
+class ImageStats(BaseModel):
+    """Statistics computed from the last exposure (histogram + optional star analysis)."""
+    histogram: list[int]    # 128-bin raw ADU distribution
+    hist_min: float         # sample minimum (ADU)
+    hist_max: float         # sample maximum (ADU)
+    stretch_low: float      # auto-stretch black point = median of sample (ADU)
+    stretch_high: float     # auto-stretch white point = 99th percentile (ADU)
+    mean: float
+    median: float
+    fwhm: float | None = None   # median FWHM in pixels; None when autofocus plugin is not loaded
+    star_count: int = 0
+
+
 class BaseEvent(BaseModel):
     id: str = Field(default_factory=_uid)
     timestamp: datetime = Field(default_factory=_now)
@@ -71,6 +84,7 @@ class ExposureCompleted(BaseEvent):
     duration: float
     width: int
     height: int
+    stats: ImageStats | None = None
 
 
 class ExposureFailed(BaseEvent):

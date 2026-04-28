@@ -271,6 +271,18 @@ export interface FilterWheelStatus {
   is_moving: boolean
 }
 
+export interface ImageStats {
+  histogram: number[]     // 128 ADU-bin counts
+  hist_min: number        // ADU sample minimum
+  hist_max: number        // ADU sample maximum
+  stretch_low: number     // auto-stretch black point (median, ADU)
+  stretch_high: number    // auto-stretch white point (99th pct, ADU)
+  mean: number
+  median: number
+  fwhm: number | null     // median FWHM in pixels (null if autofocus plugin not loaded)
+  star_count: number
+}
+
 export interface ExposureResult {
   device_id: string
   fits_path: string
@@ -417,6 +429,7 @@ export interface ExposureCompletedEvent extends BaseEvent {
   duration: number
   width: number
   height: number
+  stats: ImageStats | null
 }
 
 export interface ExposureStartedEvent extends BaseEvent {

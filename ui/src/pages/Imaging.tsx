@@ -5,7 +5,7 @@ import {
 } from 'lucide-react'
 import { api } from '@/api/client'
 import { useStore } from '@/store'
-import type { CameraStatus, DitherConfig, FilterWheelStatus, FrameType, ImagerDeviceSettings } from '@/api/types'
+import type { CameraStatus, DitherConfig, FilterWheelStatus, FrameType, ImageStats, ImagerDeviceSettings } from '@/api/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { DevicePropertiesPanel } from '@/components/DevicePropertiesPanel'
@@ -182,10 +182,44 @@ function DurationStepper({ value, onChange }: { value: number; onChange: (v: num
   )
 }
 
+// ── Histogram overlay ─────────────────────────────────────────────────────────
+
+function HistogramOverlay({ stats }: { stats: ImageStats }) {
+  const { histogram, hist_min, hist_max, stretch_low, stretch_high } = stats
+  const W = 160
+  const H = 48
+  const maxCount = Math.max(...histogram, 1)
+  const range = hist_max - hist_min || 1
+  const lowX = Math.max(0, Math.min(W, ((stretch_low - hist_min) / range) * W))
+  const highX = Math.max(0, Math.min(W, ((stretch_high - hist_min) / range) * W))
+  const bins = histogram.length
+
+  return (
+    <svg width={W} height={H} className="block">
+      {histogram.map((count, i) => {
+        const barH = (count / maxCount) * H
+        const x = (i / bins) * W
+        const bw = W / bins + 0.5
+        return (
+          <rect
+            key={i}
+            x={x} y={H - barH} width={bw} height={barH}
+            fill="rgba(200,200,200,0.6)"
+          />
+        )
+      })}
+      {/* Stretch clip markers */}
+      <line x1={lowX} y1={0} x2={lowX} y2={H} stroke="rgba(96,165,250,0.8)" strokeWidth={1} />
+      <line x1={highX} y1={0} x2={highX} y2={H} stroke="rgba(251,191,36,0.8)" strokeWidth={1} />
+    </svg>
+  )
+}
+
 // ── Image Viewer ──────────────────────────────────────────────────────────────
 
 function ImageViewer({ deviceId, histoAuto }: { deviceId: string | undefined; histoAuto: boolean }) {
   const image = useStore((s) => deviceId ? (s.latestImages[deviceId] ?? null) : null)
+  const stats = useStore((s) => deviceId ? (s.imageStats[deviceId] ?? null) : null)
   const previewUrl = image
     ? (histoAuto || !image.previewUrlLinear ? image.previewUrl : image.previewUrlLinear)
     : null
@@ -199,9 +233,23 @@ function ImageViewer({ deviceId, histoAuto }: { deviceId: string | undefined; hi
             alt="Latest exposure"
             className="max-w-full max-h-full object-contain"
           />
-          <div className="absolute bottom-2 left-2 text-xs text-slate-400 bg-black/60 px-2 py-1 rounded">
-            {image!.width}×{image!.height} · {image!.duration}s
+          {/* Bottom-left: image info + FWHM */}
+          <div className="absolute bottom-2 left-2 flex flex-col gap-0.5">
+            <div className="text-xs text-slate-400 bg-black/60 px-2 py-1 rounded">
+              {image!.width}×{image!.height} · {image!.duration}s
+              {stats && stats.star_count > 0 && stats.fwhm != null && (
+                <span className="ml-2 text-emerald-400">
+                  FWHM {stats.fwhm.toFixed(1)}px · {stats.star_count}★
+                </span>
+              )}
+            </div>
           </div>
+          {/* Bottom-right: histogram */}
+          {stats && (
+            <div className="absolute bottom-2 right-2 bg-black/60 rounded p-1">
+              <HistogramOverlay stats={stats} />
+            </div>
+          )}
         </>
       ) : (
         <div className="text-slate-600 text-sm flex flex-col items-center gap-2">

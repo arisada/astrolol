@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { AstrolollEvent, CameraStatus, ConnectedDevice, FilterWheelStatus, FocuserStatus, MountStatus, PluginInfo } from '@/api/types'
+import type { AstrolollEvent, CameraStatus, ConnectedDevice, FilterWheelStatus, FocuserStatus, ImageStats, MountStatus, PluginInfo } from '@/api/types'
 
 const MAX_LOG_ENTRIES = 1000
 
@@ -73,8 +73,9 @@ interface AppState {
   filterWheelStatuses: Record<string, FilterWheelStatus>
 
   // Imager
-  latestImages: Record<string, LatestImage>  // device_id -> latest image for that camera
-  imagerBusy: Record<string, boolean>        // device_id -> is busy
+  latestImages: Record<string, LatestImage>    // device_id -> latest image for that camera
+  imageStats: Record<string, ImageStats>       // device_id -> stats from last exposure
+  imagerBusy: Record<string, boolean>          // device_id -> is busy
   imagerLooping: Record<string, boolean>     // device_id -> loop is running
   imagerExposures: Record<string, { startedAt: number; duration: number } | null>  // for countdown
 
@@ -116,6 +117,7 @@ export const useStore = create<AppState>((set, get) => ({
   cameraStatuses: {},
   filterWheelStatuses: {},
   latestImages: {},
+  imageStats: {},
   imagerBusy: {},
   imagerLooping: {},
   imagerExposures: {},
@@ -255,6 +257,7 @@ export const useStore = create<AppState>((set, get) => ({
               duration: event.duration,
             },
           },
+          ...(event.stats ? { imageStats: { ...s.imageStats, [event.device_id]: event.stats } } : {}),
           log, lastError,
         }))
         break

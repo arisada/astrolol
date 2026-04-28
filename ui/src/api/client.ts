@@ -11,6 +11,7 @@ import type {
   ExposureResult,
   FilterWheelStatus,
   FocuserStatus,
+  ImageStats,
   ImagerDeviceSettings,
   ImagerStatus,
   IndiDeviceMessage,
@@ -68,6 +69,7 @@ export const api = {
   imager: {
     status: (deviceId: string) => request<ImagerStatus>(`/imager/${deviceId}/status`),
     cameraStatus: (deviceId: string) => request<CameraStatus>(`/imager/${deviceId}/camera_status`),
+    stats: (deviceId: string) => request<ImageStats>(`/imager/${deviceId}/stats`),
     getSettings: (deviceId: string) => request<ImagerDeviceSettings>(`/imager/${deviceId}/settings`),
     putSettings: (deviceId: string, body: ImagerDeviceSettings) =>
       request<ImagerDeviceSettings>(`/imager/${deviceId}/settings`, {

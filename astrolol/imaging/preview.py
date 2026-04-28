@@ -48,8 +48,12 @@ def _resize_for_preview(data: np.ndarray) -> np.ndarray:
     return np.asarray(Image.fromarray(data, mode="F").resize((new_w, new_h), Image.LANCZOS))
 
 
-def fits_to_jpeg(fits_path: Path, jpeg_path: Path, quality: int = 85) -> None:
-    """Auto-stretch: median black-point + 99th-percentile white-point."""
+def fits_to_jpeg(fits_path: Path, jpeg_path: Path, quality: int = 85) -> dict:
+    """Auto-stretch: median black-point + 99th-percentile white-point.
+
+    Returns a stats dict with histogram and stretch parameters so the caller can
+    build an ``ImageStats`` without re-reading the file.
+    """
     data = _resize_for_preview(_load_fits_data(fits_path))
     # Sample every 63rd pixel — stride 63 (not a power of 2) avoids landing on
     # the same Bayer colour channel repeatedly.  After resize a 2000×2000 image
@@ -63,6 +67,19 @@ def fits_to_jpeg(fits_path: Path, jpeg_path: Path, quality: int = 85) -> None:
     stretched = np.clip((data - low) / span, 0.0, 1.0)
     uint8_data = (stretched * 255).astype(np.uint8)
     Image.fromarray(uint8_data, mode="L").save(jpeg_path, format="JPEG", quality=quality)
+
+    s_min = float(sample.min())
+    s_max = float(sample.max()) if sample.max() > s_min else s_min + 1.0
+    hist, _ = np.histogram(sample, bins=128, range=(s_min, s_max))
+    return {
+        "histogram": hist.tolist(),
+        "hist_min": s_min,
+        "hist_max": s_max,
+        "stretch_low": low,
+        "stretch_high": high,
+        "mean": float(np.mean(sample)),
+        "median": low,
+    }
 
 
 def fits_to_jpeg_linear(fits_path: Path, jpeg_path: Path, quality: int = 85) -> None:

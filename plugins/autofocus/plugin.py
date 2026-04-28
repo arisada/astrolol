@@ -28,6 +28,7 @@ class AutofocusPlugin:
     def setup(self, app: FastAPI, ctx: PluginContext) -> None:
         from plugins.autofocus.api import router
         from plugins.autofocus.engine import AutofocusEngine
+        from plugins.autofocus.star_detector import detect_stars
 
         engine = AutofocusEngine(
             event_bus=ctx.event_bus,
@@ -35,6 +36,15 @@ class AutofocusPlugin:
         )
         app.state.autofocus_engine = engine
         self._engine = engine
+
+        # Register star detection with the imager so it can annotate each frame.
+        async def _analyze_stars(fits_path: str) -> tuple[float, int]:
+            fwhm, count, _ = await detect_stars(fits_path)
+            return fwhm, count
+
+        imager_manager = getattr(app.state, "imager_manager", None)
+        if imager_manager is not None:
+            imager_manager.register_star_analyzer(_analyze_stars)
 
         app.include_router(router)
         logger.info("autofocus.plugin_setup")
