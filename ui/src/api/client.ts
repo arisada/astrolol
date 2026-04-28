@@ -205,6 +205,7 @@ export const api = {
 
   inventory: {
     list: () => request<EquipmentItem[]>('/inventory'),
+    timezones: () => request<{ timezones: string[]; system_default: string }>('/inventory/timezones'),
     create: (item: Omit<EquipmentItem, 'id'>) =>
       request<EquipmentItem>('/inventory', { method: 'POST', body: JSON.stringify(item) }),
     update: (item: EquipmentItem) =>

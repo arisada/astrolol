@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import {
-  Camera, ChevronLeft, CircleDot, Crosshair, Filter as FilterIcon,
-  Focus, Globe, Link2, MapPin, Pencil, Plug, PlugZap, Plus, RefreshCw,
+  Camera, ChevronLeft, CircleDot, Compass, Crosshair, Focus, Globe,
+  Link2, LoaderPinwheel, MapPin, Pencil, Plug, PlugZap, Plus, RefreshCw,
   Telescope, Trash2, Wind,
 } from 'lucide-react'
+import { DmsInput } from '@/components/ui/dms-input'
 import { api } from '@/api/client'
 import type {
   ConnectedDevice, DeviceKind, DeviceProperty, DriverEntry,
@@ -51,7 +52,7 @@ const KIND_ADAPTER: Record<DeviceKind, string> = {
 function KindIcon({ kind, size = 28 }: { kind: DeviceKind; size?: number }) {
   if (kind === 'camera') return <Camera size={size} />
   if (kind === 'mount') return <Telescope size={size} />
-  if (kind === 'filter_wheel') return <FilterIcon size={size} />
+  if (kind === 'filter_wheel') return <LoaderPinwheel size={size} />
   if (kind === 'rotator') return <CircleDot size={size} />
   return <Crosshair size={size} />
 }
@@ -615,14 +616,25 @@ const ITEM_TYPE_LABELS: Record<EquipmentItemType, string> = {
 
 function ItemTypeIcon({ type, size = 16 }: { type: EquipmentItemType; size?: number }) {
   if (type === 'site') return <MapPin size={size} />
-  if (type === 'mount') return <Telescope size={size} />
-  if (type === 'ota') return <Crosshair size={size} />
+  if (type === 'mount') return <Compass size={size} />
+  if (type === 'ota') return <Telescope size={size} />
   if (type === 'camera') return <Camera size={size} />
-  if (type === 'filter_wheel') return <FilterIcon size={size} />
+  if (type === 'filter_wheel') return <LoaderPinwheel size={size} />
   if (type === 'focuser') return <Focus size={size} />
   if (type === 'rotator') return <CircleDot size={size} />
   if (type === 'gps') return <Globe size={size} />
   return <Wind size={size} />
+}
+
+const ITEM_EXAMPLE_NAMES: Record<EquipmentItemType, string> = {
+  site: "Bob's backyard",
+  mount: 'Sky-Watcher EQ6-R Pro',
+  ota: 'William Optics RedCat 51',
+  camera: 'ZWO ASI2600MC Pro',
+  filter_wheel: 'ZWO EFW 8-position',
+  focuser: 'Pegasus FocusCube 3',
+  rotator: 'Pegasus Falcon Rotator',
+  gps: 'RaspiGPS',
 }
 
 function itemSubtitle(item: EquipmentItem): string {
@@ -631,6 +643,32 @@ function itemSubtitle(item: EquipmentItem): string {
   if (item.type === 'camera' && item.pixel_size_um) return `${item.indi_device_name ?? item.indi_driver ?? ''}  ·  ${item.pixel_size_um} µm`
   if ('indi_device_name' in item) return item.indi_device_name ?? item.indi_driver ?? ''
   return ''
+}
+
+// ---------------------------------------------------------------------------
+// Timezone selector
+// ---------------------------------------------------------------------------
+
+function TimezoneSelect({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [zones, setZones] = useState<string[]>([])
+
+  useEffect(() => {
+    api.inventory.timezones().then(({ timezones }) => setZones(timezones)).catch(() => {})
+  }, [])
+
+  return (
+    <select
+      value={value}
+      onChange={(e) => onChange(e.target.value)}
+      className="bg-surface border border-surface-border rounded px-3 py-1.5 text-sm text-slate-200
+        focus:outline-none focus:ring-1 focus:ring-accent w-full"
+    >
+      {zones.length === 0 && <option value={value}>{value || 'UTC'}</option>}
+      {zones.map((z) => (
+        <option key={z} value={z}>{z}</option>
+      ))}
+    </select>
+  )
 }
 
 // ---------------------------------------------------------------------------
@@ -675,6 +713,17 @@ function ItemForm({
 
   useEffect(() => { nameRef.current?.focus() }, [])
 
+  // Pre-fill system timezone for new site items
+  useEffect(() => {
+    if (initial.type === 'site' && !('id' in initial)) {
+      api.inventory.timezones()
+        .then(({ system_default }) => {
+          setForm((prev) => ({ ...prev, timezone: system_default }))
+        })
+        .catch(() => {})
+    }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
   const set = (key: string, value: FieldValue) =>
     setForm((prev) => ({ ...prev, [key]: value }))
 
@@ -708,7 +757,7 @@ function ItemForm({
           required
           value={(form as {name: string}).name}
           onChange={(e) => set('name', e.target.value)}
-          placeholder="e.g. EQ6-R Pro"
+          placeholder={`e.g. ${ITEM_EXAMPLE_NAMES[type]}`}
           className="bg-surface border border-surface-border rounded px-3 py-1.5 text-sm text-slate-200
             focus:outline-none focus:ring-1 focus:ring-accent w-full"
         />
@@ -741,26 +790,20 @@ function ItemForm({
       {/* Site fields */}
       {type === 'site' && (
         <>
-          <div className="grid grid-cols-2 gap-3">
-            <FieldRow label="Latitude (°)">
-              <input
-                type="number" step="0.0001" min="-90" max="90"
-                value={(form as { latitude: number }).latitude}
-                onChange={(e) => set('latitude', parseFloat(e.target.value) || 0)}
-                className="bg-surface border border-surface-border rounded px-3 py-1.5 text-sm text-slate-200
-                  focus:outline-none focus:ring-1 focus:ring-accent w-full"
-              />
-            </FieldRow>
-            <FieldRow label="Longitude (°)">
-              <input
-                type="number" step="0.0001" min="-180" max="180"
-                value={(form as { longitude: number }).longitude}
-                onChange={(e) => set('longitude', parseFloat(e.target.value) || 0)}
-                className="bg-surface border border-surface-border rounded px-3 py-1.5 text-sm text-slate-200
-                  focus:outline-none focus:ring-1 focus:ring-accent w-full"
-              />
-            </FieldRow>
-          </div>
+          <FieldRow label="Latitude">
+            <DmsInput
+              value={(form as { latitude: number }).latitude}
+              onChange={(v) => set('latitude', v)}
+              mode="lat"
+            />
+          </FieldRow>
+          <FieldRow label="Longitude">
+            <DmsInput
+              value={(form as { longitude: number }).longitude}
+              onChange={(v) => set('longitude', v)}
+              mode="lon"
+            />
+          </FieldRow>
           <div className="grid grid-cols-2 gap-3">
             <FieldRow label="Altitude (m)">
               <input
@@ -772,12 +815,9 @@ function ItemForm({
               />
             </FieldRow>
             <FieldRow label="Timezone">
-              <input
+              <TimezoneSelect
                 value={(form as { timezone: string }).timezone}
-                onChange={(e) => set('timezone', e.target.value)}
-                placeholder="UTC"
-                className="bg-surface border border-surface-border rounded px-3 py-1.5 text-sm text-slate-200
-                  focus:outline-none focus:ring-1 focus:ring-accent w-full"
+                onChange={(v) => set('timezone', v)}
               />
             </FieldRow>
           </div>

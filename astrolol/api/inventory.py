@@ -1,3 +1,6 @@
+import zoneinfo
+from pathlib import Path
+
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import TypeAdapter
 
@@ -6,11 +9,29 @@ from astrolol.equipment.store import EquipmentStore
 
 router = APIRouter(prefix="/inventory", tags=["inventory"])
 
+
+def _system_timezone() -> str:
+    """Best-effort read of the system timezone name."""
+    try:
+        tz_file = Path("/etc/timezone")
+        if tz_file.exists():
+            return tz_file.read_text().strip()
+    except OSError:
+        pass
+    return "UTC"
+
 _item_adapter: TypeAdapter[EquipmentItem] = TypeAdapter(EquipmentItem)
 
 
 def _store(request: Request) -> EquipmentStore:
     return request.app.state.equipment_store
+
+
+@router.get("/timezones")
+async def list_timezones() -> dict:
+    """Return sorted list of IANA timezone names and the system default."""
+    zones = sorted(zoneinfo.available_timezones())
+    return {"timezones": zones, "system_default": _system_timezone()}
 
 
 @router.get("", response_model=list[EquipmentItem])

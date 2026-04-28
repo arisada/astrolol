@@ -59,6 +59,7 @@ export default defineConfig({
       '/focuser':      p(backendHttp),
       '/filter_wheel': p(backendHttp),
       '/indi':         p(backendHttp),
+      '/inventory':         p(backendHttp),
       '/settings': p(backendHttp),
       '/events':   p(backendHttp),
       '/health':   p(backendHttp),
