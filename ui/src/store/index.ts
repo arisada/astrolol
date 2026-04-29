@@ -186,14 +186,14 @@ export const useStore = create<AppState>((set, get) => ({
               dec: event.dec,
               ra_jnow: event.ra_jnow,
               dec_jnow: event.dec_jnow,
-              alt: cur?.alt ?? null,
-              az: cur?.az ?? null,
+              alt: event.alt,
+              az: event.az,
               is_tracking: cur?.is_tracking ?? false,
               is_parked: cur?.is_parked ?? false,
               is_slewing: cur?.is_slewing ?? false,
-              pier_side: cur?.pier_side ?? null,
-              hour_angle: cur?.hour_angle ?? null,
-              lst: cur?.lst ?? null,
+              pier_side: event.pier_side,
+              hour_angle: event.hour_angle,
+              lst: event.lst,
             },
           },
         }
@@ -222,6 +222,21 @@ export const useStore = create<AppState>((set, get) => ({
     switch (event.type) {
       case 'device.connected': {
         set({ log, lastError })
+        break
+      }
+      case 'device.state_changed': {
+        if (event.device_kind === 'mount') {
+          set((s) => {
+            const cur = s.mountStatuses[event.device_key]
+            if (!cur) return { log, lastError }
+            return {
+              mountStatuses: { ...s.mountStatuses, [event.device_key]: { ...cur, state: event.new_state as MountStatus['state'] } },
+              log, lastError,
+            }
+          })
+        } else {
+          set({ log, lastError })
+        }
         break
       }
       case 'device.disconnected': {

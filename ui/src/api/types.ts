@@ -557,6 +557,11 @@ export interface MountCoordsUpdatedEvent extends BaseEvent {
   dec: number | null      // ICRS J2000 decimal degrees
   ra_jnow: number | null  // JNow decimal hours (raw driver value)
   dec_jnow: number | null // JNow decimal degrees
+  alt: number | null
+  az: number | null
+  pier_side: 'East' | 'West' | null
+  hour_angle: number | null
+  lst: number | null
 }
 
 export interface LogEvent extends BaseEvent { type: 'log'; level: string; component: string; message: string }

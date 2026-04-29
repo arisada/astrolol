@@ -129,12 +129,17 @@ class DeviceManager:
             def _on_coords(
                 ra: float | None, dec: float | None,
                 ra_jnow: float | None, dec_jnow: float | None,
+                alt: float | None = None, az: float | None = None,
+                pier_side: str | None = None,
+                hour_angle: float | None = None, lst: float | None = None,
                 _did: str = _device_id,
             ) -> None:
                 asyncio.create_task(
                     _bus.publish(MountCoordsUpdated(
                         device_id=_did, ra=ra, dec=dec,
                         ra_jnow=ra_jnow, dec_jnow=dec_jnow,
+                        alt=alt, az=az, pier_side=pier_side,
+                        hour_angle=hour_angle, lst=lst,
                     ))
                 )
             instance.set_coords_listener(_on_coords)

@@ -3,7 +3,7 @@ import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Crosshair, RefreshCw, Rotate
 import { api } from '@/api/client'
 import { useStore } from '@/store'
 import type { LogEntry } from '@/store'
-import type { CoordFrame, DeviceProperty, MountDeviceSettings, MountStatus, TrackingMode } from '@/api/types'
+import type { CoordFrame, DeviceProperty, MountDeviceSettings, TrackingMode } from '@/api/types'
 import { Button } from '@/components/ui/button'
 import { DmsInput } from '@/components/ui/dms-input'
 import { StateBadge } from '@/components/ui/badge'
@@ -172,7 +172,7 @@ function MountEventLog() {
 // ---------------------------------------------------------------------------
 
 function MountControls({ deviceId }: { deviceId: string }) {
-  const [status, setStatus] = useState<MountStatus | null>(null)
+  const status = useStore((s) => s.mountStatuses[deviceId] ?? null)
   const [showIndiPanel, setShowIndiPanel] = useState(false)
 
   const [slewRa, setSlewRa] = useState(0)
@@ -212,24 +212,13 @@ function MountControls({ deviceId }: { deviceId: string }) {
     api.mount.putSettings(deviceId, updated).catch(() => {})
   }, [deviceId])
 
+  // Keep target inputs in sync with live position when the user hasn't edited them
   useEffect(() => {
-    let alive = true
-    const poll = async () => {
-      try {
-        const s = await api.mount.status(deviceId)
-        if (alive) {
-          setStatus(s)
-          if (!slewEdited.current) {
-            setSlewRa(targetJnow ? (s.ra_jnow ?? 0) : (s.ra ?? 0))
-            setSlewDec(targetJnow ? (s.dec_jnow ?? 0) : (s.dec ?? 0))
-          }
-        }
-      } catch { /* ignore poll errors */ }
+    if (status && !slewEdited.current) {
+      setSlewRa(targetJnow ? (status.ra_jnow ?? 0) : (status.ra ?? 0))
+      setSlewDec(targetJnow ? (status.dec_jnow ?? 0) : (status.dec ?? 0))
     }
-    poll()
-    const id = setInterval(poll, 2000)
-    return () => { alive = false; clearInterval(id) }
-  }, [deviceId, targetJnow])
+  }, [status, targetJnow])
 
   const act = useCallback(async (fn: () => Promise<unknown>) => {
     setError(null)

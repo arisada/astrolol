@@ -73,13 +73,13 @@ class IndiMount:
 
     def set_coords_listener(
         self,
-        cb: Callable[[float | None, float | None, float | None, float | None], None] | None,
+        cb: Callable[..., None] | None,
     ) -> None:
-        """Set (or clear) a callback invoked at most once per second with (ra, dec, ra_jnow, dec_jnow).
+        """Set (or clear) a callback invoked at most once per second with full mount state.
 
+        Signature: cb(ra, dec, ra_jnow, dec_jnow, alt, az, pier_side, hour_angle, lst)
         ra / dec are ICRS J2000 (hours / degrees); ra_jnow / dec_jnow are the raw
-        JNow values from the driver.  Any value may be None when the driver reports
-        an out-of-range coordinate (e.g. dec > 90° while parked).
+        JNow values from the driver.  Any value may be None when unavailable.
 
         Called by DeviceManager after a successful connect().
         """
@@ -102,8 +102,29 @@ class IndiMount:
         icrs = _jnow_to_icrs(ra_jnow, dec_jnow)
         ra = icrs.ra.hour if icrs is not None else None
         dec = icrs.dec.deg if icrs is not None else None
+
+        alt = self._client.get_number_nowait(self._device_name, "HORIZONTAL_COORD", "ALT")
+        az  = self._client.get_number_nowait(self._device_name, "HORIZONTAL_COORD", "AZ")
+
+        pier_east = self._client.get_switch_state_nowait(
+            self._device_name, "TELESCOPE_PIER_SIDE", "PIER_EAST"
+        )
+        pier_side: str | None = None
+        if pier_east is not None:
+            pier_side = "East" if pier_east else "West"
+
+        lst = self._client.get_number_nowait(self._device_name, "TIME_LST", "LST")
+        hour_angle: float | None = None
+        if ra_jnow is not None and lst is not None:
+            ha = lst - ra_jnow
+            while ha > 12:
+                ha -= 24
+            while ha < -12:
+                ha += 24
+            hour_angle = ha
+
         try:
-            self._on_coords_cb(ra, dec, ra_jnow, dec_jnow)
+            self._on_coords_cb(ra, dec, ra_jnow, dec_jnow, alt, az, pier_side, hour_angle, lst)
         except Exception:
             pass
 
