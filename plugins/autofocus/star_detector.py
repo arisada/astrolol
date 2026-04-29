@@ -16,6 +16,10 @@ logger = structlog.get_logger()
 Metric = str  # "fwhm" | "hfd"
 
 
+_MAX_HFD_STARS = 50   # cap on stars used for the expensive HFD bisection
+_SUBSAMPLE = 2        # spatial subsampling factor applied before detection
+
+
 async def detect_stars(fits_path: str, metric: Metric = "fwhm") -> tuple[float, int, list[dict]]:
     """Detect stars in a FITS image and measure their sharpness.
 
@@ -88,6 +92,8 @@ def _detect_sync(fits_path: str, metric: Metric = "fwhm") -> tuple[float, int, l
         raw_shape = data.shape
         raw_min = float(np.min(data))
         raw_max = float(np.max(data))
+        # Convert and subsample in one step to minimise peak memory.
+        # Strided slicing creates a view, astype forces a copy at reduced size.
         data = data.astype(float)
 
     logger.info(
@@ -102,7 +108,12 @@ def _detect_sync(fits_path: str, metric: Metric = "fwhm") -> tuple[float, int, l
     while data.ndim > 2:
         data = data[0]
 
-    mean, median, std = sigma_clipped_stats(data, sigma=3.0)
+    # Subsample spatially to reduce compute for sigma stats and star finding.
+    # Coordinates are scaled back to full-res below when building star_list.
+    s = _SUBSAMPLE
+    data_s = data[::s, ::s]
+
+    mean, median, std = sigma_clipped_stats(data_s, sigma=3.0)
     logger.info("autofocus.sigma_stats", mean=float(mean), median=float(median), std=float(std))
 
     if std <= 0:
@@ -112,7 +123,7 @@ def _detect_sync(fits_path: str, metric: Metric = "fwhm") -> tuple[float, int, l
         # effective noise floor so IRAFStarFinder gets a meaningful threshold
         # (threshold = 5 * std ≈ 0.5 % of peak, which clears any zero background
         # and detects real PSF peaks).
-        data_range = float(data.max() - data.min())
+        data_range = float(data_s.max() - data_s.min())
         if data_range <= 0:
             logger.error("autofocus.detecting_stars.flat_image", fits_path=fits_path)
             return 0.0, 0, []
@@ -120,15 +131,16 @@ def _detect_sync(fits_path: str, metric: Metric = "fwhm") -> tuple[float, int, l
         logger.info("autofocus.std_fallback", std=std, data_range=data_range)
 
     # Try progressively lower thresholds to handle faint stars or simulator images.
+    # fwhm is halved because the subsampled pixel scale is s× coarser.
     sources = None
     for threshold_sigma in (5.0, 3.5, 2.5):
         finder = IRAFStarFinder(
-            fwhm=3.0,
+            fwhm=max(1.5, 3.0 / s),
             threshold=threshold_sigma * std,
             sharpness_range=(0.2, 1.0),
             roundness_range=(-0.75, 0.75),
         )
-        sources = finder(data - median)
+        sources = finder(data_s - median)
         n = len(sources) if sources is not None else 0
         logger.info("autofocus.threshold_pass", sigma=threshold_sigma, n_sources=n)
         if sources is not None and len(sources) > 0:
@@ -144,7 +156,7 @@ def _detect_sync(fits_path: str, metric: Metric = "fwhm") -> tuple[float, int, l
     if len(sources) == 0:
         return 0.0, 0, []
 
-    fwhms = np.array(sources["fwhm"], dtype=float)
+    fwhms = np.array(sources["fwhm"], dtype=float) * s  # scale back to full-res pixels
 
     # Sigma-clip FWHM to remove remaining outliers before taking the median
     med = float(np.median(fwhms))
@@ -156,19 +168,27 @@ def _detect_sync(fits_path: str, metric: Metric = "fwhm") -> tuple[float, int, l
             fwhms = fwhms[good]
 
     median_fwhm = float(np.median(fwhms))
+
+    # Scale subsampled centroids back to full-resolution pixel coordinates.
     stars = [
         {
-            "x": float(s["x_centroid"]),
-            "y": float(s["y_centroid"]),
-            "fwhm": float(s["fwhm"]),
+            "x": float(s_row["x_centroid"]) * s,
+            "y": float(s_row["y_centroid"]) * s,
+            "fwhm": float(s_row["fwhm"]) * s,
         }
-        for s in sources
+        for s_row in sources
     ]
 
     if metric == "hfd":
+        # Sort by peak flux (brightest first) and cap to avoid runaway compute.
+        # Brighter stars give more reliable HFD measurements anyway.
+        peaks = np.array(sources["peak"], dtype=float)
+        order = np.argsort(peaks)[::-1]
+        hfd_stars = [stars[i] for i in order[:_MAX_HFD_STARS]]
+        logger.info("autofocus.hfd_sample", total_stars=len(stars), hfd_sample=len(hfd_stars))
         hfds = np.array([
-            _compute_hfd(data - median, s["x"], s["y"])
-            for s in stars
+            _compute_hfd(data - median, s_row["x"], s_row["y"])
+            for s_row in hfd_stars
         ])
         valid_hfds = hfds[hfds > 0]
         if len(valid_hfds) == 0:

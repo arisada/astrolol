@@ -19,6 +19,7 @@ import structlog
 
 from astrolol.config.settings import settings
 from astrolol.core.events import EventBus
+from astrolol.core.mem_guard import mem_guard
 from astrolol.devices.base.models import ExposureParams
 from astrolol.devices.manager import DeviceManager
 from plugins.autofocus.algorithms import fit_hyperbola, fit_parabola
@@ -187,9 +188,12 @@ class AutofocusEngine:
                 run.image_width = fits_w or None
                 run.image_height = fits_h or None
 
-                # 3. Detect stars and measure sharpness (FWHM or HFD)
+                # 3. Detect stars and measure sharpness (FWHM or HFD).
+                # Wrapped in mem_guard so the heavy numpy/photutils work is
+                # serialised with other memory-intensive tasks on low-RAM hosts.
                 logger.info("autofocus.detecting_stars", step=run.current_step, metric=config.metric)
-                fwhm, star_count, raw_stars = await detect_stars(image.fits_path, metric=config.metric)
+                async with mem_guard():
+                    fwhm, star_count, raw_stars = await detect_stars(image.fits_path, metric=config.metric)
 
                 run.latest_stars = [StarInfo(x=s["x"], y=s["y"], fwhm=s["fwhm"]) for s in raw_stars]
 
