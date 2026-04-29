@@ -180,10 +180,13 @@ def _detect_sync(fits_path: str, metric: Metric = "fwhm") -> tuple[float, int, l
     ]
 
     if metric == "hfd":
-        # Sort by peak flux (brightest first) and cap to avoid runaway compute.
-        # Brighter stars give more reliable HFD measurements anyway.
-        peaks = np.array(sources["peak"], dtype=float)
-        order = np.argsort(peaks)[::-1]
+        # Select stars closest to the median FWHM for HFD measurement.
+        # Sorting by proximity to median avoids hot pixels (FWHM << median)
+        # and saturated/bloomed stars (FWHM >> median), which both give
+        # unreliable HFD values. Peak-flux sorting is explicitly avoided
+        # because hot pixels have high peak but negligible total flux.
+        dist_from_median = np.abs(fwhms - median_fwhm)
+        order = np.argsort(dist_from_median)
         hfd_stars = [stars[i] for i in order[:_MAX_HFD_STARS]]
         logger.info("autofocus.hfd_sample", total_stars=len(stars), hfd_sample=len(hfd_stars))
         hfds = np.array([
