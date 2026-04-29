@@ -221,17 +221,19 @@ class IndiMount:
     }
 
     async def set_tracking(self, enabled: bool, mode: TrackingMode | None = None) -> None:
-        # Set rate first so the driver has the right mode when tracking is enabled
+        # Set mode first so the driver has the right rate when tracking is enabled.
+        # TELESCOPE_TRACK_MODE is the standard SwitchVector for sidereal/lunar/solar.
+        # (TELESCOPE_TRACK_RATE is a NumberVector for custom arcsec/sec rates — unrelated.)
         if enabled and mode is not None:
             rate_element = self._TRACK_RATE_ELEMENTS.get(mode)
             if rate_element:
                 try:
                     await self._client.set_switch(
-                        self._device_name, "TELESCOPE_TRACK_RATE", [rate_element]
+                        self._device_name, "TELESCOPE_TRACK_MODE", [rate_element]
                     )
                 except Exception as exc:
                     logger.debug(
-                        "indi.mount_track_rate_skipped",
+                        "indi.mount_track_mode_skipped",
                         device=self._device_name,
                         mode=mode,
                         error=str(exc),
