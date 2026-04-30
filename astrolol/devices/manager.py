@@ -132,6 +132,7 @@ class DeviceManager:
                 alt: float | None = None, az: float | None = None,
                 pier_side: str | None = None,
                 hour_angle: float | None = None, lst: float | None = None,
+                is_tracking: bool = False, is_parked: bool = False,
                 _did: str = _device_id,
             ) -> None:
                 asyncio.create_task(
@@ -140,6 +141,7 @@ class DeviceManager:
                         ra_jnow=ra_jnow, dec_jnow=dec_jnow,
                         alt=alt, az=az, pier_side=pier_side,
                         hour_angle=hour_angle, lst=lst,
+                        is_tracking=is_tracking, is_parked=is_parked,
                     ))
                 )
             instance.set_coords_listener(_on_coords)

@@ -562,6 +562,8 @@ export interface MountCoordsUpdatedEvent extends BaseEvent {
   pier_side: 'East' | 'West' | null
   hour_angle: number | null
   lst: number | null
+  is_tracking: boolean
+  is_parked: boolean
 }
 
 export interface LogEvent extends BaseEvent { type: 'log'; level: string; component: string; message: string }

@@ -218,6 +218,8 @@ class MountCoordsUpdated(BaseEvent):
     pier_side: str | None = None
     hour_angle: float | None = None
     lst: float | None = None
+    is_tracking: bool = False
+    is_parked: bool = False
 
 
 # --- Filter Wheel events ---

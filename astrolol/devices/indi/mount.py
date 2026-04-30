@@ -77,13 +77,20 @@ class IndiMount:
     ) -> None:
         """Set (or clear) a callback invoked at most once per second with full mount state.
 
-        Signature: cb(ra, dec, ra_jnow, dec_jnow, alt, az, pier_side, hour_angle, lst)
+        Signature: cb(ra, dec, ra_jnow, dec_jnow, alt, az, pier_side, hour_angle, lst,
+                      is_tracking, is_parked)
         ra / dec are ICRS J2000 (hours / degrees); ra_jnow / dec_jnow are the raw
         JNow values from the driver.  Any value may be None when unavailable.
 
-        Called by DeviceManager after a successful connect().
+        Called by DeviceManager after a successful connect().  Fires immediately on
+        registration (with rate-limiter bypassed) so the UI gets correct initial state
+        even for a parked / stationary mount where EQUATORIAL_EOD_COORD never changes.
         """
         self._on_coords_cb = cb
+        if cb is not None:
+            # Bypass the rate limiter so the first publish is immediate.
+            self._last_coords_publish = 0.0
+            self._handle_coords()
 
     def _handle_coords(self) -> None:
         """Property listener — called by IndiClient whenever EQUATORIAL_EOD_COORD changes."""
@@ -123,8 +130,19 @@ class IndiMount:
                 ha += 24
             hour_angle = ha
 
+        track_on = self._client.get_switch_state_nowait(
+            self._device_name, "TELESCOPE_TRACK_STATE", "TRACK_ON"
+        )
+        is_tracking = bool(track_on) if track_on is not None else self._is_tracking
+
+        park_on = self._client.get_switch_state_nowait(
+            self._device_name, "TELESCOPE_PARK", "PARK"
+        )
+        is_parked = bool(park_on) if park_on is not None else self._is_parked
+
         try:
-            self._on_coords_cb(ra, dec, ra_jnow, dec_jnow, alt, az, pier_side, hour_angle, lst)
+            self._on_coords_cb(ra, dec, ra_jnow, dec_jnow, alt, az, pier_side, hour_angle, lst,
+                               is_tracking, is_parked)
         except Exception:
             pass
 
