@@ -100,8 +100,8 @@ async def _enrich_request(req: SolveRequest, request: Request) -> SolveRequest:
     except Exception:
         pass
 
-    # FOV from FITS header + CCD_INFO + active profile
-    if req.fov is None:
+    # FOV from FITS header + CCD_INFO + active profile (skip if file doesn't exist yet)
+    if req.fov is None and Path(req.fits_path).is_file():
         fov = await _compute_fov(req.fits_path, request)
         if fov is not None:
             req = req.model_copy(update={"fov": fov})
@@ -227,12 +227,13 @@ async def _do_install_db(event_bus) -> None:  # type: ignore[type-arg]
             return
 
         while True:
-            line = await dl.stdout.readline()  # type: ignore[union-attr]
-            if not line:
+            chunk = await dl.stdout.read(4096)  # type: ignore[union-attr]
+            if not chunk:
                 break
-            text = line.decode("utf-8", errors="replace").rstrip()
-            if text:
-                await log(text)
+            for part in chunk.decode("utf-8", errors="replace").replace("\r", "\n").splitlines():
+                part = part.strip()
+                if part:
+                    await log(part)
         await dl.wait()
 
         if dl.returncode != 0:
@@ -251,12 +252,13 @@ async def _do_install_db(event_bus) -> None:  # type: ignore[type-arg]
             return
 
         while True:
-            line = await inst.stdout.readline()  # type: ignore[union-attr]
-            if not line:
+            chunk = await inst.stdout.read(4096)  # type: ignore[union-attr]
+            if not chunk:
                 break
-            text = line.decode("utf-8", errors="replace").rstrip()
-            if text:
-                await log(text)
+            for part in chunk.decode("utf-8", errors="replace").splitlines():
+                part = part.strip()
+                if part:
+                    await log(part)
         await inst.wait()
 
         if inst.returncode == 0:
