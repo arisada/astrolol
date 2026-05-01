@@ -35,15 +35,35 @@ Source: https://github.com/arisada/astrolol
 - Node.js 18+ (for the web UI)
 - Linux (Raspberry Pi, mini-PC, or any machine at the scope)
 
+**Optional: Install astroberry (rpi only)**
+
+```bash
+curl -fsSL https://astroberry.io/debian/astroberry.asc | sudo gpg --dearmor -o /etc/apt/keyrings/astroberry.gpg
+curl -fsSL https://astroberry.io/debian/astroberry.sources | sudo tee /etc/apt/sources.list.d/astroberry.sources
+sudo apt-get update
+```
+
 **INDI drivers** (required for real hardware and integration tests):
 ```bash
 sudo apt-get install indi-bin
 ```
 
-**Optional: ASTAP plate solver**
+**Nodejs and npm**
+```bash
+sudo apt-get install -y nodejs npm
+```
+
+
+**Optional: All indi drivers**
 
 ```bash
-sudo apt-get install astap-cli
+sudo apt-get install indi-full
+```
+
+**Optional: ASTAP plate solver, gsc**
+
+```bash
+sudo apt-get install astap-cli gsc
 ```
 
 **Optional: PHD2 guiding**
@@ -55,7 +75,7 @@ astrolol can connect to local or remote PHD2 instances.
 ```bash
 git clone https://github.com/arisada/astrolol
 cd astrolol
-pip install -e ".[dev]"   # [dev] includes pytest, pytest-asyncio, httpx, etc.
+pip install -e ".[dev]" --break-system-packages
 cd ui && npm install
 ```
 
