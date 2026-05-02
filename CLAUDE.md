@@ -212,7 +212,7 @@ the console renderer.
 - Structlog output is captured by pytest's log system, not `capsys`. Use
   `caplog.at_level(logging.WARNING, logger="<module>")` to assert on log output.
 
-Current count: **191 unit tests**, **34 integration tests** (all passing).
+Current count: **263 unit tests**, **34 integration tests** (all passing).
 
 ## Key conventions
 
