@@ -163,7 +163,7 @@ class EventBusForwarder:
     def __call__(self, logger_inst: Any, method: str, event_dict: dict) -> dict:
         if (
             self._bus is not None
-            and method in ("info", "warning", "error", "critical")
+            and method in ("info", "warning", "error", "critical", "debug")
             and event_dict.get("logger") not in _SKIP_LOGGERS
         ):
             try:

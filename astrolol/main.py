@@ -13,6 +13,7 @@ from astrolol.config.logging_setup import setup_logging, event_bus_forwarder
 # Configure logging as early as possible so every module sees the right setup
 setup_logging(_boot_settings.log_file)
 from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
+from pydantic import BaseModel
 from fastapi.exception_handlers import http_exception_handler as _default_http_exc_handler
 from fastapi.exceptions import HTTPException
 from fastapi.responses import JSONResponse
@@ -32,7 +33,7 @@ from astrolol.equipment.store import EquipmentStore
 from astrolol.profiles.store import ProfileStore
 from astrolol.app import build_plugin_manager, build_registry, discover_plugins, setup_plugins
 from astrolol.core.events import EventBus
-from astrolol.core.plugin_api import PluginContext
+from astrolol.core.plugin_api import LogScope, PluginContext
 from astrolol.devices.manager import DeviceManager
 from astrolol.filter_wheel import FilterWheelManager
 from astrolol.focuser import FocuserManager
@@ -40,6 +41,15 @@ from astrolol.imaging import ImagerManager
 from astrolol.mount import MountManager
 
 logger = structlog.get_logger()
+
+# Core module log scopes (always present regardless of enabled plugins)
+_CORE_SCOPES: list[LogScope] = [
+    LogScope(key="indi",    label="INDI",    logger="astrolol.devices.indi"),
+    LogScope(key="device",  label="Devices", logger="astrolol.devices"),
+    LogScope(key="mount",   label="Mount",   logger="astrolol.mount"),
+    LogScope(key="imager",  label="Imaging", logger="astrolol.imaging"),
+    LogScope(key="focuser", label="Focuser", logger="astrolol.focuser"),
+]
 
 
 def create_app() -> FastAPI:
@@ -146,6 +156,15 @@ def create_app() -> FastAPI:
     app.state.discovered_plugins = discovered_plugins
     app.state.enabled_plugin_ids = set(user_settings.enabled_plugins)
 
+    # Collect log scopes: core always present, plus scopes declared by enabled plugins
+    plugin_scopes = [
+        scope
+        for plugin_id in user_settings.enabled_plugins
+        if (plugin := discovered_plugins.get(plugin_id)) is not None
+        for scope in plugin.manifest.log_scopes
+    ]
+    app.state.log_scopes = _CORE_SCOPES + plugin_scopes
+
     app.include_router(devices_router)
     app.include_router(properties_router)
     app.include_router(profiles_router)
@@ -209,6 +228,37 @@ def create_app() -> FastAPI:
             raise HTTPException(status_code=404, detail="INDI is not configured in managed mode")
         await manager.stop_server()
         return {"status": "stopped"}
+
+    class _LogLevelRequest(BaseModel):
+        key: str
+        level: str  # "debug" | "info"
+
+    @app.get("/admin/log_scopes")
+    async def admin_log_scopes(request: Request) -> list[dict]:
+        """Return all registered log scopes with their current verbosity level."""
+        import logging as _logging
+        result = []
+        for scope in request.app.state.log_scopes:
+            effective = _logging.getLogger(scope.logger).getEffectiveLevel()
+            result.append({
+                "key": scope.key,
+                "label": scope.label,
+                "logger": scope.logger,
+                "level": "debug" if effective <= _logging.DEBUG else "info",
+            })
+        return result
+
+    @app.post("/admin/log_level", status_code=204)
+    async def admin_log_level(body: _LogLevelRequest, request: Request) -> None:
+        """Set the verbosity level for a registered log scope."""
+        import logging as _logging
+        scopes: list[LogScope] = request.app.state.log_scopes
+        scope = next((s for s in scopes if s.key == body.key), None)
+        if scope is None:
+            raise HTTPException(status_code=404, detail=f"Unknown log scope: {body.key!r}")
+        new_level = _logging.DEBUG if body.level == "debug" else _logging.INFO
+        _logging.getLogger(scope.logger).setLevel(new_level)
+        logger.info("admin.log_level_changed", scope=body.key, level=body.level)
 
     @app.get("/plugins")
     async def list_plugins(request: Request) -> list[dict]:

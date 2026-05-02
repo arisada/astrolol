@@ -16,6 +16,14 @@ T = TypeVar("T", bound=BaseModel)
 
 
 @dataclass
+class LogScope:
+    """A named logging scope that can have its verbosity toggled at runtime."""
+    key: str      # stable ID matching the component label (e.g. "phd2", "imager")
+    label: str    # human-readable name shown in the UI (e.g. "PHD2 Guiding")
+    logger: str   # stdlib logger hierarchy root (e.g. "plugins.phd2")
+
+
+@dataclass
 class PluginManifest:
     """Metadata declared by every plugin.  Consumed by the loader and the /plugins API."""
     id: str                              # stable machine identifier, e.g. "imaging"
@@ -24,6 +32,7 @@ class PluginManifest:
     description: str = ""
     requires: list[str] = field(default_factory=list)  # IDs of plugins this one depends on
     nav_order: int = 0                   # sidebar sort key — lower = higher in the list
+    log_scopes: list[LogScope] = field(default_factory=list)  # verbosity scopes for this plugin
 
 
 @dataclass
