@@ -29,6 +29,7 @@ from astrolol.api.mount import router as mount_router
 from astrolol.api.profiles import router as profiles_router
 from astrolol.api.properties import router as properties_router
 from astrolol.api.settings import router as settings_router
+from astrolol.equipment.models import SiteItem
 from astrolol.equipment.store import EquipmentStore
 from astrolol.profiles.store import ProfileStore
 from astrolol.app import build_plugin_manager, build_registry, discover_plugins, setup_plugins
@@ -77,12 +78,17 @@ def create_app() -> FastAPI:
                 profile = store.get(last_id)
                 app.state.active_profile = profile
                 app.state.imager_manager.set_context(profile)
+                site = next(
+                    (equipment_store.get(n.item_id) for n in profile.roots
+                     if isinstance(equipment_store.get(n.item_id), SiteItem)),
+                    None,
+                )
                 for pd in profile.devices:
                     try:
                         await app.state.device_manager.connect(pd.config)
                         if pd.config.kind == "mount":
                             await app.state.mount_manager.push_site_data(
-                                pd.config.device_id, profile.location
+                                pd.config.device_id, site
                             )
                             app.state.mount_manager.start_automation(pd.config.device_id)
                     except Exception as exc:
@@ -149,6 +155,7 @@ def create_app() -> FastAPI:
         device_manager=device_manager,
         device_registry=registry,
         profile_store=profile_store,
+        equipment_store=equipment_store,
     )
     discovered_plugins = discover_plugins()
     setup_plugins(app, plugin_ctx, discovered_plugins, user_settings.enabled_plugins)
@@ -273,6 +280,7 @@ def create_app() -> FastAPI:
                 "description": p.manifest.description,
                 "enabled": p.manifest.id in enabled,
                 "nav_order": p.manifest.nav_order,
+                "nav_before": p.manifest.nav_before,
             }
             for p in discovered.values()
         ]

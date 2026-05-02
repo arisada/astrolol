@@ -18,8 +18,8 @@ from astropy.coordinates import SkyCoord
 from astrolol.devices.base.models import TrackingMode
 from astrolol.devices.config import DeviceConfig
 from astrolol.devices.manager import DeviceManager
+from astrolol.equipment.models import SiteItem
 from astrolol.mount.manager import MountManager
-from astrolol.profiles.models import ObserverLocation
 from tests.conftest import FakeMount
 
 
@@ -454,7 +454,7 @@ async def test_push_site_data_sets_location_and_time(
     await manager.connect(DeviceConfig(device_id="m1", kind="mount", adapter_key="site_mount"))
     mm = MountManager(device_manager=manager, event_bus=event_bus)
 
-    loc = ObserverLocation(name="Paris", latitude=48.85, longitude=2.35, altitude=35.0)
+    loc = SiteItem(name="Paris", latitude=48.85, longitude=2.35, altitude=35.0)
     await mm.push_site_data("m1", loc)
 
     fake: _SiteAwareMount = manager._devices["m1"].instance  # type: ignore[assignment]
@@ -489,7 +489,7 @@ async def test_push_site_data_tolerates_driver_failure(
     await manager.connect(DeviceConfig(device_id="m1", kind="mount", adapter_key="failing_site_mount"))
     mm = MountManager(device_manager=manager, event_bus=event_bus)
 
-    loc = ObserverLocation(latitude=48.85, longitude=2.35, altitude=35.0)
+    loc = SiteItem(name="Test Site", latitude=48.85, longitude=2.35, altitude=35.0)
     # Must not raise even though the mount raises on both calls
     await mm.push_site_data("m1", loc)
 
@@ -503,5 +503,5 @@ async def test_push_site_data_skips_mount_without_site_methods(
     await manager.connect(DeviceConfig(device_id="m1", kind="mount", adapter_key="fake_mount"))
     mm = MountManager(device_manager=manager, event_bus=event_bus)
 
-    loc = ObserverLocation(latitude=48.85, longitude=2.35, altitude=35.0)
+    loc = SiteItem(name="Test Site", latitude=48.85, longitude=2.35, altitude=35.0)
     await mm.push_site_data("m1", loc)  # no-op, no exception

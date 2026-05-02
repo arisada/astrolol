@@ -254,6 +254,7 @@ export interface PluginInfo {
   description: string
   enabled: boolean
   nav_order: number
+  nav_before: string | null
 }
 
 export interface LogScopeEntry {
@@ -365,13 +366,6 @@ export type EquipmentItem =
 
 // --- Equipment profiles ---
 
-export interface ObserverLocation {
-  name: string
-  latitude: number
-  longitude: number
-  altitude: number
-}
-
 export interface Telescope {
   name: string
   focal_length: number
@@ -394,7 +388,6 @@ export interface ProfileNode {
 export interface Profile {
   id: string
   name: string
-  location?: ObserverLocation
   telescope?: Telescope
   devices: ProfileDevice[]
   roots: ProfileNode[]

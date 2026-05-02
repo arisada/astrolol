@@ -24,7 +24,7 @@ from astropy.coordinates import SkyCoord
 
 from astrolol.devices.base.models import MountStatus, Target, TrackingMode
 from astrolol.devices.manager import DeviceManager
-from astrolol.profiles.models import ObserverLocation
+from astrolol.equipment.models import SiteItem
 from astrolol.profiles.store import ProfileStore
 
 logger = structlog.get_logger()
@@ -240,7 +240,7 @@ class MountManager:
     async def push_site_data(
         self,
         device_id: str,
-        location: ObserverLocation | None = None,
+        location: SiteItem | None = None,
     ) -> None:
         """Push UTC time (always) and geographic location (when available) to the mount.
 

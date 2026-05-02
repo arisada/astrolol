@@ -9,13 +9,6 @@ from astrolol.devices.config import DeviceConfig
 from astrolol.equipment.models import ProfileNode
 
 
-class ObserverLocation(BaseModel):
-    name: str = ""
-    latitude: float = Field(description="Degrees, positive = North")
-    longitude: float = Field(description="Degrees, positive = East")
-    altitude: float = Field(default=0.0, description="Metres above sea level")
-
-
 class Telescope(BaseModel):
     name: str
     focal_length: float = Field(description="Focal length in mm")
@@ -30,7 +23,6 @@ class ProfileDevice(BaseModel):
 class Profile(BaseModel):
     id: str = Field(default_factory=lambda: str(uuid4()))
     name: str
-    location: ObserverLocation | None = None
     telescope: Telescope | None = None
     devices: list[ProfileDevice] = []
     roots: list[ProfileNode] = Field(

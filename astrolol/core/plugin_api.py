@@ -32,6 +32,7 @@ class PluginManifest:
     description: str = ""
     requires: list[str] = field(default_factory=list)  # IDs of plugins this one depends on
     nav_order: int = 0                   # sidebar sort key — lower = higher in the list
+    nav_before: str | None = None        # insert before a named core page ("mount", "imaging", "logs")
     log_scopes: list[LogScope] = field(default_factory=list)  # verbosity scopes for this plugin
 
 
@@ -45,7 +46,8 @@ class PluginContext:
     event_bus: Any         # astrolol.core.events.bus.EventBus
     device_manager: Any    # astrolol.devices.manager.DeviceManager
     device_registry: Any   # astrolol.devices.registry.DeviceRegistry
-    profile_store: Any = None  # astrolol.profiles.store.ProfileStore
+    profile_store: Any = None     # astrolol.profiles.store.ProfileStore
+    equipment_store: Any = None   # astrolol.equipment.store.EquipmentStore
 
     def get_plugin_settings(self, plugin_id: str, model: type[T]) -> T:
         """Return plugin settings parsed into *model*, falling back to defaults."""

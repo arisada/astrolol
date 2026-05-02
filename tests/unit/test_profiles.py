@@ -8,7 +8,7 @@ from astrolol.api.profiles import _apply_tree_context, _push_live_context, _find
 from astrolol.equipment.models import CameraItem, MountItem, OTAItem, SiteItem
 from astrolol.equipment.store import EquipmentStore
 from astrolol.main import create_app
-from astrolol.profiles.models import Profile, ObserverLocation, ProfileNode, Telescope
+from astrolol.profiles.models import Profile, ProfileNode, Telescope
 from astrolol.profiles.store import ProfileStore
 from tests.conftest import FakeCamera, FakeMount, FakeFocuser
 
