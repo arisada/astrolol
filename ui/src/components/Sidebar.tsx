@@ -10,15 +10,23 @@ export function Sidebar() {
   const enabledPlugins = useStore((s) => s.pluginInfos.filter((p) => p.enabled))
   const cameras     = useStore((s) => s.connectedDevices.filter((d) => d.kind === 'camera' && d.state === 'connected'))
 
-  const pluginNavItems = enabledPlugins
-    .slice()
-    .sort((a, b) => a.nav_order - b.nav_order)
-    .map((p) => {
-      const entry = getPluginEntry(p.id)
-      if (!entry) return null
-      return { to: entry.to, icon: entry.icon, label: entry.label }
-    })
-    .filter(Boolean) as { to: string; icon: typeof Cpu; label: string; badge?: boolean }[]
+  const sortedPlugins = enabledPlugins.slice().sort((a, b) => a.nav_order - b.nav_order)
+
+  function toNavItem(p: typeof sortedPlugins[number]) {
+    const entry = getPluginEntry(p.id)
+    if (!entry) return null
+    return { to: entry.to, icon: entry.icon, label: entry.label }
+  }
+
+  type NavItem = { to: string; icon: typeof Cpu; label: string; badge?: boolean }
+
+  const pluginsBeforeMount = sortedPlugins
+    .filter((p) => p.nav_before === 'mount')
+    .map(toNavItem).filter(Boolean) as NavItem[]
+
+  const pluginNavItems = sortedPlugins
+    .filter((p) => !p.nav_before)
+    .map(toNavItem).filter(Boolean) as NavItem[]
 
   // One sidebar entry per connected camera; fall back to a static entry when none
   const cameraNavItems: { to: string; icon: typeof Camera; label: string; badge?: boolean }[] =
@@ -33,6 +41,7 @@ export function Sidebar() {
   const navItems = [
     { to: '/equipment', icon: Cpu,        label: 'Equipment' },
     { to: '/profiles',  icon: BookOpen,   label: 'Profiles'  },
+    ...pluginsBeforeMount,
     ...(hasMounts ? [{ to: '/mount', icon: Telescope, label: 'Mount' }] : []),
     ...cameraNavItems,
     ...pluginNavItems,

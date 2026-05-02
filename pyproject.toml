@@ -18,6 +18,7 @@ dependencies = [
     "numpy>=1.26",
     "Pillow>=10.0",
     "photutils>=1.12",
+    "astroplan>=0.10",
     "indipyclient @ {root:uri}/vendor/indipyclient",
 ]
 
