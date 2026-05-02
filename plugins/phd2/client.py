@@ -52,6 +52,7 @@ class Phd2Client:
         self._connected = False
         self._pixel_scale: float | None = None
         self._star_snr: float | None = None
+        self._pixel_scale_fetched = False  # True once we've gotten a reliable scale
 
         # Rolling RMS window (raw guide-camera pixels)
         self._ra_steps: deque[float] = deque(maxlen=_RMS_WINDOW)
@@ -208,9 +209,13 @@ class Phd2Client:
                 logger.info("phd2.connected", host=self._host, port=self._port)
                 await self._event_bus.publish(Phd2Connected())
 
-                # Fetch pixel scale and current app state
+                # Fetch pixel scale and current app state.
+                # PHD2 returns 1.0 when the scale is not yet configured/calibrated,
+                # so we only treat it as reliable if > 1.0 at connect time.
                 try:
-                    self._pixel_scale = float(await self._call("get_pixel_scale"))
+                    scale = float(await self._call("get_pixel_scale"))
+                    self._pixel_scale = scale
+                    self._pixel_scale_fetched = scale > 1.0
                 except Exception:
                     pass
                 try:
@@ -231,11 +236,23 @@ class Phd2Client:
             if not self._stop:
                 await asyncio.sleep(_RECONNECT_DELAY)
 
+    async def _refresh_pixel_scale(self) -> None:
+        """Re-fetch pixel scale from PHD2 and update the stored value."""
+        try:
+            scale = float(await self._call("get_pixel_scale"))
+            if scale > 0.0:
+                self._pixel_scale = scale
+                self._pixel_scale_fetched = True
+                logger.info("phd2.pixel_scale_updated", pixel_scale=scale)
+        except Exception:
+            pass
+
     def _on_disconnect(self) -> None:
         was_connected = self._connected
         self._connected = False
         self._writer = None
         self._state = "Disconnected"
+        self._pixel_scale_fetched = False
 
         for fut in self._pending.values():
             if not fut.done():
@@ -303,6 +320,13 @@ class Phd2Client:
                 self._state = "Guiding"
                 await self._event_bus.publish(Phd2StateChanged(state=self._state))
 
+            # If we still don't have a reliable pixel scale (e.g. PHD2 was already
+            # guiding when we connected and CalibrationComplete never fired), try
+            # once to fetch it now.  The flag prevents a retry on every frame.
+            if not self._pixel_scale_fetched:
+                asyncio.create_task(self._refresh_pixel_scale())
+                self._pixel_scale_fetched = True  # don't retry until next connect
+
             scale = self._pixel_scale or 1.0
             await self._event_bus.publish(
                 Phd2GuideStep(
@@ -354,6 +378,9 @@ class Phd2Client:
 
         elif event_name == "CalibrationComplete":
             self._state = "Guiding"
+            # Calibration just finished — this is the definitive moment PHD2
+            # has a reliable pixel scale, so always re-fetch it.
+            await self._refresh_pixel_scale()
             await self._event_bus.publish(Phd2StateChanged(state=self._state))
 
         elif event_name == "CalibrationFailed":
