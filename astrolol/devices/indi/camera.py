@@ -16,6 +16,7 @@ import asyncio
 import re
 from pathlib import Path
 
+import astropy.io.fits as astropy_fits
 import structlog
 
 from astrolol.config.settings import settings
@@ -115,6 +116,26 @@ class IndiCamera:
                 error=str(exc),
             )
 
+        # Reset CCD_FRAME to full sensor dimensions before every exposure.
+        # The ZWO ASI SDK applies internal alignment when binning changes and can
+        # silently reduce the frame width (e.g. 5496 → 5472). Explicitly restoring
+        # the full frame prevents that drift from accumulating in ~/.indi/ and
+        # producing images with inconsistent X dimensions across sessions.
+        try:
+            max_x = await self._client.get_number(self._device_name, "CCD_INFO", "CCD_MAX_X")
+            max_y = await self._client.get_number(self._device_name, "CCD_INFO", "CCD_MAX_Y")
+            await self._client.set_number(
+                self._device_name,
+                "CCD_FRAME",
+                {"X": 0.0, "Y": 0.0, "WIDTH": float(max_x), "HEIGHT": float(max_y)},
+            )
+        except Exception as exc:
+            logger.debug(
+                "indi.camera_frame_reset_skipped",
+                device=self._device_name,
+                error=str(exc),
+            )
+
         # Set gain if supported (best-effort)
         if params.gain is not None:
             try:
@@ -165,8 +186,12 @@ class IndiCamera:
                     f.write(blob.data)
             await asyncio.to_thread(_save)
 
-        # Read dimensions from CCD_INFO (best-effort)
-        width, height = await self._read_dimensions()
+        # Read actual dimensions from the FITS header — these reflect what the
+        # driver truly captured, not the theoretical sensor maximum.
+        try:
+            width, height = await asyncio.to_thread(self._dims_from_fits, fits_path)
+        except Exception:
+            width, height = 0, 0
 
         self._state = DeviceState.CONNECTED
         logger.info(
@@ -308,13 +333,11 @@ class IndiCamera:
     # Internal helpers
     # ------------------------------------------------------------------
 
-    async def _read_dimensions(self) -> tuple[int, int]:
-        try:
-            w = await self._client.get_number(self._device_name, "CCD_INFO", "CCD_MAX_X")
-            h = await self._client.get_number(self._device_name, "CCD_INFO", "CCD_MAX_Y")
-            return int(w), int(h)
-        except Exception:
-            return 0, 0
+    @staticmethod
+    def _dims_from_fits(fits_path: Path) -> tuple[int, int]:
+        with astropy_fits.open(str(fits_path)) as hdul:
+            hdr = hdul[0].header
+            return int(hdr["NAXIS1"]), int(hdr["NAXIS2"])
 
     async def get_pixel_size_um(self) -> float | None:
         """Return the physical pixel size in µm from CCD_INFO, or None if unavailable."""
