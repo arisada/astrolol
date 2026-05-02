@@ -197,6 +197,34 @@ Event names follow the `<plugin>.<verb>_<noun>` convention (matches WebSocket ev
 `exc_info=True` on errors ensures the full traceback lands in `astrolol.log` without cluttering
 the console renderer.
 
+### Log scopes (per-plugin verbosity control)
+
+Declare `log_scopes` in the plugin's `PluginManifest` so users can toggle debug verbosity per
+component from the Logs page gear menu at runtime:
+
+```python
+from astrolol.core.plugin_api import LogScope, PluginManifest
+
+manifest = PluginManifest(
+    id="my_feature",
+    name="My Feature",
+    ...
+    log_scopes=[
+        LogScope(key="my_feature", label="My Feature", logger="plugins.my_feature"),
+    ],
+)
+```
+
+- `key` — unique identifier, used by the UI toggle and the `POST /admin/log_level` endpoint.
+- `label` — human-readable name shown in the Verbosity panel.
+- `logger` — stdlib logger name whose level is toggled. Follows Python's logger hierarchy:
+  setting `plugins.my_feature` to `DEBUG` covers `plugins.my_feature.client`,
+  `plugins.my_feature.engine`, etc.
+
+The core always registers scopes for `indi`, `device`, `mount`, `imager`, and `focuser`.
+Plugin scopes are collected at startup and exposed via `GET /admin/log_scopes`;
+`POST /admin/log_level` changes the live level without a restart.
+
 ## Testing requirements
 
 **Every new feature that can be tested must have tests. No exceptions.**
