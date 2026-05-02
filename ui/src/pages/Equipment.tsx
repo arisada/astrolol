@@ -83,14 +83,13 @@ function StepBack({ onClick }: { onClick: () => void }) {
   )
 }
 
-// Step 1 — choose device type (only manually-connectable kinds)
+// Step 1 — choose device type
 function TypeStep({ onSelect }: { onSelect: (kind: DeviceKind) => void }) {
-  const kinds: DeviceKind[] = ['camera', 'mount', 'focuser']
-  // filter_wheel, rotator, indi are auto-discovered as companions
+  const kinds: DeviceKind[] = ['camera', 'mount', 'focuser', 'filter_wheel']
   return (
     <div>
       <p className="text-xs text-slate-500 mb-4">What do you want to connect?</p>
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 gap-3">
         {kinds.map((kind) => (
           <button
             key={kind}

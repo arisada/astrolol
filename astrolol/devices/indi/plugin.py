@@ -288,12 +288,24 @@ def _make_filter_wheel_class(manager: IndiConnectionManager):
         _manager = manager
 
         def __init__(self, device_name: str, executable: str = "",
-                     pre_connect_props: dict | None = None, **_kwargs):
+                     pre_connect_props: dict | None = None,
+                     device_port: str = "", device_baud_rate: str = "", **_kwargs):
+            props = dict(pre_connect_props or {})
+            if device_port and "DEVICE_PORT" not in props:
+                props["DEVICE_PORT"] = {"values": {"PORT": device_port}}
+            if device_baud_rate and "DEVICE_BAUD_RATE" not in props:
+                props["DEVICE_BAUD_RATE"] = {"on_elements": [device_baud_rate]}
             super().__init__(device_name=device_name, client=manager.client,
-                             pre_connect_props=pre_connect_props or None)
+                             pre_connect_props=props or None)
             self._executable = executable
 
         async def connect(self) -> None:
+            if self._manager._server.manage and not self._executable:
+                raise ValueError(
+                    "INDI driver executable is required when astrolol manages indiserver. "
+                    "Select a driver from the catalog or enter an executable name "
+                    "(e.g. indi_efw)."
+                )
             await self._manager.acquire()
             if self._executable:
                 await self._manager.load_driver(self._executable)
