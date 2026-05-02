@@ -256,6 +256,13 @@ export interface PluginInfo {
   nav_order: number
 }
 
+export interface LogScopeEntry {
+  key: string
+  label: string
+  logger: string
+  level: 'debug' | 'info'
+}
+
 export interface CameraStatus {
   state: DeviceState
   temperature: number | null

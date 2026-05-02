@@ -17,6 +17,7 @@ import type {
   ImagerStatus,
   IndiDeviceMessage,
   LoadDriverResponse,
+  LogScopeEntry,
   MountStatus,
   MountTarget,
   PluginInfo,
@@ -194,6 +195,9 @@ export const api = {
   admin: {
     restart: () => request<{ status: string }>('/admin/restart', { method: 'POST' }),
     indiStop: () => request<{ status: string }>('/admin/indi/stop', { method: 'POST' }),
+    logScopes: () => request<LogScopeEntry[]>('/admin/log_scopes'),
+    setLogLevel: (key: string, level: 'debug' | 'info') =>
+      request<void>('/admin/log_level', { method: 'POST', body: JSON.stringify({ key, level }) }),
   },
 
   plugins: {
