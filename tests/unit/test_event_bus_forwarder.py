@@ -79,7 +79,9 @@ async def test_forwards_warning_and_error():
 
 
 @pytest.mark.asyncio
-async def test_does_not_forward_debug():
+async def test_forwards_debug():
+    # Debug messages are forwarded so they appear in the live UI log panel
+    # when a scope has been set to debug verbosity.
     fwd = EventBusForwarder()
     published: list = []
 
@@ -91,11 +93,13 @@ async def test_does_not_forward_debug():
     fwd.set_bus(bus)
 
     async def _run():
-        fwd(None, "debug", _make_event_dict(level="debug", message="noisy debug"))
+        fwd(None, "debug", _make_event_dict(level="debug", message="verbose debug"))
         await asyncio.sleep(0)
 
     await _run()
-    assert published == []
+    assert len(published) == 1
+    assert published[0].level == "debug"
+    assert published[0].message == "verbose debug"
 
 
 @pytest.mark.asyncio
