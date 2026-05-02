@@ -6,7 +6,7 @@ from pathlib import Path
 import structlog
 from fastapi import FastAPI
 
-from astrolol.core.plugin_api import PluginContext, PluginManifest
+from astrolol.core.plugin_api import LogScope, PluginContext, PluginManifest
 from plugins.sequencer.api import router
 from plugins.sequencer.runner import SequenceRunner
 from plugins.sequencer.settings import SequencerSettings
@@ -24,6 +24,7 @@ class SequencerPlugin:
             "slew, plate solve, guiding, dithering, and meridian flip handling."
         ),
         requires=["platesolve", "phd2"],
+        log_scopes=[LogScope(key="sequencer", label="Sequencer", logger="plugins.sequencer")],
     )
 
     def __init__(self) -> None:

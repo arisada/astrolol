@@ -4,7 +4,7 @@ from __future__ import annotations
 import structlog
 from fastapi import FastAPI
 
-from astrolol.core.plugin_api import PluginContext, PluginManifest
+from astrolol.core.plugin_api import LogScope, PluginContext, PluginManifest
 from plugins.stellarium.api import router
 from plugins.stellarium.server import StellariumServer
 from plugins.stellarium.settings import StellariumSettings
@@ -23,6 +23,7 @@ class StellariumPlugin:
             "it at this host and port. The mount's position is pushed live "
             "and GoTo commands from Stellarium slew the mount."
         ),
+        log_scopes=[LogScope(key="stellarium", label="Stellarium Server", logger="plugins.stellarium")],
     )
 
     def __init__(self) -> None:

@@ -4,7 +4,7 @@ from __future__ import annotations
 import structlog
 from fastapi import FastAPI
 
-from astrolol.core.plugin_api import PluginContext, PluginManifest
+from astrolol.core.plugin_api import LogScope, PluginContext, PluginManifest
 from plugins.platesolve.api import router
 from plugins.platesolve.settings import PlatesolveSettings
 from plugins.platesolve.solver import SolveManager
@@ -23,6 +23,7 @@ class PlatesolvePlugin:
             "Supports concurrent solves and cancellation."
         ),
         nav_order=20,
+        log_scopes=[LogScope(key="platesolve", label="Plate Solving", logger="plugins.platesolve")],
     )
 
     def __init__(self) -> None:

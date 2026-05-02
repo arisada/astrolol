@@ -6,7 +6,7 @@ from pathlib import Path
 import structlog
 from fastapi import FastAPI
 
-from astrolol.core.plugin_api import PluginContext, PluginManifest
+from astrolol.core.plugin_api import LogScope, PluginContext, PluginManifest
 
 from plugins.object_resolver.api import router
 from plugins.object_resolver.catalog import ObjectCatalog
@@ -26,6 +26,7 @@ class ObjectResolverPlugin:
             "Powered by the OpenNGC catalog and Astropy (planets/Moon/Sun). "
             "Optional online Simbad fallback for unrecognised names."
         ),
+        log_scopes=[LogScope(key="object_resolver", label="Object Resolver", logger="plugins.object_resolver")],
     )
 
     def __init__(self) -> None:

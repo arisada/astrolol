@@ -4,7 +4,7 @@ from __future__ import annotations
 import structlog
 from fastapi import FastAPI
 
-from astrolol.core.plugin_api import PluginContext, PluginManifest
+from astrolol.core.plugin_api import LogScope, PluginContext, PluginManifest
 from plugins.lx200.api import router
 from plugins.lx200.server import Lx200Server
 from plugins.lx200.settings import Lx200Settings
@@ -23,6 +23,7 @@ class Lx200Plugin:
             "planetarium app to display the mount position and issue "
             "GoTo / Sync commands."
         ),
+        log_scopes=[LogScope(key="lx200", label="LX200 Server", logger="plugins.lx200")],
     )
 
     def __init__(self) -> None:

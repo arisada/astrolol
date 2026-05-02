@@ -4,7 +4,7 @@ from __future__ import annotations
 import structlog
 from fastapi import FastAPI
 
-from astrolol.core.plugin_api import PluginContext, PluginManifest
+from astrolol.core.plugin_api import LogScope, PluginContext, PluginManifest
 
 logger = structlog.get_logger()
 
@@ -20,6 +20,7 @@ class AutofocusPlugin:
             "photutils, fits a parabola, and moves to the computed optimal focus position."
         ),
         nav_order=21,
+        log_scopes=[LogScope(key="autofocus", label="Autofocus", logger="plugins.autofocus")],
     )
 
     def __init__(self) -> None:

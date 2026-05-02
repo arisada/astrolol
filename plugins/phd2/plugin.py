@@ -4,7 +4,7 @@ from __future__ import annotations
 import structlog
 from fastapi import FastAPI
 
-from astrolol.core.plugin_api import PluginContext, PluginManifest
+from astrolol.core.plugin_api import LogScope, PluginContext, PluginManifest
 from plugins.phd2.api import router
 from plugins.phd2.client import Phd2Client
 from plugins.phd2.settings import Phd2Settings
@@ -22,6 +22,7 @@ class Phd2Plugin:
             "guide graph, and configurable automatic dithering between frames."
         ),
         nav_order=10,
+        log_scopes=[LogScope(key="phd2", label="PHD2 Guiding", logger="plugins.phd2")],
     )
 
     def __init__(self) -> None:
