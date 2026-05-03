@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Star } from 'lucide-react'
+import { MapPin, Star } from 'lucide-react'
 import { useStore } from '@/store'
 import type { EphemerisResult, FavoriteTarget, TargetSettings } from './api'
 import { getEphemeris, getSettings, putSettings, setMountTarget, slewMount } from './api'
@@ -10,6 +10,12 @@ import { FavoritesList } from './FavoritesList'
 export function TargetPage() {
   const connectedDevices = useStore((s) => s.connectedDevices)
   const mountIds = connectedDevices.filter((d) => d.kind === 'mount').map((d) => d.device_id)
+  const mountStatuses = useStore((s) => s.mountStatuses)
+
+  // First connected mount that has a known position
+  const activeMountEntry = mountIds
+    .map((id) => ({ id, status: mountStatuses[id] }))
+    .find((e) => e.status?.ra != null && e.status?.dec != null)
 
   const [selected, setSelected] = useState<ObjectMatch | null>(null)
   const [ephemeris, setEphemeris] = useState<EphemerisResult | null>(null)
@@ -20,6 +26,10 @@ export function TargetPage() {
 
   const [toast, setToast] = useState<{ msg: string; ok: boolean } | null>(null)
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const [showMountSave, setShowMountSave] = useState(false)
+  const [mountSaveName, setMountSaveName] = useState('')
+  const mountSaveInputRef = useRef<HTMLInputElement>(null)
 
   function showToast(msg: string, ok = true) {
     if (toastTimer.current) clearTimeout(toastTimer.current)
@@ -101,6 +111,44 @@ export function TargetPage() {
     showToast(`${selected.name} added to favourites`)
   }
 
+  function openMountSaveForm() {
+    if (!activeMountEntry) return
+    const { ra, dec } = activeMountEntry.status
+    const raDeg = (ra! * 15).toFixed(2)
+    const decStr = dec! >= 0 ? `+${dec!.toFixed(2)}` : dec!.toFixed(2)
+    setMountSaveName(`${raDeg}° ${decStr}°`)
+    setShowMountSave(true)
+    setTimeout(() => mountSaveInputRef.current?.focus(), 50)
+  }
+
+  function handleSaveMountPosition() {
+    if (!activeMountEntry || !mountSaveName.trim()) return
+    const { ra, dec } = activeMountEntry.status
+    const raDeg = ra! * 15  // decimal hours → ICRS degrees
+    const exists = settings.favorites.some(
+      (f) => Math.abs(f.ra - raDeg) < 0.0003 && Math.abs(f.dec - dec!) < 0.0003,
+    )
+    if (exists) {
+      showToast('Already in favourites')
+      setShowMountSave(false)
+      return
+    }
+    const newFav: FavoriteTarget = {
+      id: crypto.randomUUID(),
+      name: mountSaveName.trim(),
+      ra: raDeg,
+      dec: dec!,
+      object_name: '',
+      object_type: 'Mount Position',
+      notes: '',
+      added_at: new Date().toISOString(),
+    }
+    saveSettings({ ...settings, favorites: [...settings.favorites, newFav] })
+    showToast(`"${mountSaveName.trim()}" saved to favourites`)
+    setShowMountSave(false)
+    setMountSaveName('')
+  }
+
   function handleDeleteFavorite(id: string) {
     saveSettings({ ...settings, favorites: settings.favorites.filter((f) => f.id !== id) })
   }
@@ -162,7 +210,48 @@ export function TargetPage() {
                 <span className="ml-2 text-xs text-slate-600">({settings.favorites.length})</span>
               )}
             </h2>
+            {activeMountEntry && !showMountSave && (
+              <button
+                onClick={openMountSaveForm}
+                className="ml-auto flex items-center gap-1 text-xs text-slate-500 hover:text-indigo-400 transition-colors"
+                title="Save current mount position as a favourite"
+              >
+                <MapPin className="h-3.5 w-3.5" />
+                Save mount position
+              </button>
+            )}
           </div>
+
+          {showMountSave && (
+            <div className="mb-3 flex items-center gap-2">
+              <input
+                ref={mountSaveInputRef}
+                type="text"
+                value={mountSaveName}
+                onChange={(e) => setMountSaveName(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleSaveMountPosition()
+                  if (e.key === 'Escape') setShowMountSave(false)
+                }}
+                placeholder="Name this position…"
+                className="flex-1 text-sm bg-slate-800 border border-slate-600 rounded px-2.5 py-1.5 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+              />
+              <button
+                onClick={handleSaveMountPosition}
+                disabled={!mountSaveName.trim()}
+                className="text-xs px-3 py-1.5 rounded bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white transition-colors"
+              >
+                Save
+              </button>
+              <button
+                onClick={() => setShowMountSave(false)}
+                className="text-xs px-2 py-1.5 rounded text-slate-500 hover:text-slate-300 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          )}
+
           <FavoritesList
             favorites={settings.favorites}
             onRecall={handleRecallFavorite}

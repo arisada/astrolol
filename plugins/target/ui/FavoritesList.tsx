@@ -26,6 +26,7 @@ const TYPE_DOT: Record<string, string> = {
   'Reflection Nebula': 'bg-sky-400',
   'HII Region': 'bg-sky-400',
   Star: 'bg-yellow-400',
+  'Mount Position': 'bg-emerald-400',
 }
 
 function typeDot(type: string): string {
