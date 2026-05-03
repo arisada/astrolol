@@ -384,8 +384,6 @@ function ProfileForm({ initial, onSave, onCancel }: ProfileFormProps) {
       await onSave({
         id: initial?.id,
         name,
-        // Preserve legacy fields unchanged — they are managed through the equipment tree now
-        location: initial?.location,
         telescope: initial?.telescope,
         devices: initial?.devices ?? [],
         roots: initial?.roots ?? [],
