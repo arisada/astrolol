@@ -6,6 +6,7 @@ import { useStore } from '@/store'
 import { Button } from '@/components/ui/button'
 import { SidebarSection } from '@/components/ui/card'
 import { DurationStepper } from '@/components/ui/duration-stepper'
+import { Input } from '@/components/ui/input'
 import { StatusPill } from '@/components/ui/badge'
 import type { StatusPillVariant } from '@/components/ui/badge'
 import type {
@@ -391,10 +392,12 @@ export function AutofocusPage() {
             <div className="flex flex-col gap-1">
               <label className="text-xs text-slate-400">Step size</label>
               <div className="flex items-center gap-1">
-                <input
-                  type="number" min={1} value={settings.step_size}
+                <Input
+                  inputSize="sm"
+                  type="number" min={1}
+                  value={settings.step_size}
                   onChange={(e) => patchSettings('step_size', Math.max(1, parseInt(e.target.value, 10) || 1))}
-                  className="flex-1 bg-surface-overlay border border-surface-border rounded px-2 py-1 text-xs text-slate-200 font-mono focus:outline-none focus:ring-1 focus:ring-accent"
+                  className="flex-1"
                 />
                 <span className="text-xs text-slate-500">steps</span>
               </div>
@@ -443,11 +446,12 @@ export function AutofocusPage() {
 
             <div className="flex flex-col gap-1">
               <label className="text-xs text-slate-400">Gain <span className="text-slate-600">(optional)</span></label>
-              <input
-                type="number" min={0} placeholder="driver default"
+              <Input
+                inputSize="sm"
+                type="number" min={0}
+                placeholder="driver default"
                 value={settings.gain ?? ''}
                 onChange={(e) => patchSettings('gain', e.target.value ? parseInt(e.target.value, 10) : null)}
-                className="w-full bg-surface-overlay border border-surface-border rounded px-2 py-1 text-xs text-slate-200 font-mono placeholder-slate-600 focus:outline-none focus:ring-1 focus:ring-accent"
               />
             </div>
 

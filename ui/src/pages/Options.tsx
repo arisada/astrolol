@@ -3,6 +3,7 @@ import { api } from '@/api/client'
 import type { PluginInfo } from '@/api/types'
 import { useStore } from '@/store'
 import { ToggleSwitch } from '@/components/ui/toggle-switch'
+import { Input } from '@/components/ui/input'
 
 interface IndiSettings {
   manageServer: boolean
@@ -32,32 +33,6 @@ function Row({ label, hint, children }: { label: string; hint?: string; children
       </div>
       <div className="flex-shrink-0">{children}</div>
     </div>
-  )
-}
-
-function TextInput({
-  value,
-  onChange,
-  onBlur,
-  disabled,
-  className = '',
-}: {
-  value: string
-  onChange: (v: string) => void
-  onBlur?: () => void
-  disabled?: boolean
-  className?: string
-}) {
-  return (
-    <input
-      type="text"
-      value={value}
-      onChange={(e) => onChange(e.target.value)}
-      onBlur={onBlur}
-      disabled={disabled}
-      className={`bg-surface border border-surface-border rounded px-3 py-1.5 text-sm text-slate-200
-        focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-40 ${className}`}
-    />
   )
 }
 
@@ -249,21 +224,21 @@ export function Options() {
           <div className="flex flex-col gap-1">
             <label className="text-sm text-slate-200">Save directory</label>
             <p className="text-xs text-slate-500">Directory template for saved subs. Supports % tokens.</p>
-            <TextInput
+            <Input
+              inputSize="sm"
               value={saveDir}
-              onChange={setSaveDir}
+              onChange={(e) => setSaveDir(e.target.value)}
               onBlur={persistSaveSettings}
-              className="w-full font-mono text-xs"
             />
           </div>
           <div className="flex flex-col gap-1">
             <label className="text-sm text-slate-200">Filename template</label>
             <p className="text-xs text-slate-500">Without extension — <code className="text-slate-400">.fits</code> is appended automatically.</p>
-            <TextInput
+            <Input
+              inputSize="sm"
               value={saveFilename}
-              onChange={setSaveFilename}
+              onChange={(e) => setSaveFilename(e.target.value)}
               onBlur={persistSaveSettings}
-              className="w-full font-mono text-xs"
             />
           </div>
           <div className="text-xs text-slate-500 bg-surface-overlay border border-surface-border rounded p-2 font-mono break-all">
@@ -291,11 +266,12 @@ export function Options() {
           label="Run directory"
           hint="Directory for the INDI FIFO and state file (persisted)"
         >
-          <TextInput
+          <Input
+            inputSize="sm"
             value={indiRunDir}
-            onChange={setIndiRunDir}
+            onChange={(e) => setIndiRunDir(e.target.value)}
             onBlur={persistSaveSettings}
-            className="w-48 font-mono text-xs"
+            className="!w-48"
           />
         </Row>
         <Row
@@ -309,11 +285,12 @@ export function Options() {
             label="Upload directory"
             hint="Shared directory where the driver saves images"
           >
-            <TextInput
+            <Input
+              inputSize="sm"
               value={indiLocalUploadDir}
-              onChange={setIndiLocalUploadDir}
+              onChange={(e) => setIndiLocalUploadDir(e.target.value)}
               onBlur={persistSaveSettings}
-              className="w-48 font-mono text-xs"
+              className="!w-48"
             />
           </Row>
         )}
@@ -334,25 +311,26 @@ export function Options() {
                 label="INDI server host"
                 hint="Only used when automatic management is disabled"
               >
-                <TextInput
+                <Input
                   value={indi.host}
-                  onChange={(v) => setIndi((s) => ({ ...s, host: v }))}
+                  onChange={(e) => setIndi((s) => ({ ...s, host: e.target.value }))}
                   disabled={indi.manageServer}
-                  className="w-40"
+                  className="!w-40"
                 />
               </Row>
               <Row
                 label="INDI server port"
                 hint="Default: 7624"
               >
-                <TextInput
+                <Input
+                  type="number"
                   value={String(indi.port)}
-                  onChange={(v) => {
-                    const n = parseInt(v, 10)
+                  onChange={(e) => {
+                    const n = parseInt(e.target.value, 10)
                     if (!isNaN(n)) setIndi((s) => ({ ...s, port: n }))
                   }}
                   disabled={indi.manageServer}
-                  className="w-24"
+                  className="!w-24"
                 />
               </Row>
               <Row

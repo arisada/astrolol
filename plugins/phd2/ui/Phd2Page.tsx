@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Crosshair, Pause, Play, Settings, Square, Target, Wifi, WifiOff } from 'lucide-react'
 import { useStore } from '@/store'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { ToggleSwitch } from '@/components/ui/toggle-switch'
 import type { Phd2Settings } from '@/api/types'
 import * as phd2Api from './api'
@@ -352,8 +353,9 @@ export function Phd2Page() {
         <div className="border border-surface-border rounded-lg p-3 bg-surface-raised flex flex-col gap-3">
           <div className="flex items-center justify-between">
             <span className="text-xs text-slate-400">PHD2 host</span>
-            <input
-              className="rounded border border-surface-border bg-surface-overlay px-2 py-1 text-xs text-slate-200 font-mono w-36 focus:outline-none focus:ring-1 focus:ring-accent"
+            <Input
+              inputSize="sm"
+              className="!w-36"
               value={phd2Settings.host}
               onChange={(e) => setPhd2Settings((s) => ({ ...s, host: e.target.value }))}
               onBlur={savePhd2Settings}
@@ -361,9 +363,10 @@ export function Phd2Page() {
           </div>
           <div className="flex items-center justify-between">
             <span className="text-xs text-slate-400">PHD2 port</span>
-            <input
+            <Input
+              inputSize="sm"
               type="number"
-              className="rounded border border-surface-border bg-surface-overlay px-2 py-1 text-xs text-slate-200 font-mono w-20 focus:outline-none focus:ring-1 focus:ring-accent"
+              className="!w-20"
               value={phd2Settings.port}
               onChange={(e) => setPhd2Settings((s) => ({ ...s, port: parseInt(e.target.value) || 4400 }))}
               onBlur={savePhd2Settings}
