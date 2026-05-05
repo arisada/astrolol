@@ -3,6 +3,7 @@ import { AlertTriangle, Camera, ChevronDown, ChevronUp, Download, ScanSearch, Se
 import { api } from '@/api/client'
 import { useStore } from '@/store'
 import { Button } from '@/components/ui/button'
+import { SidebarSection } from '@/components/ui/card'
 import * as plateSolveApi from './api'
 import type { DbStatus, PlatesolveSettings, SolveJob, SolveResult, PlateSolvePluginState } from './api'
 
@@ -431,24 +432,6 @@ function ImageViewer({ image }: { image: { previewUrl: string; width: number; he
   )
 }
 
-// ── Sidebar section wrapper ────────────────────────────────────────────────────
-
-function Section({ title, children, action }: {
-  title: string
-  children: React.ReactNode
-  action?: React.ReactNode
-}) {
-  return (
-    <div className="border-b border-surface-border p-4">
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-xs font-medium text-slate-500 uppercase tracking-wider">{title}</h3>
-        {action}
-      </div>
-      {children}
-    </div>
-  )
-}
-
 // ── Main page ──────────────────────────────────────────────────────────────────
 
 export function PlatesolvePage() {
@@ -654,7 +637,7 @@ export function PlatesolvePage() {
         )}
 
         {/* Camera */}
-        <Section title="Camera">
+        <SidebarSection title="Camera">
           {cameras.length === 0 ? (
             <span className="text-xs text-slate-600">No camera connected</span>
           ) : cameras.length === 1 ? (
@@ -665,10 +648,10 @@ export function PlatesolvePage() {
               {cameras.map((d) => <option key={d.device_id} value={d.device_id}>{d.device_id}</option>)}
             </select>
           )}
-        </Section>
+        </SidebarSection>
 
         {/* Exposure */}
-        <Section title="Exposure">
+        <SidebarSection title="Exposure">
           <div className="flex flex-col gap-3">
             <DurationStepper value={duration} onChange={(v) => patchSettings({ exposure_duration: v })} />
 
@@ -688,10 +671,10 @@ export function PlatesolvePage() {
             </div>
 
           </div>
-        </Section>
+        </SidebarSection>
 
         {/* After solve */}
-        <Section title="After solve">
+        <SidebarSection title="After solve">
           <div className="flex flex-col gap-1.5">
             {(['nothing', 'sync', 'sync_slew'] as const).map((v) => {
               const labels: Record<AfterSolve, string> = {
@@ -712,7 +695,7 @@ export function PlatesolvePage() {
               <p className="text-xs text-yellow-600 mt-1">No mount connected</p>
             )}
           </div>
-        </Section>
+        </SidebarSection>
 
         {/* Action */}
         <div className="p-4 border-b border-surface-border flex flex-col gap-2">
@@ -740,9 +723,9 @@ export function PlatesolvePage() {
 
         {/* Job history */}
         {jobs.length > 0 && (
-          <Section title="Recent solves">
+          <SidebarSection title="Recent solves">
             {jobs.map((job) => <JobRow key={job.id} job={job} onCancel={handleCancel} />)}
-          </Section>
+          </SidebarSection>
         )}
 
       </aside>

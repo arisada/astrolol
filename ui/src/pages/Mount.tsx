@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { DmsInput } from '@/components/ui/dms-input'
 import { StateBadge } from '@/components/ui/badge'
 import { ToggleSwitch } from '@/components/ui/toggle-switch'
+import { Card } from '@/components/ui/card'
 import { DevicePropertiesPanel } from '@/components/DevicePropertiesPanel'
 
 // ---------------------------------------------------------------------------
@@ -99,15 +100,6 @@ const DEFAULT_MOUNT_SETTINGS: MountDeviceSettings = {
 // ---------------------------------------------------------------------------
 // Sub-components
 // ---------------------------------------------------------------------------
-
-function Section({ title, children }: { title: React.ReactNode; children: React.ReactNode }) {
-  return (
-    <div className="border border-surface-border rounded-lg p-4 flex flex-col gap-3">
-      <h3 className="text-xs font-medium text-slate-500 uppercase tracking-wider flex items-center">{title}</h3>
-      {children}
-    </div>
-  )
-}
 
 function FrameToggle({ jnow, onChange }: { jnow: boolean; onChange: (jnow: boolean) => void }) {
   const btn = (label: string, active: boolean, onClick: () => void) => (
@@ -266,10 +258,7 @@ function MountControls({ deviceId }: { deviceId: string }) {
         )}
 
         {/* Live position */}
-        <Section title={<div className="flex items-center w-full">
-          <span>Position</span>
-          <FrameToggle jnow={positionJnow} onChange={setPositionJnow} />
-        </div>}>
+        <Card title="Position" action={<FrameToggle jnow={positionJnow} onChange={setPositionJnow} />} className="p-4 flex flex-col gap-3">
           <div className="grid grid-cols-2 gap-x-8 gap-y-1 font-mono text-sm">
             <span className="text-slate-500 text-xs">RA</span>
             <span className="text-slate-500 text-xs">Dec</span>
@@ -288,13 +277,10 @@ function MountControls({ deviceId }: { deviceId: string }) {
             <span className="text-slate-300">{status?.pier_side ?? '—'}</span>
             <span />
           </div>
-        </Section>
+        </Card>
 
         {/* Target */}
-        <Section title={<div className="flex items-center w-full">
-          <span>Target</span>
-          <FrameToggle jnow={targetJnow} onChange={setTargetJnow} />
-        </div>}>
+        <Card title="Target" action={<FrameToggle jnow={targetJnow} onChange={setTargetJnow} />} className="p-4 flex flex-col gap-3">
           <div className="flex flex-col gap-2">
             <div className="flex items-center gap-2">
               <span className="text-xs text-slate-500 w-8 shrink-0">RA</span>
@@ -337,10 +323,10 @@ function MountControls({ deviceId }: { deviceId: string }) {
               </button>
             )}
           </div>
-        </Section>
+        </Card>
 
         {/* Tracking */}
-        <Section title="Tracking">
+        <Card title="Tracking" className="p-4 flex flex-col gap-3">
           <div className="flex items-center gap-3">
             <ToggleSwitch
               checked={isTracking}
@@ -366,10 +352,10 @@ function MountControls({ deviceId }: { deviceId: string }) {
             ? <p className="text-xs text-slate-500">Unpark the mount to enable tracking.</p>
             : <p className="text-xs text-slate-600">Lunar / Solar rates require firmware support.</p>
           }
-        </Section>
+        </Card>
 
         {/* Park */}
-        <Section title="Park">
+        <Card title="Park" className="p-4 flex flex-col gap-3">
           <div className="flex items-center gap-3 flex-wrap">
             <Button
               size="sm"
@@ -410,10 +396,10 @@ function MountControls({ deviceId }: { deviceId: string }) {
             />
             <span className="text-xs text-slate-600">local time</span>
           </label>
-        </Section>
+        </Card>
 
         {/* Meridian */}
-        <Section title="Meridian">
+        <Card title="Meridian" className="p-4 flex flex-col gap-3">
           {ha != null && (
             <p className="text-xs text-slate-500">{fmtMeridianDistance(ha)}</p>
           )}
@@ -456,10 +442,10 @@ function MountControls({ deviceId }: { deviceId: string }) {
                 focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-40 disabled:cursor-not-allowed"
             />
           </label>
-        </Section>
+        </Card>
 
         {/* Nudge */}
-        <Section title="Nudge">
+        <Card title="Nudge" className="p-4 flex flex-col gap-3">
           <div className="flex items-center gap-2">
             <span className="text-xs text-slate-500">Rate</span>
             <select
@@ -488,7 +474,7 @@ function MountControls({ deviceId }: { deviceId: string }) {
               <ArrowDown size={16} />
             </Button>
           </div>
-        </Section>
+        </Card>
 
         {error && <p className="text-xs text-status-error">{error}</p>}
       </div>

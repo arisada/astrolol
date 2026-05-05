@@ -8,6 +8,7 @@ import { useStore } from '@/store'
 import type { CameraStatus, DitherConfig, FilterWheelStatus, FrameType, ImageStats, ImagerDeviceSettings } from '@/api/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Card } from '@/components/ui/card'
 import { DevicePropertiesPanel } from '@/components/DevicePropertiesPanel'
 
 // ── localStorage persistence (focuser step only) ──────────────────────────────
@@ -67,22 +68,16 @@ function Panel({
   onSettings?: (id: string) => void
   children: React.ReactNode
 }) {
+  const action = deviceId && onSettings ? (
+    <button onClick={() => onSettings(deviceId)} title="INDI properties"
+      className="text-slate-600 hover:text-slate-400 transition-colors">
+      <Settings size={12} />
+    </button>
+  ) : null
   return (
-    <div className="mx-3 my-2.5 border border-surface-border rounded-lg p-3">
-      <div className="flex items-center justify-between mb-3">
-        <h3 className="text-xs font-medium text-slate-500 uppercase tracking-wider">{title}</h3>
-        {deviceId && onSettings && (
-          <button
-            onClick={() => onSettings(deviceId)}
-            title="INDI properties"
-            className="text-slate-600 hover:text-slate-400 transition-colors"
-          >
-            <Settings size={12} />
-          </button>
-        )}
-      </div>
+    <Card title={title} action={action} className="mx-3 my-2.5 p-3 flex flex-col gap-3">
       {children}
-    </div>
+    </Card>
   )
 }
 

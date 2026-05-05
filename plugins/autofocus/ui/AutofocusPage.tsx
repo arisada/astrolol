@@ -4,6 +4,7 @@ import { api } from '@/api/client'
 import * as autofocusApi from './api'
 import { useStore } from '@/store'
 import { Button } from '@/components/ui/button'
+import { SidebarSection } from '@/components/ui/card'
 import type {
   AutofocusConfig,
   AutofocusRun,
@@ -148,17 +149,6 @@ function UCurveChart({
 // ── Preview image panel ───────────────────────────────────────────────────────
 // Star circles are burned into the JPEG server-side after detection,
 // so no SVG overlay is needed here.
-
-// ── Sidebar section wrapper ───────────────────────────────────────────────────
-
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="px-4 py-3 border-b border-surface-border">
-      <p className="text-[10px] uppercase tracking-widest text-slate-500 mb-2">{title}</p>
-      {children}
-    </div>
-  )
-}
 
 // ── Status badge ──────────────────────────────────────────────────────────────
 
@@ -362,7 +352,7 @@ export function AutofocusPage() {
       <aside className="w-72 flex flex-col overflow-y-auto border-l border-surface-border bg-surface-panel">
 
         {/* Camera */}
-        <Section title="Camera">
+        <SidebarSection title="Camera">
           {cameras.length === 0 ? (
             <span className="text-xs text-slate-600">No camera connected</span>
           ) : cameras.length === 1 ? (
@@ -373,10 +363,10 @@ export function AutofocusPage() {
               {cameras.map((d) => <option key={d.device_id} value={d.device_id}>{d.device_id}</option>)}
             </select>
           )}
-        </Section>
+        </SidebarSection>
 
         {/* Focuser */}
-        <Section title="Focuser">
+        <SidebarSection title="Focuser">
           {focusers.length === 0 ? (
             <span className="text-xs text-slate-600">No focuser connected</span>
           ) : focusers.length === 1 ? (
@@ -387,10 +377,10 @@ export function AutofocusPage() {
               {focusers.map((d) => <option key={d.device_id} value={d.device_id}>{d.device_id}</option>)}
             </select>
           )}
-        </Section>
+        </SidebarSection>
 
         {/* V-curve configuration */}
-        <Section title="V-Curve">
+        <SidebarSection title="V-Curve">
           <div className="flex flex-col gap-3">
 
             {/* Metric selector */}
@@ -455,10 +445,10 @@ export function AutofocusPage() {
               </div>
             </div>
           </div>
-        </Section>
+        </SidebarSection>
 
         {/* Exposure */}
-        <Section title="Exposure">
+        <SidebarSection title="Exposure">
           <div className="flex flex-col gap-3">
             <div className="flex flex-col gap-1">
               <label className="text-xs text-slate-400">Duration</label>
@@ -512,7 +502,7 @@ export function AutofocusPage() {
               </div>
             )}
           </div>
-        </Section>
+        </SidebarSection>
 
         {/* Action */}
         <div className="px-4 py-3 border-b border-surface-border flex flex-col gap-2">
@@ -535,7 +525,7 @@ export function AutofocusPage() {
 
         {/* Progress */}
         {run && (
-          <Section title="Progress">
+          <SidebarSection title="Progress">
             <div className="flex flex-col gap-2">
               <div className="flex items-center justify-between">
                 <span className="text-xs text-slate-300">
@@ -578,12 +568,12 @@ export function AutofocusPage() {
 
               {run.error && <p className="text-xs text-red-400 break-words">{run.error}</p>}
             </div>
-          </Section>
+          </SidebarSection>
         )}
 
         {/* V-curve chart */}
         {run && run.data_points.length > 0 && (
-          <Section title="V-Curve">
+          <SidebarSection title="V-Curve">
             <UCurveChart
               dataPoints={run.data_points}
               curveFit={run.curve_fit}
@@ -591,12 +581,12 @@ export function AutofocusPage() {
               fitAlgo={run.config.fit_algo ?? 'parabola'}
               metric={run.config.metric ?? 'fwhm'}
             />
-          </Section>
+          </SidebarSection>
         )}
 
         {/* Result */}
         {run?.status === 'completed' && run.optimal_position !== null && (
-          <Section title="Result">
+          <SidebarSection title="Result">
             <div className="flex flex-col gap-1.5">
               <div className="flex items-baseline gap-2">
                 <span className="text-xs text-slate-400">Optimal position:</span>
@@ -609,7 +599,7 @@ export function AutofocusPage() {
                 </div>
               )}
             </div>
-          </Section>
+          </SidebarSection>
         )}
 
       </aside>
