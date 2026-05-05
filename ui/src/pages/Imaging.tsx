@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useLocalStorage } from '@/hooks/useLocalStorage'
 import { useParams } from 'react-router-dom'
 import {
   Camera, ChevronDown, ChevronUp, Crosshair, Play, Settings, Square, StopCircle, Thermometer,
@@ -11,24 +12,6 @@ import { Input } from '@/components/ui/input'
 import { Card } from '@/components/ui/card'
 import { DurationStepper } from '@/components/ui/duration-stepper'
 import { DevicePropertiesPanel } from '@/components/DevicePropertiesPanel'
-
-// ── localStorage persistence (focuser step only) ──────────────────────────────
-
-function useLocalStorage<T>(key: string, initial: T): [T, (v: T) => void] {
-  const [value, setValue] = useState<T>(() => {
-    try {
-      const stored = localStorage.getItem(key)
-      return stored !== null ? (JSON.parse(stored) as T) : initial
-    } catch {
-      return initial
-    }
-  })
-  const set = useCallback((v: T) => {
-    setValue(v)
-    try { localStorage.setItem(key, JSON.stringify(v)) } catch { /* storage full */ }
-  }, [key])
-  return [value, set]
-}
 
 const DEFAULT_IMAGER_SETTINGS: ImagerDeviceSettings = {
   duration: 5,
