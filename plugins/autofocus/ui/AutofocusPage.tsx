@@ -6,6 +6,8 @@ import { useStore } from '@/store'
 import { Button } from '@/components/ui/button'
 import { SidebarSection } from '@/components/ui/card'
 import { DurationStepper } from '@/components/ui/duration-stepper'
+import { StatusPill } from '@/components/ui/badge'
+import type { StatusPillVariant } from '@/components/ui/badge'
 import type {
   AutofocusConfig,
   AutofocusRun,
@@ -130,20 +132,8 @@ function UCurveChart({
 // Star circles are burned into the JPEG server-side after detection,
 // so no SVG overlay is needed here.
 
-// ── Status badge ──────────────────────────────────────────────────────────────
-
-function RunBadge({ status }: { status: AutofocusRun['status'] }) {
-  const styles: Record<AutofocusRun['status'], string> = {
-    running:   'bg-amber-500/20 text-amber-400 animate-pulse',
-    completed: 'bg-green-500/20 text-green-400',
-    failed:    'bg-red-500/20 text-red-400',
-    aborted:   'bg-slate-500/20 text-slate-400',
-  }
-  return (
-    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${styles[status]}`}>
-      {status}
-    </span>
-  )
+const RUN_PILL_VARIANT: Record<AutofocusRun['status'], StatusPillVariant> = {
+  running: 'amber', completed: 'green', failed: 'red', aborted: 'slate',
 }
 
 // ── Default settings ──────────────────────────────────────────────────────────
@@ -513,7 +503,7 @@ export function AutofocusPage() {
                     ? `Step ${run.current_step} / ${run.total_steps}`
                     : `${run.total_steps} steps`}
                 </span>
-                <RunBadge status={run.status} />
+                <StatusPill status={run.status} variant={RUN_PILL_VARIANT[run.status]} pulse={run.status === 'running'} />
               </div>
 
               {run.total_steps > 0 && (

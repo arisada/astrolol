@@ -1,5 +1,5 @@
 import { useStore } from '@/store'
-import { Chip } from '@/components/StatusBar'
+import { Chip } from '@/components/ui/badge'
 import type { PlateSolvePluginState } from './api'
 
 export function PlatesolveChip() {

@@ -5,6 +5,8 @@ import { useStore } from '@/store'
 import { Button } from '@/components/ui/button'
 import { SidebarSection } from '@/components/ui/card'
 import { DurationStepper } from '@/components/ui/duration-stepper'
+import { StatusPill } from '@/components/ui/badge'
+import type { StatusPillVariant } from '@/components/ui/badge'
 import * as plateSolveApi from './api'
 import type { DbStatus, PlatesolveSettings, SolveJob, SolveResult, PlateSolvePluginState } from './api'
 
@@ -76,20 +78,9 @@ const PLATESOLVE_EXPOSURE_STEPS = [
 
 // ── Status badge ───────────────────────────────────────────────────────────────
 
-function StatusBadge({ status }: { status: SolveJob['status'] }) {
-  const styles: Record<SolveJob['status'], string> = {
-    pending:   'bg-surface-border text-muted',
-    exposing:  'bg-amber-500/20 text-amber-400 animate-pulse',
-    solving:   'bg-accent/20 text-accent animate-pulse',
-    completed: 'bg-green-500/20 text-green-400',
-    failed:    'bg-red-500/20 text-red-400',
-    cancelled: 'bg-surface-border text-muted',
-  }
-  return (
-    <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${styles[status]}`}>
-      {status}
-    </span>
-  )
+const SOLVE_PILL_VARIANT: Record<SolveJob['status'], StatusPillVariant> = {
+  pending: 'slate', exposing: 'amber', solving: 'accent',
+  completed: 'green', failed: 'red', cancelled: 'slate',
 }
 
 // ── Offset helpers ─────────────────────────────────────────────────────────────
@@ -169,7 +160,10 @@ function JobRow({ job, onCancel }: { job: SolveJob; onCancel: (id: string) => vo
   const active = job.status === 'pending' || job.status === 'solving'
   return (
     <div className="flex items-start gap-2 py-2 border-b border-surface-border last:border-0">
-      <div className="mt-0.5 shrink-0"><StatusBadge status={job.status} /></div>
+      <div className="mt-0.5 shrink-0">
+        <StatusPill status={job.status} variant={SOLVE_PILL_VARIANT[job.status]}
+          pulse={job.status === 'exposing' || job.status === 'solving'} />
+      </div>
       <div className="flex-1 min-w-0">
         <div className="text-xs text-slate-300 truncate font-mono">{filename}</div>
         {job.status === 'completed' && job.result && (

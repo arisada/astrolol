@@ -1,5 +1,5 @@
 import { useStore } from '@/store'
-import { Chip } from '@/components/StatusBar'
+import { Chip } from '@/components/ui/badge'
 import type { Phd2PluginState } from './api'
 
 export function Phd2Chip() {

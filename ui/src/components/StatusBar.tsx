@@ -8,6 +8,7 @@ import { Wifi, WifiOff } from 'lucide-react'
 import { useStore } from '@/store'
 import { getAllPluginEntries } from '@/plugin-registry'
 import type { ConnectedDevice } from '@/api/types'
+import { Chip } from '@/components/ui/badge'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -41,44 +42,6 @@ function useCountdown(exposure: { startedAt: number; duration: number } | null |
   }, [exposure?.startedAt, exposure?.duration])   // eslint-disable-line react-hooks/exhaustive-deps
 
   return remaining
-}
-
-// ---------------------------------------------------------------------------
-// Chip primitives
-// ---------------------------------------------------------------------------
-
-export type ChipVariant = 'green' | 'amber' | 'red' | 'blue' | 'violet' | 'slate'
-
-const chipClasses: Record<ChipVariant, string> = {
-  green:  'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
-  amber:  'bg-amber-500/20  text-amber-300  border-amber-500/30',
-  red:    'bg-rose-500/20   text-rose-300   border-rose-500/30',
-  blue:   'bg-sky-500/20    text-sky-300    border-sky-500/30',
-  violet: 'bg-violet-500/20 text-violet-300 border-violet-500/30',
-  slate:  'bg-slate-700/50  text-slate-400  border-slate-600/40',
-}
-
-export function Chip({
-  label,
-  status,
-  variant,
-  pulse = false,
-}: {
-  label: string
-  status: string
-  variant: ChipVariant
-  pulse?: boolean
-}) {
-  return (
-    <span
-      className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded border text-xs font-medium whitespace-nowrap
-        ${chipClasses[variant]} ${pulse ? 'animate-pulse' : ''}`}
-    >
-      <span className="text-slate-400 truncate max-w-[10rem]">{label}</span>
-      <span className="opacity-40">·</span>
-      <span>{status}</span>
-    </span>
-  )
 }
 
 // ---------------------------------------------------------------------------
