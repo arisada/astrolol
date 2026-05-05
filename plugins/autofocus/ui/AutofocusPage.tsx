@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ChevronDown, ChevronUp, Focus, StopCircle } from 'lucide-react'
+import { Focus, StopCircle } from 'lucide-react'
 import { api } from '@/api/client'
 import * as autofocusApi from './api'
 import { useStore } from '@/store'
 import { Button } from '@/components/ui/button'
 import { SidebarSection } from '@/components/ui/card'
+import { DurationStepper } from '@/components/ui/duration-stepper'
 import type {
   AutofocusConfig,
   AutofocusRun,
@@ -16,30 +17,9 @@ import type {
   FocusMetric,
 } from '@/api/types'
 
-// ── Exposure duration stepper ─────────────────────────────────────────────────
+// ── Autofocus exposure steps ──────────────────────────────────────────────────
 
-const EXPOSURE_STEPS = [0.5, 1, 1.5, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20, 30]
-
-function fmtDuration(s: number): string {
-  return s < 1 ? `${Math.round(s * 1000)} ms` : `${s} s`
-}
-
-function DurationStepper({ value, onChange }: { value: number; onChange: (v: number) => void }) {
-  const idx = EXPOSURE_STEPS.reduce(
-    (best, v, i) => Math.abs(v - value) < Math.abs(EXPOSURE_STEPS[best] - value) ? i : best, 0,
-  )
-  return (
-    <div className="flex items-center gap-1">
-      <Button size="icon" variant="outline" disabled={idx === 0}
-        onClick={() => onChange(EXPOSURE_STEPS[idx - 1])}><ChevronDown size={13} /></Button>
-      <span className="flex-1 text-center text-xs font-mono text-slate-200 bg-surface-overlay border border-surface-border rounded px-2 py-1.5">
-        {fmtDuration(value)}
-      </span>
-      <Button size="icon" variant="outline" disabled={idx === EXPOSURE_STEPS.length - 1}
-        onClick={() => onChange(EXPOSURE_STEPS[idx + 1])}><ChevronUp size={13} /></Button>
-    </div>
-  )
-}
+const AUTOFOCUS_EXPOSURE_STEPS = [0.5, 1, 1.5, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20, 30]
 
 // ── U-curve SVG chart ─────────────────────────────────────────────────────────
 
@@ -452,7 +432,7 @@ export function AutofocusPage() {
           <div className="flex flex-col gap-3">
             <div className="flex flex-col gap-1">
               <label className="text-xs text-slate-400">Duration</label>
-              <DurationStepper value={settings.exposure_time} onChange={(v) => patchSettings('exposure_time', v)} />
+              <DurationStepper steps={AUTOFOCUS_EXPOSURE_STEPS} value={settings.exposure_time} onChange={(v) => patchSettings('exposure_time', v)} />
             </div>
 
             <div className="flex flex-col gap-1">

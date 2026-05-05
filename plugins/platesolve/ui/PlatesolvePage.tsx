@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { AlertTriangle, Camera, ChevronDown, ChevronUp, Download, ScanSearch, Settings, StopCircle, X } from 'lucide-react'
+import { AlertTriangle, Camera, Download, ScanSearch, Settings, StopCircle, X } from 'lucide-react'
 import { api } from '@/api/client'
 import { useStore } from '@/store'
 import { Button } from '@/components/ui/button'
 import { SidebarSection } from '@/components/ui/card'
+import { DurationStepper } from '@/components/ui/duration-stepper'
 import * as plateSolveApi from './api'
 import type { DbStatus, PlatesolveSettings, SolveJob, SolveResult, PlateSolvePluginState } from './api'
 
@@ -66,41 +67,12 @@ function useLocalStorage<T>(key: string, initial: T): [T, (v: T) => void] {
   return [value, set]
 }
 
-// ── Exposure duration stepper ──────────────────────────────────────────────────
+// ── Platesolve exposure steps ─────────────────────────────────────────────────
 
-const EXPOSURE_STEPS = [
+const PLATESOLVE_EXPOSURE_STEPS = [
   0.1, 0.125, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5, 0.6, 0.8,
   1, 1.5, 2, 3, 4, 5, 6, 8, 10, 12, 15,
 ]
-
-function fmtDuration(s: number): string {
-  if (s < 1) return `${Math.round(s * 1000)} ms`
-  return `${s} s`
-}
-
-function DurationStepper({ value, onChange }: { value: number; onChange: (v: number) => void }) {
-  const idx = EXPOSURE_STEPS.reduce(
-    (best, v, i) => Math.abs(v - value) < Math.abs(EXPOSURE_STEPS[best] - value) ? i : best, 0,
-  )
-  return (
-    <div className="flex flex-col gap-1">
-      <span className="text-xs text-slate-400">Duration</span>
-      <div className="flex items-center gap-1">
-        <Button size="icon" variant="outline" disabled={idx === 0}
-          onClick={() => onChange(EXPOSURE_STEPS[idx - 1])} title="Shorter">
-          <ChevronDown size={14} />
-        </Button>
-        <span className="flex-1 text-center text-xs font-mono text-slate-200 bg-surface-overlay border border-surface-border rounded px-2 py-1.5">
-          {fmtDuration(value)}
-        </span>
-        <Button size="icon" variant="outline" disabled={idx === EXPOSURE_STEPS.length - 1}
-          onClick={() => onChange(EXPOSURE_STEPS[idx + 1])} title="Longer">
-          <ChevronUp size={14} />
-        </Button>
-      </div>
-    </div>
-  )
-}
 
 // ── Status badge ───────────────────────────────────────────────────────────────
 
@@ -653,7 +625,7 @@ export function PlatesolvePage() {
         {/* Exposure */}
         <SidebarSection title="Exposure">
           <div className="flex flex-col gap-3">
-            <DurationStepper value={duration} onChange={(v) => patchSettings({ exposure_duration: v })} />
+            <DurationStepper steps={PLATESOLVE_EXPOSURE_STEPS} value={duration} onChange={(v) => patchSettings({ exposure_duration: v })} />
 
             <div className="flex flex-col gap-1">
               <span className="text-xs text-slate-400">Binning</span>

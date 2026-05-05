@@ -9,6 +9,7 @@ import type { CameraStatus, DitherConfig, FilterWheelStatus, FrameType, ImageSta
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card } from '@/components/ui/card'
+import { DurationStepper } from '@/components/ui/duration-stepper'
 import { DevicePropertiesPanel } from '@/components/DevicePropertiesPanel'
 
 // ── localStorage persistence (focuser step only) ──────────────────────────────
@@ -49,14 +50,6 @@ const EXPOSURE_STEPS = [
   1, 1.5, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20, 25, 30,
   45, 60, 90, 120, 180, 240, 300, 360, 480, 600, 900, 1200, 1800, 3600,
 ]
-
-function fmtDuration(s: number): string {
-  if (s < 1) return `${Math.round(s * 1000)} ms`
-  if (s < 60) return `${s} s`
-  const m = Math.floor(s / 60)
-  const rem = s % 60
-  return rem === 0 ? `${m} m` : `${m} m ${rem} s`
-}
 
 // ── Shared sub-components ─────────────────────────────────────────────────────
 
@@ -121,59 +114,6 @@ function TogglePill({ label, value, onChange }: { label: string; value: boolean;
       <span>{label}</span>
       <span className="text-slate-500">{value ? 'ON' : 'OFF'}</span>
     </button>
-  )
-}
-
-function DurationStepper({ value, onChange }: { value: number; onChange: (v: number) => void }) {
-  const [editing, setEditing] = useState(false)
-  const [raw, setRaw] = useState('')
-  const inputRef = useRef<HTMLInputElement>(null)
-
-  const idx = EXPOSURE_STEPS.reduce(
-    (best, v, i) => Math.abs(v - value) < Math.abs(EXPOSURE_STEPS[best] - value) ? i : best, 0,
-  )
-
-  const startEdit = () => {
-    setRaw(String(value))
-    setEditing(true)
-    setTimeout(() => inputRef.current?.select(), 0)
-  }
-
-  const commitEdit = () => {
-    const n = parseFloat(raw)
-    if (!isNaN(n) && n > 0) onChange(n)
-    setEditing(false)
-  }
-
-  return (
-    <div className="flex flex-col gap-1">
-      <span className="text-xs text-slate-400">Duration</span>
-      <div className="flex items-center gap-1">
-        <Button size="icon" variant="outline" disabled={idx === 0}
-          onClick={() => { setEditing(false); onChange(EXPOSURE_STEPS[idx - 1]) }} title="Shorter">
-          <ChevronDown size={14} />
-        </Button>
-        {editing ? (
-          <input
-            ref={inputRef}
-            type="number" min="0.001" step="any" value={raw}
-            onChange={(e) => setRaw(e.target.value)}
-            onBlur={commitEdit}
-            onKeyDown={(e) => { if (e.key === 'Enter') commitEdit(); if (e.key === 'Escape') setEditing(false) }}
-            className="flex-1 text-center text-xs font-mono text-slate-200 bg-surface-overlay border border-accent rounded px-2 py-1.5 min-w-[5rem] focus:outline-none"
-          />
-        ) : (
-          <button type="button" onClick={startEdit} title="Click to enter a custom value"
-            className="flex-1 text-center text-xs font-mono text-slate-200 bg-surface-overlay border border-surface-border rounded px-2 py-1.5 min-w-[5rem] hover:border-slate-500 transition-colors">
-            {fmtDuration(value)}
-          </button>
-        )}
-        <Button size="icon" variant="outline" disabled={idx === EXPOSURE_STEPS.length - 1}
-          onClick={() => { setEditing(false); onChange(EXPOSURE_STEPS[idx + 1]) }} title="Longer">
-          <ChevronUp size={14} />
-        </Button>
-      </div>
-    </div>
   )
 }
 
@@ -456,7 +396,7 @@ function CameraPanel({
           onChange={(v) => patchSettings({ frame_type: v })} label="Frame type" />
 
         {/* Duration stepper */}
-        <DurationStepper value={settings.duration} onChange={(v) => patchSettings({ duration: v })} />
+        <DurationStepper steps={EXPOSURE_STEPS} value={settings.duration} onChange={(v) => patchSettings({ duration: v })} />
 
         {/* Gain */}
         <div className="flex flex-col gap-1">
