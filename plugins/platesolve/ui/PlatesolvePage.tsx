@@ -1,4 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { fmtRA, fmtDec } from '@/utils/formatting'
+import { useLocalStorage } from '@/hooks/useLocalStorage'
 import { AlertTriangle, Camera, Download, ScanSearch, Settings, StopCircle, X } from 'lucide-react'
 import { api } from '@/api/client'
 import { useStore } from '@/store'
@@ -13,28 +15,6 @@ import type { DbStatus, PlatesolveSettings, SolveJob, SolveResult, PlateSolvePlu
 // ── Types ──────────────────────────────────────────────────────────────────────
 
 type AfterSolve = 'nothing' | 'sync' | 'sync_slew'
-
-// ── Coordinate formatters (RA in hours, Dec in degrees) ───────────────────────
-
-function fmtRA(h: number | null | undefined): string {
-  if (h == null) return '—'
-  const H = Math.floor(h)
-  const mf = (h - H) * 60
-  const M = Math.floor(mf)
-  const S = ((mf - M) * 60).toFixed(1)
-  return `${String(H).padStart(2, '0')}h ${String(M).padStart(2, '0')}m ${S.padStart(4, '0')}s`
-}
-
-function fmtDec(d: number | null | undefined): string {
-  if (d == null) return '—'
-  const sign = d < 0 ? '−' : '+'
-  const abs = Math.abs(d)
-  const deg = Math.floor(abs)
-  const mf = (abs - deg) * 60
-  const min = Math.floor(mf)
-  const sec = Math.round((mf - min) * 60)
-  return `${sign}${String(deg).padStart(2, '0')}° ${String(min).padStart(2, '0')}′ ${String(sec).padStart(2, '0')}″`
-}
 
 function fmtField(deg: number): string {
   return deg >= 1 ? `${deg.toFixed(2)}°` : `${(deg * 60).toFixed(1)}′`
@@ -51,22 +31,6 @@ const DEFAULT_PLATESOLVE_SETTINGS: PlatesolveSettings = {
   exposure_duration: 5,
   binning: 1,
   after_solve: 'nothing',
-}
-
-// ── localStorage helpers ───────────────────────────────────────────────────────
-
-function useLocalStorage<T>(key: string, initial: T): [T, (v: T) => void] {
-  const [value, setValue] = useState<T>(() => {
-    try {
-      const stored = localStorage.getItem(key)
-      return stored !== null ? (JSON.parse(stored) as T) : initial
-    } catch { return initial }
-  })
-  const set = useCallback((v: T) => {
-    setValue(v)
-    try { localStorage.setItem(key, JSON.stringify(v)) } catch { /* full */ }
-  }, [key])
-  return [value, set]
 }
 
 // ── Platesolve exposure steps ─────────────────────────────────────────────────

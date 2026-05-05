@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { fmtRA, fmtDec } from '@/utils/formatting'
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Crosshair, RefreshCw, RotateCw, Settings, StopCircle } from 'lucide-react'
 import { api } from '@/api/client'
 import { useStore } from '@/store'
@@ -37,15 +38,6 @@ const TRACKING_MODES: { label: string; mode: TrackingMode }[] = [
 // Pure formatting helpers
 // ---------------------------------------------------------------------------
 
-function fmtRA(h: number | null | undefined): string {
-  if (h == null) return '—'
-  const H = Math.floor(h)
-  const mf = (h - H) * 60
-  const M = Math.floor(mf)
-  const S = ((mf - M) * 60).toFixed(1)
-  return `${String(H).padStart(2, '0')}h ${String(M).padStart(2, '0')}m ${S.padStart(4, '0')}s`
-}
-
 function fmtHA(ha: number | null | undefined): string {
   if (ha == null) return '—'
   const sign = ha >= 0 ? '+' : '−'
@@ -62,17 +54,6 @@ function fmtMeridianDistance(ha: number): string {
   const m = Math.floor((abs - h) * 60)
   const parts = h > 0 ? `${h}h ${m}m` : `${m}m`
   return ha < 0 ? `${parts} to meridian` : `${parts} past meridian`
-}
-
-function fmtDec(d: number | null | undefined): string {
-  if (d == null) return '—'
-  const sign = d < 0 ? '−' : '+'
-  const abs = Math.abs(d)
-  const deg = Math.floor(abs)
-  const mf = (abs - deg) * 60
-  const min = Math.floor(mf)
-  const sec = Math.round((mf - min) * 60)
-  return `${sign}${String(deg).padStart(2, '0')}° ${String(min).padStart(2, '0')}' ${String(sec).padStart(2, '0')}"`
 }
 
 // ---------------------------------------------------------------------------
