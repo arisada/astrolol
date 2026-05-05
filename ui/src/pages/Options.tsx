@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { api } from '@/api/client'
 import type { PluginInfo } from '@/api/types'
 import { useStore } from '@/store'
+import { ToggleSwitch } from '@/components/ui/toggle-switch'
 
 interface IndiSettings {
   manageServer: boolean
@@ -31,22 +32,6 @@ function Row({ label, hint, children }: { label: string; hint?: string; children
       </div>
       <div className="flex-shrink-0">{children}</div>
     </div>
-  )
-}
-
-function Toggle({ value, onChange }: { value: boolean; onChange: (v: boolean) => void }) {
-  return (
-    <button
-      type="button"
-      onClick={() => onChange(!value)}
-      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none
-        ${value ? 'bg-accent' : 'bg-slate-600'}`}
-    >
-      <span
-        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform
-          ${value ? 'translate-x-6' : 'translate-x-1'}`}
-      />
-    </button>
   )
 }
 
@@ -296,9 +281,10 @@ export function Options() {
           label="Manage indiserver automatically"
           hint="astrolol will start and stop indiserver as needed"
         >
-          <Toggle
-            value={indi.manageServer}
-            onChange={(v) => setIndi((s) => ({ ...s, manageServer: v }))}
+          <ToggleSwitch
+            checked={indi.manageServer}
+            onChange={() => setIndi((s) => ({ ...s, manageServer: !s.manageServer }))}
+            label="Manage indiserver automatically"
           />
         </Row>
         <Row
@@ -316,7 +302,7 @@ export function Options() {
           label="Local image transfer"
           hint="Driver writes FITS directly to disk — eliminates base64 encoding over TCP."
         >
-          <Toggle value={indiLocalUpload} onChange={persistIndiLocalUpload} />
+          <ToggleSwitch checked={indiLocalUpload} onChange={() => persistIndiLocalUpload(!indiLocalUpload)} label="Local image transfer" />
         </Row>
         {indiLocalUpload && (
           <Row
@@ -391,7 +377,7 @@ export function Options() {
                 label="Low memory mode"
                 hint="Serialise image processing and plate solving. Use on Raspberry Pi or other memory-constrained hardware to avoid OOM kills."
               >
-                <Toggle value={lowMemoryMode} onChange={persistLowMemoryMode} />
+                <ToggleSwitch checked={lowMemoryMode} onChange={() => persistLowMemoryMode(!lowMemoryMode)} label="Low memory mode" />
               </Row>
             </div>
           )}
@@ -407,7 +393,7 @@ export function Options() {
                 label={plugin.name}
                 hint={plugin.description || undefined}
               >
-                <Toggle value={plugin.enabled} onChange={() => togglePlugin(plugin)} />
+                <ToggleSwitch checked={plugin.enabled} onChange={() => togglePlugin(plugin)} label={plugin.name} />
               </Row>
             ))}
           </div>

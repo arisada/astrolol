@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Crosshair, Pause, Play, Settings, Square, Target, Wifi, WifiOff } from 'lucide-react'
 import { useStore } from '@/store'
 import { Button } from '@/components/ui/button'
+import { ToggleSwitch } from '@/components/ui/toggle-switch'
 import type { Phd2Settings } from '@/api/types'
 import * as phd2Api from './api'
 import type { GuidePoint, Phd2PluginState } from './api'
@@ -38,28 +39,6 @@ function fmtAgo(secondsAgo: number): string {
   const m = Math.floor(secondsAgo / 60)
   const s = Math.round(secondsAgo % 60)
   return s === 0 ? `-${m}m` : `-${m}m${s}s`
-}
-
-// ── Toggle switch (local — same pattern as Mount page) ────────────────────────
-
-function ToggleSwitch({ checked, onChange, label }: {
-  checked: boolean; onChange: () => void; label: string
-}) {
-  return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
-      onClick={onChange}
-      className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors focus:outline-none cursor-pointer
-        ${checked ? 'bg-accent' : 'bg-surface-border'}`}
-      aria-label={label}
-    >
-      <span className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform
-        ${checked ? 'translate-x-[22px]' : 'translate-x-0.5'}`}
-      />
-    </button>
-  )
 }
 
 // ── Guide graph ───────────────────────────────────────────────────────────────
