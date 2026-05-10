@@ -9,7 +9,7 @@ import { useStore } from '@/store'
 import type { CameraStatus, DitherConfig, FilterWheelStatus, FrameType, ImageStats, ImagerDeviceSettings } from '@/api/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Card } from '@/components/ui/card'
+import { SidebarSection } from '@/components/ui/card'
 import { DurationStepper } from '@/components/ui/duration-stepper'
 import { EventLog } from '@/components/ui/event-log'
 import { PillGroup } from '@/components/ui/pill-group'
@@ -53,9 +53,9 @@ function Panel({
     </button>
   ) : null
   return (
-    <Card title={title} action={action} className="mx-3 my-2.5 p-3 flex flex-col gap-3">
+    <SidebarSection title={title} action={action}>
       {children}
-    </Card>
+    </SidebarSection>
   )
 }
 
