@@ -600,7 +600,7 @@ export function Imaging() {
       </div>
 
       {/* Right sidebar */}
-      <aside className="w-64 shrink-0 border-l border-surface-border overflow-y-auto bg-surface-raised py-1">
+      <aside className="w-72 shrink-0 border-l border-surface-border overflow-y-auto bg-surface-raised">
         {camera === null ? (
           <div className="p-4 text-xs text-slate-500">No camera connected.</div>
         ) : (

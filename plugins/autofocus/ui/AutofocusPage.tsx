@@ -321,7 +321,7 @@ export function AutofocusPage() {
       </div>
 
       {/* ── Right: sidebar ── */}
-      <aside className="w-72 flex flex-col overflow-y-auto border-l border-surface-border bg-surface-panel">
+      <aside className="w-72 shrink-0 flex flex-col overflow-y-auto border-l border-surface-border bg-surface-raised">
 
         {/* Camera */}
         <SidebarSection title="Camera">
