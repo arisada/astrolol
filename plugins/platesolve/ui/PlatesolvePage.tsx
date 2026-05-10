@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { fmtRA, fmtDec } from '@/utils/formatting'
 import { useLocalStorage } from '@/hooks/useLocalStorage'
 import { AlertTriangle, Camera, Download, ScanSearch, Settings, StopCircle, X } from 'lucide-react'
