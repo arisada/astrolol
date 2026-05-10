@@ -3,6 +3,7 @@ import { Focus, StopCircle } from 'lucide-react'
 import { api } from '@/api/client'
 import * as autofocusApi from './api'
 import { useStore } from '@/store'
+import { CollapsibleSidebar } from '@/components/ui/collapsible-sidebar'
 import { Button } from '@/components/ui/button'
 import { SidebarSection } from '@/components/ui/card'
 import { DurationStepper } from '@/components/ui/duration-stepper'
@@ -321,7 +322,7 @@ export function AutofocusPage() {
       </div>
 
       {/* ── Right: sidebar ── */}
-      <aside className="w-72 shrink-0 flex flex-col overflow-y-auto border-l border-surface-border bg-surface-raised">
+      <CollapsibleSidebar>
 
         {/* Camera */}
         <SidebarSection title="Camera">
@@ -554,7 +555,7 @@ export function AutofocusPage() {
           </SidebarSection>
         )}
 
-      </aside>
+      </CollapsibleSidebar>
     </div>
   )
 }

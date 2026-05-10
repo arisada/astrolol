@@ -13,6 +13,7 @@ import { DurationStepper } from '@/components/ui/duration-stepper'
 import { EventLog } from '@/components/ui/event-log'
 import { PillGroup } from '@/components/ui/pill-group'
 import { DevicePropertiesPanel } from '@/components/DevicePropertiesPanel'
+import { CollapsibleSidebar } from '@/components/ui/collapsible-sidebar'
 
 const DEFAULT_IMAGER_SETTINGS: ImagerDeviceSettings = {
   duration: 5,
@@ -607,7 +608,7 @@ export function Imaging() {
       </div>
 
       {/* Right sidebar */}
-      <aside className="w-72 shrink-0 border-l border-surface-border overflow-y-auto bg-surface-raised">
+      <CollapsibleSidebar>
         {camera === null ? (
           <div className="p-4 text-xs text-slate-500">No camera connected.</div>
         ) : (
@@ -627,7 +628,7 @@ export function Imaging() {
             )}
           </>
         )}
-      </aside>
+      </CollapsibleSidebar>
     </div>
     {propertiesDeviceId && (
       <DevicePropertiesPanel

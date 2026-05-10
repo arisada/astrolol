@@ -3,6 +3,7 @@ import { fmtRA, fmtDec } from '@/utils/formatting'
 import { AlertTriangle, Camera, Download, ScanSearch, Settings, StopCircle, X } from 'lucide-react'
 import { api } from '@/api/client'
 import { useStore } from '@/store'
+import { CollapsibleSidebar } from '@/components/ui/collapsible-sidebar'
 import { Button } from '@/components/ui/button'
 import { SidebarSection } from '@/components/ui/card'
 import { DurationStepper } from '@/components/ui/duration-stepper'
@@ -534,7 +535,7 @@ export function PlatesolvePage() {
       </div>
 
       {/* Right sidebar: controls */}
-      <aside className="w-72 shrink-0 border-l border-surface-border overflow-y-auto bg-surface-raised">
+      <CollapsibleSidebar>
 
         {/* Header */}
         <div className="border-b border-surface-border p-4 flex items-center justify-between">
@@ -650,7 +651,7 @@ export function PlatesolvePage() {
           </SidebarSection>
         )}
 
-      </aside>
+      </CollapsibleSidebar>
     </div>
   )
 }
