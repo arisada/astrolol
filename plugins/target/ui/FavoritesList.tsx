@@ -1,9 +1,7 @@
 // Favourites panel: list saved targets, recall on click, delete, inline name editing.
 
-import { useState } from 'react'
 import { BookmarkX, ChevronRight, Star } from 'lucide-react'
 import type { FavoriteTarget } from './api'
-import type { ObjectMatch } from './SearchBox'
 
 interface Props {
   favorites: FavoriteTarget[]

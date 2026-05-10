@@ -1,5 +1,4 @@
 import { useEffect, useState } from 'react'
-import { api } from '@/api/client'
 
 interface Lx200Status {
   running: boolean

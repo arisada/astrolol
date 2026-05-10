@@ -16,7 +16,13 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
     "baseUrl": ".",
-    "paths": { "@/*": ["src/*"] }
+    "paths": {
+      "@/*": ["src/*"],
+      "@plugins/*": ["../plugins/*"],
+      "react": ["node_modules/@types/react"],
+      "react/jsx-runtime": ["node_modules/@types/react/jsx-runtime"],
+      "lucide-react": ["node_modules/lucide-react"]
+    }
   },
-  "include": ["src"]
+  "include": ["src", "../plugins/**/*.ts", "../plugins/**/*.tsx"]
 }

@@ -1,5 +1,6 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
+import checker from 'vite-plugin-checker'
 import path from 'path'
 // Backend URL for the dev-server proxy.  In Docker Compose the BACKEND_URL
 // env var is set to the service name; locally it defaults to localhost.
@@ -37,7 +38,7 @@ function p(target: string) {
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  plugins: [react()],
+  plugins: [react(), checker({ typescript: true })],
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
