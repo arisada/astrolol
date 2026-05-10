@@ -370,14 +370,14 @@ export function PlatesolvePage() {
   const latestImages     = useStore((s) => s.latestImages)
   const solveJobsMap     = useStore((s) => (s.pluginStates['platesolve'] as PlateSolvePluginState | null)?.jobs ?? {})
 
+  const mount = connectedDevices.find((d) => d.kind === 'mount') ?? null
+
+  const [settings, setSettings]         = useState<PlatesolveSettings | null>(null)
+
   const cameras = connectedDevices.filter((d) => d.kind === 'camera')
   const selectedCameraId = settings?.camera_id ?? ''
   const camera = cameras.find((d) => d.device_id === selectedCameraId) ?? cameras[0] ?? null
   const latestImage = camera ? (latestImages[camera.device_id] ?? null) : null
-
-  const mount = connectedDevices.find((d) => d.kind === 'mount') ?? null
-
-  const [settings, setSettings]         = useState<PlatesolveSettings | null>(null)
 
   // Exposure + post-solve settings are part of server-persisted PlatesolveSettings
   // so all browsers see the same values.
