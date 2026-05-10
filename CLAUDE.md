@@ -161,6 +161,32 @@ Handler contract:
 Plugin state is stored under `useStore((s) => s.pluginStates['my_feature'])`. Cast it to your
 interface inside the component; the store holds it as `unknown` to avoid coupling.
 
+### Shared UI components
+
+Use components from `ui/src/components/ui/` rather than re-implementing them per plugin:
+
+| Component | Import | Description |
+|---|---|---|
+| `EventLog` | `@/components/ui/event-log` | Scrollable log panel filtered by component name(s) |
+| `PillGroup` | `@/components/ui/pill-group` | Segmented button group for enum-like or numeric options |
+| `DurationStepper` | `@/components/ui/duration-stepper` | Number input with +/− stepper buttons |
+| `Input` | `@/components/ui/input` | Styled text/number input |
+| `ToggleSwitch` | `@/components/ui/toggle-switch` | Labelled boolean toggle |
+| `Card`, `SidebarSection` | `@/components/ui/card` | Container variants |
+| `Badge`, `Chip`, `StatusPill` | `@/components/ui/badge` | Status indicators |
+
+```tsx
+import { EventLog } from '@/components/ui/event-log'
+import { PillGroup } from '@/components/ui/pill-group'
+
+<EventLog filter={['my_feature', 'indi']} />
+<PillGroup options={[1, 2, 4]} value={binning} onChange={setBinning} label="Binning" />
+```
+
+Tailwind design tokens are defined in `ui/tailwind.config.js`. Use only tokens defined there —
+undefined tokens silently render as transparent without any build error.
+Valid surface tokens: `bg-surface` · `bg-surface-raised` · `bg-surface-overlay` · `bg-surface-border`.
+
 ### Status-bar chips
 
 If a plugin has activity worth surfacing globally (an ongoing run, a background task), export a
@@ -242,7 +268,22 @@ Plugin scopes are collected at startup and exposed via `GET /admin/log_scopes`;
 - Structlog output is captured by pytest's log system, not `capsys`. Use
   `caplog.at_level(logging.WARNING, logger="<module>")` to assert on log output.
 
-Current count: **263 unit tests**, **34 integration tests** (all passing).
+Current count: **277 unit tests**, **37 integration tests**, **172 plugin tests** (all passing).
+
+### TypeScript type checking
+
+`ui/tsconfig.json` covers both `src/` and `plugins/**/*.tsx` — all plugin UI files are
+type-checked alongside core UI. A pre-commit hook enforces this on every commit:
+
+```bash
+cd ui && npm run typecheck   # run manually; the pre-commit hook does this automatically
+```
+
+`vite-plugin-checker` also shows TypeScript errors as a browser overlay during `npm run dev`,
+so type errors surface immediately without waiting for a build.
+
+**Do not bypass the pre-commit hook** (`--no-verify`). If `tsc` reports an error, fix it.
+Missing imports and wrong types that reach runtime are harder to debug than a failed hook.
 
 ## Key conventions
 
@@ -288,6 +329,9 @@ python3 -m pytest tests/unit/ -v
 
 # Integration tests (require indiserver / indi-bin)
 python3 -m pytest tests/integration/ -v
+
+# TypeScript type checking (src/ + plugins/)
+cd ui && npm run typecheck
 ```
 
 ## Docker development environment
@@ -310,7 +354,7 @@ Vite proxies `/devices`, `/imager`, `/mount`, `/focuser`, `/ws`, `/plugins`, `/h
 astrolol/
 ├── api/
 │   ├── devices.py      # connect/disconnect endpoints
-│   ├── focuser.py      # move_to, move_by, halt, status
+│   ├── focuser.py      # move_to, move_by, halt, status, per-device settings
 │   ├── imager.py       # expose, loop, image serving
 │   ├── mount.py        # slew, stop, park, sync, tracking, meridian_flip
 │   ├── settings.py     # GET/PUT /settings (UserSettings)
@@ -370,12 +414,15 @@ plugins/
 ui/
 ├── src/
 │   ├── api/            # typed fetch client (core devices only) + hand-written types
-│   ├── hooks/          # useEvents — WebSocket with auto-reconnect
+│   ├── hooks/          # useEvents (WebSocket), useLocalStorage
+│   ├── utils/          # formatting.ts — fmtRA, fmtDec
 │   ├── store/          # Zustand — core device state + pluginStates + registerPluginEventHandlers
 │   ├── plugin-registry.ts  # runtime map: plugin id → { route, icon, Component, StatusChip? }
-│   ├── components/     # Layout, Sidebar, StatusBar (auto-renders plugin StatusChips), base UI
+│   ├── components/
+│   │   └── ui/         # EventLog, PillGroup, DurationStepper, Input, ToggleSwitch,
+│   │                   # Card, SidebarSection, Badge, Chip, StatusPill, Button
 │   └── pages/          # Equipment, Profiles, Imaging, Mount, Logs, Options
-└── vite.config.ts      # @plugins alias + proxy for /devices /imager /mount etc.
+└── vite.config.ts      # @plugins alias + vite-plugin-checker + proxy
 
 tests/
 ├── conftest.py         # FakeCamera (real FITS), FakeMount, FakeFocuser + fixtures
