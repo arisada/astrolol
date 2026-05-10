@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { useLocalStorage } from '@/hooks/useLocalStorage'
 import { useParams } from 'react-router-dom'
 import {
   Camera, ChevronDown, ChevronUp, Crosshair, Play, Settings, Square, StopCircle, Thermometer,
@@ -451,13 +450,16 @@ function FocuserPanel({
   const position = focuserStatuses[deviceId]?.position
 
   const [target, setTarget] = useState('')
-  const [step, setStep] = useLocalStorage('imaging.focuserStep', '100')
+  const [step, setStep] = useState('100')
   const [error, setError] = useState<string | null>(null)
 
-  // Fetch initial position immediately on mount
+  // Fetch initial position and persisted step on mount
   useEffect(() => {
     api.focuser.status(deviceId)
       .then((s) => setFocuserStatus(deviceId, s))
+      .catch(() => {})
+    api.focuser.getSettings(deviceId)
+      .then((s) => setStep(String(s.step)))
       .catch(() => {})
   }, [deviceId, setFocuserStatus])
 
@@ -480,7 +482,12 @@ function FocuserPanel({
             <ChevronDown size={14} />
           </Button>
           <Input className="w-20 text-center" type="number" min="1" value={step}
-            onChange={(e) => setStep(e.target.value)} />
+            onChange={(e) => setStep(e.target.value)}
+            onBlur={(e) => {
+              const n = Math.max(1, parseInt(e.target.value) || 1)
+              setStep(String(n))
+              api.focuser.putSettings(deviceId, { step: n }).catch(() => {})
+            }} />
           <Button size="icon" variant="outline"
             onClick={() => act(() => api.focuser.moveBy(deviceId, parseInt(step)))} title="Move out">
             <ChevronUp size={14} />

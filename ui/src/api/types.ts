@@ -115,6 +115,10 @@ export interface ImagerDeviceSettings {
   target_temp: string
 }
 
+export interface FocuserDeviceSettings {
+  step: number
+}
+
 // --- Per-plugin settings ---
 
 export interface Phd2Settings {

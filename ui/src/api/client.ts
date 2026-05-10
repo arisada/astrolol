@@ -11,6 +11,7 @@ import type {
   ExposureRequest,
   ExposureResult,
   FilterWheelStatus,
+  FocuserDeviceSettings,
   FocuserStatus,
   ImageStats,
   ImagerDeviceSettings,
@@ -219,6 +220,12 @@ export const api = {
 
   focuser: {
     status: (deviceId: string) => request<FocuserStatus>(`/focuser/${deviceId}/status`),
+    getSettings: (deviceId: string) => request<FocuserDeviceSettings>(`/focuser/${deviceId}/settings`),
+    putSettings: (deviceId: string, body: FocuserDeviceSettings) =>
+      request<FocuserDeviceSettings>(`/focuser/${deviceId}/settings`, {
+        method: 'PUT',
+        body: JSON.stringify(body),
+      }),
     moveTo: (deviceId: string, position: number) =>
       request<void>(`/focuser/${deviceId}/move_to`, {
         method: 'POST',

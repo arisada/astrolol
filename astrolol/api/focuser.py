@@ -1,5 +1,5 @@
 from fastapi import APIRouter, HTTPException, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from astrolol.core.errors import DeviceKindError, DeviceNotFoundError
 from astrolol.devices.base.models import FocuserStatus
@@ -12,12 +12,35 @@ def _manager(request: Request) -> FocuserManager:
     return request.app.state.focuser_manager
 
 
+class FocuserDeviceSettings(BaseModel):
+    """Per-focuser settings persisted server-side."""
+    step: int = Field(default=100, ge=1)
+
+
 class MoveToRequest(BaseModel):
     position: int
 
 
 class MoveByRequest(BaseModel):
     steps: int
+
+
+@router.get("/{device_id}/settings", response_model=FocuserDeviceSettings)
+async def get_device_settings(device_id: str, request: Request) -> FocuserDeviceSettings:
+    """Return persisted focuser settings (defaults if not yet saved)."""
+    store = request.app.state.profile_store
+    raw = store.get_user_settings().focuser_settings.get(device_id, {})
+    return FocuserDeviceSettings(**raw)
+
+
+@router.put("/{device_id}/settings", response_model=FocuserDeviceSettings)
+async def put_device_settings(device_id: str, body: FocuserDeviceSettings, request: Request) -> FocuserDeviceSettings:
+    """Persist focuser settings."""
+    store = request.app.state.profile_store
+    current = store.get_user_settings()
+    new_map = {**current.focuser_settings, device_id: body.model_dump()}
+    store.update_user_settings(current.model_copy(update={"focuser_settings": new_map}))
+    return body
 
 
 @router.get("/{device_id}/status", response_model=FocuserStatus)
