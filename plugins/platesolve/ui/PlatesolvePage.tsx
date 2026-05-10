@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { SidebarSection } from '@/components/ui/card'
 import { DurationStepper } from '@/components/ui/duration-stepper'
 import { StatusPill } from '@/components/ui/badge'
+import { PillGroup } from '@/components/ui/pill-group'
 import type { StatusPillVariant } from '@/components/ui/badge'
 import * as plateSolveApi from './api'
 import type { DbStatus, PlatesolveSettings, SolveJob, SolveResult, PlateSolvePluginState } from './api'
@@ -328,7 +329,7 @@ function SolveLog() {
           [...log].reverse().map((e) => (
             <div key={e.id} className="flex gap-2 text-xs leading-5">
               <span className="text-slate-600 shrink-0">{e.timestamp.slice(11, 19)}</span>
-              <span className={`whitespace-pre-wrap break-all ${e.level === 'error' ? 'text-red-400' : e.level === 'warning' ? 'text-yellow-400' : 'text-slate-400'}`}>
+              <span className={`whitespace-pre-wrap break-all ${e.level === 'error' ? 'text-status-error' : e.level === 'warning' ? 'text-yellow-400' : 'text-slate-400'}`}>
                 {e.message}
               </span>
             </div>
@@ -585,20 +586,13 @@ export function PlatesolvePage() {
           <div className="flex flex-col gap-3">
             <DurationStepper steps={PLATESOLVE_EXPOSURE_STEPS} value={duration} onChange={(v) => patchSettings({ exposure_duration: v })} />
 
-            <div className="flex flex-col gap-1">
-              <span className="text-xs text-slate-400">Binning</span>
-              <div className="flex gap-1">
-                {BINNINGS.map((b) => (
-                  <button key={b} type="button" onClick={() => patchSettings({ binning: b })}
-                    className={`px-2 py-0.5 text-xs rounded border transition-colors
-                      ${binning === b
-                        ? 'border-accent text-accent bg-accent/10'
-                        : 'border-surface-border text-slate-400 hover:border-slate-500 hover:text-slate-300'}`}>
-                    {b}×{b}
-                  </button>
-                ))}
-              </div>
-            </div>
+            <PillGroup
+              options={BINNINGS}
+              value={binning}
+              onChange={(b) => patchSettings({ binning: b })}
+              label="Binning"
+              formatLabel={(b) => `${b}×${b}`}
+            />
 
           </div>
         </SidebarSection>

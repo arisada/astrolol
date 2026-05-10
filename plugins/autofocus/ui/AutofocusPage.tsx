@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { SidebarSection } from '@/components/ui/card'
 import { DurationStepper } from '@/components/ui/duration-stepper'
 import { Input } from '@/components/ui/input'
+import { PillGroup } from '@/components/ui/pill-group'
 import { StatusPill } from '@/components/ui/badge'
 import type { StatusPillVariant } from '@/components/ui/badge'
 import type {
@@ -355,38 +356,23 @@ export function AutofocusPage() {
           <div className="flex flex-col gap-3">
 
             {/* Metric selector */}
-            <div className="flex flex-col gap-1">
-              <label className="text-xs text-slate-400">Sharpness metric</label>
-              <div className="flex gap-1">
-                {(['fwhm', 'hfd'] as FocusMetric[]).map((m) => (
-                  <button key={m} type="button" onClick={() => patchSettings('metric', m)}
-                    className={`flex-1 py-0.5 text-xs rounded border uppercase transition-colors ${
-                      settings.metric === m
-                        ? 'border-accent text-accent bg-accent/10'
-                        : 'border-surface-border text-slate-400 hover:border-slate-500 hover:text-slate-300'
-                    }`}>
-                    {m}
-                  </button>
-                ))}
-              </div>
-            </div>
+            <PillGroup
+              options={['fwhm', 'hfd'] as FocusMetric[]}
+              value={settings.metric}
+              onChange={(m) => patchSettings('metric', m)}
+              label="Sharpness metric"
+              formatLabel={(m) => m.toUpperCase()}
+              stretch
+            />
 
             {/* Algorithm selector */}
-            <div className="flex flex-col gap-1">
-              <label className="text-xs text-slate-400">Fit algorithm</label>
-              <div className="flex gap-1">
-                {(['parabola', 'hyperbola'] as FitAlgo[]).map((algo) => (
-                  <button key={algo} type="button" onClick={() => patchSettings('fit_algo', algo)}
-                    className={`flex-1 py-0.5 text-xs rounded border capitalize transition-colors ${
-                      settings.fit_algo === algo
-                        ? 'border-accent text-accent bg-accent/10'
-                        : 'border-surface-border text-slate-400 hover:border-slate-500 hover:text-slate-300'
-                    }`}>
-                    {algo}
-                  </button>
-                ))}
-              </div>
-            </div>
+            <PillGroup
+              options={['parabola', 'hyperbola'] as FitAlgo[]}
+              value={settings.fit_algo}
+              onChange={(a) => patchSettings('fit_algo', a)}
+              label="Fit algorithm"
+              stretch
+            />
 
             {/* Step size */}
             <div className="flex flex-col gap-1">
@@ -428,21 +414,13 @@ export function AutofocusPage() {
               <DurationStepper steps={AUTOFOCUS_EXPOSURE_STEPS} value={settings.exposure_time} onChange={(v) => patchSettings('exposure_time', v)} />
             </div>
 
-            <div className="flex flex-col gap-1">
-              <label className="text-xs text-slate-400">Binning</label>
-              <div className="flex gap-1">
-                {BINNINGS.map((b) => (
-                  <button key={b} type="button" onClick={() => patchSettings('binning', b)}
-                    className={`px-2 py-0.5 text-xs rounded border transition-colors ${
-                      settings.binning === b
-                        ? 'border-accent text-accent bg-accent/10'
-                        : 'border-surface-border text-slate-400 hover:border-slate-500 hover:text-slate-300'
-                    }`}>
-                    {b}×{b}
-                  </button>
-                ))}
-              </div>
-            </div>
+            <PillGroup
+              options={BINNINGS}
+              value={settings.binning}
+              onChange={(b) => patchSettings('binning', b)}
+              label="Binning"
+              formatLabel={(b) => `${b}×${b}`}
+            />
 
             <div className="flex flex-col gap-1">
               <label className="text-xs text-slate-400">Gain <span className="text-slate-600">(optional)</span></label>

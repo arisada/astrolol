@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input'
 import { Card } from '@/components/ui/card'
 import { DurationStepper } from '@/components/ui/duration-stepper'
 import { EventLog } from '@/components/ui/event-log'
+import { PillGroup } from '@/components/ui/pill-group'
 import { DevicePropertiesPanel } from '@/components/DevicePropertiesPanel'
 
 const DEFAULT_IMAGER_SETTINGS: ImagerDeviceSettings = {
@@ -55,32 +56,6 @@ function Panel({
     <Card title={title} action={action} className="mx-3 my-2.5 p-3 flex flex-col gap-3">
       {children}
     </Card>
-  )
-}
-
-function PillGroup<T extends string>({
-  options, value, onChange, label, formatLabel,
-}: { options: T[]; value: T; onChange: (v: T) => void; label: string; formatLabel?: (v: T) => string }) {
-  return (
-    <div className="flex flex-col gap-1">
-      <span className="text-xs text-slate-400">{label}</span>
-      <div className="flex gap-1 flex-wrap">
-        {options.map((o) => (
-          <button
-            key={o}
-            type="button"
-            onClick={() => onChange(o)}
-            className={`px-2 py-0.5 text-xs rounded border transition-colors capitalize
-              ${value === o
-                ? 'border-accent text-accent bg-accent/10'
-                : 'border-surface-border text-slate-400 hover:border-slate-500 hover:text-slate-300'
-              }`}
-          >
-            {formatLabel ? formatLabel(o) : o}
-          </button>
-        ))}
-      </div>
-    </div>
   )
 }
 
@@ -376,8 +351,12 @@ function CameraPanel({
         )}
 
         {/* Frame type */}
-        <PillGroup options={FRAME_TYPES} value={settings.frame_type as FrameType}
-          onChange={(v) => patchSettings({ frame_type: v })} label="Frame type" />
+        <PillGroup
+          options={FRAME_TYPES}
+          value={settings.frame_type as FrameType}
+          onChange={(v) => patchSettings({ frame_type: v })}
+          label="Frame type"
+        />
 
         {/* Duration stepper */}
         <DurationStepper steps={EXPOSURE_STEPS} value={settings.duration} onChange={(v) => patchSettings({ duration: v })} />
@@ -398,11 +377,11 @@ function CameraPanel({
 
         {/* Binning */}
         <PillGroup
-          options={BINNINGS.map(String) as string[]}
-          value={String(settings.binning)}
-          onChange={(v) => patchSettings({ binning: parseInt(v) })}
+          options={BINNINGS}
+          value={settings.binning}
+          onChange={(v) => patchSettings({ binning: v })}
           label="Binning"
-          formatLabel={(v) => `${v}×${v}`}
+          formatLabel={(b) => `${b}×${b}`}
         />
 
         {/* Save subs + stretch mode */}
