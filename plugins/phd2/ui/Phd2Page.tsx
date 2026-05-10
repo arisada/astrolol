@@ -4,6 +4,7 @@ import { useStore } from '@/store'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ToggleSwitch } from '@/components/ui/toggle-switch'
+import { EventLog } from '@/components/ui/event-log'
 import type { Phd2Settings } from '@/api/types'
 import * as phd2Api from './api'
 import type { GuidePoint, Phd2PluginState } from './api'
@@ -202,22 +203,6 @@ function Metric({ label, value, unit }: { label: string; value: number | null | 
       <span className="text-xs font-mono text-slate-200">
         {value != null ? `${value.toFixed(3)}${unit ?? ''}` : '—'}
       </span>
-    </div>
-  )
-}
-
-// ── Event log ─────────────────────────────────────────────────────────────────
-
-function Phd2EventLog() {
-  const log = useStore((s) => s.log.filter((e) => e.component === 'phd2'))
-  return (
-    <div className="h-28 bg-surface border-t border-surface-border overflow-y-auto px-3 py-2 font-mono shrink-0">
-      {log.map((e) => (
-        <div key={e.id} className="flex gap-2 text-xs leading-5">
-          <span className="text-slate-600 shrink-0">{e.timestamp.slice(11, 19)}</span>
-          <span className="text-slate-400 truncate">{e.message}</span>
-        </div>
-      ))}
     </div>
   )
 }
@@ -481,7 +466,7 @@ export function Phd2Page() {
         </p>
       )}
     </div>
-    <Phd2EventLog />
+    <EventLog filter={['phd2']} />
     </div>
   )
 }

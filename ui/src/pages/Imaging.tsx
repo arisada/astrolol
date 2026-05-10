@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card } from '@/components/ui/card'
 import { DurationStepper } from '@/components/ui/duration-stepper'
+import { EventLog } from '@/components/ui/event-log'
 import { DevicePropertiesPanel } from '@/components/DevicePropertiesPanel'
 
 const DEFAULT_IMAGER_SETTINGS: ImagerDeviceSettings = {
@@ -578,22 +579,6 @@ function FilterWheelPanel({
   )
 }
 
-// ── Event Log ─────────────────────────────────────────────────────────────────
-
-function EventLog() {
-  const log = useStore((s) => s.log.filter((e) => e.component === 'imager' || e.component === 'indi' || e.component === 'phd2'))
-  return (
-    <div className="h-28 bg-surface border-t border-surface-border overflow-y-auto px-3 py-2 font-mono">
-      {log.map((e) => (
-        <div key={e.id} className="flex gap-2 text-xs leading-5">
-          <span className="text-slate-600 shrink-0">{e.timestamp.slice(11, 19)}</span>
-          <span className="text-slate-400 truncate">{e.message}</span>
-        </div>
-      ))}
-    </div>
-  )
-}
-
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export function Imaging() {
@@ -632,7 +617,7 @@ export function Imaging() {
       {/* Image viewer */}
       <div className="flex-1 flex flex-col min-w-0">
         <ImageViewer deviceId={deviceId} histoAuto={histoAuto} />
-        <EventLog />
+        <EventLog filter={['imager', 'indi', 'phd2']} />
       </div>
 
       {/* Right sidebar */}

@@ -3,13 +3,13 @@ import { fmtRA, fmtDec } from '@/utils/formatting'
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Crosshair, RefreshCw, RotateCw, Settings, StopCircle } from 'lucide-react'
 import { api } from '@/api/client'
 import { useStore } from '@/store'
-import type { LogEntry } from '@/store'
 import type { CoordFrame, DeviceProperty, MountDeviceSettings, TrackingMode } from '@/api/types'
 import { Button } from '@/components/ui/button'
 import { DmsInput } from '@/components/ui/dms-input'
 import { StateBadge } from '@/components/ui/badge'
 import { ToggleSwitch } from '@/components/ui/toggle-switch'
 import { Card } from '@/components/ui/card'
+import { EventLog } from '@/components/ui/event-log'
 import { DevicePropertiesPanel } from '@/components/DevicePropertiesPanel'
 
 // ---------------------------------------------------------------------------
@@ -97,24 +97,6 @@ function FrameToggle({ jnow, onChange }: { jnow: boolean; onChange: (jnow: boole
     <div className="flex items-center gap-0.5 ml-auto">
       {btn('JNow', jnow, () => onChange(true))}
       {btn('J2000', !jnow, () => onChange(false))}
-    </div>
-  )
-}
-
-// ---------------------------------------------------------------------------
-// Event log (mount + indi messages only)
-// ---------------------------------------------------------------------------
-
-function MountEventLog() {
-  const log = useStore((s) => s.log.filter((e: LogEntry) => e.component === 'mount' || e.component === 'indi'))
-  return (
-    <div className="h-28 bg-surface border-t border-surface-border overflow-y-auto px-3 py-2 font-mono shrink-0">
-      {log.map((e: LogEntry) => (
-        <div key={e.id} className="flex gap-2 text-xs leading-5">
-          <span className="text-slate-600 shrink-0">{e.timestamp.slice(11, 19)}</span>
-          <span className={`truncate ${e.level === 'error' ? 'text-status-error' : 'text-slate-400'}`}>{e.message}</span>
-        </div>
-      ))}
     </div>
   )
 }
@@ -460,7 +442,7 @@ function MountControls({ deviceId }: { deviceId: string }) {
         {error && <p className="text-xs text-status-error">{error}</p>}
       </div>
     </div>
-    <MountEventLog />
+    <EventLog filter={['mount', 'indi']} />
     </div>
   )
 }
