@@ -4,6 +4,7 @@ import { useStore } from '@/store'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ToggleSwitch } from '@/components/ui/toggle-switch'
+import { Card } from '@/components/ui/card'
 import { EventLog } from '@/components/ui/event-log'
 import type { Phd2Settings } from '@/api/types'
 import * as phd2Api from './api'
@@ -335,7 +336,7 @@ export function Phd2Page() {
 
       {/* Settings panel */}
       {showSettings && (
-        <div className="border border-surface-border rounded-lg p-3 bg-surface-raised flex flex-col gap-3">
+        <Card className="p-3 bg-surface-raised flex flex-col gap-3">
           <div className="flex items-center justify-between">
             <span className="text-xs text-slate-400">PHD2 host</span>
             <Input
@@ -390,7 +391,7 @@ export function Phd2Page() {
             </div>
             <ToggleSwitch checked={debugEnabled} onChange={toggleDebug} label="PHD2 debug logging" />
           </div>
-        </div>
+        </Card>
       )}
 
       {/* Guide graph — full available width */}
