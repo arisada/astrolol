@@ -128,6 +128,26 @@ async def _enrich_request(req: SolveRequest, request: Request) -> SolveRequest:
     return req
 
 
+_PLUGIN_KEY = "platesolve"
+
+
+@router.get("/settings", response_model=PlatesolveSettings)
+async def get_settings(request: Request) -> PlatesolveSettings:
+    """Return persisted plate-solve settings (defaults if not yet saved)."""
+    raw = request.app.state.profile_store.get_user_settings().plugin_settings.get(_PLUGIN_KEY, {})
+    return PlatesolveSettings(**raw)
+
+
+@router.put("/settings", response_model=PlatesolveSettings)
+async def put_settings(body: PlatesolveSettings, request: Request) -> PlatesolveSettings:
+    """Persist plate-solve settings."""
+    store = request.app.state.profile_store
+    current = store.get_user_settings()
+    updated = {**current.plugin_settings, _PLUGIN_KEY: body.model_dump()}
+    store.update_user_settings(current.model_copy(update={"plugin_settings": updated}))
+    return body
+
+
 class ExposeAndSolveRequest(BaseModel):
     device_id: str
     duration: float = Field(gt=0, description="Exposure duration in seconds")

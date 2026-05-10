@@ -12,3 +12,4 @@ class PlatesolveSettings(BaseModel):
     exposure_duration: float = 5.0
     binning: int = 1
     after_solve: str = "nothing"  # "nothing" | "sync" | "sync_slew"
+    camera_id: str = ""           # device_id of the camera to expose with

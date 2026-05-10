@@ -9,10 +9,24 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from astrolol.config.user_settings import UserSettings
 from plugins.platesolve.api import router
 from plugins.platesolve.models import SolveJob, SolveRequest, SolveResult
 from plugins.platesolve.plugin import get_plugin
+from plugins.platesolve.settings import PlatesolveSettings
 from plugins.platesolve.solver import SolveManager
+
+
+class FakeProfileStore:
+    def __init__(self) -> None:
+        self._settings = UserSettings()
+
+    def get_user_settings(self) -> UserSettings:
+        return self._settings
+
+    def update_user_settings(self, settings: UserSettings) -> UserSettings:
+        self._settings = settings
+        return settings
 
 
 # ── Fake manager ──────────────────────────────────────────────────────────────
@@ -96,6 +110,7 @@ def client() -> TestClient:
     app = FastAPI()
     app.state.solve_manager = FakeSolveManager()
     app.state.event_bus = FakeEventBus()
+    app.state.profile_store = FakeProfileStore()
     app.include_router(router)
     return TestClient(app)
 
@@ -416,3 +431,38 @@ async def test_manager_failed_job_on_bad_binary() -> None:
     finally:
         os.unlink(tmp)
 
+
+
+# ── GET/PUT /plugins/platesolve/settings ─────────────────────────────────────
+
+def test_get_settings_returns_defaults(client: TestClient) -> None:
+    r = client.get("/plugins/platesolve/settings")
+    assert r.status_code == 200
+    data = r.json()
+    assert data["exposure_duration"] == 5.0
+    assert data["binning"] == 1
+    assert data["after_solve"] == "nothing"
+    assert data["camera_id"] == ""
+
+
+def test_put_settings_persists(client: TestClient) -> None:
+    payload = {
+        "astap_bin": "astap_cli",
+        "astap_db_path": "/opt/astap",
+        "astap_search_radius": 15.0,
+        "astap_tolerance": 0.005,
+        "pixel_size_um": 3.76,
+        "exposure_duration": 10.0,
+        "binning": 2,
+        "after_solve": "sync",
+        "camera_id": "cam_asi294",
+    }
+    r = client.put("/plugins/platesolve/settings", json=payload)
+    assert r.status_code == 200
+    assert r.json()["exposure_duration"] == 10.0
+    assert r.json()["camera_id"] == "cam_asi294"
+
+    # Verify persistence via GET
+    r2 = client.get("/plugins/platesolve/settings")
+    assert r2.json()["camera_id"] == "cam_asi294"
+    assert r2.json()["binning"] == 2

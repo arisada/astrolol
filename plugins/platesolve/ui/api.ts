@@ -25,6 +25,7 @@ export interface PlatesolveSettings {
   exposure_duration: number
   binning: number
   after_solve: string   // 'nothing' | 'sync' | 'sync_slew'
+  camera_id: string
 }
 
 export interface SolveRequest {

@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { fmtRA, fmtDec } from '@/utils/formatting'
-import { useLocalStorage } from '@/hooks/useLocalStorage'
 import { AlertTriangle, Camera, Download, ScanSearch, Settings, StopCircle, X } from 'lucide-react'
 import { api } from '@/api/client'
 import { useStore } from '@/store'
@@ -32,6 +31,7 @@ const DEFAULT_PLATESOLVE_SETTINGS: PlatesolveSettings = {
   exposure_duration: 5,
   binning: 1,
   after_solve: 'nothing',
+  camera_id: '',
 }
 
 // ── Platesolve exposure steps ─────────────────────────────────────────────────
@@ -371,9 +371,7 @@ export function PlatesolvePage() {
   const solveJobsMap     = useStore((s) => (s.pluginStates['platesolve'] as PlateSolvePluginState | null)?.jobs ?? {})
 
   const cameras = connectedDevices.filter((d) => d.kind === 'camera')
-  const [selectedCameraId, setSelectedCameraId] = useLocalStorage<string>(
-    'platesolve.cameraId', cameras[0]?.device_id ?? ''
-  )
+  const selectedCameraId = settings?.camera_id ?? ''
   const camera = cameras.find((d) => d.device_id === selectedCameraId) ?? cameras[0] ?? null
   const latestImage = camera ? (latestImages[camera.device_id] ?? null) : null
 
@@ -574,7 +572,7 @@ export function PlatesolvePage() {
           ) : cameras.length === 1 ? (
             <span className="text-xs text-slate-300 font-mono">{cameras[0].device_id}</span>
           ) : (
-            <select value={camera?.device_id ?? ''} onChange={(e) => setSelectedCameraId(e.target.value)}
+            <select value={camera?.device_id ?? ''} onChange={(e) => patchSettings({ camera_id: e.target.value })}
               className="w-full rounded bg-surface-overlay border border-surface-border px-2 py-1.5 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-accent">
               {cameras.map((d) => <option key={d.device_id} value={d.device_id}>{d.device_id}</option>)}
             </select>
