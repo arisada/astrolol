@@ -629,6 +629,56 @@ export interface PlatesolveCompletedEvent extends BaseEvent {
 export interface PlatesolveFailedEvent extends BaseEvent { type: 'platesolve.failed'; solve_id: string; reason: string }
 export interface PlatesolveCancelledEvent extends BaseEvent { type: 'platesolve.cancelled'; solve_id: string }
 
+// --- System management plugin ---
+
+export type NetworkMode = 'wifi' | 'hotspot' | 'disconnected' | 'unknown'
+
+export interface WifiNetwork {
+  ssid: string
+  bssid: string
+  signal: number
+  security: string
+  in_use: boolean
+}
+
+export interface NetworkStatus {
+  mode: NetworkMode
+  interface: string | null
+  ssid: string | null
+  ip_address: string | null
+  gateway: string | null
+  hotspot_ssid: string | null
+  hotspot_ip: string | null
+  nmcli_available: boolean
+}
+
+export interface SystemStatus {
+  cpu_percent: number
+  memory_percent: number
+  memory_used_mb: number
+  memory_total_mb: number
+  disk_percent: number
+  disk_used_gb: number
+  disk_total_gb: number
+  temperature_celsius: number | null
+  uptime_seconds: number
+  hostname: string
+  platform: string
+}
+
+export interface SystemSettings {
+  hotspot_ssid: string
+  hotspot_password: string
+  hotspot_interface: string
+}
+
+export interface SudoSetup {
+  nmcli_sudo_ok: boolean
+  reboot_sudo_ok: boolean
+  shutdown_sudo_ok: boolean
+  setup_commands: string[]
+}
+
 export type AstrolollEvent =
   | DeviceConnectedEvent | DeviceDisconnectedEvent | DeviceStateChangedEvent
   | ExposureStartedEvent | ExposureCompletedEvent | ExposureFailedEvent

@@ -20,6 +20,7 @@ dependencies = [
     "photutils>=1.12",
     "astroplan>=0.10",
     "indipyclient @ {root:uri}/vendor/indipyclient",
+    "psutil>=5.9",
 ]
 
 [project.scripts]
