@@ -15,6 +15,7 @@ export interface TwilightTimes {
 }
 
 export interface EphemerisResult {
+  obs_date: string   // "YYYY-MM-DD" — calendar date of the evening (dusk side)
   rise: string | null
   transit: string | null
   set: string | null
@@ -29,6 +30,7 @@ export interface EphemerisResult {
   twilight: TwilightTimes
   moon_separation: number | null
   moon_illumination: number | null
+  moon_altitude_curve: AltitudePoint[]
   observer_location_missing: boolean
 }
 

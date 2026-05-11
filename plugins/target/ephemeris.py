@@ -33,12 +33,14 @@ def _to_utc_iso(t: Time) -> str:
 
 
 def _midnight_utc(obs_date: date, observer: Observer) -> Time:
-    """Return the UTC Time corresponding to local midnight on obs_date."""
-    # Build a naive local midnight, then shift by the observer's UTC offset.
-    # astroplan's Observer.midnight() is cleaner but requires a starting Time.
-    naive_midnight = datetime(obs_date.year, obs_date.month, obs_date.day, 0, 0, 0)
-    # UTC offset from the observer's longitude (simple solar-noon approximation,
-    # good enough for centring the window; we never display this time directly).
+    """Return UTC time of solar midnight for the night *starting* on obs_date.
+
+    obs_date is the calendar date of the evening (dusk side).  Solar midnight
+    falls on obs_date+1 in solar time, so we compute midnight of the next
+    calendar day shifted by the longitude-based UTC offset.
+    """
+    next_day = obs_date + timedelta(days=1)
+    naive_midnight = datetime(next_day.year, next_day.month, next_day.day, 0, 0, 0)
     lon_deg = observer.location.lon.deg  # type: ignore[union-attr]
     utc_offset_hours = lon_deg / 15.0
     utc_midnight = naive_midnight - timedelta(hours=utc_offset_hours)
@@ -68,20 +70,35 @@ def compute_ephemeris(
     Returns:
         EphemerisResult with all fields populated.
     """
+    now_utc: datetime | None = None
     if obs_date is None:
-        obs_date = datetime.now(timezone.utc).date()
+        now_utc = datetime.now(timezone.utc)
+        obs_date = now_utc.date()
 
     location = EarthLocation(
         lat=latitude * u.deg,
         lon=longitude * u.deg,
         height=altitude_m * u.m,
     )
-    print("location:", location, latitude, longitude)
+    logger.debug("target.ephemeris", latitude=latitude, longitude=longitude, altitude_m=altitude_m, obs_date=str(obs_date))
     observer = Observer(location=location)
     target = FixedTarget(SkyCoord(ra=ra_deg * u.deg, dec=dec_deg * u.deg, frame="icrs"))
 
-    # Centre the window on local midnight
+    # Centre the window on solar midnight for the night starting on obs_date.
+    # When no explicit date was supplied, snap to the correct night:
+    #   now > window_end   → night is over, advance to tomorrow
+    #   now < window_start → early morning, still inside last night
     t_midnight = _midnight_utc(obs_date, observer)
+    if now_utc is not None:
+        t_window_start = (t_midnight - timedelta(hours=_WINDOW_HOURS / 2)).to_datetime(timezone.utc)
+        t_window_end   = (t_midnight + timedelta(hours=_WINDOW_HOURS / 2)).to_datetime(timezone.utc)
+        if now_utc > t_window_end:
+            obs_date   = obs_date + timedelta(days=1)
+            t_midnight = _midnight_utc(obs_date, observer)
+        elif now_utc < t_window_start:
+            obs_date   = obs_date - timedelta(days=1)
+            t_midnight = _midnight_utc(obs_date, observer)
+
     t_start = t_midnight - timedelta(hours=_WINDOW_HOURS / 2)
     t_end   = t_midnight + timedelta(hours=_WINDOW_HOURS / 2)
 
@@ -246,19 +263,47 @@ def compute_ephemeris(
                 imaging_window_end = _to_utc_iso(times[-1])
 
     # ── Moon ──────────────────────────────────────────────────────────────────
+    # Use the midpoint of the darkest available twilight band as the reference
+    # time for illumination and separation — t_midnight is solar midnight which
+    # can be hours away from when the moon actually matters for imaging.
+    t_moon_ref = t_midnight
+    _tw_pairs = [
+        (twilight.astronomical_dusk, twilight.astronomical_dawn),
+        (twilight.nautical_dusk, twilight.nautical_dawn),
+        (twilight.civil_dusk, twilight.civil_dawn),
+    ]
+    for _dusk_iso, _dawn_iso in _tw_pairs:
+        if _dusk_iso and _dawn_iso:
+            _t1 = Time(datetime.fromisoformat(_dusk_iso))
+            _t2 = Time(datetime.fromisoformat(_dawn_iso))
+            t_moon_ref = Time((_t1.jd + _t2.jd) / 2, format='jd')
+            break
+
     moon_separation: float | None = None
     moon_illumination: float | None = None
+    moon_altitude_curve: list[AltitudePoint] = []
     try:
-        moon_coord = get_body("moon", t_midnight, location=location)
+        moon_coord = get_body("moon", t_moon_ref, location=location)
         # Convert GCRS → ICRS before separation to avoid the NonRotationTransformationWarning
         moon_icrs = SkyCoord(ra=moon_coord.icrs.ra, dec=moon_coord.icrs.dec, frame="icrs")
         target_coord = SkyCoord(ra=ra_deg * u.deg, dec=dec_deg * u.deg, frame="icrs")
         moon_separation = float(target_coord.separation(moon_icrs).deg)
-        moon_illumination = float(observer.moon_illumination(t_midnight))
+        moon_illumination = float(observer.moon_illumination(t_moon_ref))
+
+        # Full altitude curve for the moon over the same time window
+        moon_coords_all = get_body("moon", times, location=location)
+        moon_altaz_all = moon_coords_all.transform_to(AltAz(obstime=times, location=location))
+        moon_alts_arr = moon_altaz_all.alt.deg
+        for i, t in enumerate(times):
+            moon_altitude_curve.append(AltitudePoint(
+                time=_to_utc_iso(t),
+                alt=float(moon_alts_arr[i]),
+            ))
     except Exception:
         pass
 
     return EphemerisResult(
+        obs_date=obs_date.isoformat(),
         rise=rise,
         transit=transit,
         set=t_set,
@@ -273,4 +318,5 @@ def compute_ephemeris(
         twilight=twilight,
         moon_separation=moon_separation,
         moon_illumination=moon_illumination,
+        moon_altitude_curve=moon_altitude_curve,
     )

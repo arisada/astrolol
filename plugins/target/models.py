@@ -54,6 +54,9 @@ class TwilightTimes(BaseModel):
 
 
 class EphemerisResult(BaseModel):
+    # Calendar date of the evening (dusk side) of the observation night, "YYYY-MM-DD"
+    obs_date: str = ""
+
     # Rise / transit / set (UTC ISO strings, None = circumpolar or never rises)
     rise: str | None = None
     transit: str | None = None
@@ -80,6 +83,7 @@ class EphemerisResult(BaseModel):
     # Moon
     moon_separation: float | None = None    # degrees
     moon_illumination: float | None = None  # 0.0 – 1.0
+    moon_altitude_curve: list[AltitudePoint] = []
 
     # Set when profile has no observer location configured
     observer_location_missing: bool = False
