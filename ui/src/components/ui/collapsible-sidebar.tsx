@@ -1,8 +1,24 @@
+import { useEffect, useRef } from 'react'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useLocalStorage } from '@/hooks/useLocalStorage'
 
+const BREAKPOINT = 768
+
 export function CollapsibleSidebar({ children }: { children: React.ReactNode }) {
-  const [open, setOpen] = useLocalStorage('ui.sidebar.open', window.innerWidth >= 768)
+  const [open, setOpen] = useLocalStorage('ui.sidebar.open', window.innerWidth >= BREAKPOINT)
+  const prevWide = useRef(window.innerWidth >= BREAKPOINT)
+
+  useEffect(() => {
+    const onResize = () => {
+      const wide = window.innerWidth >= BREAKPOINT
+      if (wide !== prevWide.current) {
+        prevWide.current = wide
+        setOpen(wide)
+      }
+    }
+    window.addEventListener('resize', onResize)
+    return () => window.removeEventListener('resize', onResize)
+  }, [setOpen])
 
   return (
     <aside
