@@ -14,12 +14,14 @@ from plugins.system.models import (
     HostnameInfo,
     HotspotStartRequest,
     NetworkStatus,
+    SavedWifiConnection,
     SetHostnameRequest,
     StorageDisk,
     SudoSetup,
     SystemSettings,
     SystemStatus,
     TimeInfo,
+    UsbDevice,
     WifiConnectRequest,
     WifiNetwork,
 )
@@ -79,6 +81,21 @@ async def connect_wifi(body: WifiConnectRequest, request: Request) -> dict[str, 
     except RuntimeError as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
     return {"status": "connected", "ssid": body.ssid}
+
+
+@router.get("/network/saved", response_model=list[SavedWifiConnection])
+async def list_saved_connections() -> list[SavedWifiConnection]:
+    """Return saved WiFi connection profiles."""
+    return await _net.list_saved_wifi_connections()
+
+
+@router.delete("/network/saved/{name}", status_code=204)
+async def delete_saved_connection(name: str) -> None:
+    """Delete a saved WiFi connection profile by name."""
+    try:
+        await _net.delete_saved_connection(name)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
 @router.post("/network/disconnect", status_code=200)
@@ -153,6 +170,14 @@ async def get_sudo_setup() -> SudoSetup:
         shutdown_sudo_ok=perms.get("shutdown", False),
         setup_commands=setup_commands,
     )
+
+
+# ── USB devices ───────────────────────────────────────────────────────────────
+
+@router.get("/usb", response_model=list[UsbDevice])
+async def get_usb_devices() -> list[UsbDevice]:
+    """Return connected non-hub USB devices."""
+    return await _si.get_usb_devices()
 
 
 # ── Storage ───────────────────────────────────────────────────────────────────

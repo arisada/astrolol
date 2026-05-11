@@ -377,6 +377,61 @@ def test_set_hostname_empty_rejected(client: TestClient) -> None:
     assert r.status_code == 422
 
 
+# ── USB devices ────────────────────────────────────────────────────────────────
+
+def test_usb_devices_returns_list(client: TestClient) -> None:
+    from plugins.system.models import UsbDevice
+    fake = [
+        UsbDevice(bus="001", device="002", vendor_id="03c3", product_id="120c",
+                  name="ZWO ASI294MC Pro"),
+        UsbDevice(bus="001", device="003", vendor_id="067b", product_id="2303",
+                  name="Prolific Technology, Inc. PL2303 Serial Port"),
+    ]
+    with patch("plugins.system.api._si.get_usb_devices", AsyncMock(return_value=fake)):
+        r = client.get("/plugins/system/usb")
+    assert r.status_code == 200
+    data = r.json()
+    assert len(data) == 2
+    assert data[0]["name"] == "ZWO ASI294MC Pro"
+
+
+def test_usb_devices_empty(client: TestClient) -> None:
+    with patch("plugins.system.api._si.get_usb_devices", AsyncMock(return_value=[])):
+        r = client.get("/plugins/system/usb")
+    assert r.status_code == 200
+    assert r.json() == []
+
+
+# ── Saved WiFi connections ─────────────────────────────────────────────────────
+
+def test_list_saved_connections(client: TestClient) -> None:
+    from plugins.system.models import SavedWifiConnection
+    fake = [
+        SavedWifiConnection(name="HomeNet", interface="wlan0", autoconnect=True),
+        SavedWifiConnection(name="Observatory", interface=None, autoconnect=False),
+    ]
+    with patch("plugins.system.api._net.list_saved_wifi_connections", AsyncMock(return_value=fake)):
+        r = client.get("/plugins/system/network/saved")
+    assert r.status_code == 200
+    data = r.json()
+    assert len(data) == 2
+    assert data[0]["name"] == "HomeNet"
+    assert data[0]["autoconnect"] is True
+
+
+def test_delete_saved_connection_success(client: TestClient) -> None:
+    with patch("plugins.system.api._net.delete_saved_connection", AsyncMock()):
+        r = client.delete("/plugins/system/network/saved/HomeNet")
+    assert r.status_code == 204
+
+
+def test_delete_saved_connection_failure(client: TestClient) -> None:
+    with patch("plugins.system.api._net.delete_saved_connection",
+               AsyncMock(side_effect=RuntimeError("Not found"))):
+        r = client.delete("/plugins/system/network/saved/NoSuchNetwork")
+    assert r.status_code == 500
+
+
 # ── Plugin manifest ────────────────────────────────────────────────────────────
 
 def test_plugin_manifest() -> None:

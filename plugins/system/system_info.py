@@ -10,7 +10,7 @@ from pathlib import Path
 import psutil
 import structlog
 
-from plugins.system.models import HostnameInfo, StorageDisk, SystemStatus, TimeInfo
+from plugins.system.models import HostnameInfo, StorageDisk, SystemStatus, TimeInfo, UsbDevice
 
 logger = structlog.get_logger()
 
@@ -204,6 +204,45 @@ async def set_hostname(new_hostname: str) -> None:
     _, stderr = await proc.communicate()
     if proc.returncode != 0:
         raise RuntimeError(stderr.decode().strip() or f"hostnamectl exited {proc.returncode}")
+
+
+async def get_usb_devices() -> list[UsbDevice]:
+    """List connected USB devices via lsusb."""
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "lsusb",
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        stdout, _ = await proc.communicate()
+        if proc.returncode != 0:
+            return []
+    except FileNotFoundError:
+        return []
+
+    devices: list[UsbDevice] = []
+    for line in stdout.decode().splitlines():
+        # Format: Bus 001 Device 001: ID 1d6b:0002 Linux Foundation 2.0 root hub
+        import re as _re
+        m = _re.match(
+            r"Bus (\d+) Device (\d+): ID ([0-9a-f]{4}):([0-9a-f]{4})\s+(.*)",
+            line.strip(),
+            _re.IGNORECASE,
+        )
+        if not m:
+            continue
+        name = m.group(5).strip()
+        # Skip root hubs to keep the list clean
+        if "root hub" in name.lower() or "usb hub" in name.lower():
+            continue
+        devices.append(UsbDevice(
+            bus=m.group(1),
+            device=m.group(2),
+            vendor_id=m.group(3),
+            product_id=m.group(4),
+            name=name,
+        ))
+    return devices
 
 
 async def set_timezone(tz: str) -> None:

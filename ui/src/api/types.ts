@@ -704,6 +704,20 @@ export interface HostnameInfo {
   fqdn: string | null
 }
 
+export interface UsbDevice {
+  bus: string
+  device: string
+  vendor_id: string
+  product_id: string
+  name: string
+}
+
+export interface SavedWifiConnection {
+  name: string
+  interface: string | null
+  autoconnect: boolean
+}
+
 export type AstrolollEvent =
   | DeviceConnectedEvent | DeviceDisconnectedEvent | DeviceStateChangedEvent
   | ExposureStartedEvent | ExposureCompletedEvent | ExposureFailedEvent

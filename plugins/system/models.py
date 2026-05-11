@@ -98,3 +98,17 @@ class HostnameInfo(BaseModel):
 
 class SetHostnameRequest(BaseModel):
     hostname: str = Field(min_length=1, max_length=63)
+
+
+class UsbDevice(BaseModel):
+    bus: str
+    device: str
+    vendor_id: str
+    product_id: str
+    name: str
+
+
+class SavedWifiConnection(BaseModel):
+    name: str
+    interface: str | None
+    autoconnect: bool

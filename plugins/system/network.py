@@ -18,7 +18,7 @@ import re
 import shutil
 import structlog
 
-from plugins.system.models import NetworkMode, NetworkStatus, WifiNetwork
+from plugins.system.models import NetworkMode, NetworkStatus, SavedWifiConnection, WifiNetwork
 
 logger = structlog.get_logger()
 
@@ -286,6 +286,43 @@ async def stop_hotspot() -> None:
     # Clean up the connection profile
     await _run("nmcli", "connection", "delete", _HOTSPOT_CON_NAME, sudo=True)
     logger.info("system.hotspot_stopped")
+
+
+async def list_saved_wifi_connections() -> list[SavedWifiConnection]:
+    """Return saved WiFi connection profiles from NetworkManager."""
+    if not nmcli_available():
+        return []
+    rc, out, _ = await _run(
+        "nmcli", "-t", "-f", "NAME,TYPE,DEVICE,AUTOCONNECT", "connection", "show"
+    )
+    if rc != 0:
+        return []
+    results: list[SavedWifiConnection] = []
+    for line in out.splitlines():
+        parts = line.split(":")
+        if len(parts) < 4:
+            continue
+        name, conn_type, device, autoconnect = parts[0], parts[1], parts[2], parts[3]
+        if conn_type != "802-11-wireless":
+            continue
+        if name == _HOTSPOT_CON_NAME:
+            continue  # hide the internal hotspot profile
+        results.append(SavedWifiConnection(
+            name=name,
+            interface=device if device and device != "--" else None,
+            autoconnect=autoconnect.strip().lower() == "yes",
+        ))
+    return results
+
+
+async def delete_saved_connection(name: str) -> None:
+    """Delete a saved NetworkManager connection profile by name."""
+    if not nmcli_available():
+        raise RuntimeError("nmcli not available")
+    rc, _, err = await _run("nmcli", "connection", "delete", name, sudo=True)
+    if rc != 0:
+        raise RuntimeError(err or f"nmcli exited {rc}")
+    logger.info("system.connection_deleted", name=name)
 
 
 async def check_sudo_permissions() -> dict[str, bool]:

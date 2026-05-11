@@ -16,16 +16,20 @@ import {
   Clock,
   HardDrive,
   Server,
+  Usb,
+  Trash2,
 } from 'lucide-react'
 import type {
   HostnameInfo,
   NetworkMode,
   NetworkStatus,
+  SavedWifiConnection,
   StorageDisk,
   SystemSettings,
   SystemStatus,
   SudoSetup,
   TimeInfo,
+  UsbDevice,
   WifiNetwork,
 } from '@/api/types'
 import * as api from './api'
@@ -243,10 +247,13 @@ export function SystemPage() {
   const [networks, setNetworks]     = useState<WifiNetwork[] | null>(null)
   const [sudoSetup, setSudoSetup]   = useState<SudoSetup | null>(null)
   const [settings, setSettings]     = useState<SystemSettings | null>(null)
-  const [storage, setStorage]       = useState<StorageDisk[] | null>(null)
-  const [timeInfo, setTimeInfo]     = useState<TimeInfo | null>(null)
-  const [hostnameInfo, setHostname] = useState<HostnameInfo | null>(null)
-  const [timezones, setTimezones]   = useState<string[] | null>(null)
+  const [storage, setStorage]             = useState<StorageDisk[] | null>(null)
+  const [timeInfo, setTimeInfo]           = useState<TimeInfo | null>(null)
+  const [hostnameInfo, setHostname]       = useState<HostnameInfo | null>(null)
+  const [timezones, setTimezones]         = useState<string[] | null>(null)
+  const [usbDevices, setUsbDevices]       = useState<UsbDevice[] | null>(null)
+  const [savedConns, setSavedConns]       = useState<SavedWifiConnection[] | null>(null)
+  const [deletingConn, setDeletingConn]   = useState<string | null>(null)
 
   const [scanning, setScanning]               = useState(false)
   const [connecting, setConnecting]           = useState<string | null>(null)
@@ -297,6 +304,8 @@ export function SystemPage() {
       api.getStorage().then(setStorage).catch(() => {}),
       api.getTimeInfo().then((t) => { setTimeInfo(t); setSelectedTz(t.timezone) }).catch(() => {}),
       api.getHostname().then((h) => { setHostname(h); setDraftHostname(h.hostname) }).catch(() => {}),
+      api.getUsbDevices().then(setUsbDevices).catch(() => {}),
+      api.listSavedConnections().then(setSavedConns).catch(() => {}),
     ])
   }, [])
 
@@ -415,6 +424,19 @@ export function SystemPage() {
       setError(e instanceof Error ? e.message : 'Failed to set hostname')
     } finally {
       setSavingHostname(false)
+    }
+  }
+
+  const handleDeleteConnection = async (name: string) => {
+    setDeletingConn(name)
+    try {
+      await api.deleteSavedConnection(name)
+      setSavedConns((c) => c?.filter((x) => x.name !== name) ?? null)
+      setMsg(`Deleted connection "${name}"`)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Delete failed')
+    } finally {
+      setDeletingConn(null)
     }
   }
 
@@ -624,6 +646,52 @@ export function SystemPage() {
           </div>
         )}
       </Section>
+
+      {/* ── Saved WiFi connections ───────────────────────────────────────── */}
+      {savedConns !== null && savedConns.length > 0 && (
+        <Section title="Saved WiFi Connections" icon={Wifi}>
+          <div className="space-y-2">
+            {savedConns.map((conn) => (
+              <div key={conn.name} className="flex items-center gap-3 py-1">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-slate-200 truncate">{conn.name}</p>
+                  <p className="text-xs text-slate-500">
+                    {conn.autoconnect ? 'Auto-connect' : 'Manual'}
+                    {conn.interface ? ` · ${conn.interface}` : ''}
+                  </p>
+                </div>
+                <button
+                  onClick={() => handleDeleteConnection(conn.name)}
+                  disabled={deletingConn === conn.name}
+                  title="Delete saved connection"
+                  className="p-1.5 rounded hover:bg-rose-500/10 text-slate-500 hover:text-rose-400 transition-colors disabled:opacity-50"
+                >
+                  <Trash2 size={13} />
+                </button>
+              </div>
+            ))}
+          </div>
+        </Section>
+      )}
+
+      {/* ── USB devices ──────────────────────────────────────────────────── */}
+      {usbDevices !== null && usbDevices.length > 0 && (
+        <Section title="USB Devices" icon={Usb}>
+          <div className="space-y-2">
+            {usbDevices.map((dev) => (
+              <div key={`${dev.bus}-${dev.device}`} className="flex items-start gap-3">
+                <Usb size={13} className="text-slate-500 mt-0.5 flex-none" />
+                <div className="min-w-0">
+                  <p className="text-sm text-slate-200 truncate">{dev.name}</p>
+                  <p className="text-xs text-slate-600 font-mono">
+                    {dev.vendor_id}:{dev.product_id} · Bus {dev.bus} Dev {dev.device}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </Section>
+      )}
 
       {/* ── Hotspot settings ──────────────────────────────────────────────── */}
       <Section title="Hotspot Settings" icon={Radio}>

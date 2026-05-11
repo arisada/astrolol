@@ -1,11 +1,13 @@
 import type {
   HostnameInfo,
   NetworkStatus,
+  SavedWifiConnection,
   StorageDisk,
   SystemSettings,
   SystemStatus,
   SudoSetup,
   TimeInfo,
+  UsbDevice,
   WifiNetwork,
 } from '@/api/types'
 
@@ -60,6 +62,15 @@ export const putSettings = (s: SystemSettings) =>
 
 export const getSudoSetup = () =>
   request<SudoSetup>('/plugins/system/sudo')
+
+export const getUsbDevices = () =>
+  request<UsbDevice[]>('/plugins/system/usb')
+
+export const listSavedConnections = () =>
+  request<SavedWifiConnection[]>('/plugins/system/network/saved')
+
+export const deleteSavedConnection = (name: string) =>
+  request<void>(`/plugins/system/network/saved/${encodeURIComponent(name)}`, { method: 'DELETE' })
 
 export const getStorage = () =>
   request<StorageDisk[]>('/plugins/system/storage')
