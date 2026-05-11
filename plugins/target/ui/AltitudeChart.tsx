@@ -72,6 +72,15 @@ function formatHour(ms: number): string {
   return `${h}:${m}`
 }
 
+function isMidnight(ms: number): boolean {
+  const d = new Date(ms)
+  return d.getHours() === 0 && d.getMinutes() === 0
+}
+
+function formatDate(ms: number): string {
+  return new Date(ms).toLocaleDateString([], { day: 'numeric', month: 'short' })
+}
+
 function vMarker(
   iso: string | null,
   domain: [number, number],
@@ -98,6 +107,23 @@ export function AltitudeChart({ ephemeris, minAlt }: Props) {
   if (altitude_curve.length === 0) return null
 
   const domain = chartDomain(ephemeris)
+
+  // Moon curve — filtered to domain, clamped to Y_MIN for area fill
+  const { moon_altitude_curve } = ephemeris
+  const visibleMoonPoints = moon_altitude_curve.filter((p: AltitudePoint) => {
+    const ms = isoToMs(p.time)
+    return ms >= domain[0] && ms <= domain[1]
+  })
+  const moonAreaPoints = [
+    `${toX(domain[0], domain).toFixed(1)},${toY(Y_MIN).toFixed(1)}`,
+    ...visibleMoonPoints.map((p: AltitudePoint) =>
+      `${toX(isoToMs(p.time), domain).toFixed(1)},${toY(Math.max(p.alt, Y_MIN)).toFixed(1)}`
+    ),
+    `${toX(domain[1], domain).toFixed(1)},${toY(Y_MIN).toFixed(1)}`,
+  ].join(' ')
+  const moonLinePoints = visibleMoonPoints
+    .map((p: AltitudePoint) => `${toX(isoToMs(p.time), domain).toFixed(1)},${toY(p.alt).toFixed(1)}`)
+    .join(' ')
 
   // Filter curve to domain, build polyline points
   const visiblePoints = altitude_curve.filter((p: AltitudePoint) => {
@@ -181,13 +207,34 @@ export function AltitudeChart({ ephemeris, minAlt }: Props) {
         </g>
       ))}
 
-      {/* Horizon line */}
+      {/* Sub-horizon zone — greyed out so objects below 0° read as not visible */}
+      <rect
+        x={PAD.left} y={y0}
+        width={CHART_W} height={PAD.top + CHART_H - y0}
+        fill="rgba(0,0,0,0.45)"
+      />
+
+      {/* Horizon line — drawn on top of the grey zone so it's the clear boundary */}
       <line x1={PAD.left} y1={y0} x2={PAD.left + CHART_W} y2={y0}
-        stroke="rgba(100,116,139,0.45)" strokeWidth={1} />
+        stroke="rgba(148,163,184,0.6)" strokeWidth={1} />
 
       {/* Min-altitude dashed line */}
       <line x1={PAD.left} y1={yMin} x2={PAD.left + CHART_W} y2={yMin}
         stroke="rgba(251,146,60,0.5)" strokeWidth={1} strokeDasharray="4 3" />
+
+      {/* Moon altitude fill + curve — behind target curve */}
+      {visibleMoonPoints.length > 1 && (
+        <g clipPath={`url(#${clipId})`}>
+          <polygon points={moonAreaPoints} fill="rgba(148,163,184,0.13)" />
+          <polyline
+            points={moonLinePoints}
+            fill="none"
+            stroke="rgba(148,163,184,0.38)"
+            strokeWidth={1.5}
+            strokeLinejoin="round"
+          />
+        </g>
+      )}
 
       {/* Filled area + curve — clipped to chart bounds */}
       <g clipPath={`url(#${clipId})`}>
@@ -213,14 +260,20 @@ export function AltitudeChart({ ephemeris, minAlt }: Props) {
       {/* X-axis ticks */}
       {tickMs.map((ms, i) => {
         const x = toX(ms, domain)
-        const showLabel = i % tickInterval === 0
+        const midnight = isMidnight(ms)
+        const showTimeLabel = midnight || i % tickInterval === 0
         return (
           <g key={ms}>
-            <line x1={x} y1={PAD.top + CHART_H} x2={x} y2={PAD.top + CHART_H + 3}
-              stroke="rgba(100,116,139,0.4)" strokeWidth={1} />
-            {showLabel && (
-              <text x={x} y={PAD.top + CHART_H + 12} fill="rgba(148,163,184,0.55)" fontSize={8} textAnchor="middle">
+            <line x1={x} y1={PAD.top + CHART_H} x2={x} y2={PAD.top + CHART_H + (midnight ? 5 : 3)}
+              stroke={midnight ? 'rgba(148,163,184,0.55)' : 'rgba(100,116,139,0.4)'} strokeWidth={1} />
+            {showTimeLabel && (
+              <text x={x} y={PAD.top + CHART_H + 12} fill={midnight ? 'rgba(203,213,225,0.7)' : 'rgba(148,163,184,0.55)'} fontSize={8} textAnchor="middle">
                 {formatHour(ms)}
+              </text>
+            )}
+            {midnight && (
+              <text x={x} y={PAD.top + CHART_H + 22} fill="rgba(203,213,225,0.55)" fontSize={8} textAnchor="middle">
+                {formatDate(ms)}
               </text>
             )}
           </g>

@@ -2,7 +2,7 @@
 // and action buttons for a selected sky object.
 
 import { useState } from 'react'
-import { AlertTriangle, BookmarkPlus, ChevronRight, Crosshair, Moon, Navigation } from 'lucide-react'
+import { AlertTriangle, BookmarkPlus, ChevronLeft, ChevronRight, Crosshair, Moon, Navigation } from 'lucide-react'
 import type { ObjectMatch } from './SearchBox'
 import type { EphemerisResult } from './api'
 import { AltitudeChart } from './AltitudeChart'
@@ -13,9 +13,26 @@ interface Props {
   loading: boolean
   mountIds: string[]        // connected mount device IDs
   minAlt: number
+  obsDate: string | null
+  onObsDateChange: (date: string | null) => void
   onSetTarget: (mountId: string) => void
   onSetAndSlew: (mountId: string) => void
   onAddToFavorites: () => void
+}
+
+function shiftDate(base: string, delta: number): string {
+  const d = new Date(base + 'T12:00:00')  // noon avoids DST edge cases
+  d.setDate(d.getDate() + delta)
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+function formatObsDate(dateStr: string): string {
+  return new Date(dateStr + 'T12:00:00').toLocaleDateString([], {
+    weekday: 'short', day: 'numeric', month: 'short', year: 'numeric',
+  })
 }
 
 function fmt(degrees: number, isRa = false): string {
@@ -49,6 +66,7 @@ function moonIcon(illumination: number): string {
 
 export function ObjectCard({
   object, ephemeris, loading, mountIds, minAlt,
+  onObsDateChange,
   onSetTarget, onSetAndSlew, onAddToFavorites,
 }: Props) {
   const [selectedMount, setSelectedMount] = useState<string>(mountIds[0] ?? '')
@@ -132,13 +150,16 @@ export function ObjectCard({
             </div>
 
             {/* Rise / Transit / Set row */}
-            {!ephemeris.circumpolar && !ephemeris.never_rises && (
+            {!ephemeris.never_rises && (
               <div className="flex gap-1 mb-3">
-                {([
-                  ['Rise',    ephemeris.rise,    'text-emerald-400'],
-                  ['Transit', ephemeris.transit ?? ephemeris.peak_time, 'text-yellow-400'],
-                  ['Set',     ephemeris.set,     'text-red-400'],
-                ] as [string, string | null, string][]).map(([label, iso, color]) => (
+                {(ephemeris.circumpolar
+                  ? [['Transit', ephemeris.transit ?? ephemeris.peak_time, 'text-yellow-400']] as [string, string | null, string][]
+                  : [
+                      ['Rise',    ephemeris.rise,    'text-emerald-400'],
+                      ['Transit', ephemeris.transit ?? ephemeris.peak_time, 'text-yellow-400'],
+                      ['Set',     ephemeris.set,     'text-red-400'],
+                    ] as [string, string | null, string][]
+                ).map(([label, iso, color]) => (
                   <div key={label} className="flex-1 rounded-lg bg-slate-900/50 px-3 py-2 text-center">
                     <p className={`text-[10px] uppercase tracking-wide font-medium mb-1 ${color}`}>{label}</p>
                     <p className="text-sm font-mono text-slate-200 whitespace-nowrap">{fmtTime(iso)}</p>
@@ -150,6 +171,32 @@ export function ObjectCard({
             {/* Altitude chart */}
             {ephemeris.altitude_curve.length > 0 && (
               <div className="mb-3">
+                {/* Observation date navigation */}
+                {ephemeris.obs_date && (
+                  <div className="flex items-center justify-between mb-2">
+                    <button
+                      onClick={() => onObsDateChange(shiftDate(ephemeris.obs_date, -1))}
+                      className="p-1 rounded text-slate-400 hover:text-slate-200 hover:bg-slate-700/50 transition-colors"
+                      title="Previous night"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                    </button>
+                    <button
+                      onClick={() => onObsDateChange(null)}
+                      className="text-xs text-slate-400 hover:text-slate-200 transition-colors"
+                      title="Jump to tonight"
+                    >
+                      {formatObsDate(ephemeris.obs_date)}
+                    </button>
+                    <button
+                      onClick={() => onObsDateChange(shiftDate(ephemeris.obs_date, +1))}
+                      className="p-1 rounded text-slate-400 hover:text-slate-200 hover:bg-slate-700/50 transition-colors"
+                      title="Next night"
+                    >
+                      <ChevronRight className="h-4 w-4" />
+                    </button>
+                  </div>
+                )}
                 <AltitudeChart ephemeris={ephemeris} minAlt={minAlt} />
               </div>
             )}

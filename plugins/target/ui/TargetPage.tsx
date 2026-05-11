@@ -18,6 +18,7 @@ export function TargetPage() {
     .find((e) => e.status?.ra != null && e.status?.dec != null)
 
   const [selected, setSelected] = useState<ObjectMatch | null>(null)
+  const [obsDate, setObsDate] = useState<string | null>(null)
   const [ephemeris, setEphemeris] = useState<EphemerisResult | null>(null)
   const [ephLoading, setEphLoading] = useState(false)
 
@@ -42,19 +43,22 @@ export function TargetPage() {
     getSettings().then((s) => { setSettings(s); setSettingsLoaded(true) }).catch(() => setSettingsLoaded(true))
   }, [])
 
-  // Fetch ephemeris whenever selection changes
+  // Fetch ephemeris whenever selection or observation date changes
   useEffect(() => {
     if (!selected) { setEphemeris(null); return }
+    let cancelled = false
     setEphLoading(true)
     setEphemeris(null)
-    getEphemeris(selected.ra, selected.dec)
-      .then(setEphemeris)
-      .catch(() => showToast('Ephemeris computation failed', false))
-      .finally(() => setEphLoading(false))
-  }, [selected])
+    getEphemeris(selected.ra, selected.dec, obsDate ?? undefined)
+      .then((data) => { if (!cancelled) setEphemeris(data) })
+      .catch(() => { if (!cancelled) showToast('Ephemeris computation failed', false) })
+      .finally(() => { if (!cancelled) setEphLoading(false) })
+    return () => { cancelled = true }
+  }, [selected, obsDate])
 
   const handleSelect = useCallback((obj: ObjectMatch) => {
     setSelected(obj)
+    setObsDate(null)  // reset to auto-select when switching targets
   }, [])
 
   async function handleSetTarget(mountId: string) {
@@ -193,6 +197,8 @@ export function TargetPage() {
           loading={ephLoading}
           mountIds={mountIds}
           minAlt={settings.min_altitude_deg}
+          obsDate={obsDate}
+          onObsDateChange={setObsDate}
           onSetTarget={handleSetTarget}
           onSetAndSlew={handleSetAndSlew}
           onAddToFavorites={handleAddToFavorites}
