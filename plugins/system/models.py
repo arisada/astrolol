@@ -69,3 +69,32 @@ class SudoSetup(BaseModel):
     reboot_sudo_ok: bool
     shutdown_sudo_ok: bool
     setup_commands: list[str]
+
+
+class TimeInfo(BaseModel):
+    datetime_local: str        # ISO 8601 local time
+    datetime_utc: str          # ISO 8601 UTC
+    timezone: str              # e.g. "Europe/Brussels"
+    ntp_synced: bool
+    ntp_service_active: bool
+    rtc_time: str | None
+
+
+class StorageDisk(BaseModel):
+    device: str
+    mountpoint: str
+    filesystem: str
+    total_gb: float
+    used_gb: float
+    free_gb: float
+    percent: float
+    removable: bool
+
+
+class HostnameInfo(BaseModel):
+    hostname: str
+    fqdn: str | None
+
+
+class SetHostnameRequest(BaseModel):
+    hostname: str = Field(min_length=1, max_length=63)

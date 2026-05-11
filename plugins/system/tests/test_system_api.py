@@ -276,6 +276,107 @@ def test_shutdown_returns_202(client: TestClient) -> None:
     assert r.json()["status"] == "shutting_down"
 
 
+# ── Storage ────────────────────────────────────────────────────────────────────
+
+def test_storage_returns_list(client: TestClient) -> None:
+    from plugins.system.models import StorageDisk
+    fake = [
+        StorageDisk(device="/dev/sda1", mountpoint="/", filesystem="ext4",
+                    total_gb=32.0, used_gb=8.0, free_gb=24.0, percent=25.0, removable=False),
+        StorageDisk(device="/dev/sdb1", mountpoint="/media/usb", filesystem="vfat",
+                    total_gb=128.0, used_gb=64.0, free_gb=64.0, percent=50.0, removable=True),
+    ]
+    with patch("plugins.system.api._si.get_storage_disks", AsyncMock(return_value=fake)):
+        r = client.get("/plugins/system/storage")
+    assert r.status_code == 200
+    data = r.json()
+    assert len(data) == 2
+    assert data[0]["mountpoint"] == "/"
+    assert data[1]["removable"] is True
+
+
+# ── Time / Timezone ─────────────────────────────────────────────────────────────
+
+def test_get_time_info(client: TestClient) -> None:
+    from plugins.system.models import TimeInfo
+    fake = TimeInfo(
+        datetime_local="2026-05-11T22:00:00+02:00",
+        datetime_utc="2026-05-11T20:00:00+00:00",
+        timezone="Europe/Brussels",
+        ntp_synced=True,
+        ntp_service_active=True,
+        rtc_time=None,
+    )
+    with patch("plugins.system.api._si.get_time_info", AsyncMock(return_value=fake)):
+        r = client.get("/plugins/system/time")
+    assert r.status_code == 200
+    assert r.json()["timezone"] == "Europe/Brussels"
+    assert r.json()["ntp_synced"] is True
+
+
+def test_list_timezones(client: TestClient) -> None:
+    fake_tzs = ["UTC", "Europe/Brussels", "America/New_York"]
+    with patch("plugins.system.api._si.get_available_timezones", AsyncMock(return_value=fake_tzs)):
+        r = client.get("/plugins/system/time/timezones")
+    assert r.status_code == 200
+    assert "Europe/Brussels" in r.json()
+
+
+def test_set_timezone_success(client: TestClient) -> None:
+    with patch("plugins.system.api._si.set_timezone", AsyncMock()):
+        r = client.put("/plugins/system/time/timezone", json={"timezone": "Europe/Paris"})
+    assert r.status_code == 200
+    assert r.json()["timezone"] == "Europe/Paris"
+
+
+def test_set_timezone_empty_rejected(client: TestClient) -> None:
+    with patch("plugins.system.api._si.set_timezone", AsyncMock()):
+        r = client.put("/plugins/system/time/timezone", json={"timezone": ""})
+    assert r.status_code == 400
+
+
+def test_set_timezone_failure(client: TestClient) -> None:
+    with patch("plugins.system.api._si.set_timezone", AsyncMock(side_effect=RuntimeError("Invalid timezone"))):
+        r = client.put("/plugins/system/time/timezone", json={"timezone": "Invalid/Zone"})
+    assert r.status_code == 500
+
+
+# ── Hostname ────────────────────────────────────────────────────────────────────
+
+def test_get_hostname(client: TestClient) -> None:
+    from plugins.system.models import HostnameInfo
+    fake = HostnameInfo(hostname="astrolol-pi", fqdn=None)
+    with patch("plugins.system.api._si.get_hostname_info", AsyncMock(return_value=fake)):
+        r = client.get("/plugins/system/hostname")
+    assert r.status_code == 200
+    assert r.json()["hostname"] == "astrolol-pi"
+
+
+def test_set_hostname_success(client: TestClient) -> None:
+    from plugins.system.models import HostnameInfo
+    updated = HostnameInfo(hostname="my-astrolol", fqdn=None)
+    with patch("plugins.system.api._si.set_hostname", AsyncMock()):
+        with patch("plugins.system.api._si.get_hostname_info", AsyncMock(return_value=updated)):
+            r = client.put("/plugins/system/hostname", json={"hostname": "my-astrolol"})
+    assert r.status_code == 200
+    assert r.json()["hostname"] == "my-astrolol"
+
+
+def test_set_hostname_invalid_chars(client: TestClient) -> None:
+    r = client.put("/plugins/system/hostname", json={"hostname": "my hostname!"})
+    assert r.status_code == 400
+
+
+def test_set_hostname_leading_hyphen(client: TestClient) -> None:
+    r = client.put("/plugins/system/hostname", json={"hostname": "-badname"})
+    assert r.status_code == 400
+
+
+def test_set_hostname_empty_rejected(client: TestClient) -> None:
+    r = client.put("/plugins/system/hostname", json={"hostname": ""})
+    assert r.status_code == 422
+
+
 # ── Plugin manifest ────────────────────────────────────────────────────────────
 
 def test_plugin_manifest() -> None:

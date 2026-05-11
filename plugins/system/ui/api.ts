@@ -1,8 +1,11 @@
 import type {
+  HostnameInfo,
   NetworkStatus,
+  StorageDisk,
   SystemSettings,
   SystemStatus,
   SudoSetup,
+  TimeInfo,
   WifiNetwork,
 } from '@/api/types'
 
@@ -57,6 +60,30 @@ export const putSettings = (s: SystemSettings) =>
 
 export const getSudoSetup = () =>
   request<SudoSetup>('/plugins/system/sudo')
+
+export const getStorage = () =>
+  request<StorageDisk[]>('/plugins/system/storage')
+
+export const getTimeInfo = () =>
+  request<TimeInfo>('/plugins/system/time')
+
+export const listTimezones = () =>
+  request<string[]>('/plugins/system/time/timezones')
+
+export const setTimezone = (timezone: string) =>
+  request<{ timezone: string }>('/plugins/system/time/timezone', {
+    method: 'PUT',
+    body: JSON.stringify({ timezone }),
+  })
+
+export const getHostname = () =>
+  request<HostnameInfo>('/plugins/system/hostname')
+
+export const setHostname = (hostname: string) =>
+  request<HostnameInfo>('/plugins/system/hostname', {
+    method: 'PUT',
+    body: JSON.stringify({ hostname }),
+  })
 
 export const reboot = () =>
   request<{ status: string }>('/plugins/system/reboot', { method: 'POST' })

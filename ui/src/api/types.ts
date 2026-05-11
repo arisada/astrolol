@@ -679,6 +679,31 @@ export interface SudoSetup {
   setup_commands: string[]
 }
 
+export interface TimeInfo {
+  datetime_local: string
+  datetime_utc: string
+  timezone: string
+  ntp_synced: boolean
+  ntp_service_active: boolean
+  rtc_time: string | null
+}
+
+export interface StorageDisk {
+  device: string
+  mountpoint: string
+  filesystem: string
+  total_gb: number
+  used_gb: number
+  free_gb: number
+  percent: number
+  removable: boolean
+}
+
+export interface HostnameInfo {
+  hostname: string
+  fqdn: string | null
+}
+
 export type AstrolollEvent =
   | DeviceConnectedEvent | DeviceDisconnectedEvent | DeviceStateChangedEvent
   | ExposureStartedEvent | ExposureCompletedEvent | ExposureFailedEvent

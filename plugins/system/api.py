@@ -11,11 +11,15 @@ from fastapi import APIRouter, HTTPException, Request
 from plugins.system import network as _net
 from plugins.system import system_info as _si
 from plugins.system.models import (
+    HostnameInfo,
     HotspotStartRequest,
     NetworkStatus,
+    SetHostnameRequest,
+    StorageDisk,
     SudoSetup,
     SystemSettings,
     SystemStatus,
+    TimeInfo,
     WifiConnectRequest,
     WifiNetwork,
 )
@@ -149,6 +153,65 @@ async def get_sudo_setup() -> SudoSetup:
         shutdown_sudo_ok=perms.get("shutdown", False),
         setup_commands=setup_commands,
     )
+
+
+# ── Storage ───────────────────────────────────────────────────────────────────
+
+@router.get("/storage", response_model=list[StorageDisk])
+async def get_storage() -> list[StorageDisk]:
+    """Return mounted filesystems with usage statistics."""
+    return await _si.get_storage_disks()
+
+
+# ── Time / Timezone ────────────────────────────────────────────────────────────
+
+@router.get("/time", response_model=TimeInfo)
+async def get_time_info() -> TimeInfo:
+    """Return current time, timezone, and NTP sync status."""
+    return await _si.get_time_info()
+
+
+@router.get("/time/timezones", response_model=list[str])
+async def list_timezones() -> list[str]:
+    """Return all available timezone names."""
+    return await _si.get_available_timezones()
+
+
+@router.put("/time/timezone", status_code=200)
+async def set_timezone(body: dict, request: Request) -> dict[str, str]:
+    """Set the system timezone. Requires passwordless sudo for timedatectl."""
+    tz = body.get("timezone", "").strip()
+    if not tz:
+        raise HTTPException(status_code=400, detail="timezone is required")
+    try:
+        await _si.set_timezone(tz)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    return {"timezone": tz}
+
+
+# ── Hostname ───────────────────────────────────────────────────────────────────
+
+@router.get("/hostname", response_model=HostnameInfo)
+async def get_hostname() -> HostnameInfo:
+    """Return current hostname and FQDN."""
+    return await _si.get_hostname_info()
+
+
+@router.put("/hostname", status_code=200, response_model=HostnameInfo)
+async def set_hostname(body: SetHostnameRequest) -> HostnameInfo:
+    """Change the system hostname. Requires passwordless sudo for hostnamectl."""
+    import re
+    if not re.match(r'^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?$', body.hostname):
+        raise HTTPException(
+            status_code=400,
+            detail="Hostname must consist of alphanumeric characters and hyphens, not starting/ending with a hyphen",
+        )
+    try:
+        await _si.set_hostname(body.hostname)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=500, detail=str(exc)) from exc
+    return await _si.get_hostname_info()
 
 
 # ── Power controls ─────────────────────────────────────────────────────────────
