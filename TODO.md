@@ -57,6 +57,10 @@ Items designed for but not yet built. Ordered roughly by priority.
   image metadata, autofocus run data.
 - **UI: red mode** — CSS filter toggle for night vision preservation.
 - **UI: mobile layout** — responsive breakpoints, bottom tab navigation on small screens.
+- **UI: touch target sizes** — most action buttons use `size="sm"` (h-8, 32px), below the
+  recommended 44px minimum for touch. Worst offenders: `DurationStepper` +/− buttons,
+  focuser move-in/out buttons, and the CollapsibleSidebar toggle strip (h-8). Audit and
+  increase tap area before declaring mobile support.
 - **Caddy / systemd packaging** — deployment guide for Raspberry Pi with HTTPS and autostart.
 - **Auth / security** — API keys or JWT tokens. Required before any internet exposure.
   See the Security section in README.md.
