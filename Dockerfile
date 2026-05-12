@@ -1,13 +1,13 @@
 # ──────────────────────────────────────────────────────────────────────────────
-# astrolol — development image
+# astrolol — shared base image
 #
 # Runs as root inside the container (standard for dev containers — the
 # container boundary is the security perimeter, not the uid).  Pip and npm
 # root-user warnings are silenced via environment variables.
 #
-# The source tree is NOT baked in; it is bind-mounted at runtime so code
-# changes take effect immediately without rebuilding.  Rebuilding is only
-# needed when pyproject.toml or ui/package.json change.
+# Two compose files consume this image:
+#   docker-compose.yml      — production: source baked in, UI pre-built
+#   docker-compose-dev.yml  — development: source bind-mounted, Vite HMR
 # ──────────────────────────────────────────────────────────────────────────────
 FROM ubuntu:24.04
 
@@ -41,8 +41,17 @@ RUN mkdir -p astrolol && touch astrolol/__init__.py \
 # ── Node dependencies ─────────────────────────────────────────────────────────
 # Installed here so the ui_node_modules named volume is seeded from the image
 # on first run (Docker copies image content into an empty named volume).
+# IMPORTANT: after any change to ui/package.json, run
+#   docker compose -f docker-compose-dev.yml down -v && docker compose -f docker-compose-dev.yml up
+# to drop the stale volume so it is reseeded from the new image.
 COPY ui/package.json ui/package-lock.json ./ui/
 RUN npm --prefix ./ui ci --silent
+
+# ── Application source + UI build (production) ───────────────────────────────
+# Copy the full source tree and build the UI.  In development the bind-mount
+# shadows these files, so they are only used in the production image.
+COPY . /app/
+RUN npm --prefix ./ui run build
 
 # ── Runtime environment ───────────────────────────────────────────────────────
 ENV PYTHONPATH=/app
