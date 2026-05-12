@@ -32,11 +32,14 @@ def nmcli_available() -> bool:
 async def _run(*args: str, sudo: bool = False) -> tuple[int, str, str]:
     """Run a command and return (returncode, stdout, stderr)."""
     cmd = (["sudo"] if sudo else []) + list(args)
-    proc = await asyncio.create_subprocess_exec(
-        *cmd,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-    )
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+    except FileNotFoundError:
+        return 127, "", f"{cmd[0]}: command not found"
     stdout, stderr = await proc.communicate()
     return proc.returncode, stdout.decode().strip(), stderr.decode().strip()
 
