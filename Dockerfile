@@ -30,6 +30,7 @@ ENV PIP_ROOT_USER_ACTION=ignore \
 
 WORKDIR /app
 COPY pyproject.toml ./
+COPY vendor /app/vendor
 # Stub install: resolves and caches all deps in the image without needing the
 # real source.  PYTHONPATH=/app (set below) makes the bind-mounted source
 # importable at runtime without a separate "pip install -e ." on startup.
