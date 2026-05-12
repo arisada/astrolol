@@ -11,4 +11,11 @@ services:
       - "80:8000"
       - "10001:10001"
       - "10002:10002"
+    environment:
+      - ASTROLOL_DATA_DIR=/data
+    volumes:
+      - astrolol_data:/data
     command: python -m astrolol.main
+
+volumes:
+  astrolol_data:

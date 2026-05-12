@@ -5,9 +5,12 @@ services:
     build: .
     volumes:
       - .:/app
+      - astrolol_data:/data
     ports:
       - "10001:10001"
       - "10002:10002"
+    environment:
+      - ASTROLOL_DATA_DIR=/data
     command: python -m astrolol.main
 
   # ── Vite dev server (hot-reload UI) ────────────────────────────────────────
@@ -35,4 +38,5 @@ services:
       - backend
 
 volumes:
+  astrolol_data:
   ui_node_modules:
