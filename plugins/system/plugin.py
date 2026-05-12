@@ -16,7 +16,7 @@ class SystemPlugin:
         version="0.1.0",
         description=(
             "Device management for the host running astrolol. "
-            "Manages WiFi connections and access-point mode (like ZWO ASIAIR), "
+            "Manages WiFi connections and access-point mode, "
             "shows CPU / memory / temperature / disk statistics, "
             "and provides reboot / shutdown / restart controls."
         ),
