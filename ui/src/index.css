@@ -9,6 +9,14 @@ html, body, #root {
   height: 100%;
 }
 
+/* Safe-area insets for notched / home-bar devices (iOS PWA, Android cutouts) */
+body {
+  padding-top: env(safe-area-inset-top);
+  padding-left: env(safe-area-inset-left);
+  padding-right: env(safe-area-inset-right);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
 /* Scrollbar styling */
 * {
   scrollbar-width: thin;

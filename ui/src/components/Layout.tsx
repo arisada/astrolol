@@ -40,7 +40,7 @@ export function Layout() {
   useStatusPolling()  // poll device statuses globally
 
   return (
-    <div className="flex flex-col h-screen bg-surface text-slate-200 overflow-hidden">
+    <div className="flex flex-col h-dvh bg-surface text-slate-200 overflow-hidden">
       <StatusBar />
       <div className="flex flex-1 min-h-0">
         <Sidebar />

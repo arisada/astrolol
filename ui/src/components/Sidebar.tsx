@@ -50,7 +50,7 @@ export function Sidebar() {
   ]
 
   return (
-    <aside className="flex flex-col w-14 lg:w-48 shrink-0 bg-surface-raised border-r border-surface-border h-screen">
+    <aside className="flex flex-col w-14 lg:w-48 shrink-0 bg-surface-raised border-r border-surface-border h-full">
       {/* Logo */}
       <div className="flex items-center gap-2 px-3 py-4 border-b border-surface-border">
         <span className="text-accent font-bold text-lg">✦</span>

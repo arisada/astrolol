@@ -7,6 +7,11 @@ import path from 'path'
 const backendHttp = process.env.BACKEND_URL ?? 'http://localhost:8000'
 const backendWs   = backendHttp.replace(/^http/, 'ws')
 
+// VITE_ALLOWED_HOSTS: comma-separated extra hostnames for the dev server.
+// Only needed when running `npm run dev` behind an FQDN (e.g. starkiller.lan).
+// In production use `npm run build` — FastAPI serves static files with no restriction.
+const extraHosts  = process.env.VITE_ALLOWED_HOSTS?.split(',').map((h) => h.trim()).filter(Boolean) ?? []
+
 /**
  * Attach an error handler to an http-proxy instance so that when the backend
  * is unreachable (ECONNREFUSED, startup gap, mid-restart) the browser gets a
@@ -51,6 +56,7 @@ export default defineConfig({
   },
   server: {
     fs: { allow: ['..'] },
+    ...(extraHosts.length > 0 && { allowedHosts: extraHosts }),
     proxy: {
       '/api':      p(backendHttp),
       '/devices':  p(backendHttp),
