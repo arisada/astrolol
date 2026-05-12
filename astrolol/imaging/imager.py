@@ -28,6 +28,7 @@ from astrolol.imaging.preview import fits_to_jpeg, fits_to_jpeg_linear
 
 if TYPE_CHECKING:
     from astrolol.equipment.store import EquipmentStore
+    from astrolol.mount.manager import MountManager
     from astrolol.profiles.models import Profile
     from astrolol.profiles.store import ProfileStore
 
@@ -39,19 +40,33 @@ def _expand_template(
     frame_type: str,
     counter: int,
     duration: float,
-    gain: int,
+    gain: int | None,
+    *,
+    camera_name: str = "",
+    filter_name: str = "",
+    object_name: str = "",
 ) -> str:
-    """Expand % tokens in a save-path template."""
+    """Expand % tokens in a save-path template.
+
+    Tokens:
+      %D  ISO date (YYYY-MM-DD)       %T  time (HHMMSS)
+      %U  home directory              %O  object/target name
+      %F  frame type (light/dark/…)   %N  counter (6-digit, zero-padded)
+      %C  camera name (device ID)     %f  filter name
+      %E  exposure duration (s)       %G  gain
+    """
     now = datetime.now(timezone.utc)
     result = template
     result = result.replace("%D", now.strftime("%Y-%m-%d"))
     result = result.replace("%T", now.strftime("%H%M%S"))
     result = result.replace("%U", str(Path.home()))
-    result = result.replace("%O", "unknown")
+    result = result.replace("%O", object_name or "unknown")
     result = result.replace("%F", frame_type)
-    result = result.replace("%C", f"{counter:06d}")
+    result = result.replace("%N", f"{counter:06d}")
+    result = result.replace("%C", camera_name)
+    result = result.replace("%f", filter_name)
     result = result.replace("%E", f"{duration:.1f}")
-    result = result.replace("%G", str(gain))
+    result = result.replace("%G", str(gain) if gain is not None else "")
     return result
 
 
@@ -83,12 +98,19 @@ def _write_imagetyp(fits_path: Path, frame_type: str) -> None:
         logger.warning("imager.fits_imagetyp_failed", fits=str(fits_path))
 
 
-def _patch_fits_headers(fits_path: Path, profile: "Profile", coord: "SkyCoord | None") -> None:
+def _patch_fits_headers(
+    fits_path: Path,
+    profile: "Profile",
+    coord: "SkyCoord | None",
+    object_name: str = "",
+) -> None:
     """Inject observatory and telescope metadata into an existing FITS file."""
     try:
         from astropy.io import fits as astrofits
         with astrofits.open(str(fits_path), mode="update") as hdul:
             hdr = hdul[0].header
+            if object_name:
+                hdr["OBJECT"] = (object_name, "Target object name")
             if profile.telescope:
                 hdr["TELESCOP"] = (profile.telescope.name, "Telescope name")
                 hdr["FOCALLEN"] = (profile.telescope.focal_length, "[mm] Focal length")
@@ -120,6 +142,7 @@ class ImagerManager:
         images_dir: Path | None = None,
         profile_store: "ProfileStore | None" = None,
         equipment_store: "EquipmentStore | None" = None,
+        mount_manager: "MountManager | None" = None,
     ) -> None:
         self._device_manager = device_manager
         self._event_bus = event_bus
@@ -128,6 +151,7 @@ class ImagerManager:
         self._active_profile: "Profile | None" = None
         self._profile_store = profile_store
         self._equipment_store = equipment_store
+        self._mount_manager = mount_manager
         self._save_counters: dict[str, int] = {}
         self._last_stats: dict[str, ImageStats] = {}
         # Optional dither hook set by the PHD2 plugin on startup.
@@ -301,6 +325,29 @@ class ImagerManager:
             except Exception:
                 pass  # best-effort — never block an exposure
 
+        # Snapshot metadata for filename tokens and FITS OBJECT header.
+        object_name = ""
+        if self._mount_manager is not None and profile is not None:
+            for pd in profile.devices:
+                if pd.role == "mount":
+                    target = self._mount_manager.get_target(pd.config.device_id)
+                    if target and target.name:
+                        object_name = target.name
+                        break
+
+        filter_name = ""
+        if profile is not None:
+            fw_role = next((pd for pd in profile.devices if pd.role == "filter_wheel"), None)
+            if fw_role is not None:
+                try:
+                    fw = self._device_manager.get_filter_wheel(fw_role.config.device_id)
+                    fw_status = await fw.get_status()
+                    slot = fw_status.current_slot
+                    if slot is not None and fw_status.filter_names and 0 < slot <= len(fw_status.filter_names):
+                        filter_name = fw_status.filter_names[slot - 1]
+                except Exception:
+                    pass
+
         imager.state = ImagerState.EXPOSING
         await self._event_bus.publish(
             ExposureStarted(
@@ -342,18 +389,19 @@ class ImagerManager:
 
         await asyncio.to_thread(_write_imagetyp, fits_path, request.frame_type)
         if profile is not None:
-            await asyncio.to_thread(_patch_fits_headers, fits_path, profile, coord)
+            await asyncio.to_thread(_patch_fits_headers, fits_path, profile, coord, object_name)
 
         # Optionally move to save directory, or park unsaved frames in a fixed temp path
         if request.save and self._profile_store is not None:
             user_cfg = self._profile_store.get_user_settings()
             counter = self._save_counters.get(device_id, 0) + 1
             self._save_counters[device_id] = counter
+            _tpl_kw = dict(camera_name=device_id, filter_name=filter_name, object_name=object_name)
             dir_part = _expand_template(
-                user_cfg.save_dir_template, request.frame_type, counter, request.duration, request.gain
+                user_cfg.save_dir_template, request.frame_type, counter, request.duration, request.gain, **_tpl_kw
             )
             file_part = _expand_template(
-                user_cfg.save_filename_template, request.frame_type, counter, request.duration, request.gain
+                user_cfg.save_filename_template, request.frame_type, counter, request.duration, request.gain, **_tpl_kw
             )
             save_dir = Path(dir_part).expanduser()
             save_dir.mkdir(parents=True, exist_ok=True)

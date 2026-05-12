@@ -41,9 +41,11 @@ const TOKEN_REFERENCE = [
   { token: '%D', desc: 'ISO date (YYYY-MM-DD)' },
   { token: '%T', desc: 'Time (HHMMSS)' },
   { token: '%U', desc: 'Home directory' },
-  { token: '%O', desc: 'Object name' },
+  { token: '%O', desc: 'Object / target name' },
   { token: '%F', desc: 'Frame type (light/dark/flat/bias)' },
-  { token: '%C', desc: 'Counter (6-digit, per camera)' },
+  { token: '%N', desc: 'Counter (6-digit, zero-padded, per camera)' },
+  { token: '%C', desc: 'Camera name (device ID)' },
+  { token: '%f', desc: 'Filter name (empty if no filter wheel)' },
   { token: '%E', desc: 'Exposure time (seconds)' },
   { token: '%G', desc: 'Gain' },
 ]
@@ -86,7 +88,7 @@ export function Options() {
 
   // Image saving settings (persisted via backend)
   const [saveDir, setSaveDir] = useState('~/astrolol_pictures/%D')
-  const [saveFilename, setSaveFilename] = useState('%F_%C_%Es_%Gg')
+  const [saveFilename, setSaveFilename] = useState('%F_%N_%Es_%Gg')
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
 
   // INDI run dir
@@ -242,7 +244,7 @@ export function Options() {
             />
           </div>
           <div className="text-xs text-slate-500 bg-surface-overlay border border-surface-border rounded p-2 font-mono break-all">
-            Example: <span className="text-slate-300">{saveDir.replace('%D', '2026-04-13').replace('%T', '210530').replace('%U', '~').replace('%O', 'M42').replace('%F', 'light').replace('%C', '000001').replace('%E', '60.0').replace('%G', '100')}/{saveFilename.replace('%D', '2026-04-13').replace('%T', '210530').replace('%U', '~').replace('%O', 'M42').replace('%F', 'light').replace('%C', '000001').replace('%E', '60.0').replace('%G', '100')}.fits</span>
+            Example: <span className="text-slate-300">{saveDir.replace('%D', '2026-04-13').replace('%T', '210530').replace('%U', '~').replace('%O', 'M42').replace('%F', 'light').replace('%N', '000001').replace('%C', 'zwo_asi294').replace('%f', 'L').replace('%E', '60.0').replace('%G', '100')}/{saveFilename.replace('%D', '2026-04-13').replace('%T', '210530').replace('%U', '~').replace('%O', 'M42').replace('%F', 'light').replace('%N', '000001').replace('%C', 'zwo_asi294').replace('%f', 'L').replace('%E', '60.0').replace('%G', '100')}.fits</span>
           </div>
           <TokenReference />
           {saveStatus === 'saving' && <p className="text-xs text-slate-500">Saving…</p>}

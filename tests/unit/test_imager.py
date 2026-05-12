@@ -7,6 +7,7 @@ from astrolol.core.events import ExposureCompleted, ExposureFailed, ExposureStar
 from astrolol.devices.config import DeviceConfig
 from astrolol.devices.manager import DeviceManager
 from astrolol.imaging import ImagerManager
+from astrolol.imaging.imager import _expand_template, _patch_fits_headers
 from astrolol.imaging.models import ExposureRequest, ImagerState
 
 
@@ -159,3 +160,78 @@ async def test_two_cameras_independent(
     assert imager_manager.get_status("cam2").state != ImagerState.IDLE
 
     await imager_manager.stop_loop("cam2")
+
+
+# --- _expand_template ---
+
+def test_expand_template_counter_token():
+    out = _expand_template("%N", "light", 7, 10.0, 100)
+    assert out == "000007"
+
+
+def test_expand_template_camera_name():
+    out = _expand_template("%C", "light", 1, 1.0, 0, camera_name="zwo_asi294")
+    assert out == "zwo_asi294"
+
+
+def test_expand_template_filter_name():
+    out = _expand_template("%f", "light", 1, 1.0, 0, filter_name="Ha")
+    assert out == "Ha"
+
+
+def test_expand_template_filter_empty_by_default():
+    out = _expand_template("%f", "light", 1, 1.0, 0)
+    assert out == ""
+
+
+def test_expand_template_object_name():
+    out = _expand_template("%O", "light", 1, 1.0, 0, object_name="M42")
+    assert out == "M42"
+
+
+def test_expand_template_object_falls_back_to_unknown():
+    out = _expand_template("%O", "light", 1, 1.0, 0)
+    assert out == "unknown"
+
+
+def test_expand_template_gain_none():
+    out = _expand_template("%G", "light", 1, 1.0, None)
+    assert out == ""
+
+
+def test_expand_template_full_path():
+    out = _expand_template(
+        "%O/%F_%N_%Es_%Gg_%C_%f",
+        "light", 3, 60.0, 200,
+        camera_name="cam1", filter_name="L", object_name="NGC7293",
+    )
+    assert out.startswith("NGC7293/")
+    assert "light_000003_60.0s_200g_cam1_L" in out
+
+
+# --- _patch_fits_headers OBJECT keyword ---
+
+def test_patch_fits_headers_writes_object(tmp_path: Path):
+    from astropy.io import fits as astrofits
+    from tests.conftest import make_fake_fits
+    fits_file = make_fake_fits(tmp_path / "test.fits")
+
+    from astrolol.profiles.models import Profile
+    profile = Profile(id="p1", name="test")
+    _patch_fits_headers(fits_file, profile, None, object_name="M42")
+
+    with astrofits.open(str(fits_file)) as hdul:
+        assert hdul[0].header["OBJECT"] == "M42"
+
+
+def test_patch_fits_headers_no_object_when_empty(tmp_path: Path):
+    from astropy.io import fits as astrofits
+    from tests.conftest import make_fake_fits
+    fits_file = make_fake_fits(tmp_path / "test.fits")
+
+    from astrolol.profiles.models import Profile
+    profile = Profile(id="p1", name="test")
+    _patch_fits_headers(fits_file, profile, None, object_name="")
+
+    with astrofits.open(str(fits_file)) as hdul:
+        assert "OBJECT" not in hdul[0].header

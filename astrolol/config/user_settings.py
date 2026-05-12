@@ -20,7 +20,7 @@ class MountDeviceSettings(BaseModel):
 
 class UserSettings(BaseModel):
     save_dir_template: str = "~/astrolol_pictures/%D"
-    save_filename_template: str = "%F_%C_%Es_%Gg"
+    save_filename_template: str = "%F_%N_%Es_%Gg"
     enabled_plugins: list[str] = []
     indi_run_dir: str = "/tmp/astrolol"       # directory for INDI FIFO and state file
     indi_local_upload: bool = False

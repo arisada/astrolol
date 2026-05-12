@@ -4,11 +4,6 @@ Items designed for but not yet built. Ordered roughly by priority.
 
 ## Near-term
 
-- **Target: write OBJECT to FITS headers** — the active target name (when set) should be
-  written as the `OBJECT` keyword in captured FITS files. `ImagerManager` already reads mount
-  position for `RA`/`DEC` headers; extend it to also read `MountManager.get_target()`.
-- **Simbad / NED name resolver plugin** — resolve an object name ("M31", "NGC 7293") to
-  ICRS coordinates and call `PUT /mount/{id}/target` automatically.
 - **Target persistence across restart** — store the last-set target in `profiles.json` so
   it survives a backend restart.
 
@@ -28,13 +23,8 @@ Items designed for but not yet built. Ordered roughly by priority.
 
 ## Imaging — deferred
 
-- **Sequencer** — state machine (idle → slewing → focusing → guiding → imaging → dithering).
-  Cancellable at every step. PHD2 and plate-solve plugins already exist as building blocks.
-  Strong plugin candidate.
 - **Debayer + full STF preview** — colour camera preview shows raw Bayer grid today.
 - **Calibration pipeline** — flat/dark/bias acquisition and application (ccdproc). Plugin.
-- **Autofocus module** — V-curve fitting, backlash compensation, temperature compensation.
-  Plugin.
 
 ## Mount — deferred
 
@@ -48,8 +38,6 @@ Items designed for but not yet built. Ordered roughly by priority.
   button while Equipment page uses a different pattern. Audit all pages (PHD2, Equipment,
   Focuser, Mount) and extract a shared `ConnectButton` component so styling is identical
   everywhere.
-- **ToggleSwitch duplication** — defined locally in both `Mount.tsx` and `Phd2Page.tsx`.
-  Extract to `ui/src/components/ui/toggle-switch.tsx` and import from both.
 
 ## Post-MVP
 
