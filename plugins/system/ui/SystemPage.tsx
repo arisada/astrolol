@@ -18,6 +18,7 @@ import {
   Server,
   Usb,
   Trash2,
+  Zap,
 } from 'lucide-react'
 import type {
   HostnameInfo,
@@ -28,10 +29,13 @@ import type {
   SystemSettings,
   SystemStatus,
   SudoSetup,
+  ThrottleStatus,
   TimeInfo,
   UsbDevice,
   WifiNetwork,
 } from '@/api/types'
+import { ToggleSwitch } from '@/components/ui/toggle-switch'
+import { DurationStepper } from '@/components/ui/duration-stepper'
 import * as api from './api'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -243,6 +247,7 @@ function ConfirmButton({
 
 export function SystemPage() {
   const [sysStatus, setSysStatus]   = useState<SystemStatus | null>(null)
+  const [throttleStatus, setThrottleStatus] = useState<ThrottleStatus | null>(null)
   const [netStatus, setNetStatus]   = useState<NetworkStatus | null>(null)
   const [networks, setNetworks]     = useState<WifiNetwork[] | null>(null)
   const [sudoSetup, setSudoSetup]   = useState<SudoSetup | null>(null)
@@ -289,6 +294,11 @@ export function SystemPage() {
       setError(null)
     } catch {
       setError('Cannot reach backend')
+    }
+    try {
+      setThrottleStatus(await api.getThrottleStatus())
+    } catch {
+      // ignore — throttle status is best-effort
     }
   }, [])
 
@@ -373,6 +383,30 @@ export function SystemPage() {
       setError(e instanceof Error ? e.message : 'Failed to stop hotspot')
     } finally {
       setHotspotBusy(false)
+    }
+  }
+
+  const handleToggleThrottleMonitor = async () => {
+    if (!settings) return
+    const updated = { ...settings, throttle_monitor_enabled: !settings.throttle_monitor_enabled }
+    try {
+      await api.putSettings(updated)
+      setSettings(updated)
+      setDraftSettings((d) => d ? { ...d, throttle_monitor_enabled: updated.throttle_monitor_enabled } : d)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to update throttle monitor')
+    }
+  }
+
+  const handleSetThrottleInterval = async (seconds: number) => {
+    if (!settings) return
+    const updated = { ...settings, throttle_check_interval_seconds: Math.round(seconds) }
+    try {
+      await api.putSettings(updated)
+      setSettings(updated)
+      setDraftSettings((d) => d ? { ...d, throttle_check_interval_seconds: updated.throttle_check_interval_seconds } : d)
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to update throttle check interval')
     }
   }
 
@@ -499,6 +533,71 @@ export function SystemPage() {
               </div>
             )}
           </div>
+        ) : (
+          <p className="text-xs text-slate-600">Loading…</p>
+        )}
+      </Section>
+
+      {/* ── Power / throttling ──────────────────────────────────────────── */}
+      <Section title="Power" icon={Zap}>
+        {throttleStatus ? (
+          throttleStatus.available ? (
+            <div className="space-y-3">
+              {throttleStatus.underpowered ? (
+                <div className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-300 flex items-center gap-2">
+                  <Zap size={14} className="flex-none" /> System is currently underpowered — check the power supply.
+                </div>
+              ) : (
+                <div className="flex items-center gap-2 text-xs text-emerald-400">
+                  <CheckCircle size={13} className="flex-none" /> Power supply OK
+                </div>
+              )}
+              <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-xs">
+                {[
+                  { label: 'Under-voltage', now: throttleStatus.under_voltage, ever: throttleStatus.under_voltage_occurred },
+                  { label: 'Throttled', now: throttleStatus.throttled, ever: throttleStatus.throttled_occurred },
+                  { label: 'Frequency capped', now: throttleStatus.freq_capped, ever: throttleStatus.freq_capped_occurred },
+                  { label: 'Soft temp limit', now: throttleStatus.soft_temp_limit, ever: throttleStatus.soft_temp_limit_occurred },
+                ].map(({ label, now, ever }) => (
+                  <div key={label} className="flex items-center justify-between">
+                    <span className="text-slate-500">{label}</span>
+                    <span className={now ? 'text-rose-400 font-medium' : ever ? 'text-amber-400' : 'text-slate-400'}>
+                      {now ? 'Now' : ever ? 'Since boot' : 'OK'}
+                    </span>
+                  </div>
+                ))}
+              </div>
+              <p className="text-[10px] text-slate-600">
+                Source: {throttleStatus.source} · raw {throttleStatus.raw_hex}
+              </p>
+              <div className="border-t border-surface-border pt-3 flex items-center justify-between">
+                <div>
+                  <p className="text-xs text-slate-400">Monitor throttling</p>
+                  <p className="text-xs text-slate-600">
+                    Warn in the logs when the system becomes underpowered
+                    {settings ? ` · checked every ${settings.throttle_check_interval_seconds}s` : ''}
+                  </p>
+                </div>
+                <ToggleSwitch
+                  checked={settings?.throttle_monitor_enabled ?? true}
+                  onChange={handleToggleThrottleMonitor}
+                  label="Monitor throttling"
+                />
+              </div>
+              {settings?.throttle_monitor_enabled && (
+                <DurationStepper
+                  steps={[1, 2, 5, 10, 15, 30, 60, 120, 300, 600]}
+                  value={settings.throttle_check_interval_seconds}
+                  onChange={handleSetThrottleInterval}
+                  label="Check interval"
+                />
+              )}
+            </div>
+          ) : (
+            <p className="text-xs text-slate-600">
+              Throttling status unavailable (vcgencmd not found and no sysfs support detected).
+            </p>
+          )
         ) : (
           <p className="text-xs text-slate-600">Loading…</p>
         )}

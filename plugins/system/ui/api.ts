@@ -6,6 +6,7 @@ import type {
   SystemSettings,
   SystemStatus,
   SudoSetup,
+  ThrottleStatus,
   TimeInfo,
   UsbDevice,
   WifiNetwork,
@@ -26,6 +27,9 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 
 export const getSystemStatus = () =>
   request<SystemStatus>('/plugins/system/status')
+
+export const getThrottleStatus = () =>
+  request<ThrottleStatus>('/plugins/system/throttled')
 
 export const getNetworkStatus = () =>
   request<NetworkStatus>('/plugins/system/network')

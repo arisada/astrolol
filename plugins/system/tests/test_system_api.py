@@ -229,14 +229,63 @@ def test_get_settings_defaults(client: TestClient) -> None:
     assert data["hotspot_ssid"] == "AstroLOL"
     assert data["hotspot_password"] == "astronomy123"
     assert data["hotspot_interface"] == "wlan0"
+    assert data["throttle_monitor_enabled"] is True
+    assert data["throttle_check_interval_seconds"] == 1
 
 
 def test_put_settings(client: TestClient) -> None:
-    payload = {"hotspot_ssid": "MyScope", "hotspot_password": "telescope1", "hotspot_interface": "wlan1"}
-    r = client.put("/plugins/system/settings", json=payload)
+    payload = {"hotspot_ssid": "MyScope", "hotspot_password": "telescope1", "hotspot_interface": "wlan1",
+               "throttle_monitor_enabled": False, "throttle_check_interval_seconds": 30}
+    with patch("plugins.system.throttle.get_throttle_status", AsyncMock()):
+        r = client.put("/plugins/system/settings", json=payload)
     assert r.status_code == 200
     data = r.json()
     assert data["hotspot_ssid"] == "MyScope"
+    assert data["throttle_monitor_enabled"] is False
+
+
+# ── Throttling ─────────────────────────────────────────────────────────────────
+
+def test_throttled_status_returns_200(client: TestClient) -> None:
+    from plugins.system.models import ThrottleStatus
+    fake = ThrottleStatus(
+        available=True, source="vcgencmd", raw_hex="0x50005",
+        under_voltage=True, freq_capped=False, throttled=True, soft_temp_limit=False,
+        under_voltage_occurred=True, freq_capped_occurred=False,
+        throttled_occurred=True, soft_temp_limit_occurred=False,
+        underpowered=True,
+    )
+    with patch("plugins.system.api._throttle.get_throttle_status", AsyncMock(return_value=fake)):
+        r = client.get("/plugins/system/throttled")
+    assert r.status_code == 200
+    data = r.json()
+    assert data["underpowered"] is True
+    assert data["source"] == "vcgencmd"
+    assert data["raw_hex"] == "0x50005"
+
+
+def test_throttled_status_unavailable(client: TestClient) -> None:
+    from plugins.system.models import ThrottleStatus
+    fake = ThrottleStatus(
+        available=False, source="unavailable", raw_hex=None,
+        under_voltage=False, freq_capped=False, throttled=False, soft_temp_limit=False,
+        under_voltage_occurred=False, freq_capped_occurred=False,
+        throttled_occurred=False, soft_temp_limit_occurred=False,
+        underpowered=False,
+    )
+    with patch("plugins.system.api._throttle.get_throttle_status", AsyncMock(return_value=fake)):
+        r = client.get("/plugins/system/throttled")
+    assert r.status_code == 200
+    assert r.json()["available"] is False
+
+
+def test_put_settings_reconfigures_throttle_monitor(client: TestClient) -> None:
+    payload = {"hotspot_ssid": "AstroLOL", "hotspot_password": "astronomy123", "hotspot_interface": "wlan0",
+               "throttle_monitor_enabled": True, "throttle_check_interval_seconds": 45}
+    with patch("plugins.system.throttle.ThrottleMonitor.apply_settings", AsyncMock()) as mock_apply:
+        r = client.put("/plugins/system/settings", json=payload)
+    assert r.status_code == 200
+    mock_apply.assert_awaited_once_with(enabled=True, interval_seconds=45)
 
 
 # ── Sudo setup ─────────────────────────────────────────────────────────────────

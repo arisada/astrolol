@@ -670,6 +670,23 @@ export interface SystemSettings {
   hotspot_ssid: string
   hotspot_password: string
   hotspot_interface: string
+  throttle_monitor_enabled: boolean
+  throttle_check_interval_seconds: number
+}
+
+export interface ThrottleStatus {
+  available: boolean
+  source: string
+  raw_hex: string | null
+  under_voltage: boolean
+  freq_capped: boolean
+  throttled: boolean
+  soft_temp_limit: boolean
+  under_voltage_occurred: boolean
+  freq_capped_occurred: boolean
+  throttled_occurred: boolean
+  soft_temp_limit_occurred: boolean
+  underpowered: boolean
 }
 
 export interface SudoSetup {

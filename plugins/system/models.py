@@ -62,6 +62,10 @@ class SystemSettings(BaseModel):
     hotspot_ssid: str = Field(default="AstroLOL")
     hotspot_password: str = Field(default="astronomy123")
     hotspot_interface: str = Field(default="wlan0")
+    throttle_monitor_enabled: bool = Field(default=True)
+    # Under-voltage dips are typically brief (a few seconds), so this defaults
+    # low — a sysfs read is cheap (no subprocess spawn) and safe to do often.
+    throttle_check_interval_seconds: int = Field(default=1, ge=1, le=3600)
 
 
 class SudoSetup(BaseModel):
@@ -112,3 +116,18 @@ class SavedWifiConnection(BaseModel):
     name: str
     interface: str | None
     autoconnect: bool
+
+
+class ThrottleStatus(BaseModel):
+    available: bool             # False when neither vcgencmd nor the sysfs file could be read
+    source: str                 # "vcgencmd" | "sysfs" | "unavailable"
+    raw_hex: str | None         # raw bitmask, e.g. "0x50005"
+    under_voltage: bool
+    freq_capped: bool
+    throttled: bool
+    soft_temp_limit: bool
+    under_voltage_occurred: bool
+    freq_capped_occurred: bool
+    throttled_occurred: bool
+    soft_temp_limit_occurred: bool
+    underpowered: bool          # True if any of the four "now" flags above is set

@@ -9,6 +9,7 @@ interface SystemChipState {
   hotspot_ssid: string | null
   ip: string | null
   temperature: number | null
+  underpowered: boolean
 }
 
 export function SystemChip() {
@@ -20,12 +21,19 @@ export function SystemChip() {
         api.getNetworkStatus(),
         api.getSystemStatus(),
       ])
+      let underpowered = false
+      try {
+        underpowered = (await api.getThrottleStatus()).underpowered
+      } catch {
+        // ignore — best-effort
+      }
       setState({
         mode: net.mode,
         ssid: net.ssid,
         hotspot_ssid: net.hotspot_ssid,
         ip: net.ip_address ?? net.hotspot_ip,
         temperature: sys.temperature_celsius,
+        underpowered,
       })
     } catch {
       // ignore — no network or backend down
@@ -39,6 +47,11 @@ export function SystemChip() {
   }, [])
 
   if (!state) return null
+
+  // Underpowered — most urgent: overrides network/temperature display
+  if (state.underpowered) {
+    return <Chip label="Power" status="Underpowered" variant="red" pulse />
+  }
 
   // Hotspot mode — most visible: device is sharing its WiFi
   if (state.mode === 'hotspot') {

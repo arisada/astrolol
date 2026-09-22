@@ -10,6 +10,7 @@ from fastapi import APIRouter, HTTPException, Request
 
 from plugins.system import network as _net
 from plugins.system import system_info as _si
+from plugins.system import throttle as _throttle
 from plugins.system.models import (
     HostnameInfo,
     HotspotStartRequest,
@@ -20,6 +21,7 @@ from plugins.system.models import (
     SudoSetup,
     SystemSettings,
     SystemStatus,
+    ThrottleStatus,
     TimeInfo,
     UsbDevice,
     WifiConnectRequest,
@@ -51,6 +53,12 @@ def _save_settings(request: Request, s: SystemSettings) -> None:
 async def get_system_status() -> SystemStatus:
     """Return CPU, memory, disk, temperature, and uptime."""
     return await _si.get_system_status()
+
+
+@router.get("/throttled", response_model=ThrottleStatus)
+async def get_throttled_status() -> ThrottleStatus:
+    """Return current power/thermal throttling status (vcgencmd get_throttled or sysfs)."""
+    return await _throttle.get_throttle_status()
 
 
 # ── Network ────────────────────────────────────────────────────────────────────
@@ -148,6 +156,12 @@ async def get_settings(request: Request) -> SystemSettings:
 @router.put("/settings", response_model=SystemSettings)
 async def put_settings(body: SystemSettings, request: Request) -> SystemSettings:
     _save_settings(request, body)
+    monitor = getattr(request.app.state, "system_throttle_monitor", None)
+    if monitor is not None:
+        await monitor.apply_settings(
+            enabled=body.throttle_monitor_enabled,
+            interval_seconds=body.throttle_check_interval_seconds,
+        )
     return body
 
 
