@@ -105,3 +105,50 @@ def test_settings_apply_live_to_connected_mount(tmp_path) -> None:
 
     mount = device_manager.get_mount("m1")
     assert mount.get_led_brightness() == 77
+
+
+def test_setup_registers_real_eqmod_adapter() -> None:
+    from plugins.eqmod.mount import EqmodMount
+
+    registry = DeviceRegistry()
+    event_bus = EventBus()
+    ctx = PluginContext(
+        event_bus=event_bus,
+        device_manager=DeviceManager(registry=registry, event_bus=event_bus),
+        device_registry=registry,
+    )
+    EqmodPlugin().setup(FastAPI(), ctx)
+    assert registry.mounts["eqmod"] is EqmodMount
+    assert registry.default_connect_params("mount", "eqmod") == {"port": "/dev/ttyUSB0"}
+    assert registry.default_connect_params("mount", "eqmod_sim") == {"state_key": "default"}
+
+
+def test_diagnostics_reports_connected_real_mounts_only(tmp_path) -> None:
+    from plugins.eqmod.mount import EqmodMount
+    from plugins.eqmod.tests.test_mount import CPR, _FakeController
+
+    app, device_manager = _make_app(tmp_path)
+    controller = _FakeController()
+    device_manager.registry.register_mount(
+        "eqmod_fake",
+        lambda **params: EqmodMount(transport_factory=lambda port, baud: controller, **params),
+    )
+    client = TestClient(app)
+
+    # The simulator has no controller to read, so it is not listed.
+    asyncio.run(device_manager.connect(
+        DeviceConfig(device_id="sim1", kind="mount", adapter_key="eqmod_sim")
+    ))
+    assert client.get("/plugins/eqmod/diagnostics").json() == []
+
+    # Mounts are a singleton kind: connecting the real one evicts the simulator.
+    asyncio.run(device_manager.connect(DeviceConfig(
+        device_id="real1", kind="mount", adapter_key="eqmod_fake",
+        params={"port": "/dev/fake", "baudrate": 9600},
+    )))
+    r = client.get("/plugins/eqmod/diagnostics")
+    assert r.status_code == 200
+    body = r.json()
+    assert [d["device_id"] for d in body] == ["real1"]
+    assert body[0]["axes"]["RA"]["cpr"] == CPR
+    assert body[0]["error"] is None

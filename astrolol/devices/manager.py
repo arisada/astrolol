@@ -401,15 +401,7 @@ class DeviceManager:
             )
 
     def _lookup_adapter(self, config: DeviceConfig) -> Any:
-        pool = {
-            "camera": self.registry.cameras,
-            "mount": self.registry.mounts,
-            "focuser": self.registry.focusers,
-            "filter_wheel": self.registry.filter_wheels,
-            "rotator": self.registry.rotators,
-            "indi": self.registry.indi_raws,
-        }.get(config.kind, {})
-
+        pool = self.registry.adapters_for_kind(config.kind)
         adapter_class = pool.get(config.adapter_key)
         if adapter_class is None:
             raise AdapterNotFoundError(

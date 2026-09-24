@@ -116,3 +116,22 @@ async def test_get_config_unknown_404(client: AsyncClient) -> None:
     async with client as c:
         r = await c.get("/devices/connected/ghost/config")
     assert r.status_code == 404
+
+
+class _CameraWithDefaults(FakeCamera):
+    DEFAULT_CONNECT_PARAMS = {"port": "/dev/ttyUSB0"}
+
+
+@pytest.mark.asyncio
+async def test_adapter_defaults(app, client: AsyncClient) -> None:
+    app.state.registry.register_camera("cam_defaults", _CameraWithDefaults)  # type: ignore[arg-type]
+    async with client as c:
+        r = await c.get("/devices/available/camera/cam_defaults/defaults")
+        assert r.status_code == 200
+        assert r.json() == {"port": "/dev/ttyUSB0"}
+
+        r = await c.get("/devices/available/camera/fake_camera/defaults")
+        assert r.json() == {}
+
+        r = await c.get("/devices/available/camera/nope/defaults")
+        assert r.status_code == 404

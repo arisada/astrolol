@@ -1,0 +1,173 @@
+import { useEffect, useState } from 'react'
+import { Button } from '@/components/ui/button'
+import { getDiagnostics, getSettings, putSettings, type AxisDiagnostics, type MountDiagnostics } from './api'
+
+const STATUS_FLAGS: { key: string; label: string }[] = [
+  { key: 'running', label: 'running' },
+  { key: 'tracking_mode', label: 'speed mode' },
+  { key: 'fast', label: 'high speed' },
+  { key: 'ccw', label: 'CCW' },
+  { key: 'blocked', label: 'blocked' },
+  { key: 'initialized', label: 'initialized' },
+  { key: 'level_switch', label: 'level switch' },
+]
+
+function Row({ label, value }: { label: string; value: React.ReactNode }) {
+  return (
+    <div className="flex justify-between gap-4 py-0.5">
+      <span className="text-slate-500">{label}</span>
+      <span className="font-mono text-slate-200 text-right">{value}</span>
+    </div>
+  )
+}
+
+function AxisCard({ name, axis }: { name: string; axis: AxisDiagnostics }) {
+  return (
+    <div className="bg-surface border border-surface-border rounded p-3 text-xs">
+      <p className="text-slate-300 font-medium mb-2">{name} axis{axis.reversed ? ' (reversed)' : ''}</p>
+      <Row label="CPR" value={axis.cpr.toLocaleString()} />
+      <Row label="High-speed ratio" value={axis.high_speed_ratio} />
+      <Row label="Position (counts)" value={axis.position_counts.toLocaleString()} />
+      <Row label="Position (deg from home)" value={axis.position_degrees.toFixed(4)} />
+      <Row label="Step period (T1)" value={axis.step_period.toLocaleString()} />
+      <Row label="Extended status" value={axis.extended_status} />
+      <div className="flex flex-wrap gap-1 mt-2">
+        {STATUS_FLAGS.map(({ key, label }) => (
+          <span
+            key={key}
+            className={`px-1.5 py-0.5 rounded border ${
+              axis.status[key]
+                ? 'bg-sky-500/20 text-sky-300 border-sky-500/30'
+                : 'bg-slate-700/50 text-slate-500 border-slate-600/40'
+            }`}
+          >
+            {label}
+          </span>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function MountCard({ d }: { d: MountDiagnostics }) {
+  return (
+    <div className="bg-surface-raised border border-surface-border rounded p-4 flex flex-col gap-3">
+      <div className="flex items-baseline justify-between">
+        <p className="text-sm text-slate-200 font-medium">{d.device_id}</p>
+        <p className="text-xs text-slate-500 font-mono">{d.port} @ {d.baudrate ?? '?'} baud</p>
+      </div>
+      {d.error ? (
+        <p className="text-xs text-status-error bg-status-error/10 rounded px-3 py-2">{d.error}</p>
+      ) : (
+        <>
+          <div className="text-xs grid grid-cols-2 gap-x-6">
+            <Row label="Board version" value={d.board_version ?? '—'} />
+            <Row label="Timer frequency" value={d.timer_freq?.toLocaleString() ?? '—'} />
+            <Row label="Tracking" value={d.tracking ? d.tracking_mode : 'off'} />
+            <Row label="Nudging" value={d.nudging.length ? d.nudging.join(', ') : '—'} />
+            <Row
+              label="Site"
+              value={d.location
+                ? `${d.location[0].toFixed(4)}°, ${d.location[1].toFixed(4)}°, ${d.location[2].toFixed(0)} m`
+                : 'none (no Site in active profile)'}
+            />
+            <Row label="Parked" value={d.parked ? 'yes' : 'no'} />
+            <Row
+              label="Park position (counts)"
+              value={d.park_counts ? d.park_counts.map((c) => c.toLocaleString()).join(' / ') : '—'}
+            />
+            <Row
+              label="Sync offset"
+              value={d.sync_offset
+                ? `RA ${(d.sync_offset.ra_axis_h * 60).toFixed(2)} min, Dec ${d.sync_offset.dec_axis_deg.toFixed(3)}°`
+                : 'none (not synced)'}
+            />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            {Object.entries(d.axes).map(([name, axis]) => (
+              <AxisCard key={name} name={name} axis={axis} />
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
+function LedControl() {
+  const [value, setValue] = useState<number | null>(null)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    getSettings().then((s) => setValue(s.led_brightness)).catch((e: Error) => setError(e.message))
+  }, [])
+
+  const save = async () => {
+    if (value === null) return
+    setSaving(true)
+    setError(null)
+    try {
+      await putSettings({ led_brightness: value })
+    } catch (e) {
+      setError((e as Error).message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="bg-surface-raised border border-surface-border rounded p-4 flex items-center gap-3 text-sm">
+      <span className="text-slate-400">Polar scope LED</span>
+      <input
+        type="range" min={0} max={100}
+        value={value ?? 0}
+        disabled={value === null}
+        onChange={(e) => setValue(Number(e.target.value))}
+        className="flex-1"
+      />
+      <span className="font-mono text-slate-200 w-10 text-right">{value ?? '—'}%</span>
+      <Button type="button" size="sm" disabled={value === null || saving} onClick={save}>
+        {saving ? 'Applying…' : 'Apply'}
+      </Button>
+      {error && <span className="text-xs text-status-error">{error}</span>}
+    </div>
+  )
+}
+
+export function EqmodPage() {
+  const [mounts, setMounts] = useState<MountDiagnostics[] | null>(null)
+  const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    const load = () =>
+      getDiagnostics()
+        .then((d) => { if (!cancelled) { setMounts(d); setError(null) } })
+        .catch((e: Error) => { if (!cancelled) setError(e.message) })
+    load()
+    const id = setInterval(load, 2000)
+    return () => { cancelled = true; clearInterval(id) }
+  }, [])
+
+  return (
+    <div className="p-6 max-w-4xl flex flex-col gap-4">
+      <h1 className="text-lg font-semibold text-slate-100">EQMOD diagnostics</h1>
+      {error && <p className="text-xs text-status-error">{error}</p>}
+      {mounts !== null && mounts.length === 0 && (
+        <div className="text-sm text-slate-500 space-y-1">
+          <p>No real eqmod mount connected.</p>
+          <p className="text-xs">
+            Equipment → Load driver → Mount → Other adapter → <span className="font-mono">eqmod</span>, with
+            params <span className="font-mono">{'{"port": "/dev/ttyUSB0"}'}</span>. Add{' '}
+            <span className="font-mono">"baudrate"</span> to skip auto-detection (9600 for an EQMOD cable,
+            115200 for the AZ-EQ6 built-in USB), and <span className="font-mono">"ra_reverse"</span> /{' '}
+            <span className="font-mono">"dec_reverse"</span> if a nudge moves the wrong way.
+          </p>
+        </div>
+      )}
+      {mounts?.map((d) => <MountCard key={d.device_id} d={d} />)}
+      <LedControl />
+    </div>
+  )
+}

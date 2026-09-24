@@ -26,10 +26,9 @@ from astrolol.api.imager import router as imager_router
 from astrolol.api.indi import router as indi_router
 from astrolol.api.inventory import router as inventory_router
 from astrolol.api.mount import router as mount_router
-from astrolol.api.profiles import router as profiles_router
+from astrolol.api.profiles import restore_last_profile, router as profiles_router
 from astrolol.api.properties import router as properties_router
 from astrolol.api.settings import router as settings_router
-from astrolol.equipment.models import SiteItem
 from astrolol.equipment.store import EquipmentStore
 from astrolol.profiles.store import ProfileStore
 from astrolol.app import (
@@ -77,37 +76,7 @@ def create_app() -> FastAPI:
                 except Exception as exc:
                     logger.error("plugin.startup_failed", plugin_id=plugin_id, error=str(exc), exc_info=True)
 
-        store: ProfileStore = app.state.profile_store
-        last_id = store.get_last_active_id()
-        if last_id is not None:
-            try:
-                profile = store.get(last_id)
-                app.state.active_profile = profile
-                app.state.imager_manager.set_context(profile)
-                site = next(
-                    (equipment_store.get(n.item_id) for n in profile.roots
-                     if isinstance(equipment_store.get(n.item_id), SiteItem)),
-                    None,
-                )
-                for pd in profile.devices:
-                    try:
-                        await app.state.device_manager.connect(pd.config)
-                        if pd.config.kind == "mount":
-                            await app.state.mount_manager.push_site_data(
-                                pd.config.device_id, site
-                            )
-                            app.state.mount_manager.start_automation(pd.config.device_id)
-                    except Exception as exc:
-                        logger.warning(
-                            "startup.device_connect_failed",
-                            device_id=pd.config.device_id,
-                            error=str(exc),
-                        )
-                    else:
-                        if pd.config.kind == "camera":
-                            await app.state.imager_manager.push_scope_info(pd.config.device_id)
-            except KeyError:
-                logger.warning("startup.last_profile_not_found", profile_id=last_id)
+        await restore_last_profile(app.state)
         yield
 
         # --- Shutdown ---

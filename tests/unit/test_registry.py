@@ -30,3 +30,39 @@ def test_all_keys():
     assert "cam_a" in keys["cameras"]
     assert keys["mounts"] == []
     assert keys["focusers"] == []
+
+
+class _AdapterWithDefaults:
+    DEFAULT_CONNECT_PARAMS = {"port": "/dev/ttyUSB0"}
+
+
+class _AdapterWithoutDefaults:
+    pass
+
+
+def test_adapters_for_kind():
+    registry = DeviceRegistry()
+    registry.register_mount("m", _AdapterWithDefaults)  # type: ignore[arg-type]
+    assert registry.adapters_for_kind("mount") == {"m": _AdapterWithDefaults}
+    assert registry.adapters_for_kind("unknown") == {}
+
+
+def test_default_connect_params():
+    registry = DeviceRegistry()
+    registry.register_mount("with", _AdapterWithDefaults)  # type: ignore[arg-type]
+    registry.register_mount("without", _AdapterWithoutDefaults)  # type: ignore[arg-type]
+    assert registry.default_connect_params("mount", "with") == {"port": "/dev/ttyUSB0"}
+    assert registry.default_connect_params("mount", "without") == {}
+
+
+def test_default_connect_params_returns_a_copy():
+    registry = DeviceRegistry()
+    registry.register_mount("with", _AdapterWithDefaults)  # type: ignore[arg-type]
+    registry.default_connect_params("mount", "with")["port"] = "mutated"
+    assert _AdapterWithDefaults.DEFAULT_CONNECT_PARAMS == {"port": "/dev/ttyUSB0"}
+
+
+def test_default_connect_params_unknown_adapter():
+    import pytest
+    with pytest.raises(KeyError):
+        DeviceRegistry().default_connect_params("mount", "nope")

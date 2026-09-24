@@ -8,6 +8,7 @@ from astrolol.core.errors import (
     DeviceConnectionError,
     DeviceNotFoundError,
 )
+from astrolol.api.profiles import find_profile_site
 from astrolol.devices.config import DeviceConfig
 from astrolol.devices.manager import DeviceManager
 
@@ -26,8 +27,13 @@ async def _push_mount_site_data(request: Request, device_id: str) -> None:
         if mount_manager is None:
             return
         profile = getattr(request.app.state, "active_profile", None)
-        location = profile.location if profile is not None else None
-        await mount_manager.push_site_data(device_id, location)
+        equipment_store = getattr(request.app.state, "equipment_store", None)
+        site = (
+            find_profile_site(profile, equipment_store)
+            if profile is not None and equipment_store is not None
+            else None
+        )
+        await mount_manager.push_site_data(device_id, site)
     except Exception as exc:
         logger.warning("mount.site_data_push_failed", device_id=device_id, error=str(exc))
 
@@ -51,6 +57,15 @@ class ConnectResponse(BaseModel):
 async def list_available(request: Request) -> dict[str, list[str]]:
     """List all adapter keys registered by plugins."""
     return request.app.state.registry.all_keys()
+
+
+@router.get("/available/{kind}/{adapter_key}/defaults")
+async def adapter_defaults(kind: str, adapter_key: str, request: Request) -> dict:
+    """Default connect params an adapter suggests (empty if it declares none)."""
+    try:
+        return request.app.state.registry.default_connect_params(kind, adapter_key)
+    except KeyError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
 
 
 @router.get("/connected")

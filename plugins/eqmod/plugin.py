@@ -1,24 +1,17 @@
 """EQMOD mount plugin for astrolol.
 
-Phase 1 (current): a generic, protocol-agnostic mount emulator
-(`EqmodSimMount`, adapter_key "eqmod_sim") that validates the device-adapter
-integration contract — registry wiring, the full MountManager call surface,
-and reconnect-without-resync persistence — independently of the real EQMOD/
-SynScan wire protocol.
-
-Phase 2 (later): the real serial driver behind the same IMount contract,
-registered as adapter_key "eqmod".
-
-Phase 3 (later): a minimal INDI guide server so PHD2 can issue pulse-guide
-corrections to whichever adapter is connected, without needing indiserver.
+- "eqmod_sim": protocol-agnostic mount emulator (Phase 1).
+- "eqmod": real Sky-Watcher driver over serial (Phase 2, bring-up build).
+- Phase 3 (later): minimal INDI guide server so PHD2 can pulse-guide without indiserver.
 """
 from __future__ import annotations
 
 import structlog
 from fastapi import FastAPI
 
-from astrolol.core.plugin_api import PluginContext, PluginManifest
+from astrolol.core.plugin_api import LogScope, PluginContext, PluginManifest
 from plugins.eqmod.api import router
+from plugins.eqmod.mount import EqmodMount
 from plugins.eqmod.simulator import EqmodSimMount
 
 logger = structlog.get_logger()
@@ -28,18 +21,19 @@ class EqmodPlugin:
     manifest = PluginManifest(
         id="eqmod",
         name="EQMOD Mount",
-        version="0.1.0",
+        version="0.2.0",
         description=(
-            "Native (non-INDI) driver for SkyWatcher EQMOD-protocol mounts: "
-            "GoTo, full sync after plate-solve, sidereal/lunar/solar tracking, "
-            "nudge, and parking, with no alignment model. Currently ships a "
-            "mount emulator ('eqmod_sim') that proves out the integration; "
-            "the real serial driver lands in a later phase."
+            "Native (non-INDI) driver for Sky-Watcher mounts over the motor controller "
+            "protocol (EQMOD cable or built-in USB). Bring-up build: connect, nudge, "
+            "tracking and live diagnostics; GoTo, sync and park follow. Also ships a "
+            "mount emulator ('eqmod_sim')."
         ),
+        log_scopes=[LogScope(key="eqmod", label="EQMOD", logger="plugins.eqmod")],
     )
 
     def setup(self, app: FastAPI, ctx: PluginContext) -> None:
         ctx.device_registry.register_mount("eqmod_sim", EqmodSimMount)
+        ctx.device_registry.register_mount("eqmod", EqmodMount)
         app.include_router(router)
         logger.info("eqmod.plugin_setup")
 

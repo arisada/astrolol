@@ -37,6 +37,23 @@ class DeviceRegistry:
     def register_indi_raw(self, key: str, adapter: Any) -> None:
         self.indi_raws[key] = adapter
 
+    def adapters_for_kind(self, kind: str) -> dict[str, Any]:
+        return {
+            "camera": self.cameras,
+            "mount": self.mounts,
+            "focuser": self.focusers,
+            "filter_wheel": self.filter_wheels,
+            "rotator": self.rotators,
+            "indi": self.indi_raws,
+        }.get(kind, {})
+
+    def default_connect_params(self, kind: str, key: str) -> dict[str, Any]:
+        """Params an adapter suggests for the connect form (its DEFAULT_CONNECT_PARAMS, if any)."""
+        adapter = self.adapters_for_kind(kind).get(key)
+        if adapter is None:
+            raise KeyError(f"No adapter '{key}' registered for kind '{kind}'")
+        return dict(getattr(adapter, "DEFAULT_CONNECT_PARAMS", {}))
+
     def all_keys(self) -> dict[str, list[str]]:
         return {
             "cameras": list(self.cameras),

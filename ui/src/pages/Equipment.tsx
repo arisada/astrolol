@@ -342,6 +342,16 @@ function GenericAdapterStep({
     }
   }, [adapterKeys]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Pre-fill the JSON with whatever defaults the chosen adapter declares.
+  useEffect(() => {
+    if (!adapterKey) return
+    let cancelled = false
+    api.devices.adapterDefaults(kind, adapterKey)
+      .then((d) => { if (!cancelled) setParamsText(JSON.stringify(d, null, 2)) })
+      .catch(() => { if (!cancelled) setParamsText('{}') })
+    return () => { cancelled = true }
+  }, [kind, adapterKey])
+
   const deviceIdInvalid = deviceId !== '' && !DEVICE_ID_RE.test(deviceId)
 
   const handleConnect = () => {

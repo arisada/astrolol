@@ -170,6 +170,8 @@ class EqmodSimMount:
     'eqmod_sim'. See module docstring for the design rationale.
     """
 
+    DEFAULT_CONNECT_PARAMS = {"state_key": "default"}
+
     def __init__(self, state_key: str = "default", **_kwargs: object) -> None:
         self._state_key = state_key
         self._connected = False
@@ -462,7 +464,7 @@ class EqmodSimMount:
     def get_led_brightness(self) -> int:
         return self._led_brightness
 
-    def set_led_brightness(self, value: int) -> None:
+    async def set_led_brightness(self, value: int) -> None:
         self._led_brightness = value
 
     # --- Internal ---

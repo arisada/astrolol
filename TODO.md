@@ -4,16 +4,69 @@ Items designed for but not yet built. Ordered roughly by priority.
 
 ## Known bugs
 
-- **Non-INDI equipment doesn't reconnect via Profiles** — an inventory item connected
-  through a non-INDI adapter (e.g. `plugins/eqmod`'s `eqmod_sim`) shows up correctly in
-  Inventory and in a Profile's device tree, but activating/reloading the profile does not
-  bring it back online in the Connections tab. `Equipment.tsx`'s "Other adapter" wizard and
-  the inventory/matching models (`EquipmentItem.adapter_key` / `connect_params`,
-  `api/profiles.py::_find_device_for_item`) were updated to support non-INDI adapters, but
-  `Profiles.tsx` was never audited — it likely has its own, separate logic for turning an
-  inventory item into a connectable `DeviceConfig` when building/activating a profile, still
-  assuming `indi_driver` / `indi_device_name`. Flagged as the first concretely observed
-  symptom of a wider profiles/equipment audit that's still needed.
+- **Profile deactivation ignores the equipment tree** — activation and startup restore now
+  connect every connectable inventory item in the profile tree
+  (`api/profiles.py::connect_tree_devices`), but `DELETE /profiles/active` still only
+  disconnects the legacy `profile.devices` list, so tree devices stay connected.
+- **INDI items connected from the tree are untested on real indiserver** — the mapping
+  (`indi_<kind>` + `{device_name, executable}`) matches what the wizard sends and the INDI
+  adapters load the driver themselves, but only non-INDI items were verified end to end.
+- **FITS headers silently not patched with an active profile** —
+  `imaging/imager.py::_patch_fits_headers` still reads `profile.location`, a field that no
+  longer exists on `Profile` (the site now lives in the equipment tree as a `SiteItem`).
+  The `AttributeError` is swallowed by the function's broad `try`, so the *whole* header
+  patch is skipped — OBJECT, RA/DEC and TELESCOP included, not just the site keys. Fix by
+  resolving the site with `api/profiles.py::find_profile_site` (the same stale read in
+  `api/devices.py` was fixed that way).
+
+## EQMOD native driver — assumptions & deferred items
+
+Phase 2 (`plugins/eqmod/`) deliberately starts narrow. Each item below is an assumption
+baked into the current code/design or a feature left out; revisit when it bites.
+
+- **Northern hemisphere only** — geometry assumes the NCP; southern hemisphere (SCP home,
+  mirrored Dec axis) not supported yet.
+- **Home = polar home at power-on** — raw axis counters are assumed to read 0 with
+  counterweights down and the OTA pointing at the pole when the mount is powered up.
+- **Axis direction signs are per-mount** — whether positive counts mean E/W (RA) and N/S
+  (Dec) will be measured during hardware bring-up and stored as a setting, not guessed.
+- **Pier-side policy** — when both pier sides can reach a target, pick the one with the
+  longest tracking time before a flip. No user-selectable policy yet.
+- **Single-point sync, no alignment model** — sync is one software offset stored in
+  *axis-angle* space (latest sync wins); the controller's counters are never rewritten.
+  Axis space matters: it corrects zero-point error (e.g. eyeballed polar home) identically
+  on both pier sides, whereas an RA/Dec-space offset would apply the Dec correction in the
+  wrong direction after a meridian flip. Does not correct polar misalignment/cone error,
+  which differ per pier side; per-side offsets could be added later if that ever matters.
+- **No refraction, no meridian/horizon limits yet** — both are ours to implement
+  (the controller does no geometry at all).
+- **Serial transport only** — EQMOD cable (9600) or AZ-EQ6 built-in USB (115200), with
+  baud auto-detect. SynScan WiFi (same protocol over UDP :11880) not implemented.
+- **EQ mode only** — AZ mode / Alt-Az mounts (shared TX/RX bus with Drop line) not
+  supported.
+- **Out of scope for now** — PEC/PPEC, dual encoders, EEPROM/register access,
+  bootloader, extended settings.
+- **To probe on real hardware** — AZ-EQ6 extended status (`:q1010000`) "original position
+  indexer": may allow recovering absolute axis position after a power cycle instead of
+  treating it as lost.
+- **Power-cycle detection** — inferred from controller counts: on connect, counts must be
+  within 0.5° of the last saved position (plus sidereal drift if it was tracking), otherwise
+  the saved sync offset is discarded. Park position is kept either way.
+- **Controller direction convention** — assumes the CW motion bit increases the position
+  counter (as indi-eqmod does). `ra_reverse` / `dec_reverse` then calibrate which way the
+  counts turn the axes; one flag per axis is enough only if that CW assumption holds.
+- **Stops never use channel "3"** — Instant Stop is sent per axis (`:L1`, `:L2`) like
+  indi-eqmod does. `:L3` is the suspected cause of Stop not halting a GOTO on the AZ-EQ6
+  (unconfirmed: to verify on hardware). Only `:F3` (init) still uses channel 3, and that one
+  works on the AZ-EQ6.
+- **GOTO method** — relative `:H` increment + direction bit, no `:M` brake point sent. The
+  controller decelerates on its own; verify stopping accuracy on hardware. Two passes: the
+  second corrects for sky motion during the first. A GOTO always ends with tracking on.
+- **Offline astronomy** — LST uses the GMST formula on UTC (UT1-UTC < 0.9s ignored) and
+  Alt/Az is plain spherical trig without refraction, so nothing needs IERS downloads.
+  ICRS↔JNow still uses astropy FK5 (precession only, no IERS needed).
+- **RA nudge while tracking** — the nudge replaces tracking for its duration instead of being
+  added to it (fine for centering; proper guide-rate blending belongs to the PHD2 phase).
 
 ## Near-term
 

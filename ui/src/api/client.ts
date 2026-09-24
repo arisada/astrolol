@@ -6,6 +6,7 @@ import type {
   EquipmentItem,
   MountDeviceSettings,
   DeviceConfig,
+  DeviceKind,
   DeviceProperty,
   DriverEntry,
   ExposureRequest,
@@ -46,6 +47,8 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 export const api = {
   devices: {
     available: () => request<Record<string, string[]>>('/devices/available'),
+    adapterDefaults: (kind: DeviceKind, adapterKey: string) =>
+      request<Record<string, unknown>>(`/devices/available/${kind}/${encodeURIComponent(adapterKey)}/defaults`),
     connected: () => request<ConnectedDevice[]>('/devices/connected'),
     connect: (config: DeviceConfig) =>
       request<{ device_id: string }>('/devices/connect', {

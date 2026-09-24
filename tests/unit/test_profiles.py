@@ -4,7 +4,10 @@ from __future__ import annotations
 import pytest
 from httpx import ASGITransport, AsyncClient
 
-from astrolol.api.profiles import _apply_tree_context, _push_live_context, _find_mount_for_camera
+from astrolol.api.profiles import (
+    _apply_tree_context, _push_live_context, _find_mount_for_camera, find_profile_site,
+    item_device_config, restore_last_profile,
+)
 from astrolol.equipment.models import CameraItem, MountItem, OTAItem, SiteItem
 from astrolol.equipment.store import EquipmentStore
 from astrolol.main import create_app
@@ -604,3 +607,176 @@ def test_find_mount_for_camera_wrong_name_returns_none(inv_store):
     roots = [ProfileNode(item_id=mount_item.id, children=[ProfileNode(item_id=cam_item.id)])]
     result = _find_mount_for_camera(roots, inv_store, dm, "Some Other Camera")
     assert result is None
+
+
+# ===========================================================================
+# Site lookup in the profile tree (find_profile_site)
+# ===========================================================================
+
+
+def _site(inv_store):
+    return inv_store.create(SiteItem(name="Backyard", latitude=48.85, longitude=2.35, altitude=35.0))
+
+
+def test_find_profile_site_at_root(inv_store):
+    site = _site(inv_store)
+    profile = Profile(name="p", roots=[ProfileNode(item_id=site.id)])
+    assert find_profile_site(profile, inv_store) == site
+
+
+def test_find_profile_site_nested(inv_store):
+    ota = inv_store.create(OTAItem(name="OTA", focal_length=500.0, aperture=80.0))
+    site = _site(inv_store)
+    profile = Profile(name="p", roots=[ProfileNode(item_id=ota.id, children=[ProfileNode(item_id=site.id)])])
+    assert find_profile_site(profile, inv_store) == site
+
+
+def test_find_profile_site_skips_missing_items(inv_store):
+    site = _site(inv_store)
+    profile = Profile(name="p", roots=[ProfileNode(item_id="gone"), ProfileNode(item_id=site.id)])
+    assert find_profile_site(profile, inv_store) == site
+
+
+def test_find_profile_site_none(inv_store):
+    mount = inv_store.create(MountItem(name="EQ6-R"))
+    assert find_profile_site(Profile(name="p", roots=[ProfileNode(item_id=mount.id)]), inv_store) is None
+    assert find_profile_site(Profile(name="p"), inv_store) is None
+
+
+@pytest.mark.asyncio
+async def test_connecting_a_mount_pushes_the_active_profile_site(app, client, tmp_path):
+    """Regression: /devices/connect read a removed Profile.location field and never pushed the site."""
+    inv_store = EquipmentStore(tmp_path / "inventory.json")
+    app.state.equipment_store = inv_store
+    site = _site(inv_store)
+    app.state.active_profile = Profile(name="p", roots=[ProfileNode(item_id=site.id)])
+
+    async with client as c:
+        r = await c.post("/devices/connect", json={"device_id": "m1", "kind": "mount", "adapter_key": "fake_mount"})
+    assert r.status_code == 201
+    assert app.state.device_manager.get_mount("m1").location == (48.85, 2.35, 35.0)
+
+
+# ===========================================================================
+# Connecting the equipment tree (activation + startup restore)
+# ===========================================================================
+
+
+def test_item_device_config_native_adapter(inv_store):
+    item = inv_store.create(MountItem(name="AZ-EQ6", adapter_key="eqmod", connect_params={"port": "/dev/ttyUSB0"}))
+    config = item_device_config(item)
+    assert (config.device_id, config.kind, config.adapter_key) == ("mount_az_eq6", "mount", "eqmod")
+    assert config.params == {"port": "/dev/ttyUSB0"}
+
+
+def test_item_device_config_indi(inv_store):
+    item = inv_store.create(CameraItem(name="ASI2600", indi_driver="indi_asi_ccd", indi_device_name="ZWO CCD ASI2600MC Pro"))
+    config = item_device_config(item)
+    assert config.adapter_key == "indi_camera"
+    assert config.params == {"device_name": "ZWO CCD ASI2600MC Pro", "executable": "indi_asi_ccd"}
+
+
+def test_item_device_config_none_without_connection_info(inv_store):
+    assert item_device_config(inv_store.create(MountItem(name="bare"))) is None
+    assert item_device_config(_site(inv_store)) is None
+    assert item_device_config(inv_store.create(OTAItem(name="OTA", focal_length=500.0, aperture=80.0))) is None
+
+
+def test_item_device_config_id_is_stable_and_falls_back_to_item_id(inv_store):
+    item = inv_store.create(MountItem(name="!!!", adapter_key="fake_mount"))
+    assert item_device_config(item).device_id == f"mount_{item.id[:8]}"
+    assert item_device_config(item).device_id == item_device_config(item).device_id
+
+
+def _tree_profile(inv_store, *items):
+    site = _site(inv_store)
+    return Profile(name="rig", roots=[ProfileNode(item_id=site.id, children=[ProfileNode(item_id=i.id) for i in items])])
+
+
+@pytest.mark.asyncio
+async def test_activate_connects_tree_devices_and_pushes_the_site(app, client, tmp_path):
+    inv_store = EquipmentStore(tmp_path / "inventory.json")
+    app.state.equipment_store = inv_store
+    mount = inv_store.create(MountItem(name="Sim mount", adapter_key="fake_mount", connect_params={}))
+    profile = app.state.profile_store.create(_tree_profile(inv_store, mount))
+
+    async with client as c:
+        r = await c.post(f"/profiles/{profile.id}/activate")
+    assert r.status_code == 200
+    assert [d["device_id"] for d in r.json()["connected"]] == ["mount_sim_mount"]
+    assert app.state.device_manager.get_mount("mount_sim_mount").location == (48.85, 2.35, 35.0)
+
+
+@pytest.mark.asyncio
+async def test_activate_does_not_reconnect_a_device_already_connected_by_the_wizard(app, client, tmp_path):
+    inv_store = EquipmentStore(tmp_path / "inventory.json")
+    app.state.equipment_store = inv_store
+    mount = inv_store.create(MountItem(name="Sim mount", adapter_key="fake_mount", connect_params={}))
+    profile = app.state.profile_store.create(_tree_profile(inv_store, mount))
+
+    async with client as c:
+        await c.post("/devices/connect", json={"device_id": "wizard_mount", "kind": "mount", "adapter_key": "fake_mount"})
+        r = await c.post(f"/profiles/{profile.id}/activate")
+    assert [d["device_id"] for d in r.json()["connected"]] == ["wizard_mount"]
+    assert [d["device_id"] for d in app.state.device_manager.list_connected()] == ["wizard_mount"]
+
+
+@pytest.mark.asyncio
+async def test_activate_reports_tree_devices_that_fail_to_connect(app, client, tmp_path):
+    inv_store = EquipmentStore(tmp_path / "inventory.json")
+    app.state.equipment_store = inv_store
+    mount = inv_store.create(MountItem(name="Ghost", adapter_key="no_such_adapter", connect_params={}))
+    profile = app.state.profile_store.create(_tree_profile(inv_store, mount))
+
+    async with client as c:
+        r = await c.post(f"/profiles/{profile.id}/activate")
+    assert r.status_code == 200
+    assert [d["device_id"] for d in r.json()["failed"]] == ["mount_ghost"]
+
+
+@pytest.mark.asyncio
+async def test_restore_last_profile_reconnects_the_tree(tmp_path):
+    """Regression: after a restart the profile's mount was forgotten and needed the wizard again."""
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock, MagicMock
+
+    from astrolol.core.events import EventBus
+    from astrolol.devices.manager import DeviceManager
+    from astrolol.devices.registry import DeviceRegistry
+    from astrolol.mount.manager import MountManager
+
+    inv_store = EquipmentStore(tmp_path / "inventory.json")
+    profile_store = ProfileStore(tmp_path / "profiles.json")
+    mount = inv_store.create(MountItem(name="Sim mount", adapter_key="fake_mount", connect_params={}))
+    profile = _tree_profile(inv_store, mount)
+    profile.roots.append(ProfileNode(item_id="deleted-item"))  # must not abort the restore
+    profile = profile_store.create(profile)
+    profile_store.set_last_active_id(profile.id)
+
+    registry = DeviceRegistry()
+    registry.register_mount("fake_mount", FakeMount)  # type: ignore[arg-type]
+    bus = EventBus()
+    device_manager = DeviceManager(registry=registry, event_bus=bus)
+    mount_manager = MountManager(device_manager=device_manager, event_bus=bus)
+    state = SimpleNamespace(
+        profile_store=profile_store, equipment_store=inv_store, device_manager=device_manager,
+        mount_manager=mount_manager, imager_manager=MagicMock(push_scope_info=AsyncMock()),
+        active_profile=None,
+    )
+
+    await restore_last_profile(state)
+
+    assert state.active_profile.id == profile.id
+    restored = device_manager.get_mount("mount_sim_mount")
+    assert restored.location == (48.85, 2.35, 35.0)
+    for task in mount_manager._automation_tasks.values():
+        task.cancel()
+
+
+@pytest.mark.asyncio
+async def test_restore_last_profile_without_last_profile_is_a_noop(tmp_path):
+    from types import SimpleNamespace
+
+    state = SimpleNamespace(profile_store=ProfileStore(tmp_path / "profiles.json"), active_profile=None)
+    await restore_last_profile(state)
+    assert state.active_profile is None

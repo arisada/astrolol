@@ -326,7 +326,7 @@ async def test_slew_takes_measurable_time_at_the_real_rate(monkeypatch) -> None:
 async def test_led_brightness_get_set() -> None:
     mount = EqmodSimMount()
     assert mount.get_led_brightness() == 50
-    mount.set_led_brightness(10)
+    await mount.set_led_brightness(10)
     assert mount.get_led_brightness() == 10
 
 
