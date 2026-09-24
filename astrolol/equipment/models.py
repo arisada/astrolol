@@ -36,6 +36,12 @@ class MountItem(BaseModel):
     name: str
     indi_driver: str | None = None
     indi_device_name: str | None = None
+    # For non-INDI adapters (e.g. plugins/eqmod's "eqmod_sim"/"eqmod"): the
+    # adapter_key + params used to connect, mirroring DeviceConfig. Matched
+    # against connected devices by astrolol/api/profiles.py's
+    # _find_device_for_item() when indi_device_name is absent.
+    adapter_key: str | None = None
+    connect_params: dict = {}
 
 
 class OTAItem(BaseModel):
@@ -52,6 +58,8 @@ class CameraItem(BaseModel):
     name: str
     indi_driver: str | None = None
     indi_device_name: str | None = None
+    adapter_key: str | None = None
+    connect_params: dict = {}
     pixel_size_um: float | None = None
 
 
@@ -61,6 +69,8 @@ class FilterWheelItem(BaseModel):
     name: str
     indi_driver: str | None = None
     indi_device_name: str | None = None
+    adapter_key: str | None = None
+    connect_params: dict = {}
     filter_names: list[str] = []
 
 
@@ -70,6 +80,8 @@ class FocuserItem(BaseModel):
     name: str
     indi_driver: str | None = None
     indi_device_name: str | None = None
+    adapter_key: str | None = None
+    connect_params: dict = {}
 
 
 class RotatorItem(BaseModel):
@@ -78,6 +90,8 @@ class RotatorItem(BaseModel):
     name: str
     indi_driver: str | None = None
     indi_device_name: str | None = None
+    adapter_key: str | None = None
+    connect_params: dict = {}
 
 
 class GpsItem(BaseModel):
@@ -86,6 +100,8 @@ class GpsItem(BaseModel):
     name: str
     indi_driver: str | None = None
     indi_device_name: str | None = None
+    adapter_key: str | None = None
+    connect_params: dict = {}
 
 
 EquipmentItem = Annotated[

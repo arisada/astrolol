@@ -94,11 +94,31 @@ async def delete_profile(profile_id: str, request: Request) -> None:
 # Tree-context propagation
 # ---------------------------------------------------------------------------
 
-def _find_device_by_indi_name(device_manager, kind: str, indi_device_name: str):
-    """Return the adapter instance for a connected device matching kind + INDI device name."""
+def _clean_params(params: dict) -> dict:
+    return {k: v for k, v in params.items() if k != "pre_connect_props"}
+
+
+def _find_device_for_item(device_manager, kind: str, item: EquipmentItem):
+    """Return the adapter instance for a connected device matching this inventory item.
+
+    INDI-family items match by the driver's own announced device_name — stable
+    across reconnects even if astrolol's device_id changes, see astrolol/api/indi.py.
+    Any other adapter (e.g. plugins/eqmod's native, non-INDI mount) has no such
+    driver-announced identity, so it matches by adapter_key + exact connect_params
+    equality instead — there's no single params key that means "identity" across
+    arbitrary adapters, so the full params dict is the only adapter-agnostic option.
+    """
+    indi_name = getattr(item, "indi_device_name", None)
+    adapter_key = getattr(item, "adapter_key", None)
+    connect_params = _clean_params(getattr(item, "connect_params", None) or {})
+
     for entry in device_manager._devices.values():
-        if entry.config.kind == kind:
-            if entry.config.params.get("device_name") == indi_device_name:
+        if entry.config.kind != kind:
+            continue
+        if indi_name and entry.config.params.get("device_name") == indi_name:
+            return entry.instance
+        if adapter_key and entry.config.adapter_key == adapter_key:
+            if _clean_params(entry.config.params) == connect_params:
                 return entry.instance
     return None
 
@@ -131,40 +151,36 @@ async def _apply_tree_context(
             current_site = item  # type: ignore[assignment]
 
         elif item.type == "mount" and current_site is not None:
-            indi_name = getattr(item, "indi_device_name", None)
-            if indi_name:
-                mount = _find_device_by_indi_name(device_manager, "mount", indi_name)
-                if mount is not None and hasattr(mount, "set_location"):
-                    try:
-                        await mount.set_location(
-                            current_site.latitude,
-                            current_site.longitude,
-                            current_site.altitude,
-                        )
-                    except Exception as exc:
-                        logger.warning(
-                            "profile.push_location_failed",
-                            device=indi_name, error=str(exc),
-                        )
+            mount = _find_device_for_item(device_manager, "mount", item)
+            if mount is not None and hasattr(mount, "set_location"):
+                try:
+                    await mount.set_location(
+                        current_site.latitude,
+                        current_site.longitude,
+                        current_site.altitude,
+                    )
+                except Exception as exc:
+                    logger.warning(
+                        "profile.push_location_failed",
+                        item_id=item.id, error=str(exc),  # type: ignore[union-attr]
+                    )
 
         elif item.type == "ota":
             current_ota = item  # type: ignore[assignment]
 
         elif item.type == "camera" and current_ota is not None:
-            indi_name = getattr(item, "indi_device_name", None)
-            if indi_name:
-                camera = _find_device_by_indi_name(device_manager, "camera", indi_name)
-                if camera is not None and hasattr(camera, "push_scope_info"):
-                    try:
-                        await camera.push_scope_info(
-                            current_ota.focal_length,
-                            current_ota.aperture,
-                        )
-                    except Exception as exc:
-                        logger.warning(
-                            "profile.push_scope_info_failed",
-                            device=indi_name, error=str(exc),
-                        )
+            camera = _find_device_for_item(device_manager, "camera", item)
+            if camera is not None and hasattr(camera, "push_scope_info"):
+                try:
+                    await camera.push_scope_info(
+                        current_ota.focal_length,
+                        current_ota.aperture,
+                    )
+                except Exception as exc:
+                    logger.warning(
+                        "profile.push_scope_info_failed",
+                        item_id=item.id, error=str(exc),  # type: ignore[union-attr]
+                    )
 
         # Recurse into children, propagating the updated context
         await _apply_tree_context(
@@ -206,27 +222,23 @@ async def _push_live_context(
         current_mount = mount_adapter
 
         if item.type == "mount":
-            indi_name = getattr(item, "indi_device_name", None)
-            if indi_name:
-                adapter = _find_device_by_indi_name(device_manager, "mount", indi_name)
-                if adapter is not None:
-                    current_mount = adapter
+            adapter = _find_device_for_item(device_manager, "mount", item)
+            if adapter is not None:
+                current_mount = adapter
 
         elif item.type == "camera" and current_mount is not None:
-            indi_name = getattr(item, "indi_device_name", None)
-            if indi_name:
-                camera = _find_device_by_indi_name(device_manager, "camera", indi_name)
-                if camera is not None and hasattr(camera, "push_telescope_coord"):
-                    try:
-                        status = await current_mount.get_status()
-                        await camera.push_telescope_coord(
-                            status.ra_jnow, status.dec_jnow
-                        )
-                    except Exception as exc:
-                        logger.warning(
-                            "profile.push_telescope_coord_failed",
-                            device=indi_name, error=str(exc),
-                        )
+            camera = _find_device_for_item(device_manager, "camera", item)
+            if camera is not None and hasattr(camera, "push_telescope_coord"):
+                try:
+                    status = await current_mount.get_status()
+                    await camera.push_telescope_coord(
+                        status.ra_jnow, status.dec_jnow
+                    )
+                except Exception as exc:
+                    logger.warning(
+                        "profile.push_telescope_coord_failed",
+                        item_id=item.id, error=str(exc),  # type: ignore[union-attr]
+                    )
 
         await _push_live_context(
             node.children, equipment_store, device_manager,
@@ -262,11 +274,9 @@ def _find_mount_for_camera(
         current_mount = mount_adapter
 
         if item.type == "mount":
-            indi_name = getattr(item, "indi_device_name", None)
-            if indi_name:
-                adapter = _find_device_by_indi_name(device_manager, "mount", indi_name)
-                if adapter is not None:
-                    current_mount = adapter
+            adapter = _find_device_for_item(device_manager, "mount", item)
+            if adapter is not None:
+                current_mount = adapter
 
         elif item.type == "camera":
             indi_name = getattr(item, "indi_device_name", None)

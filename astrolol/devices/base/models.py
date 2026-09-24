@@ -68,6 +68,9 @@ class MountStatus(BaseModel):
     is_tracking: bool = False
     is_parked: bool = False
     is_slewing: bool = False
+    is_synced: bool | None = None   # None = adapter doesn't track this (e.g. INDI's own alignment
+                                     # model always has *a* position); False = raw position only,
+                                     # ra/dec below should not be trusted for pointing decisions.
     pier_side: str | None = None    # "East" | "West" — which side of the pier the OTA is on
     hour_angle: float | None = None   # decimal hours, negative = east (pre-meridian), positive = west (post)
     lst: float | None = None           # Local Sidereal Time in decimal hours

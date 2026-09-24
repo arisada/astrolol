@@ -329,6 +329,8 @@ export interface MountEquipmentItem extends BaseEquipmentItem {
   type: 'mount'
   indi_driver: string | null
   indi_device_name: string | null
+  adapter_key: string | null
+  connect_params: Record<string, unknown>
 }
 export interface OTAEquipmentItem extends BaseEquipmentItem {
   type: 'ota'
@@ -339,28 +341,38 @@ export interface CameraEquipmentItem extends BaseEquipmentItem {
   type: 'camera'
   indi_driver: string | null
   indi_device_name: string | null
+  adapter_key: string | null
+  connect_params: Record<string, unknown>
   pixel_size_um: number | null
 }
 export interface FilterWheelEquipmentItem extends BaseEquipmentItem {
   type: 'filter_wheel'
   indi_driver: string | null
   indi_device_name: string | null
+  adapter_key: string | null
+  connect_params: Record<string, unknown>
   filter_names: string[]
 }
 export interface FocuserEquipmentItem extends BaseEquipmentItem {
   type: 'focuser'
   indi_driver: string | null
   indi_device_name: string | null
+  adapter_key: string | null
+  connect_params: Record<string, unknown>
 }
 export interface RotatorEquipmentItem extends BaseEquipmentItem {
   type: 'rotator'
   indi_driver: string | null
   indi_device_name: string | null
+  adapter_key: string | null
+  connect_params: Record<string, unknown>
 }
 export interface GpsEquipmentItem extends BaseEquipmentItem {
   type: 'gps'
   indi_driver: string | null
   indi_device_name: string | null
+  adapter_key: string | null
+  connect_params: Record<string, unknown>
 }
 
 export type EquipmentItem =

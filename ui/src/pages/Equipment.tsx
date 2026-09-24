@@ -20,7 +20,7 @@ import { DevicePropertiesPanel } from '@/components/DevicePropertiesPanel'
 // Types & constants
 // ---------------------------------------------------------------------------
 
-type WizardStep = 'type' | 'manufacturer' | 'model' | 'loading' | 'manual' | 'configure'
+type WizardStep = 'type' | 'source' | 'manufacturer' | 'model' | 'loading' | 'manual' | 'configure' | 'generic'
 
 const DEVICE_ID_RE = /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/
 
@@ -47,6 +47,16 @@ const KIND_ADAPTER: Record<DeviceKind, string> = {
   filter_wheel: 'indi_filter_wheel',
   rotator: 'indi_rotator',
   indi: 'indi_raw',
+}
+
+// DeviceKind -> the plural key GET /devices/available groups adapters under
+const KIND_REGISTRY_KEY: Record<DeviceKind, string> = {
+  camera: 'cameras',
+  mount: 'mounts',
+  focuser: 'focusers',
+  filter_wheel: 'filter_wheels',
+  rotator: 'rotators',
+  indi: 'indi_raws',
 }
 
 function KindIcon({ kind, size = 28 }: { kind: DeviceKind; size?: number }) {
@@ -100,6 +110,49 @@ function TypeStep({ onSelect }: { onSelect: (kind: DeviceKind) => void }) {
             <span className="text-sm font-medium">{KIND_LABELS[kind]}</span>
           </button>
         ))}
+      </div>
+    </div>
+  )
+}
+
+// Step 1b — INDI catalog vs. any other registered adapter (native drivers, simulators, …)
+function SourceStep({
+  kind,
+  onChooseIndi,
+  onChooseGeneric,
+  onBack,
+}: {
+  kind: DeviceKind
+  onChooseIndi: () => void
+  onChooseGeneric: () => void
+  onBack: () => void
+}) {
+  return (
+    <div>
+      <StepBack onClick={onBack} />
+      <p className="text-xs text-slate-500 mb-4">
+        <span className="text-slate-300 font-medium">{KIND_LABELS[kind]}</span>
+        {' · '}How is it connected?
+      </p>
+      <div className="flex flex-col gap-2">
+        <button
+          onClick={onChooseIndi}
+          className="text-left rounded px-3 py-2.5 text-sm text-slate-300 border border-transparent hover:border-surface-border hover:bg-surface-raised transition-colors"
+        >
+          Browse INDI drivers
+          <span className="block text-xs text-slate-500 mt-0.5">
+            Starts indiserver and loads a driver from the catalog
+          </span>
+        </button>
+        <button
+          onClick={onChooseGeneric}
+          className="text-left rounded px-3 py-2.5 text-sm text-slate-300 border border-transparent hover:border-surface-border hover:bg-surface-raised transition-colors"
+        >
+          Other adapter
+          <span className="block text-xs text-slate-500 mt-0.5">
+            Native (non-INDI) drivers and simulators — e.g. plugins that register their own adapter
+          </span>
+        </button>
       </div>
     </div>
   )
@@ -250,6 +303,138 @@ function ManualStep({
         >
           <Plug size={14} className="mr-2" />
           {loading ? 'Loading driver…' : 'Load driver'}
+        </Button>
+      </div>
+    </div>
+  )
+}
+
+// Step for "Other adapter" — any adapter_key registered in the device registry
+// (e.g. by a plugin) that isn't part of the INDI catalog flow above. Connect
+// params are fully adapter-specific, so this collects them as raw JSON rather
+// than assuming any particular shape.
+function GenericAdapterStep({
+  kind,
+  adapterKeys,
+  onBack,
+  onConnect,
+  connecting,
+  error,
+}: {
+  kind: DeviceKind
+  adapterKeys: string[]
+  onBack: () => void
+  onConnect: (adapterKey: string, deviceId: string, params: Record<string, unknown>) => void
+  connecting: boolean
+  error: string | null
+}) {
+  const [adapterKey, setAdapterKey] = useState(adapterKeys[0] ?? '')
+  const [deviceId, setDeviceId] = useState('')
+  const [paramsText, setParamsText] = useState('{}')
+  const [paramsError, setParamsError] = useState<string | null>(null)
+
+  // adapterKeys arrives asynchronously (fetched after this step mounts), so the
+  // useState initialiser above only ever sees the empty first render — keep
+  // adapterKey in sync once the real list lands.
+  useEffect(() => {
+    if (adapterKeys.length > 0 && !adapterKeys.includes(adapterKey)) {
+      setAdapterKey(adapterKeys[0])
+    }
+  }, [adapterKeys]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const deviceIdInvalid = deviceId !== '' && !DEVICE_ID_RE.test(deviceId)
+
+  const handleConnect = () => {
+    let params: Record<string, unknown>
+    try {
+      params = paramsText.trim() ? JSON.parse(paramsText) : {}
+    } catch {
+      setParamsError('Params must be valid JSON, e.g. {"state_key": "rig1"}')
+      return
+    }
+    setParamsError(null)
+    onConnect(adapterKey, deviceId, params)
+  }
+
+  if (adapterKeys.length === 0) {
+    return (
+      <div>
+        <StepBack onClick={onBack} />
+        <p className="text-sm text-slate-500">
+          No non-INDI adapters are registered for {KIND_LABELS[kind]}. Enable a plugin that
+          registers one (e.g. the EQMOD plugin's mount emulator) and reload.
+        </p>
+      </div>
+    )
+  }
+
+  return (
+    <div>
+      <StepBack onClick={onBack} />
+      <p className="text-xs text-slate-500 mb-4">
+        <span className="text-slate-300 font-medium">{KIND_LABELS[kind]}</span>
+        {' · '}Other adapter
+      </p>
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-1">
+          <label className="text-xs text-slate-400">Adapter</label>
+          <select
+            value={adapterKey}
+            onChange={(e) => setAdapterKey(e.target.value)}
+            className="bg-surface border border-surface-border rounded px-3 py-1.5 text-sm text-slate-200
+              focus:outline-none focus:ring-1 focus:ring-accent"
+          >
+            {adapterKeys.map((k) => (
+              <option key={k} value={k}>{k}</option>
+            ))}
+          </select>
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <label className="text-xs text-slate-400">
+            Device ID
+            <span className="ml-2 text-slate-600">(leave blank to auto-generate)</span>
+          </label>
+          <Input
+            placeholder="auto-generated"
+            value={deviceId}
+            onChange={(e) => setDeviceId(e.target.value)}
+            className={deviceIdInvalid ? 'border-status-error focus-visible:ring-status-error' : ''}
+          />
+          {deviceIdInvalid && (
+            <p className="text-xs text-status-error">
+              Only letters, digits, hyphens, and underscores. Must start with a letter or digit (max 64 chars).
+            </p>
+          )}
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <label className="text-xs text-slate-400">
+            Connect params (JSON)
+            <span className="ml-2 text-slate-600">adapter-specific, e.g. {'{"state_key": "rig1"}'}</span>
+          </label>
+          <textarea
+            value={paramsText}
+            onChange={(e) => setParamsText(e.target.value)}
+            rows={4}
+            className="bg-surface border border-surface-border rounded px-3 py-1.5 text-sm text-slate-200
+              font-mono focus:outline-none focus:ring-1 focus:ring-accent"
+          />
+          {paramsError && <p className="text-xs text-status-error">{paramsError}</p>}
+        </div>
+
+        {error && (
+          <p className="text-xs text-status-error bg-status-error/10 rounded px-3 py-2">{error}</p>
+        )}
+
+        <Button
+          type="button"
+          disabled={connecting || !adapterKey || deviceIdInvalid}
+          className="self-start"
+          onClick={handleConnect}
+        >
+          <Plug size={14} className="mr-2" />
+          {connecting ? 'Connecting…' : 'Connect'}
         </Button>
       </div>
     </div>
@@ -690,13 +875,13 @@ function emptyForm(type: EquipmentItemType): Omit<EquipmentItem, 'id'> {
   const r: Record<string, any> = { type, name: '' }
   if (type === 'site') Object.assign(r, { latitude: 0, longitude: 0, altitude: 0, timezone: 'UTC' })
   else if (type === 'ota') Object.assign(r, { focal_length: 500, aperture: 80 })
-  else if (type === 'camera') Object.assign(r, { indi_driver: null, indi_device_name: null, pixel_size_um: null })
-  else if (type === 'filter_wheel') Object.assign(r, { indi_driver: null, indi_device_name: null, filter_names: [] })
-  else Object.assign(r, { indi_driver: null, indi_device_name: null })
+  else if (type === 'camera') Object.assign(r, { indi_driver: null, indi_device_name: null, adapter_key: null, connect_params: {}, pixel_size_um: null })
+  else if (type === 'filter_wheel') Object.assign(r, { indi_driver: null, indi_device_name: null, adapter_key: null, connect_params: {}, filter_names: [] })
+  else Object.assign(r, { indi_driver: null, indi_device_name: null, adapter_key: null, connect_params: {} })
   return r as Omit<EquipmentItem, 'id'>
 }
 
-type FieldValue = string | number | null | string[]
+type FieldValue = string | number | null | string[] | Record<string, unknown>
 
 function FieldRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
@@ -721,6 +906,12 @@ function ItemForm({
   const [error, setError] = useState<string | null>(null)
   const nameRef = useRef<HTMLInputElement>(null)
 
+  const initialConnectParams = (initial as { connect_params?: Record<string, unknown> }).connect_params
+  const [connectParamsText, setConnectParamsText] = useState(
+    JSON.stringify(initialConnectParams ?? {}),
+  )
+  const [connectParamsError, setConnectParamsError] = useState<string | null>(null)
+
   useEffect(() => { nameRef.current?.focus() }, [])
 
   // Pre-fill system timezone for new site items
@@ -739,10 +930,20 @@ function ItemForm({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    let connectParams: Record<string, unknown> = {}
+    if (form.type !== 'site' && form.type !== 'ota') {
+      try {
+        connectParams = connectParamsText.trim() ? JSON.parse(connectParamsText) : {}
+        setConnectParamsError(null)
+      } catch {
+        setConnectParamsError('Connect params must be valid JSON, e.g. {"state_key": "rig1"}')
+        return
+      }
+    }
     setSaving(true)
     setError(null)
     try {
-      await onSave(form)
+      await onSave({ ...form, connect_params: connectParams } as typeof form)
     } catch (err) {
       setError((err as Error).message)
       setSaving(false)
@@ -793,6 +994,30 @@ function ItemForm({
               className="bg-surface border border-surface-border rounded px-3 py-1.5 text-sm text-slate-200
                 focus:outline-none focus:ring-1 focus:ring-accent w-full"
             />
+          </FieldRow>
+
+          <p className="text-xs text-slate-600 -mb-1">
+            Or, for a non-INDI adapter (native driver, simulator, …):
+          </p>
+          <FieldRow label="Adapter key">
+            <input
+              value={(form as { adapter_key: string | null }).adapter_key ?? ''}
+              onChange={(e) => set('adapter_key', e.target.value || null)}
+              placeholder="e.g. eqmod_sim"
+              className="bg-surface border border-surface-border rounded px-3 py-1.5 text-sm text-slate-200
+                focus:outline-none focus:ring-1 focus:ring-accent w-full"
+            />
+          </FieldRow>
+          <FieldRow label="Connect params (JSON)">
+            <textarea
+              value={connectParamsText}
+              onChange={(e) => setConnectParamsText(e.target.value)}
+              rows={3}
+              placeholder='e.g. {"state_key": "rig1"}'
+              className="bg-surface border border-surface-border rounded px-3 py-1.5 text-sm text-slate-200
+                font-mono focus:outline-none focus:ring-1 focus:ring-accent w-full"
+            />
+            {connectParamsError && <p className="text-xs text-status-error mt-1">{connectParamsError}</p>}
           </FieldRow>
         </>
       )}
@@ -1098,6 +1323,9 @@ export function Equipment() {
   // All device names announced by the loaded driver (may be model-specific and/or multiple)
   const [discoveredDeviceNames, setDiscoveredDeviceNames] = useState<string[]>([])
 
+  // "Other adapter" (non-INDI) path
+  const [genericAdapters, setGenericAdapters] = useState<string[]>([])
+
   const refresh = () => {
     api.devices.connected().then(setConnectedDevices).catch(console.error)
   }
@@ -1105,7 +1333,7 @@ export function Equipment() {
   useEffect(() => { refresh() }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (step === 'type') return
+    if (step === 'type' || step === 'source' || step === 'generic') return
     setDrivers([])
     api.indi.drivers(selectedKind).then(setDrivers).catch(() => setDrivers([]))
   }, [selectedKind, step])
@@ -1115,7 +1343,44 @@ export function Equipment() {
     setSelectedManufacturer(null)
     setSelectedDriver(null)
     setError(null)
+    setStep('source')
+  }
+
+  const handleChooseIndi = () => {
+    setError(null)
     setStep('manufacturer')
+  }
+
+  const handleChooseGeneric = () => {
+    setError(null)
+    api.devices.available()
+      .then((reg) => {
+        const keys = reg[KIND_REGISTRY_KEY[selectedKind]] ?? []
+        setGenericAdapters(keys.filter((k) => !k.startsWith('indi_')))
+      })
+      .catch(() => setGenericAdapters([]))
+    setStep('generic')
+  }
+
+  const handleGenericConnect = async (
+    adapterKey: string, deviceId: string, params: Record<string, unknown>,
+  ) => {
+    setError(null)
+    setConnecting(true)
+    try {
+      await api.devices.connect({
+        device_id: deviceId || undefined,
+        kind: selectedKind,
+        adapter_key: adapterKey,
+        params,
+      })
+      refresh()
+      setStep('type')
+    } catch (err) {
+      setError((err as Error).message)
+    } finally {
+      setConnecting(false)
+    }
   }
 
   const handleSelectManufacturer = (manufacturer: string | null) => {
@@ -1152,6 +1417,8 @@ export function Equipment() {
       setStep(selectedManufacturer === null ? 'manufacturer' : 'model')
     } else if (step === 'model') {
       setStep('manufacturer')
+    } else if (step === 'manufacturer' || step === 'generic') {
+      setStep('source')
     } else {
       setStep('type')
     }
@@ -1214,16 +1481,28 @@ export function Equipment() {
 
     try {
       const config = await api.devices.getConfig(device.device_id)
+      const isIndi = typeof config.params?.device_name === 'string'
       const deviceName = (config.params?.device_name as string) || device.device_id
-      const executable = (config.params?.executable as string) || null
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const item: Record<string, any> = {
-        type: invType,
-        name: deviceName,
-        indi_driver: executable,
-        indi_device_name: deviceName,
-      }
+      const item: Record<string, any> = isIndi
+        ? {
+            type: invType,
+            name: deviceName,
+            indi_driver: (config.params?.executable as string) || null,
+            indi_device_name: deviceName,
+            adapter_key: null,
+            connect_params: {},
+          }
+        : {
+            type: invType,
+            name: deviceName,
+            indi_driver: null,
+            indi_device_name: null,
+            adapter_key: config.adapter_key,
+            // eslint-disable-next-line @typescript-eslint/no-unused-vars
+            connect_params: (({ pre_connect_props, ...rest }) => rest)(config.params ?? {}),
+          }
 
       if (invType === 'filter_wheel') item.filter_names = []
 
@@ -1363,6 +1642,24 @@ export function Equipment() {
         <div className="bg-surface-raised border border-surface-border rounded p-4">
           {step === 'type' && (
             <TypeStep onSelect={handleSelectKind} />
+          )}
+          {step === 'source' && (
+            <SourceStep
+              kind={selectedKind}
+              onChooseIndi={handleChooseIndi}
+              onChooseGeneric={handleChooseGeneric}
+              onBack={handleBack}
+            />
+          )}
+          {step === 'generic' && (
+            <GenericAdapterStep
+              kind={selectedKind}
+              adapterKeys={genericAdapters}
+              onBack={handleBack}
+              onConnect={handleGenericConnect}
+              connecting={connecting}
+              error={error}
+            />
           )}
           {step === 'manufacturer' && (
             <ManufacturerStep

@@ -324,6 +324,7 @@ def _fake_device_manager(entries: dict):
         def __init__(self, kind, device_name, instance):
             self.config = type("cfg", (), {
                 "kind": kind,
+                "adapter_key": None,
                 "params": {"device_name": device_name},
             })()
             self.instance = instance
@@ -331,6 +332,26 @@ def _fake_device_manager(entries: dict):
     class _DM:
         def __init__(self):
             self._devices = {k: v for k, v in entries.items()}
+
+    dm = _DM()
+    dm._devices = {k: _Entry(*v) for k, v in entries.items()}
+    return dm
+
+
+def _fake_device_manager_generic(entries: dict):
+    """Like _fake_device_manager, but entries are keyed by (kind, adapter_key, params)
+    for adapters with no INDI-style device_name (e.g. plugins/eqmod's eqmod_sim)."""
+    class _Entry:
+        def __init__(self, kind, adapter_key, params, instance):
+            self.config = type("cfg", (), {
+                "kind": kind,
+                "adapter_key": adapter_key,
+                "params": params,
+            })()
+            self.instance = instance
+
+    class _DM:
+        pass
 
     dm = _DM()
     dm._devices = {k: _Entry(*v) for k, v in entries.items()}
@@ -416,6 +437,54 @@ async def test_tree_context_missing_inventory_item_skipped(inv_store):
     dm = _fake_device_manager({})
     # Should not raise
     await _apply_tree_context(roots, inv_store, dm)
+
+
+@pytest.mark.asyncio
+async def test_tree_context_matches_non_indi_adapter_by_key_and_params(inv_store):
+    """A mount with no indi_device_name (e.g. plugins/eqmod's eqmod_sim) matches by
+    adapter_key + connect_params instead — see _find_device_for_item."""
+    site = inv_store.create(SiteItem(
+        name="Backyard", latitude=48.85, longitude=2.35, altitude=35.0,
+    ))
+    mount_item = inv_store.create(MountItem(
+        name="EQMOD Sim", adapter_key="eqmod_sim", connect_params={"state_key": "rig1"},
+    ))
+
+    fake_mount = FakeMount()
+    dm = _fake_device_manager_generic({
+        "m1": ("mount", "eqmod_sim", {"state_key": "rig1"}, fake_mount),
+    })
+
+    roots = [ProfileNode(item_id=site.id, children=[
+        ProfileNode(item_id=mount_item.id),
+    ])]
+    await _apply_tree_context(roots, inv_store, dm)
+
+    assert fake_mount.location == (48.85, 2.35, 35.0)
+
+
+@pytest.mark.asyncio
+async def test_tree_context_generic_adapter_params_mismatch_is_noop(inv_store):
+    """Same adapter_key but different connect_params must not match — this is the
+    only identity signal available for a non-INDI adapter, so it must be exact."""
+    site = inv_store.create(SiteItem(
+        name="Backyard", latitude=48.85, longitude=2.35, altitude=35.0,
+    ))
+    mount_item = inv_store.create(MountItem(
+        name="EQMOD Sim", adapter_key="eqmod_sim", connect_params={"state_key": "rig1"},
+    ))
+
+    fake_mount = FakeMount()
+    dm = _fake_device_manager_generic({
+        "m1": ("mount", "eqmod_sim", {"state_key": "rig2"}, fake_mount),
+    })
+
+    roots = [ProfileNode(item_id=site.id, children=[
+        ProfileNode(item_id=mount_item.id),
+    ])]
+    await _apply_tree_context(roots, inv_store, dm)  # should not raise
+
+    assert not hasattr(fake_mount, "location")
 
 
 @pytest.mark.asyncio

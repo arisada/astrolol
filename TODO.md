@@ -2,6 +2,19 @@
 
 Items designed for but not yet built. Ordered roughly by priority.
 
+## Known bugs
+
+- **Non-INDI equipment doesn't reconnect via Profiles** — an inventory item connected
+  through a non-INDI adapter (e.g. `plugins/eqmod`'s `eqmod_sim`) shows up correctly in
+  Inventory and in a Profile's device tree, but activating/reloading the profile does not
+  bring it back online in the Connections tab. `Equipment.tsx`'s "Other adapter" wizard and
+  the inventory/matching models (`EquipmentItem.adapter_key` / `connect_params`,
+  `api/profiles.py::_find_device_for_item`) were updated to support non-INDI adapters, but
+  `Profiles.tsx` was never audited — it likely has its own, separate logic for turning an
+  inventory item into a connectable `DeviceConfig` when building/activating a profile, still
+  assuming `indi_driver` / `indi_device_name`. Flagged as the first concretely observed
+  symptom of a wider profiles/equipment audit that's still needed.
+
 ## Near-term
 
 - **Target persistence across restart** — store the last-set target in `profiles.json` so
