@@ -74,6 +74,37 @@ def discover_plugins() -> dict[str, Plugin]:
     return discovered
 
 
+def resolve_enabled_plugins(discovered: dict[str, Plugin], enabled: list[str]) -> list[str]:
+    """Expand *enabled* to include the transitive closure of each plugin's ``requires``.
+
+    A plugin that declares ``requires=["object_resolver"]`` gets that dependency
+    auto-enabled alongside it, even if the user never explicitly enabled it.
+    Preserves the original order and appends newly auto-enabled dependencies
+    right after the plugin that pulled them in. A required plugin that isn't
+    among *discovered* is left out here — ``setup_plugins`` still warns about it.
+    """
+    resolved: list[str] = []
+    seen: set[str] = set()
+
+    def _add(plugin_id: str) -> None:
+        if plugin_id in seen:
+            return
+        seen.add(plugin_id)
+        resolved.append(plugin_id)
+        plugin = discovered.get(plugin_id)
+        if plugin is None:
+            return
+        for req in plugin.manifest.requires:
+            if req in discovered and req not in seen:
+                logger.info("plugin.auto_enabled", plugin_id=req, required_by=plugin_id)
+                _add(req)
+
+    for plugin_id in enabled:
+        _add(plugin_id)
+
+    return resolved
+
+
 def setup_plugins(
     app: "FastAPI",  # type: ignore[name-defined]  # avoid circular at module level
     ctx: PluginContext,

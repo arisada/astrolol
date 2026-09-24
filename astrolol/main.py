@@ -32,7 +32,13 @@ from astrolol.api.settings import router as settings_router
 from astrolol.equipment.models import SiteItem
 from astrolol.equipment.store import EquipmentStore
 from astrolol.profiles.store import ProfileStore
-from astrolol.app import build_plugin_manager, build_registry, discover_plugins, setup_plugins
+from astrolol.app import (
+    build_plugin_manager,
+    build_registry,
+    discover_plugins,
+    resolve_enabled_plugins,
+    setup_plugins,
+)
 from astrolol.core.events import EventBus
 from astrolol.core.plugin_api import LogScope, PluginContext
 from astrolol.devices.manager import DeviceManager
@@ -158,15 +164,19 @@ def create_app() -> FastAPI:
         equipment_store=equipment_store,
     )
     discovered_plugins = discover_plugins()
-    setup_plugins(app, plugin_ctx, discovered_plugins, user_settings.enabled_plugins)
+    # Auto-enable each enabled plugin's declared dependencies (e.g. "target"
+    # requires "object_resolver") without persisting that back to user settings —
+    # disabling "target" later naturally drops the dependency too.
+    resolved_enabled = resolve_enabled_plugins(discovered_plugins, user_settings.enabled_plugins)
+    setup_plugins(app, plugin_ctx, discovered_plugins, resolved_enabled)
 
     app.state.discovered_plugins = discovered_plugins
-    app.state.enabled_plugin_ids = set(user_settings.enabled_plugins)
+    app.state.enabled_plugin_ids = set(resolved_enabled)
 
     # Collect log scopes: core always present, plus scopes declared by enabled plugins
     plugin_scopes = [
         scope
-        for plugin_id in user_settings.enabled_plugins
+        for plugin_id in resolved_enabled
         if (plugin := discovered_plugins.get(plugin_id)) is not None
         for scope in plugin.manifest.log_scopes
     ]

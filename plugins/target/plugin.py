@@ -18,6 +18,7 @@ class TargetPlugin:
             "Search sky objects by name, view rise/set/transit times and an altitude "
             "graph, set the mount target, and manage a favourites list."
         ),
+        requires=["object_resolver"],
         nav_order=5,
         nav_before="mount",
         log_scopes=[LogScope(key="target", label="Target", logger="plugins.target")],

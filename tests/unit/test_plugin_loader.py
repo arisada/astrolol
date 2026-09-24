@@ -9,7 +9,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from fastapi import FastAPI
 
-from astrolol.app import discover_plugins, setup_plugins
+from astrolol.app import discover_plugins, resolve_enabled_plugins, setup_plugins
 from astrolol.core.plugin_api import Plugin, PluginContext, PluginManifest
 
 
@@ -141,6 +141,60 @@ def test_setup_continues_after_plugin_setup_error() -> None:
 
     setup_plugins(app, ctx, {"bad": bad, "good": good}, ["bad", "good"])
     good.setup.assert_called_once_with(app, ctx)
+
+
+# ---------------------------------------------------------------------------
+# resolve_enabled_plugins
+# ---------------------------------------------------------------------------
+
+def test_resolve_auto_enables_required_dependency() -> None:
+    child = _make_plugin("child")
+    child.manifest = PluginManifest(id="child", name="Child", version="0.1.0", requires=["parent"])
+    parent = _make_plugin("parent")
+    discovered = {"child": child, "parent": parent}
+
+    resolved = resolve_enabled_plugins(discovered, ["child"])
+    assert resolved == ["child", "parent"]
+
+
+def test_resolve_does_not_duplicate_already_enabled_dependency() -> None:
+    child = _make_plugin("child")
+    child.manifest = PluginManifest(id="child", name="Child", version="0.1.0", requires=["parent"])
+    parent = _make_plugin("parent")
+    discovered = {"child": child, "parent": parent}
+
+    resolved = resolve_enabled_plugins(discovered, ["parent", "child"])
+    assert resolved == ["parent", "child"]
+
+
+def test_resolve_leaves_out_missing_dependency() -> None:
+    child = _make_plugin("child")
+    child.manifest = PluginManifest(id="child", name="Child", version="0.1.0", requires=["ghost"])
+    discovered = {"child": child}
+
+    resolved = resolve_enabled_plugins(discovered, ["child"])
+    assert resolved == ["child"]
+
+
+def test_resolve_transitive_dependencies() -> None:
+    a = _make_plugin("a")
+    a.manifest = PluginManifest(id="a", name="A", version="0.1.0", requires=["b"])
+    b = _make_plugin("b")
+    b.manifest = PluginManifest(id="b", name="B", version="0.1.0", requires=["c"])
+    c = _make_plugin("c")
+    discovered = {"a": a, "b": b, "c": c}
+
+    resolved = resolve_enabled_plugins(discovered, ["a"])
+    assert resolved == ["a", "b", "c"]
+
+
+def test_resolve_preserves_order_of_originally_enabled() -> None:
+    p1 = _make_plugin("p1")
+    p2 = _make_plugin("p2")
+    discovered = {"p1": p1, "p2": p2}
+
+    resolved = resolve_enabled_plugins(discovered, ["p2", "p1"])
+    assert resolved == ["p2", "p1"]
 
 
 def test_setup_order_matches_enabled_list() -> None:
