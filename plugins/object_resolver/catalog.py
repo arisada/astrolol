@@ -20,6 +20,20 @@ OPENGC_URL = (
     "https://github.com/mattiaverga/OpenNGC/raw/refs/heads/master/database_files/NGC.csv"
 )
 
+# Sharpless (Sh2) catalogue of HII regions, via VizieR (CDS). ``_RAJ2000``/``_DEJ2000``
+# are VizieR-computed positions (source data is published in the B1900 equinox).
+SHARPLESS_URL = (
+    "https://vizier.cds.unistra.fr/viz-bin/asu-tsv"
+    "?-source=VII/20/catalog&-out.add=_RAJ,_DEJ&-out=Sh2,Diam&-out.max=99999"
+)
+
+# Hipparcos main catalogue (118,218 stars) via VizieR — smaller than the Henry
+# Draper catalogue (~272,000 stars), so preferred as the bundled star catalogue.
+HIPPARCOS_URL = (
+    "https://vizier.cds.unistra.fr/viz-bin/asu-tsv"
+    "?-source=I/239/hip_main&-out=HIP,RAICRS,DEICRS,Vmag&-out.max=200000"
+)
+
 _SKIP_TYPES = {"NonEx", "Dup"}
 
 _TYPE_LABELS: dict[str, str] = {
@@ -72,6 +86,25 @@ def _normalize_name(raw: str) -> str:
         m = re.match(r'(\d+)', raw[2:].strip())
         return f"IC {int(m.group(1))}" if m else raw
     return raw
+
+
+def _parse_vizier_tsv(content: str) -> list[dict[str, str]]:
+    """Parse a VizieR ASU ``-tsv`` response into a list of field dicts.
+
+    Layout (after stripping ``#`` comment/blank lines): a header row, a units
+    row, a dashes separator row, then tab-separated data rows.
+    """
+    lines = [line for line in content.splitlines() if line and not line.startswith("#")]
+    if len(lines) < 4:
+        return []
+    header = [h.strip() for h in lines[0].split("\t")]
+    rows = []
+    for line in lines[3:]:
+        fields = line.split("\t")
+        if len(fields) != len(header):
+            continue
+        rows.append({h: f.strip() for h, f in zip(header, fields)})
+    return rows
 
 
 def _angular_sep_deg(ra1: float, dec1: float, ra2: float, dec2: float) -> float:
@@ -157,31 +190,85 @@ class ObjectCatalog:
     # ── Sync ───────────────────────────────────────────────────────────────────
 
     async def sync(self) -> int:
-        """Download OpenNGC and (re)populate the database. Returns object count."""
+        """Download OpenNGC, Sharpless and Hipparcos, and (re)populate the database.
+
+        Returns the total object count.
+        """
         async with self._sync_lock:
-            logger.info("object_resolver.sync_start", url=OPENGC_URL)
-            content = await self._download_csv()
-            count = await asyncio.to_thread(self._load_csv, content)
+            logger.info(
+                "object_resolver.sync_start",
+                ngc_url=OPENGC_URL,
+                sharpless_url=SHARPLESS_URL,
+                hipparcos_url=HIPPARCOS_URL,
+            )
+            ngc_content, sharpless_content, hipparcos_content = await asyncio.gather(
+                self._download(OPENGC_URL),
+                self._download(SHARPLESS_URL),
+                self._download(HIPPARCOS_URL),
+            )
+            count = await asyncio.to_thread(
+                self._load_all, ngc_content, sharpless_content, hipparcos_content
+            )
             logger.info("object_resolver.sync_done", count=count)
             return count
 
-    async def _download_csv(self) -> str:
+    async def _download(self, url: str) -> str:
         async with httpx.AsyncClient(follow_redirects=True, timeout=60.0) as client:
-            resp = await client.get(OPENGC_URL)
+            resp = await client.get(url)
             resp.raise_for_status()
             return resp.text
 
+    def _clear(self) -> None:
+        assert self._conn is not None
+        self._conn.execute("DELETE FROM object_names")
+        self._conn.execute("DELETE FROM objects")
+
+    def _finalize(self, count: int) -> None:
+        assert self._conn is not None
+        self._conn.execute(
+            "INSERT OR REPLACE INTO catalog_meta (key, value) VALUES ('object_count', ?)",
+            (str(count),),
+        )
+        self._conn.execute(
+            "INSERT OR REPLACE INTO catalog_meta (key, value) VALUES ('last_updated', ?)",
+            (datetime.now(timezone.utc).isoformat(),),
+        )
+        self._conn.commit()
+
+    def _load_all(self, ngc_content: str, sharpless_content: str, hipparcos_content: str) -> int:
+        """Clear the database and load all three bundled catalogues (public for testing)."""
+        self._clear()
+        count = self._load_ngc_csv(ngc_content)
+        count += self._load_sharpless_tsv(sharpless_content)
+        count += self._load_hipparcos_tsv(hipparcos_content)
+        self._finalize(count)
+        return count
+
     def load_csv(self, content: str) -> int:
         """Parse OpenNGC CSV content and populate the database (public for testing)."""
-        return self._load_csv(content)
+        self._clear()
+        count = self._load_ngc_csv(content)
+        self._finalize(count)
+        return count
 
-    def _load_csv(self, content: str) -> int:
+    def load_sharpless_tsv(self, content: str) -> int:
+        """Parse a Sharpless VizieR TSV response and populate the database (public for testing)."""
+        self._clear()
+        count = self._load_sharpless_tsv(content)
+        self._finalize(count)
+        return count
+
+    def load_hipparcos_tsv(self, content: str) -> int:
+        """Parse a Hipparcos VizieR TSV response and populate the database (public for testing)."""
+        self._clear()
+        count = self._load_hipparcos_tsv(content)
+        self._finalize(count)
+        return count
+
+    def _load_ngc_csv(self, content: str) -> int:
         assert self._conn is not None
         reader = csv.DictReader(io.StringIO(content), delimiter=";")
         count = 0
-
-        self._conn.execute("DELETE FROM object_names")
-        self._conn.execute("DELETE FROM objects")
 
         for row in reader:
             obj_type = (row.get("Type") or "").strip()
@@ -248,15 +335,85 @@ class ObjectCatalog:
 
             count += 1
 
-        self._conn.execute(
-            "INSERT OR REPLACE INTO catalog_meta (key, value) VALUES ('object_count', ?)",
-            (str(count),),
-        )
-        self._conn.execute(
-            "INSERT OR REPLACE INTO catalog_meta (key, value) VALUES ('last_updated', ?)",
-            (datetime.now(timezone.utc).isoformat(),),
-        )
-        self._conn.commit()
+        return count
+
+    def _load_sharpless_tsv(self, content: str) -> int:
+        """Load Sharpless (Sh2) HII regions from a VizieR TSV response."""
+        assert self._conn is not None
+        count = 0
+
+        for row in _parse_vizier_tsv(content):
+            sh2 = row.get("Sh2", "")
+            ra_str = row.get("_RAJ2000", "")
+            dec_str = row.get("_DEJ2000", "")
+            if not sh2 or not ra_str or not dec_str:
+                continue
+
+            try:
+                n = int(sh2)
+                ra = float(ra_str)
+                dec = float(dec_str)
+            except ValueError:
+                continue
+
+            primary_name = f"Sh2-{n}"
+            self._conn.execute(
+                "INSERT OR REPLACE INTO objects (primary_name, object_type, ra, dec)"
+                " VALUES (?, ?, ?, ?)",
+                (primary_name, "HII Region", ra, dec),
+            )
+            obj_id = self._conn.execute(
+                "SELECT id FROM objects WHERE primary_name=?", (primary_name,)
+            ).fetchone()["id"]
+
+            aliases = {primary_name, f"Sh2 {n}", f"SH2-{n}", f"Sharpless {n}", f"Sharpless-{n}"}
+            for alias in aliases:
+                self._conn.execute(
+                    "INSERT OR IGNORE INTO object_names (name, object_id) VALUES (?, ?)",
+                    (alias, obj_id),
+                )
+
+            count += 1
+
+        return count
+
+    def _load_hipparcos_tsv(self, content: str) -> int:
+        """Load Hipparcos catalogue stars from a VizieR TSV response."""
+        assert self._conn is not None
+        count = 0
+
+        for row in _parse_vizier_tsv(content):
+            hip = row.get("HIP", "")
+            ra_str = row.get("RAICRS", "")
+            dec_str = row.get("DEICRS", "")
+            if not hip or not ra_str or not dec_str:
+                continue
+
+            try:
+                n = int(hip)
+                ra = float(ra_str)
+                dec = float(dec_str)
+            except ValueError:
+                continue
+
+            primary_name = f"HIP {n}"
+            self._conn.execute(
+                "INSERT OR REPLACE INTO objects (primary_name, object_type, ra, dec)"
+                " VALUES (?, ?, ?, ?)",
+                (primary_name, "Star", ra, dec),
+            )
+            obj_id = self._conn.execute(
+                "SELECT id FROM objects WHERE primary_name=?", (primary_name,)
+            ).fetchone()["id"]
+
+            for alias in {primary_name, f"HIP{n}"}:
+                self._conn.execute(
+                    "INSERT OR IGNORE INTO object_names (name, object_id) VALUES (?, ?)",
+                    (alias, obj_id),
+                )
+
+            count += 1
+
         return count
 
     # ── Queries ────────────────────────────────────────────────────────────────
