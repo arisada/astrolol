@@ -563,9 +563,10 @@ async def test_meridian_flip_triggered(
     )
     runner = _make_runner(tmp_path, event_bus, settings)
 
-    # Mount status: past meridian (HA = 0.5 hours)
+    # Mount status: past meridian (HA = 0.5 hours), still on the eastern-target side
     mock_status = MagicMock()
     mock_status.hour_angle = 0.5
+    mock_status.pier_side = "West"
 
     flip_called = False
 
@@ -606,6 +607,45 @@ async def test_meridian_flip_not_triggered_before_threshold(
 
     mock_status = MagicMock()
     mock_status.hour_angle = 0.3  # below threshold
+
+    flip_called = False
+
+    async def mock_meridian_flip(mount_id: str) -> None:
+        nonlocal flip_called
+        flip_called = True
+
+    mock_mount_manager = MagicMock()
+    mock_mount_manager.get_status = AsyncMock(return_value=mock_status)
+    mock_mount_manager.meridian_flip = mock_meridian_flip
+    runner._app.state.mount_manager = mock_mount_manager
+
+    runner.add_task(_task(count=1))
+    await runner.start()
+    await asyncio.wait_for(runner._run_task, timeout=5.0)
+
+    assert not flip_called
+
+
+@pytest.mark.asyncio
+async def test_meridian_flip_not_triggered_when_already_on_the_western_side(
+    tmp_path: Path, event_bus: FakeEventBus
+) -> None:
+    """Past the threshold but pier East (looking west): the mount is already flipped."""
+    settings = SequencerSettings(
+        unpark_on_start=False,
+        park_on_complete=False,
+        stop_guide_before_slew=False,
+        restart_guide_after_slew=False,
+        meridian_flip_enabled=True,
+        plate_solve_after_flip=False,
+        meridian_flip_ha_threshold=0.1,
+        autofocus_before_start=False,
+    )
+    runner = _make_runner(tmp_path, event_bus, settings)
+
+    mock_status = MagicMock()
+    mock_status.hour_angle = 1.3
+    mock_status.pier_side = "East"
 
     flip_called = False
 

@@ -1,6 +1,7 @@
 import asyncio
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
+from typing import Callable
 
 import structlog
 
@@ -25,6 +26,7 @@ from astropy.coordinates import SkyCoord
 from astrolol.devices.base.models import MountStatus, Target, TrackingMode
 from astrolol.devices.manager import DeviceManager
 from astrolol.equipment.models import SiteItem
+from astrolol.mount.sky import altitude_of
 from astrolol.profiles.store import ProfileStore
 
 logger = structlog.get_logger()
@@ -48,7 +50,23 @@ class MountController:
         return self._active_task is not None and not self._active_task.done()
 
 
+def meridian_flip_due(pier_side: str | None, hour_angle: float | None) -> bool | None:
+    """True if the OTA is on the pier side meant for the other half of the sky, so a flip
+    would bring it back to the normal side; False if it already is there; None if unknown.
+
+    Pier side follows INDI/ASCOM: "East" = OTA east of the pier, looking west (the normal
+    side for western targets, HA >= 0); "West" = looking east (eastern targets, HA < 0).
+    A flip from the normal side would put the counterweight up, so it is never "due".
+    Northern hemisphere.
+    """
+    if hour_angle is None or pier_side not in ("East", "West"):
+        return None
+    ha = (hour_angle + 12.0) % 24.0 - 12.0
+    return pier_side != ("East" if ha >= 0 else "West")
+
+
 _AUTOMATION_INTERVAL = 30  # seconds between automation checks
+_HORIZON_REARM_DEG = 1.0   # the horizon action re-arms once the mount is this far above the limit
 
 
 class MountManager:
@@ -57,15 +75,19 @@ class MountManager:
         device_manager: DeviceManager,
         event_bus: EventBus,
         profile_store: ProfileStore | None = None,
+        site_provider: Callable[[], SiteItem | None] | None = None,
     ) -> None:
         self._device_manager = device_manager
         self._event_bus = event_bus
         self._profile_store = profile_store
+        # The observing site lives in the active profile's equipment tree; asked for on use.
+        self._site_provider = site_provider
         self._controllers: dict[str, MountController] = {}
         # Automation
         self._automation_tasks: dict[str, asyncio.Task] = {}
         self._auto_flip_triggered: set[str] = set()       # device_ids that flipped this transit
         self._auto_park_last: dict[str, tuple[int, int]] = {}  # device_id → (h, m) last parked
+        self._horizon_triggered: set[str] = set()          # device_ids that crossed the horizon limit
 
     # --- Public API ---
 
@@ -134,6 +156,7 @@ class MountManager:
             )
 
         coord = ctrl._target
+        self._check_above_horizon(device_id, coord)
         icrs = coord.icrs
         ctrl._active_task = asyncio.create_task(
             self._slew_worker(ctrl, coord),
@@ -242,6 +265,12 @@ class MountManager:
         """
         ctrl = self._get_or_create(device_id)
         self._require_idle(ctrl)
+        status = await self.get_status(device_id)
+        if meridian_flip_due(status.pier_side, status.hour_angle) is False:
+            raise ValueError(
+                f"No meridian flip needed: pier side {status.pier_side} is already the normal one "
+                f"for hour angle {status.hour_angle:+.2f} h"
+            )
 
         ctrl._active_task = asyncio.create_task(
             self._flip_worker(ctrl),
@@ -279,6 +308,67 @@ class MountManager:
         mount = self._device_manager.get_mount(device_id)
         return await mount.get_status()
 
+    # --- Limits ---
+
+    async def apply_limits(self, device_id: str) -> None:
+        """Push the configured meridian limit to adapters that enforce one (duck-typed, best effort).
+
+        The horizon limit is enforced here instead (GOTO check + automation loop), since it
+        only needs the pointing every adapter reports.
+        """
+        try:
+            mount = self._device_manager.get_mount(device_id)
+            if hasattr(mount, "set_meridian_limit"):
+                await mount.set_meridian_limit(self._get_mount_settings(device_id).meridian_limit_deg)
+        except Exception as exc:
+            logger.warning("mount.limits_apply_failed", device_id=device_id, error=str(exc))
+
+    def _site(self) -> SiteItem | None:
+        if self._site_provider is None:
+            return None
+        try:
+            return self._site_provider()
+        except Exception as exc:
+            logger.warning("mount.site_lookup_failed", error=str(exc))
+            return None
+
+    def _check_above_horizon(self, device_id: str, coord: SkyCoord) -> None:
+        """ValueError if the target is below the flat horizon limit (no site known: no check)."""
+        site = self._site()
+        if site is None:
+            return
+        limit = self._get_mount_settings(device_id).horizon_min_alt_deg
+        alt = altitude_of(coord, datetime.now(timezone.utc), site.latitude, site.longitude)
+        if alt < limit:
+            raise ValueError(f"Target is below the horizon limit: altitude {alt:.1f}° < {limit:g}°")
+
+    async def _check_horizon(self, device_id: str, cfg: MountDeviceSettings, status: MountStatus) -> None:
+        """Apply the horizon action once when a tracking mount sinks below the limit."""
+        alt = status.alt
+        if alt is None:
+            return
+        if alt >= cfg.horizon_min_alt_deg + _HORIZON_REARM_DEG:
+            self._horizon_triggered.discard(device_id)
+            return
+        if (
+            alt >= cfg.horizon_min_alt_deg
+            or cfg.horizon_action == "none"
+            or not status.is_tracking
+            or status.is_parked
+            or device_id in self._horizon_triggered
+            or self._get_or_create(device_id).is_busy
+        ):
+            return
+        self._horizon_triggered.add(device_id)
+        logger.warning(
+            "mount.horizon_limit_reached", device_id=device_id, alt=round(alt, 2),
+            limit=cfg.horizon_min_alt_deg, action=cfg.horizon_action,
+        )
+        if cfg.horizon_action == "park":
+            await self.park(device_id)
+        else:
+            await self.set_tracking(device_id, False)
+
     # --- Automation ---
 
     def _get_mount_settings(self, device_id: str) -> MountDeviceSettings:
@@ -299,6 +389,7 @@ class MountManager:
         logger.info("mount.automation_started", device_id=device_id)
 
     async def _automation_loop(self, device_id: str) -> None:
+        await self.apply_limits(device_id)
         while True:
             await asyncio.sleep(_AUTOMATION_INTERVAL)
             try:
@@ -328,12 +419,16 @@ class MountManager:
                             logger.info("mount.auto_park_triggered", device_id=device_id, time=cfg.auto_park_time)
                             await self.park(device_id)
 
+        try:
+            status = await self.get_status(device_id)
+        except Exception:
+            return
+
+        # ── Horizon limit while tracking ─────────────────────────────────────
+        await self._check_horizon(device_id, cfg, status)
+
         # ── Auto meridian flip when HA exceeds threshold ──────────────────────
         if cfg.auto_flip_enabled:
-            try:
-                status = await self.get_status(device_id)
-            except Exception:
-                return
             ha = status.hour_angle
             if ha is None:
                 return
@@ -341,7 +436,11 @@ class MountManager:
             if ha < -0.5:
                 self._auto_flip_triggered.discard(device_id)
             # Trigger flip when HA crosses the threshold
-            if ha >= cfg.auto_flip_ha_hours and device_id not in self._auto_flip_triggered:
+            if (
+                ha >= cfg.auto_flip_ha_hours
+                and device_id not in self._auto_flip_triggered
+                and meridian_flip_due(status.pier_side, ha) is not False
+            ):
                 self._auto_flip_triggered.add(device_id)
                 ctrl = self._get_or_create(device_id)
                 if not ctrl.is_busy:

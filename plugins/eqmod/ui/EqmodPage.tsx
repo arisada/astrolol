@@ -73,6 +73,16 @@ function MountCard({ d }: { d: MountDiagnostics }) {
             <Row label="Guide rate" value={d.guide_rate != null ? `${d.guide_rate}x sidereal` : '—'} />
             <Row label="Guide pulse" value={d.pulsing.length ? d.pulsing.join(', ') : '—'} />
             <Row
+              label="Meridian limit"
+              value={d.meridian_limit_deg != null ? `${d.meridian_limit_deg}° past the meridian` : '—'}
+            />
+            <Row
+              label="RA margin to limit"
+              value={d.ra_axis_margin_deg != null
+                ? (d.ra_axis_margin_deg < 0 ? `beyond by ${(-d.ra_axis_margin_deg).toFixed(1)}°` : `${d.ra_axis_margin_deg.toFixed(1)}°`)
+                : '—'}
+            />
+            <Row
               label="Site"
               value={d.location
                 ? `${d.location[0].toFixed(4)}°, ${d.location[1].toFixed(4)}°, ${d.location[2].toFixed(0)} m`

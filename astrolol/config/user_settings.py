@@ -3,9 +3,10 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Literal
 
 import structlog
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 logger = structlog.get_logger()
 
@@ -16,6 +17,12 @@ class MountDeviceSettings(BaseModel):
     auto_park_time: str | None = None          # "HH:MM" in local 24 h time
     auto_flip_enabled: bool = False
     auto_flip_ha_hours: float = 1.0            # hour angle threshold in decimal hours
+    # How far the RA axis may turn past counterweight-horizontal, either way. Enforced by
+    # drivers that implement set_meridian_limit (eqmod); INDI drivers keep their own limits.
+    meridian_limit_deg: float = Field(default=20.0, ge=0.0, le=60.0)
+    # Flat horizon: GOTOs below it are refused; crossing it while tracking triggers the action.
+    horizon_min_alt_deg: float = Field(default=0.0, ge=-10.0, le=60.0)
+    horizon_action: Literal["none", "stop_tracking", "park"] = "stop_tracking"
 
 
 class UserSettings(BaseModel):

@@ -38,6 +38,8 @@ class MountDiagnostics(BaseModel):
     nudging: list[str] = []
     pulsing: list[str] = []
     guide_rate: float | None = None
+    meridian_limit_deg: float | None = None   # RA axis travel allowed past counterweight-horizontal
+    ra_axis_margin_deg: float | None = None   # left before that limit; negative = beyond it
     location: list[float] | None = None  # [lat, lon, alt_m], pushed from the active profile's site
     parked: bool = False
     park_counts: list[int] | None = None

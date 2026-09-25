@@ -542,3 +542,194 @@ async def test_pulse_guide_refused_while_slewing(mount_manager: MountManager, ma
     with pytest.raises(ValueError, match="busy"):
         await mount_manager.pulse_guide("g", "N", 100)
     await mount_manager.stop("g")
+
+
+# --- Limits: horizon (core) and meridian (pushed to adapters that enforce it) ---
+
+from astrolol.config.user_settings import MountDeviceSettings, UserSettings  # noqa: E402
+from astrolol.devices.base.models import MountStatus  # noqa: E402
+
+_PARIS = SiteItem(name="Paris", latitude=48.85, longitude=2.35, altitude=35.0)
+
+
+class _SettingsStore:
+    def __init__(self, **mount_settings) -> None:
+        self.settings = UserSettings(mount_settings={"m1": MountDeviceSettings(**mount_settings).model_dump()})
+
+    def get_user_settings(self) -> UserSettings:
+        return self.settings
+
+
+class _AltitudeMount(FakeMount):
+    """Reports a settable altitude and records the meridian limit it was given."""
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.alt: float | None = 30.0
+        self.meridian_limit: float | None = None
+
+    async def get_status(self) -> MountStatus:
+        return (await super().get_status()).model_copy(update={"alt": self.alt})
+
+    async def set_meridian_limit(self, degrees: float) -> None:
+        self.meridian_limit = degrees
+
+
+async def _limits_setup(manager: DeviceManager, event_bus, site=_PARIS, **mount_settings):
+    manager.registry.register_mount("alt_mount", _AltitudeMount)  # type: ignore[arg-type]
+    await manager.connect(DeviceConfig(device_id="m1", kind="mount", adapter_key="alt_mount"))
+    mm = MountManager(
+        device_manager=manager, event_bus=event_bus,
+        profile_store=_SettingsStore(**mount_settings),  # type: ignore[arg-type]
+        site_provider=lambda: site,
+    )
+    fake: _AltitudeMount = manager._devices["m1"].instance  # type: ignore[assignment]
+    return mm, fake
+
+
+_NEVER_RISES = SkyCoord(ra=0 * u.deg, dec=-80 * u.deg)      # from Paris
+_CIRCUMPOLAR = SkyCoord(ra=37.95 * u.deg, dec=89.26 * u.deg)  # Polaris, alt ~ latitude
+
+
+@pytest.mark.asyncio
+async def test_slew_below_the_horizon_is_refused(manager: DeviceManager, event_bus) -> None:
+    mm, _ = await _limits_setup(manager, event_bus)
+    await mm.set_target("m1", _NEVER_RISES)
+    with pytest.raises(ValueError, match="below the horizon limit"):
+        await mm.slew("m1")
+    assert not mm._get_or_create("m1").is_busy
+
+
+@pytest.mark.asyncio
+async def test_horizon_limit_altitude_is_configurable(manager: DeviceManager, event_bus) -> None:
+    mm, _ = await _limits_setup(manager, event_bus, horizon_min_alt_deg=55.0)
+    await mm.set_target("m1", _CIRCUMPOLAR)
+    with pytest.raises(ValueError, match="55"):
+        await mm.slew("m1")
+
+
+@pytest.mark.asyncio
+async def test_slew_above_the_horizon_is_allowed(manager: DeviceManager, event_bus) -> None:
+    mm, _ = await _limits_setup(manager, event_bus)
+    await mm.set_target("m1", _CIRCUMPOLAR)
+    await mm.slew("m1")
+    await mm._get_or_create("m1")._active_task
+
+
+@pytest.mark.asyncio
+async def test_without_a_site_the_horizon_is_not_checked(manager: DeviceManager, event_bus) -> None:
+    mm, _ = await _limits_setup(manager, event_bus, site=None)
+    await mm.set_target("m1", _NEVER_RISES)
+    await mm.slew("m1")
+    await mm._get_or_create("m1")._active_task
+
+
+@pytest.mark.asyncio
+async def test_sinking_below_the_horizon_stops_tracking_once(manager: DeviceManager, event_bus) -> None:
+    mm, fake = await _limits_setup(manager, event_bus, horizon_min_alt_deg=10.0)
+    fake._tracking = True
+    fake.alt = 12.0
+    await mm._check_automation("m1")
+    assert fake._tracking  # above the limit
+
+    fake.alt = 9.5
+    await mm._check_automation("m1")
+    assert not fake._tracking
+
+    fake._tracking = True  # user restarts tracking below the limit: not fought
+    await mm._check_automation("m1")
+    assert fake._tracking
+
+    fake.alt = 10.5  # inside the re-arm band: still not re-armed
+    await mm._check_automation("m1")
+    fake.alt = 9.0
+    await mm._check_automation("m1")
+    assert fake._tracking
+
+    fake.alt = 11.5  # clearly above: re-armed
+    await mm._check_automation("m1")
+    fake.alt = 9.0
+    await mm._check_automation("m1")
+    assert not fake._tracking
+
+
+@pytest.mark.asyncio
+async def test_horizon_action_park(manager: DeviceManager, event_bus) -> None:
+    mm, fake = await _limits_setup(manager, event_bus, horizon_action="park")
+    fake._tracking, fake.alt = True, -0.5
+    await mm._check_automation("m1")
+    await mm._get_or_create("m1")._active_task
+    assert fake._parked
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("action,tracking", [("none", True), ("stop_tracking", False)])
+async def test_horizon_action_none_or_idle_mount_does_nothing(
+    manager: DeviceManager, event_bus, action: str, tracking: bool
+) -> None:
+    mm, fake = await _limits_setup(manager, event_bus, horizon_action=action)
+    fake._tracking, fake.alt = tracking, -5.0
+    await mm._check_automation("m1")
+    assert fake._tracking is tracking and not fake._parked
+
+
+@pytest.mark.asyncio
+async def test_apply_limits_pushes_the_meridian_limit(manager: DeviceManager, event_bus) -> None:
+    mm, fake = await _limits_setup(manager, event_bus, meridian_limit_deg=12.5)
+    await mm.apply_limits("m1")
+    assert fake.meridian_limit == 12.5
+
+
+@pytest.mark.asyncio
+async def test_apply_limits_skips_adapters_without_a_meridian_limit(manager: DeviceManager, event_bus) -> None:
+    await connected_mount(manager, "m2")
+    mm = MountManager(device_manager=manager, event_bus=event_bus)
+    await mm.apply_limits("m2")  # FakeMount has no set_meridian_limit: silently skipped
+    await mm.apply_limits("missing")  # unknown device: logged, not raised
+
+
+# --- Meridian flip needs the pier side, not just the hour angle ---
+
+from astrolol.mount.manager import meridian_flip_due  # noqa: E402
+
+
+@pytest.mark.parametrize("pier,ha,due", [
+    ("West", 1.3, True),     # tracked past the meridian on the eastern-target side
+    ("East", 1.3, False),    # already flipped: normal for a western target
+    ("West", -2.0, False),   # normal for an eastern target
+    ("East", -0.5, True),    # counterweight up on the east side
+    ("West", 23.0, False),   # HA given as 0..24 is normalised (-1h)
+    (None, 1.0, None),
+    ("West", None, None),
+])
+def test_meridian_flip_due(pier, ha, due) -> None:
+    assert meridian_flip_due(pier, ha) is due
+
+
+@pytest.mark.asyncio
+async def test_manual_flip_from_the_normal_side_is_refused(manager: DeviceManager, event_bus) -> None:
+    mm, fake = await _limits_setup(manager, event_bus)
+    fake._pier_side, fake._hour_angle = "East", 1.3
+    with pytest.raises(ValueError, match="No meridian flip needed"):
+        await mm.meridian_flip("m1")
+    assert not mm._get_or_create("m1").is_busy
+
+    fake._pier_side = "West"
+    await mm.meridian_flip("m1")
+    await mm._get_or_create("m1")._active_task
+    assert fake._pier_side == "East"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("pier,flips", [("West", True), ("East", False)])
+async def test_auto_flip_only_from_the_wrong_side(
+    manager: DeviceManager, event_bus, pier: str, flips: bool
+) -> None:
+    mm, fake = await _limits_setup(manager, event_bus, auto_flip_enabled=True, auto_flip_ha_hours=1.0)
+    fake._pier_side, fake._hour_angle = pier, 1.2
+    await mm._check_automation("m1")
+    task = mm._get_or_create("m1")._active_task
+    assert (task is not None) is flips
+    if task is not None:
+        await task
+        assert fake._pier_side == "East"

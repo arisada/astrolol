@@ -20,6 +20,8 @@ export interface MountDiagnostics {
   nudging: string[]
   pulsing: string[]
   guide_rate: number | null
+  meridian_limit_deg: number | null
+  ra_axis_margin_deg: number | null
   location: [number, number, number] | null
   parked: boolean
   park_counts: [number, number] | null

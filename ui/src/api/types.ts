@@ -45,6 +45,9 @@ export interface MountDeviceSettings {
   auto_park_time: string | null   // "HH:MM" local 24 h
   auto_flip_enabled: boolean
   auto_flip_ha_hours: number      // decimal hours
+  meridian_limit_deg: number      // RA axis travel allowed past the meridian, either way (0–60)
+  horizon_min_alt_deg: number     // flat horizon (−10–60): lower GOTOs refused
+  horizon_action: 'none' | 'stop_tracking' | 'park'  // when a tracking mount sinks below it
 }
 
 export interface MountStatus {

@@ -226,5 +226,6 @@ async def put_mount_settings(
     current = store.get_user_settings()
     updated = {**current.mount_settings, device_id: body.model_dump()}
     store.update_user_settings(current.model_copy(update={"mount_settings": updated}))
+    await _manager(request).apply_limits(device_id)
     _manager(request).start_automation(device_id)
     return body

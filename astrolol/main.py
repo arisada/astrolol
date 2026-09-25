@@ -26,7 +26,7 @@ from astrolol.api.imager import router as imager_router
 from astrolol.api.indi import router as indi_router
 from astrolol.api.inventory import router as inventory_router
 from astrolol.api.mount import router as mount_router
-from astrolol.api.profiles import restore_last_profile, router as profiles_router
+from astrolol.api.profiles import find_profile_site, restore_last_profile, router as profiles_router
 from astrolol.api.properties import router as properties_router
 from astrolol.api.settings import router as settings_router
 from astrolol.equipment.store import EquipmentStore
@@ -105,7 +105,15 @@ def create_app() -> FastAPI:
     event_bus = EventBus()
     event_bus_forwarder.set_bus(event_bus)  # bridge structlog → EventBus
     device_manager = DeviceManager(registry=registry, event_bus=event_bus)
-    mount_manager = MountManager(device_manager=device_manager, event_bus=event_bus, profile_store=profile_store)
+
+    def _active_site():
+        profile = app.state.active_profile
+        return find_profile_site(profile, equipment_store) if profile is not None else None
+
+    mount_manager = MountManager(
+        device_manager=device_manager, event_bus=event_bus, profile_store=profile_store,
+        site_provider=_active_site,
+    )
     imager_manager = ImagerManager(device_manager=device_manager, event_bus=event_bus, profile_store=profile_store, equipment_store=equipment_store, mount_manager=mount_manager)
     focuser_manager = FocuserManager(device_manager=device_manager, event_bus=event_bus)
     filter_wheel_manager = FilterWheelManager(device_manager=device_manager, event_bus=event_bus)

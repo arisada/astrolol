@@ -76,11 +76,40 @@ const DEFAULT_MOUNT_SETTINGS: MountDeviceSettings = {
   auto_park_time: null,
   auto_flip_enabled: false,
   auto_flip_ha_hours: 1.0,
+  meridian_limit_deg: 20,
+  horizon_min_alt_deg: 0,
+  horizon_action: 'stop_tracking',
 }
 
 // ---------------------------------------------------------------------------
 // Sub-components
 // ---------------------------------------------------------------------------
+
+/** Small degrees field: edits freely, commits a clamped value on blur / Enter. */
+function DegreesInput({ value, min, max, onCommit }: {
+  value: number
+  min: number
+  max: number
+  onCommit: (v: number) => void
+}) {
+  const [raw, setRaw] = useState<string | null>(null)
+  const commit = () => {
+    const n = parseFloat(raw ?? '')
+    if (!isNaN(n)) onCommit(Math.min(max, Math.max(min, n)))
+    setRaw(null)
+  }
+  return (
+    <input
+      type="number" min={min} max={max} step="any"
+      value={raw ?? String(value)}
+      onChange={(e) => setRaw(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') setRaw(null) }}
+      className="w-16 rounded border border-surface-border bg-surface-overlay px-2 py-0.5 text-xs text-slate-200 font-mono
+        focus:outline-none focus:ring-1 focus:ring-accent"
+    />
+  )
+}
 
 function FrameToggle({ jnow, onChange }: { jnow: boolean; onChange: (jnow: boolean) => void }) {
   const btn = (label: string, active: boolean, onClick: () => void) => (
@@ -177,9 +206,15 @@ function MountControls({ deviceId }: { deviceId: string }) {
   const isSlewing  = status?.is_slewing  ?? false
   const ha         = status?.hour_angle ?? null
   const lst        = status?.lst ?? null
-  // Flip is useful once the mount has passed the meridian (HA > 0) and within 2h past it.
-  // Before the meridian (HA < 0) a flip would point the OTA through the mount.
-  const canFlip    = ha != null && ha > 0 && ha <= 2.0 && !isParked && !isSlewing
+  // A flip is due when the OTA is on the pier side meant for the other half of the sky
+  // (East = looking west, normal for HA >= 0; West = looking east, normal for HA < 0), like
+  // MountManager.meridian_flip_due. Flipping from the normal side would raise the counterweight.
+  // Without a reported pier side, fall back to "past the meridian, by at most 2 h".
+  const pierSide   = status?.pier_side ?? null
+  const flipDue: boolean | null = ha != null && pierSide != null
+    ? pierSide !== ((((ha + 12) % 24 + 24) % 24 - 12) >= 0 ? 'East' : 'West')
+    : null
+  const canFlip    = ha != null && !isParked && !isSlewing && (flipDue ?? (ha > 0 && ha <= 2.0))
 
   // Common props for d-pad buttons (hold to move)
   const dpadBtn = (dir: string, title: string) => ({
@@ -362,7 +397,7 @@ function MountControls({ deviceId }: { deviceId: string }) {
         </Card>
 
         {/* Meridian */}
-        <Card title="Meridian" className="p-4 flex flex-col gap-3">
+        <Card title="Meridian & horizon" className="p-4 flex flex-col gap-3">
           {ha != null && (
             <p className="text-xs text-slate-500">{fmtMeridianDistance(ha)}</p>
           )}
@@ -375,16 +410,22 @@ function MountControls({ deviceId }: { deviceId: string }) {
               title={
                 canFlip            ? 'Perform meridian flip' :
                 ha == null         ? 'Hour angle unknown' :
+                flipDue === false  ? `Pier ${pierSide} is already the normal side for this hour angle` :
                 ha <= 0            ? 'Mount has not crossed the meridian yet' :
                                      'More than 2 h past meridian — slew to target first'
               }
             >
               <RefreshCw size={12} className="mr-1.5" /> Meridian Flip
             </Button>
-            {ha != null && !canFlip && ha <= 0 && (
+            {ha != null && !canFlip && flipDue === false && (
+              <span className="text-xs text-slate-600">
+                {ha >= 0 ? `Pier ${pierSide}: no flip needed` : 'Waiting for meridian crossing'}
+              </span>
+            )}
+            {ha != null && !canFlip && flipDue === null && ha <= 0 && (
               <span className="text-xs text-slate-600">Waiting for meridian crossing</span>
             )}
-            {ha != null && !canFlip && ha > 2.0 && (
+            {ha != null && !canFlip && flipDue === null && ha > 2.0 && (
               <span className="text-xs text-yellow-700">Slew to target before flipping</span>
             )}
           </div>
@@ -405,6 +446,41 @@ function MountControls({ deviceId }: { deviceId: string }) {
                 focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-40 disabled:cursor-not-allowed"
             />
           </label>
+          <div
+            className="flex items-center gap-2 flex-wrap"
+            title="How far the RA axis may turn past the meridian, either way. Past it, tracking stops and slews/nudges are refused. Enforced by mounts that support it (EQMOD); INDI drivers keep their own limits."
+          >
+            <span className="text-xs text-slate-400">Meridian limit</span>
+            <DegreesInput
+              value={mountSettings.meridian_limit_deg}
+              min={0} max={60}
+              onCommit={(v) => saveMountSettings({ ...mountSettings, meridian_limit_deg: v })}
+            />
+            <span className="text-xs text-slate-600">° past the meridian ({hoursToHHMM(mountSettings.meridian_limit_deg / 15)} h)</span>
+          </div>
+          <div
+            className="flex items-center gap-2 flex-wrap"
+            title="Flat horizon: GOTOs to targets below it are refused. When a tracking mount sinks below it, the chosen action runs once."
+          >
+            <span className="text-xs text-slate-400">Horizon limit</span>
+            <DegreesInput
+              value={mountSettings.horizon_min_alt_deg}
+              min={-10} max={60}
+              onCommit={(v) => saveMountSettings({ ...mountSettings, horizon_min_alt_deg: v })}
+            />
+            <span className="text-xs text-slate-600">° altitude, then</span>
+            <select
+              className="rounded bg-surface-overlay border border-surface-border px-2 py-0.5 text-xs text-slate-200 focus:outline-none"
+              value={mountSettings.horizon_action}
+              onChange={(e) => saveMountSettings({
+                ...mountSettings, horizon_action: e.target.value as MountDeviceSettings['horizon_action'],
+              })}
+            >
+              <option value="stop_tracking">stop tracking</option>
+              <option value="park">park</option>
+              <option value="none">do nothing</option>
+            </select>
+          </div>
         </Card>
 
         {/* Nudge */}

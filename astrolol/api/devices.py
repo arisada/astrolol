@@ -21,7 +21,8 @@ def _manager(request: Request) -> DeviceManager:
 
 
 async def _push_mount_site_data(request: Request, device_id: str) -> None:
-    """Best-effort: push UTC + active-profile location to a newly connected mount."""
+    """Best-effort: push UTC + active-profile location to a newly connected mount, apply its
+    limits and start its automation loop."""
     try:
         mount_manager = getattr(request.app.state, "mount_manager", None)
         if mount_manager is None:
@@ -36,6 +37,10 @@ async def _push_mount_site_data(request: Request, device_id: str) -> None:
         await mount_manager.push_site_data(device_id, site)
     except Exception as exc:
         logger.warning("mount.site_data_push_failed", device_id=device_id, error=str(exc))
+        return
+    # Limits and automation (horizon action, auto flip/park), as for mounts connected from a profile.
+    await mount_manager.apply_limits(device_id)
+    mount_manager.start_automation(device_id)
 
 
 async def _push_camera_scope_info(request: Request, device_id: str) -> None:

@@ -11,7 +11,8 @@ from astropy.coordinates import SkyCoord
 
 from astrolol.devices.base.models import TrackingMode
 from plugins.eqmod import mount as mount_module
-from plugins.eqmod.geometry import MountGeometry, PierSide, icrs_to_jnow, local_sidereal_time_h
+from astrolol.mount.sky import icrs_to_jnow, jnow_to_icrs, local_sidereal_time_h
+from plugins.eqmod.geometry import MountGeometry, PierSide
 from plugins.eqmod.mount import EqmodMount, EqmodNotReadyError
 from plugins.eqmod.protocol import (
     SIDEREAL_DEG_PER_SEC,
@@ -164,7 +165,6 @@ def _expected_counts(coord: SkyCoord, **geo_kwargs) -> tuple[int, int, PierSide]
 
 def _star(ha_h: float, dec_deg: float) -> SkyCoord:
     """ICRS coordinate that sits at the given HA (equinox of date) at NOW."""
-    from plugins.eqmod.geometry import jnow_to_icrs
     return jnow_to_icrs((_lst() - ha_h) % 24.0, dec_deg, NOW)
 
 
@@ -717,3 +717,172 @@ async def test_diagnostics_report_guide_rate_and_pulses() -> None:
     mount, _ = await _connected(guide_rate=0.8)
     diag = await mount.diagnostics()
     assert diag["guide_rate"] == 0.8 and diag["pulsing"] == []
+
+
+# --- Meridian limit (RA axis past counterweight-horizontal, either way) ---
+
+def _ra_counts(mech_deg: float) -> int:
+    """Raw RA counts for a mechanical RA axis angle (90 deg = counterweight horizontal)."""
+    return round(mech_deg / 360.0 * CPR)
+
+
+async def _settle() -> None:
+    import asyncio
+    for _ in range(20):
+        await asyncio.sleep(0)
+
+
+@pytest.mark.parametrize("degrees", [-1.0, 61.0])
+async def test_meridian_limit_is_validated(degrees: float) -> None:
+    ctrl = _FakeController()
+    with pytest.raises(ValueError, match="meridian_limit_deg"):
+        await EqmodMount(port="/dev/fake", baudrate=9600, meridian_limit_deg=degrees,
+                         transport_factory=lambda p, b: ctrl).connect()
+    mount, _ = await _connected()
+    with pytest.raises(ValueError, match="meridian_limit_deg"):
+        await mount.set_meridian_limit(degrees)
+
+
+async def test_flip_beyond_the_limit_is_refused_before_moving() -> None:
+    mount, ctrl = await _connected()
+    star = _star(2.0, 20.0)  # West side after a flip would be 30 deg past the meridian
+    await mount.slew(star)
+    ctrl.log.clear()
+    with pytest.raises(ValueError, match="meridian limit"):
+        await mount.meridian_flip()
+    assert not any(cmd.startswith(":J") for cmd in ctrl.log)
+    assert (await mount.get_status()).pier_side == "East"
+
+
+async def test_flip_within_the_limit_is_allowed() -> None:
+    mount, _ = await _connected()
+    await mount.set_meridian_limit(40.0)
+    await mount.slew(_star(2.0, 20.0))
+    await mount.meridian_flip()
+    assert (await mount.get_status()).pier_side == "West"
+
+
+async def test_slew_takes_the_other_pier_side_when_the_natural_one_is_past_the_limit() -> None:
+    from plugins.eqmod.geometry import SyncOffset
+
+    mount, ctrl = await _connected()
+    await mount.set_meridian_limit(0.0)
+    # Just east of the meridian: naturally West side at axis angle 5.9h, which the sync offset
+    # turns into 6.1h mechanically, past a zero limit. East side is -5.9h mechanically.
+    mount._geometry.offset = SyncOffset(-0.2, 0.0)
+    await mount.slew(_star(-0.1, 20.0))
+    assert (await mount.get_status()).pier_side == "East"
+    assert abs(mount._geometry.mechanical_ra_axis_h(ctrl.axes[1].position)) <= 6.0
+
+
+async def test_park_and_park_position_beyond_the_limit_are_refused() -> None:
+    mount, ctrl = await _connected()
+    ctrl.axes[1].position = _ra_counts(115.0)
+    with pytest.raises(ValueError, match="meridian limit"):
+        await mount.set_park_position()
+    mount._park_counts = (_ra_counts(-115.0), 0)
+    ctrl.log.clear()
+    with pytest.raises(ValueError, match="meridian limit"):
+        await mount.park()
+    assert not any(cmd.startswith(":J") for cmd in ctrl.log)
+
+
+async def test_tracking_cannot_start_past_the_western_limit_but_can_past_the_eastern_one() -> None:
+    mount, ctrl = await _connected()
+    ctrl.axes[1].position = _ra_counts(111.0)
+    with pytest.raises(ValueError, match="Meridian limit"):
+        await mount.set_tracking(True)
+    assert not ctrl.axes[1].running
+    ctrl.axes[1].position = _ra_counts(-111.0)
+    await mount.set_tracking(True)  # tracking turns the axis back toward the counterweight-down side
+    assert ctrl.axes[1].running
+
+
+async def test_tracking_into_the_limit_is_stopped() -> None:
+    mount, ctrl = await _connected()
+    ctrl.axes[1].position = _ra_counts(100.0)
+    await mount.set_tracking(True)
+    await mount._enforce_meridian_limit()
+    assert ctrl.axes[1].running  # still inside
+    ctrl.axes[1].position = _ra_counts(110.01)  # tracked into the limit
+    await mount._enforce_meridian_limit()
+    assert not ctrl.axes[1].running
+    assert (await mount.get_status()).is_tracking is False
+
+
+@pytest.mark.parametrize("mech_deg,direction", [(110.5, "W"), (-110.5, "E")])
+async def test_nudge_past_the_limit_is_refused(mech_deg: float, direction: str) -> None:
+    mount, ctrl = await _connected()
+    ctrl.axes[1].position = _ra_counts(mech_deg)
+    with pytest.raises(ValueError, match="Meridian limit"):
+        await mount.start_move(direction, "centering")
+    assert not ctrl.axes[1].running
+
+
+async def test_nudge_back_from_the_limit_is_allowed() -> None:
+    mount, ctrl = await _connected()
+    ctrl.axes[1].position = _ra_counts(110.5)
+    await mount.start_move("E", "centering")
+    assert ctrl.axes[1].running and ctrl.axes[1].ccw is True
+    await mount.stop_move()
+
+
+async def test_dec_nudges_ignore_the_meridian_limit() -> None:
+    mount, ctrl = await _connected()
+    ctrl.axes[1].position = _ra_counts(115.0)
+    await mount.start_move("N", "centering")
+    assert ctrl.axes[2].running
+
+
+async def test_westward_nudge_is_stopped_at_the_limit_and_tracking_stays_off() -> None:
+    mount, ctrl = await _connected()
+    ctrl.axes[1].position = _ra_counts(109.8)  # within the stop margin: the guard fires at once
+    await mount.set_tracking(True)
+    await mount.start_move("W", "centering")
+    await _settle()
+    assert not ctrl.axes[1].running
+    status = await mount.get_status()
+    assert status.is_tracking is False and status.is_slewing is False
+
+
+async def test_eastward_nudge_is_stopped_at_the_limit_and_tracking_resumes() -> None:
+    mount, ctrl = await _connected()
+    ctrl.axes[1].position = _ra_counts(-109.8)
+    await mount.set_tracking(True)
+    await mount.start_move("E", "centering")
+    await _settle()
+    ra = ctrl.axes[1]
+    assert ra.running and ra.ccw is False  # back to tracking, westward
+    assert ra.period == step_period_for_rate(SIDEREAL_DEG_PER_SEC, CPR, TIMER_FREQ)
+    assert (await mount.get_status()).is_slewing is False
+
+
+async def test_nudge_guard_is_timed_from_the_room_left(monkeypatch) -> None:
+    import asyncio
+
+    delays: list[float] = []
+    real_sleep = asyncio.sleep
+
+    async def _record(delay: float, *args) -> None:
+        delays.append(delay)
+        await real_sleep(3600) if delay > 1 else await real_sleep(0)
+
+    mount, ctrl = await _connected()
+    ctrl.axes[1].position = _ra_counts(100.0)
+    monkeypatch.setattr(mount_module.asyncio, "sleep", _record)
+    await mount.start_move("W", "centering")
+    await real_sleep(0)
+    speed = 16.0 * SIDEREAL_DEG_PER_SEC
+    assert delays[-1] == pytest.approx((10.0 - mount_module.LIMIT_STOP_MARGIN_DEG) / speed, rel=1e-3)
+    guard = mount._limit_guard
+    await mount.stop_move()  # a normal stop cancels the guard
+    await real_sleep(0)
+    assert guard is not None and guard.cancelled() and mount._limit_guard is None
+
+
+async def test_diagnostics_report_the_meridian_margin() -> None:
+    mount, ctrl = await _connected(meridian_limit_deg=15.0)
+    ctrl.axes[1].position = _ra_counts(-100.0)
+    diag = await mount.diagnostics()
+    assert diag["meridian_limit_deg"] == 15.0
+    assert diag["ra_axis_margin_deg"] == pytest.approx(5.0, abs=1e-3)

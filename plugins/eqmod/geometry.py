@@ -16,12 +16,8 @@ from __future__ import annotations
 
 import math
 from dataclasses import dataclass
-from datetime import datetime
 from enum import StrEnum
 
-import astropy.units as u
-from astropy.coordinates import FK5, SkyCoord
-from astropy.time import Time
 
 
 class PierSide(StrEnum):
@@ -85,33 +81,6 @@ def opposite(side: PierSide) -> PierSide:
     return PierSide.WEST if side is PierSide.EAST else PierSide.EAST
 
 
-# --- Time and frames (no IERS tables: must work offline in the field) ---
-
-def local_sidereal_time_h(when: datetime, longitude_deg: float) -> float:
-    """Mean LST from the GMST formula on UTC; UT1-UTC (<0.9s) is ignored."""
-    days_since_j2000 = when.timestamp() / 86400.0 + 2440587.5 - 2451545.0
-    gmst = 18.697374558 + 24.06570982441908 * days_since_j2000
-    return (gmst + longitude_deg / 15.0) % 24.0
-
-
-def alt_az(ha_h: float, dec_deg: float, latitude_deg: float) -> tuple[float, float]:
-    """Geometric altitude and azimuth (degrees, azimuth from north through east); no refraction."""
-    ha, dec, lat = math.radians(ha_h * 15.0), math.radians(dec_deg), math.radians(latitude_deg)
-    alt = math.asin(max(-1.0, min(1.0, math.sin(lat) * math.sin(dec) + math.cos(lat) * math.cos(dec) * math.cos(ha))))
-    az = math.atan2(-math.cos(dec) * math.sin(ha), math.sin(dec) * math.cos(lat) - math.cos(dec) * math.sin(lat) * math.cos(ha))
-    return math.degrees(alt), math.degrees(az) % 360.0
-
-
-def icrs_to_jnow(coord: SkyCoord, when: datetime) -> tuple[float, float]:
-    """Return (RA hours, Dec deg) in the equinox-of-date frame."""
-    jnow = coord.icrs.transform_to(FK5(equinox=Time(when)))
-    return float(jnow.ra.hour), float(jnow.dec.deg)
-
-
-def jnow_to_icrs(ra_h: float, dec_deg: float, when: datetime) -> SkyCoord:
-    return SkyCoord(ra=ra_h * u.hourangle, dec=dec_deg * u.deg, frame=FK5(equinox=Time(when))).icrs
-
-
 # --- Counts <-> axis angles for a specific mount ---
 
 @dataclass
@@ -138,6 +107,14 @@ class MountGeometry:
             normalize_hours(ra_sign * ra_counts * 24.0 / self.ra_cpr + off.ra_axis_h),
             normalize_degrees(dec_sign * dec_counts * 360.0 / self.dec_cpr + off.dec_axis_deg),
         )
+
+    def mechanical_ra_axis_h(self, ra_counts: int) -> float:
+        """RA axis angle from counts alone (no sync offset): where the counterweight physically is.
+
+        |angle| = 6h means counterweight horizontal; beyond that it rises.
+        """
+        ra_sign = -1 if self.ra_reverse else 1
+        return normalize_hours(ra_sign * ra_counts * 24.0 / self.ra_cpr)
 
     def axes_to_counts(self, axes: AxisAngles) -> tuple[int, int]:
         off = self.offset or SyncOffset()

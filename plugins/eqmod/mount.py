@@ -19,17 +19,8 @@ import structlog
 from astropy.coordinates import SkyCoord
 
 from astrolol.devices.base.models import DeviceState, MountStatus, TrackingMode
-from plugins.eqmod.geometry import (
-    MountGeometry,
-    PierSide,
-    SyncOffset,
-    alt_az,
-    icrs_to_jnow,
-    jnow_to_icrs,
-    local_sidereal_time_h,
-    opposite,
-    pier_side_of,
-)
+from astrolol.mount.sky import alt_az, icrs_to_jnow, jnow_to_icrs, local_sidereal_time_h
+from plugins.eqmod.geometry import MountGeometry, PierSide, SyncOffset, opposite, pier_side_of
 from plugins.eqmod.protocol import (
     HIGH_SPEED_THRESHOLD_DEG_PER_SEC,
     SIDEREAL_DEG_PER_SEC,
@@ -51,6 +42,10 @@ NUDGE_RATES_X_SIDEREAL = {"guide": 0.5, "centering": 16.0, "find": 64.0, "max": 
 DEFAULT_GUIDE_RATE = 0.5          # x sidereal, EQMOD's default
 MIN_GUIDE_RATE, MAX_GUIDE_RATE = 0.1, 1.0
 MAX_PULSE_MS = 10_000
+# How far the RA axis may turn past counterweight-horizontal, either way (MountDeviceSettings).
+DEFAULT_MERIDIAN_LIMIT_DEG = 20.0
+MIN_MERIDIAN_LIMIT_DEG, MAX_MERIDIAN_LIMIT_DEG = 0.0, 60.0
+LIMIT_STOP_MARGIN_DEG = 0.5       # a nudge is stopped this far before the limit (deceleration room)
 AXIS_STOP_TIMEOUT = 10.0          # seconds
 AXIS_STOP_POLL_INTERVAL = 0.1     # seconds
 GOTO_TIMEOUT = 240.0              # seconds, per pass
@@ -69,6 +64,13 @@ def _now() -> datetime:
 def _state_path(key: str) -> Path:
     env = os.environ.get("ASTROLOL_DATA_DIR")
     return (Path(env) if env else Path.home() / ".astrolol") / "eqmod" / f"{key}.json"
+
+
+def _check_meridian_limit(degrees: float) -> None:
+    if not MIN_MERIDIAN_LIMIT_DEG <= degrees <= MAX_MERIDIAN_LIMIT_DEG:
+        raise ValueError(
+            f"meridian_limit_deg must be between {MIN_MERIDIAN_LIMIT_DEG:g} and {MAX_MERIDIAN_LIMIT_DEG:g}"
+        )
 
 
 class EqmodNotReadyError(RuntimeError):
@@ -91,11 +93,13 @@ class EqmodMount:
         ra_reverse: bool = False,
         dec_reverse: bool = False,
         guide_rate: float = DEFAULT_GUIDE_RATE,
+        meridian_limit_deg: float = DEFAULT_MERIDIAN_LIMIT_DEG,
         state_key: str | None = None,
         transport_factory: Callable[[str, int], Any] = SerialTransport,
         **_kwargs: object,
     ) -> None:
         self._guide_rate = float(guide_rate)
+        self._meridian_limit_deg = float(meridian_limit_deg)
         self._port = port
         self._requested_baudrate = baudrate
         self._reverse = {Axis.RA: bool(ra_reverse), Axis.DEC: bool(dec_reverse)}
@@ -113,6 +117,7 @@ class EqmodMount:
         self._tracking_mode = TrackingMode.SIDEREAL
         self._nudging: set[Axis] = set()
         self._pulsing: set[Axis] = set()
+        self._limit_guard: asyncio.Task | None = None  # stops an RA nudge at the meridian limit
         # Bumped by every command that takes over the motors; a guide pulse only
         # restores what it changed if nothing else moved the mount meanwhile.
         self._motion_epoch = 0
@@ -131,6 +136,7 @@ class EqmodMount:
             raise ValueError('eqmod needs a "port" connect param, e.g. {"port": "/dev/ttyUSB0"}')
         if not MIN_GUIDE_RATE <= self._guide_rate <= MAX_GUIDE_RATE:
             raise ValueError(f"guide_rate must be between {MIN_GUIDE_RATE} and {MAX_GUIDE_RATE} (x sidereal)")
+        _check_meridian_limit(self._meridian_limit_deg)
         baudrate = self._requested_baudrate or await detect_baudrate(self._port)
         transport = self._transport_factory(self._port, baudrate)
         await transport.open()
@@ -175,6 +181,7 @@ class EqmodMount:
             except asyncio.CancelledError:
                 pass
             self._coords_task = None
+        self._cancel_limit_guard()
         # Stop hand-held nudges, but leave tracking running like a real handset would.
         try:
             for axis in list(self._nudging):
@@ -247,6 +254,7 @@ class EqmodMount:
         await self._push_coords()
 
     async def park(self) -> None:
+        self._check_ra_within_limit(self._park_counts[0], "The park position")
         await self._stop_all_motion()
         try:
             self._slewing = True
@@ -266,20 +274,32 @@ class EqmodMount:
         await self._push_coords()
 
     async def set_park_position(self) -> None:
-        self._park_counts = await self._read_counts()
+        counts = await self._read_counts()
+        self._check_ra_within_limit(counts[0], "The current position")
+        self._park_counts = counts
         self._persist(*self._park_counts)
         logger.info("eqmod.park_position_set", ra_counts=self._park_counts[0], dec_counts=self._park_counts[1])
 
     async def start_move(self, direction: str, rate: str) -> None:
         axis, positive = await self._resolve_direction(direction)
         speed = NUDGE_RATES_X_SIDEREAL.get(rate, NUDGE_RATES_X_SIDEREAL["centering"]) * SIDEREAL_DEG_PER_SEC
+        room_deg = None
+        if axis is Axis.RA:
+            room_deg = self._room_to_limit_deg((await self._read_counts())[0], positive)
+            if room_deg <= 0:
+                raise ValueError("Meridian limit reached: the RA axis cannot move further this way")
+        self._cancel_limit_guard()
         self._motion_epoch += 1
         self._is_parked = False
         await self._run_axis(axis, speed, positive)
         self._nudging.add(axis)
+        if room_deg is not None:
+            delay = max(0.0, room_deg - LIMIT_STOP_MARGIN_DEG) / speed
+            self._limit_guard = asyncio.create_task(self._stop_nudge_at_limit(delay, positive, self._motion_epoch))
         logger.info("eqmod.nudge_started", axis=axis.name, direction=direction, rate=rate)
 
     async def stop_move(self) -> None:
+        self._cancel_limit_guard()
         nudged = set(self._nudging)
         for axis in nudged:
             await self._stop_axis(axis)
@@ -293,14 +313,19 @@ class EqmodMount:
         if mode is not None:
             self._tracking_mode = mode
         if enabled:
+            if self._room_to_limit_deg((await self._read_counts())[0], positive=True) <= 0:
+                raise ValueError("Meridian limit reached: tracking would turn the RA axis past it")
+            self._cancel_limit_guard()
             await self._start_tracking()
         else:
+            self._cancel_limit_guard()
             await self._stop_axis(Axis.RA)
             self._tracking = False
         self._nudging.discard(Axis.RA)
         self._persist(*await self._read_counts())
 
     async def stop(self) -> None:
+        self._cancel_limit_guard()
         self._motion_epoch += 1
         self._nudging.clear()
         self._tracking = False
@@ -395,6 +420,7 @@ class EqmodMount:
         while True:
             await asyncio.sleep(COORDS_PUSH_INTERVAL)
             try:
+                await self._enforce_meridian_limit()
                 await self._push_coords()
                 if not self._slewing and time.monotonic() - self._last_persist > STATE_PERSIST_INTERVAL:
                     self._persist(*await self._read_counts())
@@ -402,6 +428,82 @@ class EqmodMount:
                 raise
             except Exception as exc:
                 logger.warning("eqmod.coords_push_failed", error=str(exc))
+
+    # --- Meridian limit (duck-typed by MountManager.apply_limits) ---
+
+    async def set_meridian_limit(self, degrees: float) -> None:
+        _check_meridian_limit(degrees)
+        self._meridian_limit_deg = float(degrees)
+        logger.info("eqmod.meridian_limit_set", degrees=degrees)
+
+    def _ra_axis_margin_deg(self, ra_counts: int) -> float:
+        """Degrees left before the limit on the side the RA axis is on (negative = beyond it)."""
+        mech = abs(self._require_geometry().mechanical_ra_axis_h(ra_counts)) * 15.0
+        return 90.0 + self._meridian_limit_deg - mech
+
+    def _room_to_limit_deg(self, ra_counts: int, positive: bool) -> float:
+        """Degrees the RA axis may still turn in the given direction (<= 0: at/beyond the limit)."""
+        mech = self._require_geometry().mechanical_ra_axis_h(ra_counts) * 15.0
+        limit = 90.0 + self._meridian_limit_deg
+        return limit - mech if positive else limit + mech
+
+    def _check_ra_within_limit(self, ra_counts: int, what: str) -> None:
+        if self._ra_axis_margin_deg(ra_counts) < 0:
+            raise ValueError(f"{what} is beyond the meridian limit ({self._meridian_limit_deg:g} deg)")
+
+    def _reachable_side(
+        self, geo: MountGeometry, ra_jnow: float, dec: float, lst: float, side: PierSide | None
+    ) -> PierSide:
+        """Pier side for a GOTO: the forced one, else the natural one, else the other one if only
+        that keeps the RA axis within the meridian limit. ValueError if the target is unreachable."""
+        ra_c, _, chosen = geo.target_counts(ra_jnow, dec, lst, side)
+        if self._ra_axis_margin_deg(ra_c) >= 0:
+            return chosen
+        if side is None:
+            ra_c, _, other = geo.target_counts(ra_jnow, dec, lst, opposite(chosen))
+            if self._ra_axis_margin_deg(ra_c) >= 0:
+                return other
+        raise ValueError(
+            f"Target is beyond the meridian limit ({self._meridian_limit_deg:g} deg past the meridian) "
+            + ("on that pier side" if side is not None else "on both pier sides")
+        )
+
+    async def _enforce_meridian_limit(self) -> None:
+        """Called from the coords pump: tracking into the limit stops tracking."""
+        if not self._tracking or self._slewing or Axis.RA in self._nudging:
+            return
+        ra_counts = (await self._read_counts())[0]
+        if self._room_to_limit_deg(ra_counts, positive=True) > 0:
+            return
+        self._motion_epoch += 1
+        await self._stop_axis(Axis.RA)
+        self._tracking = False
+        self._persist(*await self._read_counts())
+        logger.warning("eqmod.meridian_limit_reached", action="tracking_stopped",
+                       limit_deg=self._meridian_limit_deg)
+
+    async def _stop_nudge_at_limit(self, delay: float, positive: bool, epoch: int) -> None:
+        await asyncio.sleep(delay)
+        if self._motion_epoch != epoch or Axis.RA not in self._nudging:
+            return
+        self._limit_guard = None  # we are the guard: nothing may cancel us from here on
+        try:
+            await self._stop_axis(Axis.RA)
+            self._nudging.discard(Axis.RA)
+            if positive:
+                self._tracking = False  # tracking would push further past the limit
+            elif self._tracking:
+                await self._start_tracking()  # tracking moves away from the eastern limit
+            self._persist(*await self._read_counts())
+            logger.warning("eqmod.meridian_limit_reached", action="nudge_stopped",
+                           direction="W" if positive else "E", limit_deg=self._meridian_limit_deg)
+        except Exception as exc:
+            logger.error("eqmod.meridian_limit_stop_failed", error=str(exc), exc_info=True)
+
+    def _cancel_limit_guard(self) -> None:
+        if self._limit_guard is not None:
+            self._limit_guard.cancel()
+            self._limit_guard = None
 
     # --- Device-specific (not part of IMount) ---
 
@@ -424,6 +526,7 @@ class EqmodMount:
                 "reversed": self._reverse[axis],
             }
         offset = self._geometry.offset if self._geometry else None
+        ra_counts = axes[Axis.RA.name]["position_counts"] if Axis.RA.name in axes else 0
         return {
             "port": self._port,
             "baudrate": self._baudrate,
@@ -434,6 +537,8 @@ class EqmodMount:
             "nudging": sorted(a.name for a in self._nudging),
             "pulsing": sorted(a.name for a in self._pulsing),
             "guide_rate": self._guide_rate,
+            "meridian_limit_deg": self._meridian_limit_deg,
+            "ra_axis_margin_deg": self._ra_axis_margin_deg(ra_counts) if self._geometry else None,
             "location": list(self._location) if self._location else None,
             "parked": self._is_parked,
             "park_counts": list(self._park_counts),
@@ -488,7 +593,9 @@ class EqmodMount:
 
     async def _goto_sky(self, coord: SkyCoord, side: PierSide | None = None) -> None:
         geo = self._require_geometry()
-        self._lst()  # fail fast without a location, before anything moves
+        # Fail fast (no location, target beyond the meridian limit) before anything moves.
+        ra_jnow, dec = icrs_to_jnow(coord, _now())
+        side = self._reachable_side(geo, ra_jnow, dec, self._lst(), side)
         await self._stop_all_motion()
         self._is_parked = False
         self._slewing = True
@@ -556,6 +663,7 @@ class EqmodMount:
         self._tracking = True
 
     async def _stop_all_motion(self) -> None:
+        self._cancel_limit_guard()
         self._motion_epoch += 1
         for axis in (Axis.RA, Axis.DEC):
             await self._stop_axis(axis)

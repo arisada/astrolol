@@ -68,3 +68,52 @@ async def test_pulse_guide_unknown_device_is_404(client: AsyncClient) -> None:
     async with client as c:
         r = await c.post("/mount/nope/pulse_guide", json={"direction": "N", "duration_ms": 100})
     assert r.status_code == 404
+
+
+class _LimitedMount(FakeMount):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.meridian_limit: float | None = None
+
+    async def set_meridian_limit(self, degrees: float) -> None:
+        self.meridian_limit = degrees
+
+
+@pytest.fixture
+def limits_app(app, tmp_path):
+    from astrolol.profiles.store import ProfileStore
+
+    app.state.registry.register_mount("limited", _LimitedMount)  # type: ignore[arg-type]
+    store = ProfileStore(tmp_path / "profiles.json")  # never the user's real settings file
+    app.state.profile_store = store
+    app.state.mount_manager._profile_store = store
+    return app
+
+
+@pytest.mark.asyncio
+async def test_connect_applies_the_default_meridian_limit(limits_app) -> None:
+    async with AsyncClient(transport=ASGITransport(app=limits_app), base_url="http://test") as c:
+        await _connect(c, "limited")
+    assert limits_app.state.device_manager.get_mount("m").meridian_limit == 20.0
+
+
+@pytest.mark.asyncio
+async def test_saving_mount_settings_pushes_the_meridian_limit(limits_app) -> None:
+    async with AsyncClient(transport=ASGITransport(app=limits_app), base_url="http://test") as c:
+        await _connect(c, "limited")
+        r = await c.put("/mount/m/settings", json={"meridian_limit_deg": 7.5, "horizon_action": "park"})
+        assert r.status_code == 200
+        got = (await c.get("/mount/m/settings")).json()
+    assert limits_app.state.device_manager.get_mount("m").meridian_limit == 7.5
+    assert got["meridian_limit_deg"] == 7.5 and got["horizon_action"] == "park"
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("body", [
+    {"meridian_limit_deg": 61}, {"meridian_limit_deg": -1},
+    {"horizon_min_alt_deg": 70}, {"horizon_action": "explode"},
+])
+async def test_mount_limit_settings_validation(limits_app, body: dict) -> None:
+    async with AsyncClient(transport=ASGITransport(app=limits_app), base_url="http://test") as c:
+        r = await c.put("/mount/m/settings", json=body)
+    assert r.status_code == 422

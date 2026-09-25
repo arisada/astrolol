@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING, Any
 
 import structlog
 
+from astrolol.mount.manager import meridian_flip_due
 from plugins.sequencer.events import (
     SequenceCancelled,
     SequenceCompleted,
@@ -471,6 +472,8 @@ class SequenceRunner:
             ha = status.hour_angle
             if ha is None or ha <= self._settings.meridian_flip_ha_threshold:
                 return
+            if meridian_flip_due(status.pier_side, ha) is False:
+                return  # already on the normal side for a western target
         except Exception:
             return
 

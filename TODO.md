@@ -11,6 +11,15 @@ Items designed for but not yet built. Ordered roughly by priority.
 - **INDI items connected from the tree are untested on real indiserver** — the mapping
   (`indi_<kind>` + `{device_name, executable}`) matches what the wizard sends and the INDI
   adapters load the driver themselves, but only non-INDI items were verified end to end.
+- **Profile/inventory context doesn't reach the INDI drivers** — equipment data held in the
+  inventory and profile tree (OTA focal length/aperture, telescope name, site, which mount a
+  camera should snoop) is not reliably pushed to the INDI drivers that need it. Observed: the
+  guide camera simulator's focal length, aperture and telescope name, and its
+  `ACTIVE_DEVICES` telescope (to use "astrolol Mount Proxy"), had to be set by hand in the
+  INDI panel although all of it was in the inventory/profile. Starting points:
+  `api/profiles.py::_apply_tree_context` (site→mount, OTA→camera `push_scope_info`), the
+  imager's per-exposure `_push_live_context`, and devices connected through the wizard rather
+  than the tree. The FITS header bug below is one symptom of the same problem.
 - **FITS headers silently not patched with an active profile** —
   `imaging/imager.py::_patch_fits_headers` still reads `profile.location`, a field that no
   longer exists on `Profile` (the site now lives in the equipment tree as a `SiteItem`).
@@ -38,8 +47,14 @@ baked into the current code/design or a feature left out; revisit when it bites.
   on both pier sides, whereas an RA/Dec-space offset would apply the Dec correction in the
   wrong direction after a meridian flip. Does not correct polar misalignment/cone error,
   which differ per pier side; per-side offsets could be added later if that ever matters.
-- **No refraction, no meridian/horizon limits yet** — both are ours to implement
-  (the controller does no geometry at all).
+- **No refraction** — Alt/Az and the horizon limit are geometric.
+- **Meridian limit** — enforced by the driver on the *mechanical* RA axis angle (raw counts,
+  sync offset ignored): up to `meridian_limit_deg` (default 20°) past counterweight-horizontal,
+  symmetric so it also guards the east side. Tracking into it stops tracking (checked every
+  2 s by the coords pump), GOTOs/flips/park beyond it are refused (a plain GOTO takes the
+  other pier side instead), RA nudges are refused past it and stopped 0.5° before it by a
+  timer. Guide pulses are not checked individually (the pump catches them). Assumes the
+  power-on home is roughly right: a badly eyeballed home shifts the limit by the same error.
 - **Serial transport only** — EQMOD cable (9600) or AZ-EQ6 built-in USB (115200), with
   baud auto-detect. SynScan WiFi (same protocol over UDP :11880) not implemented.
 - **EQ mode only** — AZ mode / Alt-Az mounts (shared TX/RX bus with Drop line) not
@@ -104,6 +119,15 @@ baked into the current code/design or a feature left out; revisit when it bites.
 - **Watchdog** — periodic `ping()` calls on each connected device; transition to ERROR state
   and surface an alert in the UI without crashing the app.
 - **Pointing model** — n-point alignment corrections stored per-profile.
+- **Horizon limit is core, flat, and coarse** — `MountManager` refuses GOTOs below
+  `horizon_min_alt_deg` (site from the active profile; no site = no check) and runs
+  `horizon_action` (stop tracking / park / nothing) once when a tracking mount sinks below
+  it, re-armed 1° above. Checked by the 30 s automation loop, so allow a margin. Nudges and
+  sync are not checked; no horizon profile (terrain/trees) yet.
+- **Meridian flip rule is northern-hemisphere** — `mount/manager.py::meridian_flip_due`
+  (also used by the sequencer and the Mount page) treats pier East as normal for HA ≥ 0 and
+  West for HA < 0. Unknown pier side falls back to HA only (UI: 0 < HA ≤ 2h). Revisit with
+  southern-hemisphere support.
 
 ## UI consistency audit
 
