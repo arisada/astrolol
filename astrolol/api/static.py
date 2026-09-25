@@ -72,5 +72,12 @@ def mount_ui(app: FastAPI) -> None:
         # "here's your page" (fetch().ok would be true for HTML, not JSON).
         if full_path.split("/", 1)[0] in _API_PREFIXES:
             raise HTTPException(status_code=404, detail="Not Found")
+        # vite copies ui/public/* (favicon.ico, manifest.webmanifest, sw.js,
+        # icons, ...) into ui/dist/ root at build time. Serve those directly
+        # instead of masking them with the SPA shell.
+        if full_path:
+            candidate = (UI_DIST / full_path).resolve()
+            if candidate.is_file() and UI_DIST.resolve() in candidate.parents:
+                return FileResponse(candidate)
         # Anything else (including root /) gets index.html (client-side routing).
         return FileResponse(UI_DIST / "index.html")

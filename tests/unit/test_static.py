@@ -23,6 +23,12 @@ def client(tmp_path: Path) -> Generator[TestClient, None, None]:
     dist = tmp_path / "dist"
     (dist / "assets").mkdir(parents=True)
     (dist / "index.html").write_text("<html><body>spa shell</body></html>")
+    # vite copies ui/public/* into dist root at build time.
+    (dist / "favicon.ico").write_bytes(b"\x00fake-ico")
+    (dist / "manifest.webmanifest").write_text('{"name": "astrolol"}')
+
+    secret = tmp_path / "secret.txt"
+    secret.write_text("outside dist")
 
     app = FastAPI()
     # spa_fallback reads the module-level UI_DIST at request time, so the patch
@@ -59,5 +65,24 @@ def test_client_route_falls_back_to_spa_shell(client: TestClient) -> None:
 
 def test_root_falls_back_to_spa_shell(client: TestClient) -> None:
     resp = client.get("/")
+    assert resp.status_code == 200
+    assert "spa shell" in resp.text
+
+
+def test_public_root_file_is_served_directly(client: TestClient) -> None:
+    resp = client.get("/favicon.ico")
+    assert resp.status_code == 200
+    assert resp.content == b"\x00fake-ico"
+    assert "spa shell" not in resp.text
+
+
+def test_manifest_is_served_directly(client: TestClient) -> None:
+    resp = client.get("/manifest.webmanifest")
+    assert resp.status_code == 200
+    assert resp.json() == {"name": "astrolol"}
+
+
+def test_path_traversal_outside_dist_falls_back_to_spa_shell(client: TestClient) -> None:
+    resp = client.get("/../secret.txt")
     assert resp.status_code == 200
     assert "spa shell" in resp.text
