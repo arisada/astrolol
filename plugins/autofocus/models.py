@@ -43,6 +43,11 @@ class AutofocusConfig(BaseModel):
     binning: int = Field(default=1, ge=1, le=4)
     gain: int | None = None
     filter_slot: int | None = Field(default=None, description="Filter slot to select before run (None = keep current)")
+    filter_wheel_id: str | None = Field(
+        default=None,
+        description="Filter wheel to select the slot on. None = whichever filter wheel is "
+        "connected (only correct with exactly one on the whole rig).",
+    )
     fit_algo: Literal["parabola", "hyperbola"] = "parabola"
     metric: Literal["fwhm", "hfd"] = "fwhm"
 

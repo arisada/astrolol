@@ -136,7 +136,7 @@ class AutofocusEngine:
 
             # Optional: change filter before starting
             if config.filter_slot is not None:
-                await self._select_filter(config.filter_slot)
+                await self._select_filter(config.filter_slot, config.filter_wheel_id)
 
             # Determine starting position
             focuser_status = await focuser.get_status()
@@ -304,15 +304,23 @@ class AutofocusEngine:
             a, b, c, optimal = result
             run.curve_fit = CurveFit(a=a, b=b, c=c, optimal_position=optimal)
 
-    async def _select_filter(self, slot: int) -> None:
-        """Move the first connected filter wheel to the requested slot (best-effort)."""
+    async def _select_filter(self, slot: int, filter_wheel_id: str | None) -> None:
+        """Move the requested filter wheel to the requested slot (best-effort).
+
+        filter_wheel_id pins the specific wheel on this camera's optical path (resolved
+        by the UI from the active profile's equipment tree). Without it, falls back to
+        "the first connected filter wheel" — only correct when exactly one is connected.
+        """
         try:
-            fw_devices = [d for d in self._device_manager.list_connected() if d["kind"] == "filter_wheel"]
-            if fw_devices:
-                fw = self._device_manager.get_filter_wheel(fw_devices[0]["device_id"])
-                await fw.select_filter(slot)
-                logger.info("autofocus.filter_selected", slot=slot)
+            if filter_wheel_id is not None:
+                fw = self._device_manager.get_filter_wheel(filter_wheel_id)
             else:
-                logger.warning("autofocus.no_filter_wheel", requested_slot=slot)
+                fw_devices = [d for d in self._device_manager.list_connected() if d["kind"] == "filter_wheel"]
+                if not fw_devices:
+                    logger.warning("autofocus.no_filter_wheel", requested_slot=slot)
+                    return
+                fw = self._device_manager.get_filter_wheel(fw_devices[0]["device_id"])
+            await fw.select_filter(slot)
+            logger.info("autofocus.filter_selected", slot=slot, filter_wheel_id=filter_wheel_id)
         except Exception as exc:
             logger.warning("autofocus.filter_select_failed", slot=slot, error=str(exc))

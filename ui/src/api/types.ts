@@ -162,6 +162,7 @@ export interface AutofocusConfig {
   binning?: number
   gain?: number | null
   filter_slot?: number | null
+  filter_wheel_id?: string | null
   fit_algo?: FitAlgo
   metric?: FocusMetric
 }
@@ -422,6 +423,30 @@ export interface ActivationResult {
   profile_id: string
   connected: DeviceResult[]
   failed: DeviceResult[]
+}
+
+// Per-camera ancestry resolved from the active profile's equipment tree (mount/site/OTA/
+// focuser/filter-wheel/rotator), with live device ids — GET /profiles/active/optical-paths.
+// Used to associate a camera with the *correct* focuser/filter wheel panel in the Imaging
+// page instead of guessing via INDI "companions" or "first connected".
+export interface OpticalPath {
+  camera: CameraEquipmentItem
+  camera_device_id: string | null
+
+  mount: MountEquipmentItem | null
+  mount_device_id: string | null
+  site: SiteEquipmentItem | null
+
+  ota: OTAEquipmentItem | null
+
+  focuser: FocuserEquipmentItem | null
+  focuser_device_id: string | null
+
+  filter_wheel: FilterWheelEquipmentItem | null
+  filter_wheel_device_id: string | null
+
+  rotator: RotatorEquipmentItem | null
+  rotator_device_id: string | null
 }
 
 // --- Device properties (INDI) ---

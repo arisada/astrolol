@@ -23,13 +23,19 @@ from astrolol.core.events import (
 from astrolol.devices.base.models import ExposureParams
 from astrolol.devices.manager import DeviceManager
 from astrolol.core.mem_guard import mem_guard
+from astrolol.equipment.optical_path import (
+    find_optical_path_for_camera_device,
+    find_profile_site,
+    resolve_optical_paths,
+)
 from astrolol.imaging.models import DitherConfig, ExposureRequest, ExposureResult, ImagerState, ImagerStatus
 from astrolol.imaging.preview import fits_to_jpeg, fits_to_jpeg_linear
 
 if TYPE_CHECKING:
+    from astrolol.equipment.models import OTAItem, SiteItem
     from astrolol.equipment.store import EquipmentStore
     from astrolol.mount.manager import MountManager
-    from astrolol.profiles.models import Profile
+    from astrolol.profiles.models import Profile, Telescope
     from astrolol.profiles.store import ProfileStore
 
 logger = structlog.get_logger()
@@ -100,31 +106,39 @@ def _write_imagetyp(fits_path: Path, frame_type: str) -> None:
 
 def _patch_fits_headers(
     fits_path: Path,
-    profile: "Profile",
+    telescope: "Telescope | OTAItem | None",
+    site: "SiteItem | None",
     coord: "SkyCoord | None",
     object_name: str = "",
 ) -> None:
-    """Inject observatory and telescope metadata into an existing FITS file."""
+    """Inject observatory and telescope metadata into an existing FITS file.
+
+    ``telescope``/``site`` are resolved by the caller — from the camera's ancestor OTA
+    and site in the equipment tree when available (per-camera, correct for profiles with
+    more than one optical path), falling back to the profile-level ``Telescope`` for
+    profiles that predate the equipment tree. Both are duck-typed (``Telescope`` and
+    ``OTAItem`` share the same `.name`/`.focal_length`/`.aperture` fields).
+    """
     try:
         from astropy.io import fits as astrofits
         with astrofits.open(str(fits_path), mode="update") as hdul:
             hdr = hdul[0].header
             if object_name:
                 hdr["OBJECT"] = (object_name, "Target object name")
-            if profile.telescope:
-                hdr["TELESCOP"] = (profile.telescope.name, "Telescope name")
-                hdr["FOCALLEN"] = (profile.telescope.focal_length, "[mm] Focal length")
-                hdr["APTDIA"] = (profile.telescope.aperture, "[mm] Aperture diameter")
+            if telescope is not None:
+                hdr["TELESCOP"] = (telescope.name, "Telescope name")
+                hdr["FOCALLEN"] = (telescope.focal_length, "[mm] Focal length")
+                hdr["APTDIA"] = (telescope.aperture, "[mm] Aperture diameter")
                 hdr["APTAREA"] = (
-                    3.14159265 * (profile.telescope.aperture / 2) ** 2,
+                    3.14159265 * (telescope.aperture / 2) ** 2,
                     "[mm^2] Aperture area",
                 )
-            if profile.location:
-                hdr["SITELAT"] = (profile.location.latitude, "[deg] Observer latitude")
-                hdr["SITELONG"] = (profile.location.longitude, "[deg] Observer longitude")
-                hdr["SITEELEV"] = (profile.location.altitude, "[m] Observer altitude")
-                if profile.location.name:
-                    hdr["SITENAME"] = (profile.location.name, "Observer location name")
+            if site is not None:
+                hdr["SITELAT"] = (site.latitude, "[deg] Observer latitude")
+                hdr["SITELONG"] = (site.longitude, "[deg] Observer longitude")
+                hdr["SITEELEV"] = (site.altitude, "[m] Observer altitude")
+                if site.name:
+                    hdr["SITENAME"] = (site.name, "Observer location name")
             if coord is not None:
                 icrs = coord.icrs
                 hdr["RA"] = (icrs.ra.deg, "[deg] Right ascension (J2000)")
@@ -166,15 +180,31 @@ class ImagerManager:
         self._active_profile = profile
 
     async def push_scope_info(self, device_id: str) -> None:
-        """Push telescope optics from the active profile to the camera's SCOPE_INFO."""
+        """Push telescope optics to the camera's SCOPE_INFO.
+
+        Resolves the camera's ancestor OTA from the active profile's equipment tree when
+        possible (correct per-camera even with multiple optical paths); falls back to the
+        profile-level ``Telescope`` for profiles that predate the equipment tree.
+        """
         profile = self._active_profile
-        if profile is None or profile.telescope is None:
+        if profile is None:
+            return
+        focal_length: float | None = None
+        aperture: float | None = None
+        if profile.roots and self._equipment_store is not None:
+            paths = resolve_optical_paths(profile, self._equipment_store, self._device_manager)
+            path = find_optical_path_for_camera_device(paths, device_id)
+            if path is not None and path.ota is not None:
+                focal_length, aperture = path.ota.focal_length, path.ota.aperture
+        if focal_length is None and profile.telescope is not None:
+            focal_length, aperture = profile.telescope.focal_length, profile.telescope.aperture
+        if focal_length is None or aperture is None:
             return
         try:
             camera = self._device_manager.get_camera(device_id)
             push = getattr(camera, "push_scope_info", None)
             if push is not None:
-                await push(profile.telescope.focal_length, profile.telescope.aperture)
+                await push(focal_length, aperture)
         except Exception as exc:
             logger.warning("imager.scope_info_push_failed", device_id=device_id, error=str(exc))
 
@@ -284,9 +314,21 @@ class ImagerManager:
             frame_type=request.frame_type,
         )
 
+        # Resolve this camera's place in the equipment tree once (mount/OTA/site/filter
+        # wheel ancestry) — the single source of truth for a profile with more than one
+        # optical path. Profiles that predate the equipment tree fall back to the flat
+        # profile.devices/profile.telescope fields below wherever the tree has nothing.
+        profile = self._active_profile
+        my_path = None
+        if profile is not None and profile.roots and self._equipment_store is not None:
+            try:
+                paths = resolve_optical_paths(profile, self._equipment_store, self._device_manager)
+                my_path = find_optical_path_for_camera_device(paths, device_id)
+            except Exception:
+                pass
+
         # Snapshot mount pointing before the shutter opens (best represents pointing)
         coord = None
-        profile = self._active_profile
         if profile is not None:
             mount_role = next(
                 (pd for pd in profile.devices if pd.role == "mount"), None
@@ -299,18 +341,11 @@ class ImagerManager:
                 except Exception:
                     pass  # mount not connected or query failed — skip RA/DEC
 
-            # Tree-based fallback: find mount adapter for this camera via equipment tree
-            if coord is None and profile.roots and self._equipment_store is not None:
+            if coord is None and my_path is not None and my_path.mount_device_id is not None:
                 try:
-                    from astrolol.api.profiles import _find_mount_for_camera
-                    indi_name = getattr(camera, "_device_name", None)
-                    if indi_name:
-                        mount_adapter = _find_mount_for_camera(
-                            profile.roots, self._equipment_store, self._device_manager, indi_name
-                        )
-                        if mount_adapter is not None:
-                            status = await mount_adapter.get_status()
-                            coord = status.skycoord
+                    mount = self._device_manager.get_mount(my_path.mount_device_id)
+                    status = await mount.get_status()
+                    coord = status.skycoord
                 except Exception:
                     pass
 
@@ -334,19 +369,37 @@ class ImagerManager:
                     if target and target.name:
                         object_name = target.name
                         break
+            if not object_name and my_path is not None and my_path.mount_device_id is not None:
+                target = self._mount_manager.get_target(my_path.mount_device_id)
+                if target and target.name:
+                    object_name = target.name
 
         filter_name = ""
         if profile is not None:
             fw_role = next((pd for pd in profile.devices if pd.role == "filter_wheel"), None)
-            if fw_role is not None:
+            fw_device_id = fw_role.config.device_id if fw_role is not None else (
+                my_path.filter_wheel_device_id if my_path is not None else None
+            )
+            if fw_device_id is not None:
                 try:
-                    fw = self._device_manager.get_filter_wheel(fw_role.config.device_id)
+                    fw = self._device_manager.get_filter_wheel(fw_device_id)
                     fw_status = await fw.get_status()
                     slot = fw_status.current_slot
                     if slot is not None and fw_status.filter_names and 0 < slot <= len(fw_status.filter_names):
                         filter_name = fw_status.filter_names[slot - 1]
                 except Exception:
                     pass
+
+        # Telescope optics + site for the FITS header patch below: prefer the camera's
+        # ancestor OTA/site from the tree, fall back to the profile-level Telescope.
+        telescope = my_path.ota if my_path is not None and my_path.ota is not None else (
+            profile.telescope if profile is not None else None
+        )
+        site = my_path.site if my_path is not None and my_path.site is not None else (
+            find_profile_site(profile, self._equipment_store)
+            if profile is not None and profile.roots and self._equipment_store is not None
+            else None
+        )
 
         imager.state = ImagerState.EXPOSING
         await self._event_bus.publish(
@@ -389,7 +442,9 @@ class ImagerManager:
 
         await asyncio.to_thread(_write_imagetyp, fits_path, request.frame_type)
         if profile is not None:
-            await asyncio.to_thread(_patch_fits_headers, fits_path, profile, coord, object_name)
+            await asyncio.to_thread(
+                _patch_fits_headers, fits_path, telescope, site, coord, object_name
+            )
 
         # Optionally move to save directory, or park unsaved frames in a fixed temp path
         if request.save and self._profile_store is not None:

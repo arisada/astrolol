@@ -2,7 +2,7 @@ import pytest
 from httpx import AsyncClient, ASGITransport
 
 from astrolol.main import create_app
-from tests.conftest import FakeCamera, FailingCamera
+from tests.conftest import FakeCamera, FakeMount, FailingCamera
 
 
 @pytest.fixture
@@ -11,6 +11,7 @@ def app():
     # Register test adapters directly into the registry
     application.state.registry.register_camera("fake_camera", FakeCamera)  # type: ignore[arg-type]
     application.state.registry.register_camera("failing_camera", FailingCamera)  # type: ignore[arg-type]
+    application.state.registry.register_mount("fake_mount", FakeMount)  # type: ignore[arg-type]
     return application
 
 
@@ -91,6 +92,20 @@ async def test_disconnect_unknown_404(client: AsyncClient) -> None:
     async with client as c:
         r = await c.delete("/devices/connected/ghost")
     assert r.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_disconnect_mount_stops_its_automation_loop(app, client: AsyncClient) -> None:
+    """Regression: disconnecting a mount left its automation loop running forever,
+    silently polling a device_id no longer in the DeviceManager."""
+    async with client as c:
+        await c.post("/devices/connect", json={
+            "device_id": "mount1", "kind": "mount", "adapter_key": "fake_mount"
+        })
+        assert "mount1" in app.state.mount_manager._automation_tasks
+        r = await c.delete("/devices/connected/mount1")
+        assert r.status_code == 204
+    assert "mount1" not in app.state.mount_manager._automation_tasks
 
 
 @pytest.mark.asyncio

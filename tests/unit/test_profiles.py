@@ -8,12 +8,20 @@ from astrolol.api.profiles import (
     _apply_tree_context, _push_live_context, _find_mount_for_camera, find_profile_site,
     item_device_config, restore_last_profile,
 )
-from astrolol.equipment.models import CameraItem, MountItem, OTAItem, SiteItem
+from astrolol.core.events import EventBus
+from astrolol.equipment.models import CameraItem, FocuserItem, MountItem, OTAItem, SiteItem
 from astrolol.equipment.store import EquipmentStore
 from astrolol.main import create_app
+from astrolol.mount.manager import MountManager
 from astrolol.profiles.models import Profile, ProfileNode, Telescope
 from astrolol.profiles.store import ProfileStore
 from tests.conftest import FakeCamera, FakeMount, FakeFocuser
+
+
+def _mount_manager_for(device_manager) -> MountManager:
+    """A real MountManager wrapping a test's fake device manager, for _apply_tree_context
+    tests that need push_site_data/start_automation (both real MountManager behaviour)."""
+    return MountManager(device_manager=device_manager, event_bus=EventBus())
 
 
 # ===========================================================================
@@ -321,23 +329,33 @@ def inv_store(tmp_path):
     return EquipmentStore(tmp_path / "inventory.json")
 
 
+class _FakeDM:
+    """Minimal stand-in for DeviceManager: enough of ._devices and .get_<kind>() for
+    _apply_tree_context / MountManager.push_site_data to work against fake adapters."""
+
+    def __init__(self):
+        self._devices: dict = {}
+
+    def _get(self, device_id: str):
+        return self._devices[device_id].instance
+
+    get_mount = get_camera = get_focuser = get_filter_wheel = get_rotator = _get
+
+
 def _fake_device_manager(entries: dict):
-    """Minimal stand-in for DeviceManager._devices."""
+    """Minimal stand-in for DeviceManager._devices, keyed by device_id."""
     class _Entry:
-        def __init__(self, kind, device_name, instance):
+        def __init__(self, kind, device_name, instance, device_id):
             self.config = type("cfg", (), {
                 "kind": kind,
                 "adapter_key": None,
                 "params": {"device_name": device_name},
+                "device_id": device_id,
             })()
             self.instance = instance
 
-    class _DM:
-        def __init__(self):
-            self._devices = {k: v for k, v in entries.items()}
-
-    dm = _DM()
-    dm._devices = {k: _Entry(*v) for k, v in entries.items()}
+    dm = _FakeDM()
+    dm._devices = {k: _Entry(*v, device_id=k) for k, v in entries.items()}
     return dm
 
 
@@ -345,19 +363,17 @@ def _fake_device_manager_generic(entries: dict):
     """Like _fake_device_manager, but entries are keyed by (kind, adapter_key, params)
     for adapters with no INDI-style device_name (e.g. plugins/eqmod's eqmod_sim)."""
     class _Entry:
-        def __init__(self, kind, adapter_key, params, instance):
+        def __init__(self, kind, adapter_key, params, instance, device_id):
             self.config = type("cfg", (), {
                 "kind": kind,
                 "adapter_key": adapter_key,
                 "params": params,
+                "device_id": device_id,
             })()
             self.instance = instance
 
-    class _DM:
-        pass
-
-    dm = _DM()
-    dm._devices = {k: _Entry(*v) for k, v in entries.items()}
+    dm = _FakeDM()
+    dm._devices = {k: _Entry(*v, device_id=k) for k, v in entries.items()}
     return dm
 
 
@@ -376,7 +392,8 @@ async def test_tree_context_pushes_location_to_mount(inv_store):
     roots = [ProfileNode(item_id=site.id, children=[
         ProfileNode(item_id=mount_item.id),
     ])]
-    await _apply_tree_context(roots, inv_store, dm)
+    profile = Profile(name="p", roots=roots)
+    await _apply_tree_context(profile, inv_store, dm, mount_manager=_mount_manager_for(dm))
 
     assert hasattr(fake_mount, "location")
     assert fake_mount.location == (48.85, 2.35, 35.0)
@@ -397,7 +414,8 @@ async def test_tree_context_pushes_scope_info_to_camera(inv_store):
     roots = [ProfileNode(item_id=ota.id, children=[
         ProfileNode(item_id=cam_item.id),
     ])]
-    await _apply_tree_context(roots, inv_store, dm)
+    profile = Profile(name="p", roots=roots)
+    await _apply_tree_context(profile, inv_store, dm)
 
     assert hasattr(fake_camera, "scope_info")
     assert fake_camera.scope_info == (250.0, 51.0)
@@ -427,7 +445,8 @@ async def test_tree_context_propagates_through_mount(inv_store):
             ]),
         ]),
     ])]
-    await _apply_tree_context(roots, inv_store, dm)
+    profile = Profile(name="p", roots=roots)
+    await _apply_tree_context(profile, inv_store, dm, mount_manager=_mount_manager_for(dm))
 
     assert fake_mount.location == (48.85, 2.35, 35.0)
     assert fake_camera.scope_info == (500.0, 80.0)
@@ -438,8 +457,9 @@ async def test_tree_context_missing_inventory_item_skipped(inv_store):
     """A node whose item_id is missing from inventory is silently skipped."""
     roots = [ProfileNode(item_id="no-such-id")]
     dm = _fake_device_manager({})
+    profile = Profile(name="p", roots=roots)
     # Should not raise
-    await _apply_tree_context(roots, inv_store, dm)
+    await _apply_tree_context(profile, inv_store, dm, mount_manager=_mount_manager_for(dm))
 
 
 @pytest.mark.asyncio
@@ -461,7 +481,8 @@ async def test_tree_context_matches_non_indi_adapter_by_key_and_params(inv_store
     roots = [ProfileNode(item_id=site.id, children=[
         ProfileNode(item_id=mount_item.id),
     ])]
-    await _apply_tree_context(roots, inv_store, dm)
+    profile = Profile(name="p", roots=roots)
+    await _apply_tree_context(profile, inv_store, dm, mount_manager=_mount_manager_for(dm))
 
     assert fake_mount.location == (48.85, 2.35, 35.0)
 
@@ -485,7 +506,8 @@ async def test_tree_context_generic_adapter_params_mismatch_is_noop(inv_store):
     roots = [ProfileNode(item_id=site.id, children=[
         ProfileNode(item_id=mount_item.id),
     ])]
-    await _apply_tree_context(roots, inv_store, dm)  # should not raise
+    profile = Profile(name="p", roots=roots)
+    await _apply_tree_context(profile, inv_store, dm, mount_manager=_mount_manager_for(dm))  # should not raise
 
     assert not hasattr(fake_mount, "location")
 
@@ -502,7 +524,8 @@ async def test_tree_context_no_matching_device_is_noop(inv_store):
     roots = [ProfileNode(item_id=site.id, children=[
         ProfileNode(item_id=mount_item.id),
     ])]
-    await _apply_tree_context(roots, inv_store, dm)  # should not raise
+    profile = Profile(name="p", roots=roots)
+    await _apply_tree_context(profile, inv_store, dm, mount_manager=_mount_manager_for(dm))  # should not raise
 
 
 # ===========================================================================
@@ -708,6 +731,27 @@ async def test_activate_connects_tree_devices_and_pushes_the_site(app, client, t
 
 
 @pytest.mark.asyncio
+async def test_deactivate_disconnects_tree_devices(app, client, tmp_path):
+    """Regression: DELETE /profiles/active only disconnected the legacy profile.devices
+    list, so a mount connected via connect_tree_devices stayed connected forever."""
+    inv_store = EquipmentStore(tmp_path / "inventory.json")
+    app.state.equipment_store = inv_store
+    mount = inv_store.create(MountItem(name="Sim mount", adapter_key="fake_mount", connect_params={}))
+    profile = app.state.profile_store.create(_tree_profile(inv_store, mount))
+
+    async with client as c:
+        await c.post(f"/profiles/{profile.id}/activate")
+        assert "mount_sim_mount" in app.state.device_manager._devices
+        assert "mount_sim_mount" in app.state.mount_manager._automation_tasks
+        r = await c.delete("/profiles/active")
+    assert r.status_code == 204
+    assert "mount_sim_mount" not in app.state.device_manager._devices
+    # Regression: the automation loop must be stopped too, not just the connection —
+    # otherwise it keeps polling a device_id that no longer exists, forever.
+    assert "mount_sim_mount" not in app.state.mount_manager._automation_tasks
+
+
+@pytest.mark.asyncio
 async def test_activate_does_not_reconnect_a_device_already_connected_by_the_wizard(app, client, tmp_path):
     inv_store = EquipmentStore(tmp_path / "inventory.json")
     app.state.equipment_store = inv_store
@@ -719,6 +763,10 @@ async def test_activate_does_not_reconnect_a_device_already_connected_by_the_wiz
         r = await c.post(f"/profiles/{profile.id}/activate")
     assert [d["device_id"] for d in r.json()["connected"]] == ["wizard_mount"]
     assert [d["device_id"] for d in app.state.device_manager.list_connected()] == ["wizard_mount"]
+    # Regression: a device connected before the profile linked it in the tree must still
+    # get the site pushed — connect_tree_devices skips *reconnecting* it, but the site push
+    # must not be skipped along with it.
+    assert app.state.device_manager.get_mount("wizard_mount").location == (48.85, 2.35, 35.0)
 
 
 @pytest.mark.asyncio
@@ -732,6 +780,29 @@ async def test_activate_reports_tree_devices_that_fail_to_connect(app, client, t
         r = await c.post(f"/profiles/{profile.id}/activate")
     assert r.status_code == 200
     assert [d["device_id"] for d in r.json()["failed"]] == ["mount_ghost"]
+
+
+@pytest.mark.asyncio
+async def test_activate_reports_tree_item_with_no_connection_info(app, client, tmp_path):
+    """Regression: a connectable item with neither an adapter_key nor an
+    indi_driver/indi_device_name pair (e.g. added to the inventory but never assigned a
+    driver) used to vanish silently — absent from both connected and failed, with no
+    error anywhere, making a misconfigured device indistinguishable from "not in the
+    tree at all"."""
+    inv_store = EquipmentStore(tmp_path / "inventory.json")
+    app.state.equipment_store = inv_store
+    focuser = inv_store.create(FocuserItem(name="Focuser simulator"))  # no driver/adapter set
+    profile = app.state.profile_store.create(_tree_profile(inv_store, focuser))
+
+    async with client as c:
+        r = await c.post(f"/profiles/{profile.id}/activate")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["connected"] == []
+    assert len(body["failed"]) == 1
+    assert body["failed"][0]["device_id"] == "focuser_focuser_simulator"
+    assert body["failed"][0]["role"] == "focuser"
+    assert "connection info" in body["failed"][0]["error"]
 
 
 @pytest.mark.asyncio
@@ -771,6 +842,49 @@ async def test_restore_last_profile_reconnects_the_tree(tmp_path):
     assert restored.location == (48.85, 2.35, 35.0)
     for task in mount_manager._automation_tasks.values():
         task.cancel()
+
+
+@pytest.mark.asyncio
+async def test_restore_last_profile_pushes_scope_info_to_tree_camera(tmp_path):
+    """Regression: activate_profile pushed OTA->camera SCOPE_INFO via _apply_tree_context,
+    but restore_last_profile (run on every backend startup) never called it, so a camera
+    connected only through the equipment tree lost its focal length/aperture on restart."""
+    from types import SimpleNamespace
+    from unittest.mock import AsyncMock, MagicMock
+
+    from astrolol.core.events import EventBus
+    from astrolol.devices.manager import DeviceManager
+    from astrolol.devices.registry import DeviceRegistry
+    from astrolol.mount.manager import MountManager
+
+    inv_store = EquipmentStore(tmp_path / "inventory.json")
+    profile_store = ProfileStore(tmp_path / "profiles.json")
+    ota = inv_store.create(OTAItem(name="RedCat 51", focal_length=250.0, aperture=51.0))
+    cam = inv_store.create(CameraItem(name="ASI2600", adapter_key="fake_camera", connect_params={}))
+    site = _site(inv_store)
+    profile = Profile(name="rig", roots=[ProfileNode(
+        item_id=site.id, children=[ProfileNode(
+            item_id=ota.id, children=[ProfileNode(item_id=cam.id)],
+        )],
+    )])
+    profile = profile_store.create(profile)
+    profile_store.set_last_active_id(profile.id)
+
+    registry = DeviceRegistry()
+    registry.register_camera("fake_camera", FakeCamera)  # type: ignore[arg-type]
+    bus = EventBus()
+    device_manager = DeviceManager(registry=registry, event_bus=bus)
+    mount_manager = MountManager(device_manager=device_manager, event_bus=bus)
+    state = SimpleNamespace(
+        profile_store=profile_store, equipment_store=inv_store, device_manager=device_manager,
+        mount_manager=mount_manager, imager_manager=MagicMock(push_scope_info=AsyncMock()),
+        active_profile=None,
+    )
+
+    await restore_last_profile(state)
+
+    restored = device_manager.get_camera("camera_asi2600")
+    assert restored.scope_info == (250.0, 51.0)
 
 
 @pytest.mark.asyncio

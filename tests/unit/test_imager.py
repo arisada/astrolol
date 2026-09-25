@@ -216,9 +216,7 @@ def test_patch_fits_headers_writes_object(tmp_path: Path):
     from tests.conftest import make_fake_fits
     fits_file = make_fake_fits(tmp_path / "test.fits")
 
-    from astrolol.profiles.models import Profile
-    profile = Profile(id="p1", name="test")
-    _patch_fits_headers(fits_file, profile, None, object_name="M42")
+    _patch_fits_headers(fits_file, None, None, None, object_name="M42")
 
     with astrofits.open(str(fits_file)) as hdul:
         assert hdul[0].header["OBJECT"] == "M42"
@@ -229,9 +227,101 @@ def test_patch_fits_headers_no_object_when_empty(tmp_path: Path):
     from tests.conftest import make_fake_fits
     fits_file = make_fake_fits(tmp_path / "test.fits")
 
-    from astrolol.profiles.models import Profile
-    profile = Profile(id="p1", name="test")
-    _patch_fits_headers(fits_file, profile, None, object_name="")
+    _patch_fits_headers(fits_file, None, None, None, object_name="")
 
     with astrofits.open(str(fits_file)) as hdul:
         assert "OBJECT" not in hdul[0].header
+
+
+# --- _do_expose on a tree-only profile (regression: it used to silently fall back to
+# the empty flat profile.devices/profile.telescope fields for everything but the mount
+# coord snapshot) ---
+
+async def _tree_only_rig(manager: DeviceManager, tmp_path: Path):
+    """site -> mount -> ota -> filter_wheel -> camera, all connected, no flat profile.devices."""
+    from astrolol.equipment.models import CameraItem, FilterWheelItem, MountItem, OTAItem, SiteItem
+    from astrolol.equipment.store import EquipmentStore
+    from astrolol.profiles.models import Profile, ProfileNode
+
+    inv_store = EquipmentStore(tmp_path / "inventory.json")
+    site = inv_store.create(SiteItem(name="Backyard", latitude=48.85, longitude=2.35, altitude=35.0))
+    mount_item = inv_store.create(MountItem(name="Sim mount", adapter_key="fake_mount", connect_params={}))
+    ota = inv_store.create(OTAItem(name="RedCat 51", focal_length=250.0, aperture=51.0))
+    fw_item = inv_store.create(FilterWheelItem(
+        name="EFW", adapter_key="fake_filter_wheel", connect_params={}, filter_names=["L", "R", "G", "B"],
+    ))
+    cam_item = inv_store.create(CameraItem(name="ASI2600", adapter_key="fake_camera", connect_params={}))
+
+    await manager.connect(DeviceConfig(device_id="mount1", kind="mount", adapter_key="fake_mount"))
+    await manager.connect(DeviceConfig(device_id="fw1", kind="filter_wheel", adapter_key="fake_filter_wheel"))
+    await manager.connect(DeviceConfig(device_id="cam1", kind="camera", adapter_key="fake_camera"))
+
+    profile = Profile(name="rig", roots=[ProfileNode(
+        item_id=site.id, children=[ProfileNode(
+            item_id=mount_item.id, children=[ProfileNode(
+                item_id=ota.id, children=[ProfileNode(
+                    item_id=fw_item.id, children=[ProfileNode(item_id=cam_item.id)],
+                )],
+            )],
+        )],
+    )])
+    return inv_store, profile
+
+
+@pytest.mark.asyncio
+async def test_do_expose_tree_profile_patches_fits_headers_from_ota_and_site(
+    manager: DeviceManager, event_bus, tmp_path: Path
+) -> None:
+    from astropy.coordinates import SkyCoord
+    from astropy.io import fits as astrofits
+    from astrolol.mount.manager import MountManager
+
+    inv_store, profile = await _tree_only_rig(manager, tmp_path)
+    mount_manager = MountManager(device_manager=manager, event_bus=event_bus)
+    await mount_manager.set_target("mount1", SkyCoord(ra=83.8, dec=-5.4, unit="deg"), name="M42")
+
+    imager_manager = ImagerManager(
+        device_manager=manager, event_bus=event_bus, images_dir=tmp_path,
+        equipment_store=inv_store, mount_manager=mount_manager,
+    )
+    imager_manager.set_context(profile)
+
+    result = await imager_manager.expose("cam1", ExposureRequest(duration=1.0, save=False))
+
+    with astrofits.open(result.fits_path) as hdul:
+        hdr = hdul[0].header
+        assert hdr["OBJECT"] == "M42"
+        assert hdr["TELESCOP"] == "RedCat 51"
+        assert hdr["FOCALLEN"] == 250.0
+        assert hdr["APTDIA"] == 51.0
+        assert hdr["SITELAT"] == 48.85
+        assert hdr["SITELONG"] == 2.35
+        assert hdr["SITEELEV"] == 35.0
+        assert hdr["SITENAME"] == "Backyard"
+
+
+@pytest.mark.asyncio
+async def test_do_expose_tree_profile_resolves_filter_name_for_save_path(
+    manager: DeviceManager, event_bus, tmp_path: Path
+) -> None:
+    """Regression: filter_name was only ever looked up via the flat profile.devices list,
+    so it was always empty ("") for a tree-only profile — dead %f filename token."""
+    from astrolol.profiles.store import ProfileStore
+
+    inv_store, profile = await _tree_only_rig(manager, tmp_path)
+    await manager.get_filter_wheel("fw1").select_filter(2)  # "R" (1-indexed into filter_names)
+
+    profile_store = ProfileStore(tmp_path / "profiles.json")
+    profile_store.update_user_settings(
+        profile_store.get_user_settings().model_copy(update={"save_filename_template": "%f_%N"})
+    )
+
+    imager_manager = ImagerManager(
+        device_manager=manager, event_bus=event_bus, images_dir=tmp_path,
+        equipment_store=inv_store, profile_store=profile_store,
+    )
+    imager_manager.set_context(profile)
+
+    result = await imager_manager.expose("cam1", ExposureRequest(duration=1.0, save=True))
+
+    assert Path(result.fits_path).name == "R_000001.fits"

@@ -5,7 +5,9 @@ import {
 } from 'lucide-react'
 import { api } from '@/api/client'
 import { useStore } from '@/store'
-import type { CameraStatus, DitherConfig, FilterWheelStatus, FrameType, ImageStats, ImagerDeviceSettings } from '@/api/types'
+import type {
+  CameraStatus, DitherConfig, FilterWheelStatus, FrameType, ImageStats, ImagerDeviceSettings, OpticalPath,
+} from '@/api/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { SidebarSection } from '@/components/ui/card'
@@ -582,20 +584,41 @@ export function Imaging() {
     setPropertiesDeviceId((prev) => (prev === id ? null : id))
   }, [])
 
+  // Per-camera focuser/filter-wheel association resolved from the active profile's
+  // equipment tree (which optical path this camera actually sits on) — fetched once per
+  // profile activation, since nothing here changes without a (re)activate.
+  const [opticalPaths, setOpticalPaths] = useState<OpticalPath[]>([])
+  useEffect(() => {
+    api.profiles.activeOpticalPaths().then(setOpticalPaths).catch(() => setOpticalPaths([]))
+  }, [])
+
   const camera = deviceId
     ? (connectedDevices.find((d) => d.device_id === deviceId && d.kind === 'camera') ?? null)
     : null
 
-  // Find focuser: prefer companion of camera, else first connected
-  const focuser = camera
-    ? (connectedDevices.find((d) => d.kind === 'focuser' && camera.companions.includes(d.device_id))
-      ?? connectedDevices.find((d) => d.kind === 'focuser') ?? null)
+  const opticalPath = camera
+    ? (opticalPaths.find((p) => p.camera_device_id === camera.device_id) ?? null)
     : null
 
-  // Find filter wheel: prefer companion of camera, else first connected
+  // Find focuser: when the active profile's equipment tree resolved an optical path for
+  // this camera, trust it completely — including a null focuser_device_id, which means
+  // this camera genuinely has no focuser on its path (e.g. a guide camera sitting
+  // directly on an OTA with no focuser/filter wheel below it), not "unknown, keep
+  // guessing". Only fall back to the INDI-companion/first-connected heuristics when
+  // there's no tree data for this camera at all (legacy profile, or fetch not done yet).
+  const focuser = camera
+    ? (opticalPath
+        ? (connectedDevices.find((d) => d.kind === 'focuser' && d.device_id === opticalPath.focuser_device_id) ?? null)
+        : (connectedDevices.find((d) => d.kind === 'focuser' && camera.companions.includes(d.device_id))
+            ?? connectedDevices.find((d) => d.kind === 'focuser') ?? null))
+    : null
+
+  // Find filter wheel: same rule as the focuser above.
   const filterWheel = camera
-    ? (connectedDevices.find((d) => d.kind === 'filter_wheel' && camera.companions.includes(d.device_id))
-      ?? connectedDevices.find((d) => d.kind === 'filter_wheel') ?? null)
+    ? (opticalPath
+        ? (connectedDevices.find((d) => d.kind === 'filter_wheel' && d.device_id === opticalPath.filter_wheel_device_id) ?? null)
+        : (connectedDevices.find((d) => d.kind === 'filter_wheel' && camera.companions.includes(d.device_id))
+            ?? connectedDevices.find((d) => d.kind === 'filter_wheel') ?? null))
     : null
 
   return (

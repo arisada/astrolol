@@ -20,6 +20,7 @@ import type {
   FitAlgo,
   FocusDataPoint,
   FocusMetric,
+  OpticalPath,
 } from '@/api/types'
 
 // ── Autofocus exposure steps ──────────────────────────────────────────────────
@@ -168,6 +169,31 @@ export function AutofocusPage() {
   const [filterWheelStatus, setFilterWheelStatus] = useState<FilterWheelStatus | null>(null)
   const settingsLoadedRef = useRef(false)
 
+  // Per-camera focuser/filter-wheel association resolved from the active profile's
+  // equipment tree — same data Imaging.tsx uses to avoid cross-wiring devices between
+  // cameras on different optical paths (e.g. a guide camera with no focuser must not
+  // show the main camera's focuser, and vice versa).
+  const [opticalPaths, setOpticalPaths] = useState<OpticalPath[]>([])
+  useEffect(() => {
+    api.profiles.activeOpticalPaths().then(setOpticalPaths).catch(() => setOpticalPaths([]))
+  }, [])
+
+  const opticalPath = cameraId ? (opticalPaths.find((p) => p.camera_device_id === cameraId) ?? null) : null
+
+  // When the tree resolved this camera's optical path, trust it completely — including
+  // "no focuser/filter wheel here" — instead of listing every connected device system-wide
+  // regardless of which camera is selected. Only fall back to the full list when there's
+  // no tree data for this camera (legacy profile, or the fetch hasn't landed yet).
+  const resolvedFocuser = opticalPath
+    ? focusers.find((d) => d.device_id === opticalPath.focuser_device_id) ?? null
+    : null
+  const focuserCandidates = opticalPath ? (resolvedFocuser ? [resolvedFocuser] : []) : focusers
+
+  const resolvedFilterWheel = opticalPath
+    ? filterWheels.find((d) => d.device_id === opticalPath.filter_wheel_device_id) ?? null
+    : null
+  const filterWheelCandidates = opticalPath ? (resolvedFilterWheel ? [resolvedFilterWheel] : []) : filterWheels
+
   // Helper to patch a single settings key
   const patchSettings = useCallback(<K extends keyof AutofocusSettings>(key: K, value: AutofocusSettings[K]) => {
     setSettings((s) => ({ ...s, [key]: value }))
@@ -196,15 +222,23 @@ export function AutofocusPage() {
   }, [cameras])  // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
-    if (!focuserId && focusers.length > 0) setFocuserId(focusers[0].device_id)
-  }, [focusers])  // eslint-disable-line react-hooks/exhaustive-deps
+    if (opticalPath) {
+      // Tree is authoritative for this camera: switch (or clear) even if the user had
+      // manually picked a focuser before switching cameras.
+      setFocuserId(opticalPath.focuser_device_id ?? '')
+    } else if (!focuserId && focusers.length > 0) {
+      setFocuserId(focusers[0].device_id)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cameraId, opticalPaths, focusers])
 
   useEffect(() => {
-    if (filterWheels.length === 0) return
-    api.filterWheel.status(filterWheels[0].device_id)
+    if (!resolvedFilterWheel) { setFilterWheelStatus(null); return }
+    api.filterWheel.status(resolvedFilterWheel.device_id)
       .then(setFilterWheelStatus)
       .catch(() => {})
-  }, [filterWheels])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cameraId, opticalPaths, filterWheels])
 
   // ── Polling ────────────────────────────────────────────────────────────────
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -249,6 +283,7 @@ export function AutofocusPage() {
     const config: AutofocusConfig = {
       camera_id: cameraId,
       focuser_id: focuserId,
+      filter_wheel_id: resolvedFilterWheel?.device_id ?? null,
       ...settings,
     }
 
@@ -260,7 +295,7 @@ export function AutofocusPage() {
       setBusy(false)
       setError(err instanceof Error ? err.message : 'Failed to start autofocus')
     }
-  }, [cameraId, focuserId, settings, fetchRun])
+  }, [cameraId, focuserId, resolvedFilterWheel, settings, fetchRun])
 
   const handleAbort = useCallback(async () => {
     try { await autofocusApi.abort(); await fetchRun() }
@@ -340,14 +375,14 @@ export function AutofocusPage() {
 
         {/* Focuser */}
         <SidebarSection title="Focuser">
-          {focusers.length === 0 ? (
+          {focuserCandidates.length === 0 ? (
             <span className="text-xs text-slate-600">No focuser connected</span>
-          ) : focusers.length === 1 ? (
-            <span className="text-xs text-slate-300 font-mono">{focusers[0].device_id}</span>
+          ) : focuserCandidates.length === 1 ? (
+            <span className="text-xs text-slate-300 font-mono">{focuserCandidates[0].device_id}</span>
           ) : (
             <select value={focuserId} onChange={(e) => setFocuserId(e.target.value)}
               className="w-full rounded bg-surface-overlay border border-surface-border px-2 py-1.5 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-accent">
-              {focusers.map((d) => <option key={d.device_id} value={d.device_id}>{d.device_id}</option>)}
+              {focuserCandidates.map((d) => <option key={d.device_id} value={d.device_id}>{d.device_id}</option>)}
             </select>
           )}
         </SidebarSection>
@@ -434,7 +469,7 @@ export function AutofocusPage() {
               />
             </div>
 
-            {filterWheels.length > 0 && (
+            {filterWheelCandidates.length > 0 && (
               <div className="flex flex-col gap-1">
                 <label className="text-xs text-slate-400">Filter <span className="text-slate-600">(optional)</span></label>
                 <select
@@ -462,7 +497,7 @@ export function AutofocusPage() {
           {error && <p className="text-xs text-red-400">{error}</p>}
           <Button
             onClick={handleStart}
-            disabled={busy || cameras.length === 0 || focusers.length === 0}
+            disabled={busy || cameras.length === 0 || focuserCandidates.length === 0}
             className="w-full"
           >
             <Focus size={13} className="mr-2" />

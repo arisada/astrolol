@@ -507,6 +507,64 @@ async def test_push_site_data_skips_mount_without_site_methods(
     await mm.push_site_data("m1", loc)  # no-op, no exception
 
 
+# --- start_automation / stop_automation ---
+
+@pytest.mark.asyncio
+async def test_stop_automation_cancels_the_task(manager: DeviceManager, event_bus) -> None:
+    await manager.connect(DeviceConfig(device_id="m1", kind="mount", adapter_key="fake_mount"))
+    mm = MountManager(device_manager=manager, event_bus=event_bus)
+
+    mm.start_automation("m1")
+    task = mm._automation_tasks["m1"]
+    assert not task.done()
+
+    mm.stop_automation("m1")
+
+    assert "m1" not in mm._automation_tasks
+    await asyncio.sleep(0)  # let the cancellation propagate
+    assert task.cancelled()
+
+
+@pytest.mark.asyncio
+async def test_stop_automation_forgets_guard_state(manager: DeviceManager, event_bus) -> None:
+    """Regression: leftover _auto_park_last/_auto_flip_triggered/_horizon_triggered entries
+    for a device_id that's gone are a (small) leak of their own alongside the task itself."""
+    await manager.connect(DeviceConfig(device_id="m1", kind="mount", adapter_key="fake_mount"))
+    mm = MountManager(device_manager=manager, event_bus=event_bus)
+    mm.start_automation("m1")
+    mm._auto_park_last["m1"] = (3, 0)
+    mm._auto_flip_triggered.add("m1")
+    mm._horizon_triggered.add("m1")
+
+    mm.stop_automation("m1")
+
+    assert "m1" not in mm._auto_park_last
+    assert "m1" not in mm._auto_flip_triggered
+    assert "m1" not in mm._horizon_triggered
+
+
+def test_stop_automation_is_idempotent(mount_manager: MountManager) -> None:
+    """Safe to call even when automation was never started for this device_id."""
+    mount_manager.stop_automation("never-started")  # must not raise
+
+
+@pytest.mark.asyncio
+async def test_disconnect_stops_mount_automation(manager: DeviceManager, event_bus) -> None:
+    """Regression: DeviceManager.disconnect() left the automation loop running forever,
+    silently polling a device_id that no longer exists in the manager."""
+    await manager.connect(DeviceConfig(device_id="m1", kind="mount", adapter_key="fake_mount"))
+    mm = MountManager(device_manager=manager, event_bus=event_bus)
+    mm.start_automation("m1")
+    task = mm._automation_tasks["m1"]
+
+    await manager.disconnect("m1")
+    mm.stop_automation("m1")  # what api/devices.py's disconnect endpoint now does
+
+    assert "m1" not in mm._automation_tasks
+    await asyncio.sleep(0)
+    assert task.cancelled()
+
+
 # --- pulse guiding (optional adapter capability) ---
 
 class _GuidingMount(FakeMount):

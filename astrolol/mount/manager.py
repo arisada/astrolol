@@ -388,6 +388,22 @@ class MountManager:
         )
         logger.info("mount.automation_started", device_id=device_id)
 
+    def stop_automation(self, device_id: str) -> None:
+        """Stop the automation loop for *device_id* and forget its guard state —
+        idempotent, safe to call even if automation was never started.
+
+        Without this, disconnecting a mount leaves its loop running forever: every
+        _AUTOMATION_INTERVAL it wakes, get_status() immediately fails because the device
+        is gone from DeviceManager, and _check_automation() swallows that silently — a
+        zombie asyncio.Task per disconnected device_id for the life of the process.
+        """
+        task = self._automation_tasks.pop(device_id, None)
+        if task is not None and not task.done():
+            task.cancel()
+        self._auto_park_last.pop(device_id, None)
+        self._auto_flip_triggered.discard(device_id)
+        self._horizon_triggered.discard(device_id)
+
     async def _automation_loop(self, device_id: str) -> None:
         await self.apply_limits(device_id)
         while True:

@@ -1,14 +1,23 @@
 from __future__ import annotations
 
-import re
 from typing import Any
 
 import structlog
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
-from astrolol.devices.config import DeviceConfig
-from astrolol.equipment.models import EquipmentItem, OTAItem, SiteItem
+from astrolol.equipment.models import EquipmentItem
+from astrolol.equipment.optical_path import (
+    OpticalPath,
+    _CONNECTABLE_KINDS,
+    _device_id_for_item,
+    _find_device_for_item,
+    _find_entry_for_item,
+    find_profile_site,
+    item_device_config,
+    resolve_optical_paths,
+    walk_mount_sites,
+)
 from astrolol.equipment.store import EquipmentStore
 from astrolol.profiles.models import Profile, ProfileNode
 from astrolol.profiles.store import ProfileStore
@@ -41,6 +50,18 @@ async def get_active(request: Request) -> Profile | None:
     return request.app.state.active_profile
 
 
+@router.get("/active/optical-paths", response_model=list[OpticalPath])
+async def get_active_optical_paths(request: Request) -> list[OpticalPath]:
+    """Per-camera ancestry (mount/site/OTA/focuser/filter-wheel/rotator) resolved from the
+    active profile's equipment tree, with live device ids — used by the frontend to wire
+    each camera's Imaging panel to the correct focuser/filter wheel instead of guessing."""
+    profile: Profile | None = request.app.state.active_profile
+    equipment_store: EquipmentStore | None = getattr(request.app.state, "equipment_store", None)
+    if profile is None or equipment_store is None or not profile.roots:
+        return []
+    return resolve_optical_paths(profile, equipment_store, request.app.state.device_manager)
+
+
 @router.get("/{profile_id}", response_model=Profile)
 async def get_profile(profile_id: str, request: Request) -> Profile:
     try:
@@ -68,11 +89,15 @@ async def deactivate(request: Request) -> None:
     outgoing: Profile | None = request.app.state.active_profile
     if outgoing is not None:
         device_manager = request.app.state.device_manager
+        mount_manager = getattr(request.app.state, "mount_manager", None)
         for pd in outgoing.devices:
             try:
                 await device_manager.disconnect(pd.config.device_id)
             except Exception:
                 pass  # best-effort — device may already be disconnected
+            if pd.config.kind == "mount" and mount_manager is not None:
+                mount_manager.stop_automation(pd.config.device_id)
+        await disconnect_tree_devices(outgoing, request.app.state)
     request.app.state.active_profile = None
     request.app.state.imager_manager.set_context(None)
     _store(request).set_last_active_id(None)
@@ -98,87 +123,6 @@ async def delete_profile(profile_id: str, request: Request) -> None:
 # Tree-context propagation
 # ---------------------------------------------------------------------------
 
-def find_profile_site(profile: Profile, equipment_store: EquipmentStore) -> SiteItem | None:
-    """Return the first Site item in the profile's equipment tree, or None."""
-    stack = list(profile.roots)
-    while stack:
-        node = stack.pop(0)
-        try:
-            item = equipment_store.get(node.item_id)
-        except KeyError:
-            item = None
-        if isinstance(item, SiteItem):
-            return item
-        stack.extend(node.children)
-    return None
-
-
-def _clean_params(params: dict) -> dict:
-    return {k: v for k, v in params.items() if k != "pre_connect_props"}
-
-
-def _find_device_for_item(device_manager, kind: str, item: EquipmentItem):
-    """Return the adapter instance for a connected device matching this inventory item."""
-    entry = _find_entry_for_item(device_manager, kind, item)
-    return entry.instance if entry is not None else None
-
-
-def _find_entry_for_item(device_manager, kind: str, item: EquipmentItem):
-    """Return the DeviceManager entry for a connected device matching this inventory item.
-
-    INDI-family items match by the driver's own announced device_name — stable
-    across reconnects even if astrolol's device_id changes, see astrolol/api/indi.py.
-    Any other adapter (e.g. plugins/eqmod's native, non-INDI mount) has no such
-    driver-announced identity, so it matches by adapter_key + exact connect_params
-    equality instead — there's no single params key that means "identity" across
-    arbitrary adapters, so the full params dict is the only adapter-agnostic option.
-    """
-    indi_name = getattr(item, "indi_device_name", None)
-    adapter_key = getattr(item, "adapter_key", None)
-    connect_params = _clean_params(getattr(item, "connect_params", None) or {})
-
-    for entry in device_manager._devices.values():
-        if entry.config.kind != kind:
-            continue
-        if indi_name and entry.config.params.get("device_name") == indi_name:
-            return entry
-        if adapter_key and entry.config.adapter_key == adapter_key:
-            if _clean_params(entry.config.params) == connect_params:
-                return entry
-    return None
-
-
-_CONNECTABLE_KINDS = frozenset({"mount", "camera", "focuser", "filter_wheel", "rotator"})
-
-
-def item_device_config(item: EquipmentItem, device_id: str | None = None) -> DeviceConfig | None:
-    """Connection config for an inventory item, or None if it carries no connection info."""
-    if item.type not in _CONNECTABLE_KINDS:
-        return None
-    device_id = device_id or _device_id_for_item(item)
-    adapter_key = getattr(item, "adapter_key", None)
-    if adapter_key:
-        return DeviceConfig(
-            device_id=device_id, kind=item.type, adapter_key=adapter_key,
-            params=dict(getattr(item, "connect_params", None) or {}),
-        )
-    indi_driver = getattr(item, "indi_driver", None)
-    indi_name = getattr(item, "indi_device_name", None)
-    if indi_driver and indi_name:
-        # The INDI adapters load the driver themselves when given its executable.
-        return DeviceConfig(
-            device_id=device_id, kind=item.type, adapter_key=f"indi_{item.type}",
-            params={"device_name": indi_name, "executable": indi_driver},
-        )
-    return None
-
-
-def _device_id_for_item(item: EquipmentItem) -> str:
-    """Stable across restarts (per-device settings are keyed by device_id)."""
-    slug = re.sub(r"[^a-z0-9]+", "_", item.name.lower()).strip("_")[:40]  # type: ignore[union-attr]
-    return f"{item.type}_{slug}" if slug else f"{item.type}_{item.id[:8]}"  # type: ignore[union-attr]
-
-
 def _tree_items(profile: Profile, equipment_store: EquipmentStore) -> list[EquipmentItem]:
     items: list[EquipmentItem] = []
     stack = list(profile.roots)
@@ -195,15 +139,20 @@ def _tree_items(profile: Profile, equipment_store: EquipmentStore) -> list[Equip
 async def connect_tree_devices(profile: Profile, state: Any) -> tuple[list[DeviceResult], list[DeviceResult]]:
     """Connect every connectable inventory item in the profile's equipment tree.
 
-    Items already connected (e.g. through the Equipment wizard) are reported, not reconnected.
-    Newly connected mounts get the site/time pushed and their automation loop started.
+    Items already connected (e.g. through the Equipment wizard) are reported, not
+    reconnected. Site/scope-info/automation for the resolved devices is handled
+    separately by ``_apply_tree_context``, called by both callers of this function
+    right after — so it applies uniformly whether a device was just connected here
+    or was already running beforehand. A connectable item with no connection info
+    (no adapter_key, and no indi_driver+indi_device_name pair) is reported as failed
+    instead of silently vanishing from both lists — that gap used to make a misconfigured
+    inventory item (e.g. a focuser added without ever picking its INDI driver) look like
+    it simply wasn't part of the profile at all.
     """
     equipment_store: EquipmentStore | None = getattr(state, "equipment_store", None)
     if equipment_store is None or not profile.roots:
         return [], []
     device_manager = state.device_manager
-    mount_manager = getattr(state, "mount_manager", None)
-    site = find_profile_site(profile, equipment_store)
     connected: list[DeviceResult] = []
     failed: list[DeviceResult] = []
     used_ids: set[str] = set()
@@ -214,6 +163,13 @@ async def connect_tree_devices(profile: Profile, state: Any) -> tuple[list[Devic
             device_id = f"{device_id}_{item.id[:8]}"  # type: ignore[union-attr]
         config = item_device_config(item, device_id)
         if config is None:
+            if item.type in _CONNECTABLE_KINDS:
+                logger.warning("profile.tree_item_not_connectable", device_id=device_id, kind=item.type)
+                failed.append(DeviceResult(
+                    device_id=device_id, role=item.type,
+                    error="No connection info configured — set its INDI driver/device name "
+                    "or adapter in the Equipment page.",
+                ))
             continue
         used_ids.add(config.device_id)
         existing = _find_entry_for_item(device_manager, config.kind, item)
@@ -227,79 +183,87 @@ async def connect_tree_devices(profile: Profile, state: Any) -> tuple[list[Devic
             failed.append(DeviceResult(device_id=config.device_id, role=config.kind, error=str(exc)))
             continue
         connected.append(DeviceResult(device_id=config.device_id, role=config.kind))
-        if config.kind == "mount" and mount_manager is not None:
-            await mount_manager.push_site_data(config.device_id, site)
-            mount_manager.start_automation(config.device_id)
     return connected, failed
 
 
+async def disconnect_tree_devices(profile: Profile, state: Any) -> None:
+    """Disconnect every currently-connected device that matches a connectable inventory
+    item in the profile's equipment tree — the disconnect-side counterpart of
+    ``connect_tree_devices``, using the same item-to-connected-device matching so a device
+    connected via the tree (on activate, on startup restore, or beforehand through the
+    Equipment wizard) is fully torn down on deactivate instead of only the legacy flat
+    ``profile.devices`` list. Mounts also get their automation loop stopped, so it doesn't
+    keep polling a device that no longer exists.
+    """
+    equipment_store: EquipmentStore | None = getattr(state, "equipment_store", None)
+    if equipment_store is None or not profile.roots:
+        return
+    device_manager = state.device_manager
+    mount_manager = getattr(state, "mount_manager", None)
+    for item in _tree_items(profile, equipment_store):
+        entry = _find_entry_for_item(device_manager, item.type, item)
+        if entry is None:
+            continue
+        device_id = entry.config.device_id
+        try:
+            await device_manager.disconnect(device_id)
+        except Exception as exc:
+            logger.warning(
+                "profile.tree_device_disconnect_failed",
+                device_id=device_id, error=str(exc),
+            )
+        if entry.config.kind == "mount" and mount_manager is not None:
+            mount_manager.stop_automation(device_id)
+
+
 async def _apply_tree_context(
-    nodes: list[ProfileNode],
+    profile: Profile,
     equipment_store: EquipmentStore,
     device_manager,
-    *,
-    site: SiteItem | None = None,
-    ota: OTAItem | None = None,
+    mount_manager=None,
 ) -> None:
-    """Walk the equipment tree and push context-derived values to INDI devices.
+    """Push tree-derived context to every device resolved from the equipment tree.
 
-    Propagates downward:
-    - SiteItem  → sets GEOGRAPHIC_COORD on any mount in its subtree
-    - OTAItem   → sets SCOPE_INFO on any camera in its subtree
+    - site → mount: UTC time + geographic location (``MountManager.push_site_data``),
+      and the mount's automation loop is (re)started (idempotent).
+    - OTA → camera: focal length/aperture pushed to the camera's ``SCOPE_INFO``.
+
+    Resolves against *live* connection state each call, so it is safe and cheap to call
+    repeatedly — after every ``activate``, on startup restore, and any time a tree-listed
+    device reconnects — regardless of whether that device was already connected before
+    this call or was just connected by ``connect_tree_devices``.
     """
-    for node in nodes:
-        try:
-            item: EquipmentItem = equipment_store.get(node.item_id)
-        except KeyError:
-            logger.warning("profile.tree_item_missing", item_id=node.item_id)
-            continue
+    if not profile.roots:
+        return
 
-        current_site = site
-        current_ota = ota
+    if mount_manager is not None:
+        for mount_item, site in walk_mount_sites(profile.roots, equipment_store):
+            entry = _find_entry_for_item(device_manager, "mount", mount_item)
+            if entry is None:
+                continue
+            device_id = entry.config.device_id
+            try:
+                await mount_manager.push_site_data(device_id, site)
+            except Exception as exc:
+                logger.warning("profile.push_site_data_failed", device_id=device_id, error=str(exc))
+            mount_manager.start_automation(device_id)
 
-        if item.type == "site":
-            current_site = item  # type: ignore[assignment]
-
-        elif item.type == "mount" and current_site is not None:
-            mount = _find_device_for_item(device_manager, "mount", item)
-            if mount is not None and hasattr(mount, "set_location"):
+    paths = resolve_optical_paths(profile, equipment_store, device_manager)
+    for path in paths:
+        if path.camera_device_id and path.ota is not None:
+            try:
+                camera = device_manager.get_camera(path.camera_device_id)
+            except Exception:
+                continue
+            push = getattr(camera, "push_scope_info", None)
+            if push is not None:
                 try:
-                    await mount.set_location(
-                        current_site.latitude,
-                        current_site.longitude,
-                        current_site.altitude,
-                    )
-                except Exception as exc:
-                    logger.warning(
-                        "profile.push_location_failed",
-                        item_id=item.id, error=str(exc),  # type: ignore[union-attr]
-                    )
-
-        elif item.type == "ota":
-            current_ota = item  # type: ignore[assignment]
-
-        elif item.type == "camera" and current_ota is not None:
-            camera = _find_device_for_item(device_manager, "camera", item)
-            if camera is not None and hasattr(camera, "push_scope_info"):
-                try:
-                    await camera.push_scope_info(
-                        current_ota.focal_length,
-                        current_ota.aperture,
-                    )
+                    await push(path.ota.focal_length, path.ota.aperture)
                 except Exception as exc:
                     logger.warning(
                         "profile.push_scope_info_failed",
-                        item_id=item.id, error=str(exc),  # type: ignore[union-attr]
+                        device_id=path.camera_device_id, error=str(exc),
                     )
-
-        # Recurse into children, propagating the updated context
-        await _apply_tree_context(
-            node.children,
-            equipment_store,
-            device_manager,
-            site=current_site,
-            ota=current_ota,
-        )
 
 
 async def _push_live_context(
@@ -467,11 +431,14 @@ async def activate_profile(profile_id: str, request: Request) -> ActivationResul
     connected.extend(tree_connected)
     failed.extend(tree_failed)
 
-    # Push context from inventory tree (site → mount location, OTA → camera scope info)
+    # Push context from inventory tree (site → mount location/time, OTA → camera scope info)
     equipment_store: EquipmentStore | None = getattr(request.app.state, "equipment_store", None)
     if equipment_store is not None and profile.roots:
         try:
-            await _apply_tree_context(profile.roots, equipment_store, device_manager)
+            await _apply_tree_context(
+                profile, equipment_store, device_manager,
+                mount_manager=getattr(request.app.state, "mount_manager", None),
+            )
         except Exception as exc:
             logger.warning("profile.tree_context_failed", error=str(exc))
 
@@ -507,6 +474,16 @@ async def restore_last_profile(state: Any) -> None:
                 await state.imager_manager.push_scope_info(pd.config.device_id)
 
     connected, failed = await connect_tree_devices(profile, state)
+
+    if equipment_store is not None and profile.roots:
+        try:
+            await _apply_tree_context(
+                profile, equipment_store, state.device_manager,
+                mount_manager=getattr(state, "mount_manager", None),
+            )
+        except Exception as exc:
+            logger.warning("startup.tree_context_failed", error=str(exc))
+
     logger.info(
         "startup.profile_restored", profile_id=profile.id,
         connected=[d.device_id for d in connected], failed=[d.device_id for d in failed],

@@ -180,3 +180,61 @@ def test_engine_refit_curve_updates_curve_fit_with_enough_points() -> None:
     assert run.curve_fit is not None
     assert run.curve_fit.a > 0
     assert abs(run.curve_fit.optimal_position - 1000) < 50
+
+
+# ── Engine: _select_filter (per-optical-path filter wheel targeting) ──────────
+
+@pytest.mark.asyncio
+async def test_select_filter_uses_the_given_filter_wheel_id_when_two_are_connected() -> None:
+    """Regression: with two filter wheels connected (one per optical path), the engine
+    used to always move the first one in list_connected(), regardless of which camera/
+    optical path the run was actually for."""
+    from plugins.autofocus.engine import AutofocusEngine
+
+    guide_fw = AsyncMock()
+    main_fw = AsyncMock()
+    device_manager = MagicMock()
+    device_manager.list_connected.return_value = [
+        {"device_id": "fw_guide", "kind": "filter_wheel"},
+        {"device_id": "fw_main", "kind": "filter_wheel"},
+    ]
+    device_manager.get_filter_wheel.side_effect = lambda did: {
+        "fw_guide": guide_fw, "fw_main": main_fw,
+    }[did]
+
+    engine = AutofocusEngine(event_bus=MagicMock(), device_manager=device_manager)
+    await engine._select_filter(3, "fw_main")
+
+    main_fw.select_filter.assert_awaited_once_with(3)
+    guide_fw.select_filter.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_select_filter_falls_back_to_first_connected_without_an_id() -> None:
+    """Legacy behaviour preserved for callers that don't know the specific wheel
+    (e.g. a profile with no equipment tree)."""
+    from plugins.autofocus.engine import AutofocusEngine
+
+    fw = AsyncMock()
+    device_manager = MagicMock()
+    device_manager.list_connected.return_value = [{"device_id": "fw1", "kind": "filter_wheel"}]
+    device_manager.get_filter_wheel.return_value = fw
+
+    engine = AutofocusEngine(event_bus=MagicMock(), device_manager=device_manager)
+    await engine._select_filter(2, None)
+
+    device_manager.get_filter_wheel.assert_called_once_with("fw1")
+    fw.select_filter.assert_awaited_once_with(2)
+
+
+@pytest.mark.asyncio
+async def test_select_filter_no_wheel_connected_is_a_noop() -> None:
+    from plugins.autofocus.engine import AutofocusEngine
+
+    device_manager = MagicMock()
+    device_manager.list_connected.return_value = []
+
+    engine = AutofocusEngine(event_bus=MagicMock(), device_manager=device_manager)
+    await engine._select_filter(1, None)  # must not raise
+
+    device_manager.get_filter_wheel.assert_not_called()

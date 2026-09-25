@@ -4,29 +4,18 @@ Items designed for but not yet built. Ordered roughly by priority.
 
 ## Known bugs
 
-- **Profile deactivation ignores the equipment tree** — activation and startup restore now
-  connect every connectable inventory item in the profile tree
-  (`api/profiles.py::connect_tree_devices`), but `DELETE /profiles/active` still only
-  disconnects the legacy `profile.devices` list, so tree devices stay connected.
+- **Autofocus does not work correctly in the field** — reported from real telescope use;
+  behaviour has not reproduced or been diagnosed yet (unlike the rest of this section, which
+  was confirmed by reading the code). Star analysis is also disabled per-frame in the main
+  imaging loop today (`imaging/imager.py::_do_expose`, the commented-out `_star_analyzer_fn`
+  block — too expensive on a Raspberry Pi), so autofocus is the only consumer of
+  `star_detector.py`/`algorithms.py` and hasn't been cross-checked against noisy real skies,
+  varying seeing, or hot pixels the way the simulator/tests exercise it. Needs a repro log
+  from an actual run (curve fit points, FWHM/star-count per step, HFR trend) before a fix can
+  be scoped.
 - **INDI items connected from the tree are untested on real indiserver** — the mapping
   (`indi_<kind>` + `{device_name, executable}`) matches what the wizard sends and the INDI
   adapters load the driver themselves, but only non-INDI items were verified end to end.
-- **Profile/inventory context doesn't reach the INDI drivers** — equipment data held in the
-  inventory and profile tree (OTA focal length/aperture, telescope name, site, which mount a
-  camera should snoop) is not reliably pushed to the INDI drivers that need it. Observed: the
-  guide camera simulator's focal length, aperture and telescope name, and its
-  `ACTIVE_DEVICES` telescope (to use "astrolol Mount Proxy"), had to be set by hand in the
-  INDI panel although all of it was in the inventory/profile. Starting points:
-  `api/profiles.py::_apply_tree_context` (site→mount, OTA→camera `push_scope_info`), the
-  imager's per-exposure `_push_live_context`, and devices connected through the wizard rather
-  than the tree. The FITS header bug below is one symptom of the same problem.
-- **FITS headers silently not patched with an active profile** —
-  `imaging/imager.py::_patch_fits_headers` still reads `profile.location`, a field that no
-  longer exists on `Profile` (the site now lives in the equipment tree as a `SiteItem`).
-  The `AttributeError` is swallowed by the function's broad `try`, so the *whole* header
-  patch is skipped — OBJECT, RA/DEC and TELESCOP included, not just the site keys. Fix by
-  resolving the site with `api/profiles.py::find_profile_site` (the same stale read in
-  `api/devices.py` was fixed that way).
 
 ## EQMOD native driver — assumptions & deferred items
 
@@ -94,6 +83,13 @@ baked into the current code/design or a feature left out; revisit when it bites.
 
 - **Target persistence across restart** — store the last-set target in `profiles.json` so
   it survives a backend restart.
+- **No imaging scheduler** — no plan/sequence concept exists (target list with per-target
+  exposure counts/filters/altitude or time gates, autofocus-on-filter-change or temperature
+  drift, meridian-flip-aware run continuation, dawn/weather stop). Every exposure today is a
+  single manual `expose`/`start_loop` call from the UI; anything resembling a multi-target
+  night plan has to be driven by hand. Likely a `plugins/sequencer/` plugin once the
+  camera/focuser/filter-wheel "optical path" association below is fixed, since a scheduler
+  needs to reliably know which filter wheel/focuser goes with which camera per target.
 
 ## Profiles — deferred
 

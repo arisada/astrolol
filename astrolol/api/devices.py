@@ -110,9 +110,14 @@ async def connect_device(config: DeviceConfig, request: Request) -> ConnectRespo
 async def disconnect_device(device_id: str, request: Request) -> None:
     """Disconnect and fully remove a device by its device_id."""
     try:
+        config = _manager(request).get_config(device_id)
         await _manager(request).disconnect(device_id)
     except DeviceNotFoundError as exc:
         raise HTTPException(status_code=404, detail=str(exc))
+    if config.kind == "mount":
+        mount_manager = getattr(request.app.state, "mount_manager", None)
+        if mount_manager is not None:
+            mount_manager.stop_automation(device_id)
 
 
 @router.post("/connected/{device_id}/disconnect", status_code=204)
