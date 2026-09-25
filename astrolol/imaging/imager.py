@@ -316,8 +316,7 @@ class ImagerManager:
 
         # Resolve this camera's place in the equipment tree once (mount/OTA/site/filter
         # wheel ancestry) — the single source of truth for a profile with more than one
-        # optical path. Profiles that predate the equipment tree fall back to the flat
-        # profile.devices/profile.telescope fields below wherever the tree has nothing.
+        # optical path.
         profile = self._active_profile
         my_path = None
         if profile is not None and profile.roots and self._equipment_store is not None:
@@ -329,25 +328,13 @@ class ImagerManager:
 
         # Snapshot mount pointing before the shutter opens (best represents pointing)
         coord = None
-        if profile is not None:
-            mount_role = next(
-                (pd for pd in profile.devices if pd.role == "mount"), None
-            )
-            if mount_role is not None:
-                try:
-                    mount = self._device_manager.get_mount(mount_role.config.device_id)
-                    status = await mount.get_status()
-                    coord = status.skycoord
-                except Exception:
-                    pass  # mount not connected or query failed — skip RA/DEC
-
-            if coord is None and my_path is not None and my_path.mount_device_id is not None:
-                try:
-                    mount = self._device_manager.get_mount(my_path.mount_device_id)
-                    status = await mount.get_status()
-                    coord = status.skycoord
-                except Exception:
-                    pass
+        if my_path is not None and my_path.mount_device_id is not None:
+            try:
+                mount = self._device_manager.get_mount(my_path.mount_device_id)
+                status = await mount.get_status()
+                coord = status.skycoord
+            except Exception:
+                pass  # mount not connected or query failed — skip RA/DEC
 
         # Push live mount coordinates to the camera's TELESCOPE_EOD_COORD property
         # so the camera's internal FITS writer records correct pointing.
@@ -362,33 +349,21 @@ class ImagerManager:
 
         # Snapshot metadata for filename tokens and FITS OBJECT header.
         object_name = ""
-        if self._mount_manager is not None and profile is not None:
-            for pd in profile.devices:
-                if pd.role == "mount":
-                    target = self._mount_manager.get_target(pd.config.device_id)
-                    if target and target.name:
-                        object_name = target.name
-                        break
-            if not object_name and my_path is not None and my_path.mount_device_id is not None:
-                target = self._mount_manager.get_target(my_path.mount_device_id)
-                if target and target.name:
-                    object_name = target.name
+        if self._mount_manager is not None and my_path is not None and my_path.mount_device_id is not None:
+            target = self._mount_manager.get_target(my_path.mount_device_id)
+            if target and target.name:
+                object_name = target.name
 
         filter_name = ""
-        if profile is not None:
-            fw_role = next((pd for pd in profile.devices if pd.role == "filter_wheel"), None)
-            fw_device_id = fw_role.config.device_id if fw_role is not None else (
-                my_path.filter_wheel_device_id if my_path is not None else None
-            )
-            if fw_device_id is not None:
-                try:
-                    fw = self._device_manager.get_filter_wheel(fw_device_id)
-                    fw_status = await fw.get_status()
-                    slot = fw_status.current_slot
-                    if slot is not None and fw_status.filter_names and 0 < slot <= len(fw_status.filter_names):
-                        filter_name = fw_status.filter_names[slot - 1]
-                except Exception:
-                    pass
+        if my_path is not None and my_path.filter_wheel_device_id is not None:
+            try:
+                fw = self._device_manager.get_filter_wheel(my_path.filter_wheel_device_id)
+                fw_status = await fw.get_status()
+                slot = fw_status.current_slot
+                if slot is not None and fw_status.filter_names and 0 < slot <= len(fw_status.filter_names):
+                    filter_name = fw_status.filter_names[slot - 1]
+            except Exception:
+                pass
 
         # Telescope optics + site for the FITS header patch below: prefer the camera's
         # ancestor OTA/site from the tree, fall back to the profile-level Telescope.

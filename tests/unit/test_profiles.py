@@ -5,7 +5,7 @@ import pytest
 from httpx import ASGITransport, AsyncClient
 
 from astrolol.api.profiles import (
-    _apply_tree_context, _push_live_context, _find_mount_for_camera, find_profile_site,
+    _apply_tree_context, _push_live_context, find_profile_site,
     item_device_config, restore_last_profile,
 )
 from astrolol.core.events import EventBus
@@ -35,7 +35,7 @@ def store(tmp_path):
 
 
 def _profile(name: str = "test", **kwargs) -> Profile:
-    return Profile(name=name, devices=[], **kwargs)
+    return Profile(name=name, **kwargs)
 
 
 def test_empty_store_returns_no_profiles(store):
@@ -66,7 +66,7 @@ def test_get_missing_raises(store):
 
 def test_update_profile(store):
     p = store.create(_profile(name="original"))
-    updated = Profile(id=p.id, name="updated", devices=[])
+    updated = Profile(id=p.id, name="updated")
     result = store.update(updated)
     assert result.name == "updated"
     assert store.get(p.id).name == "updated"
@@ -158,7 +158,7 @@ def client(app):
     return AsyncClient(transport=ASGITransport(app=app), base_url="http://test", timeout=30.0)
 
 
-_PROFILE_BODY = {"name": "test rig", "devices": []}
+_PROFILE_BODY = {"name": "test rig"}
 
 
 @pytest.mark.asyncio
@@ -269,54 +269,6 @@ async def test_api_activate_unknown_404(client):
     assert r.status_code == 404
 
 
-@pytest.mark.asyncio
-async def test_api_activate_connects_devices(client):
-    """Activating a profile connects all its devices (best-effort)."""
-    profile_body = {
-        "name": "with devices",
-        "devices": [
-            {
-                "role": "camera",
-                "config": {
-                    "device_id": "cam1",
-                    "kind": "camera",
-                    "adapter_key": "fake_camera",
-                    "params": {},
-                },
-            }
-        ],
-    }
-    async with client as c:
-        created = (await c.post("/profiles", json=profile_body)).json()
-        result = (await c.post(f"/profiles/{created['id']}/activate")).json()
-        assert any(d["device_id"] == "cam1" for d in result["connected"])
-        connected = await c.get("/devices/connected")
-    assert any(d["device_id"] == "cam1" for d in connected.json())
-
-
-@pytest.mark.asyncio
-async def test_api_deactivate_disconnects_devices(client):
-    """Deactivating a profile disconnects all its devices."""
-    profile_body = {
-        "name": "with devices",
-        "devices": [
-            {
-                "role": "camera",
-                "config": {
-                    "device_id": "cam1",
-                    "kind": "camera",
-                    "adapter_key": "fake_camera",
-                    "params": {},
-                },
-            }
-        ],
-    }
-    async with client as c:
-        created = (await c.post("/profiles", json=profile_body)).json()
-        await c.post(f"/profiles/{created['id']}/activate")
-        await c.delete("/profiles/active")
-        connected = await c.get("/devices/connected")
-    assert connected.json() == []
 
 
 # ===========================================================================
@@ -529,7 +481,7 @@ async def test_tree_context_no_matching_device_is_noop(inv_store):
 
 
 # ===========================================================================
-# Live context propagation (_push_live_context, _find_mount_for_camera)
+# Live context propagation (_push_live_context)
 # ===========================================================================
 
 
@@ -595,41 +547,6 @@ async def test_push_live_context_missing_item_skipped(inv_store):
     ]
     await _push_live_context(roots, inv_store, dm)  # should not raise
     assert hasattr(fake_camera, "telescope_coord")
-
-
-def test_find_mount_for_camera_returns_adapter(inv_store):
-    """_find_mount_for_camera finds the ancestor mount for a given camera INDI name."""
-    mount_item = inv_store.create(MountItem(name="EQ6-R", indi_device_name="EQ6-R Mount"))
-    cam_item = inv_store.create(CameraItem(name="ASI2600", indi_device_name="ZWO CCD ASI2600MC Pro"))
-
-    fake_mount = FakeMount()
-    dm = _fake_device_manager({"mount1": ("mount", "EQ6-R Mount", fake_mount)})
-
-    roots = [ProfileNode(item_id=mount_item.id, children=[ProfileNode(item_id=cam_item.id)])]
-    result = _find_mount_for_camera(roots, inv_store, dm, "ZWO CCD ASI2600MC Pro")
-    assert result is fake_mount
-
-
-def test_find_mount_for_camera_returns_none_when_no_ancestor(inv_store):
-    """Returns None if the camera has no mount ancestor in the tree."""
-    cam_item = inv_store.create(CameraItem(name="ASI2600", indi_device_name="ZWO CCD ASI2600MC Pro"))
-    dm = _fake_device_manager({})
-
-    roots = [ProfileNode(item_id=cam_item.id)]
-    result = _find_mount_for_camera(roots, inv_store, dm, "ZWO CCD ASI2600MC Pro")
-    assert result is None
-
-
-def test_find_mount_for_camera_wrong_name_returns_none(inv_store):
-    """Returns None when asked for a camera INDI name that is not in the tree."""
-    mount_item = inv_store.create(MountItem(name="EQ6-R", indi_device_name="EQ6-R Mount"))
-    cam_item = inv_store.create(CameraItem(name="ASI2600", indi_device_name="ZWO CCD ASI2600MC Pro"))
-    fake_mount = FakeMount()
-    dm = _fake_device_manager({"mount1": ("mount", "EQ6-R Mount", fake_mount)})
-
-    roots = [ProfileNode(item_id=mount_item.id, children=[ProfileNode(item_id=cam_item.id)])]
-    result = _find_mount_for_camera(roots, inv_store, dm, "Some Other Camera")
-    assert result is None
 
 
 # ===========================================================================
@@ -732,8 +649,9 @@ async def test_activate_connects_tree_devices_and_pushes_the_site(app, client, t
 
 @pytest.mark.asyncio
 async def test_deactivate_disconnects_tree_devices(app, client, tmp_path):
-    """Regression: DELETE /profiles/active only disconnected the legacy profile.devices
-    list, so a mount connected via connect_tree_devices stayed connected forever."""
+    """Regression: DELETE /profiles/active only disconnected the (now-removed) legacy
+    flat device list, so a mount connected via connect_tree_devices stayed connected
+    forever."""
     inv_store = EquipmentStore(tmp_path / "inventory.json")
     app.state.equipment_store = inv_store
     mount = inv_store.create(MountItem(name="Sim mount", adapter_key="fake_mount", connect_params={}))

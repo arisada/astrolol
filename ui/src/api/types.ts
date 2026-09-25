@@ -392,13 +392,6 @@ export interface Telescope {
   aperture: number
 }
 
-export type DeviceRole = 'camera' | 'mount' | 'focuser' | 'filter_wheel' | 'rotator' | 'indi'
-
-export interface ProfileDevice {
-  role: DeviceRole
-  config: DeviceConfig
-}
-
 export interface ProfileNode {
   item_id: string
   role: string | null
@@ -409,7 +402,6 @@ export interface Profile {
   id: string
   name: string
   telescope?: Telescope
-  devices: ProfileDevice[]
   roots: ProfileNode[]
 }
 

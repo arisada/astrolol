@@ -87,9 +87,11 @@ baked into the current code/design or a feature left out; revisit when it bites.
   exposure counts/filters/altitude or time gates, autofocus-on-filter-change or temperature
   drift, meridian-flip-aware run continuation, dawn/weather stop). Every exposure today is a
   single manual `expose`/`start_loop` call from the UI; anything resembling a multi-target
-  night plan has to be driven by hand. Likely a `plugins/sequencer/` plugin once the
-  camera/focuser/filter-wheel "optical path" association below is fixed, since a scheduler
-  needs to reliably know which filter wheel/focuser goes with which camera per target.
+  night plan has to be driven by hand. Likely a `plugins/sequencer/` plugin — its previous
+  blocker (reliably knowing which filter wheel/focuser goes with which camera per target) is
+  resolved: `astrolol.equipment.optical_path.resolve_optical_paths` and
+  `GET /profiles/active/optical-paths` now give exactly that, per camera, from the active
+  profile's equipment tree.
 
 ## Profiles — deferred
 

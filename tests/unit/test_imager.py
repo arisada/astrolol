@@ -233,12 +233,13 @@ def test_patch_fits_headers_no_object_when_empty(tmp_path: Path):
         assert "OBJECT" not in hdul[0].header
 
 
-# --- _do_expose on a tree-only profile (regression: it used to silently fall back to
-# the empty flat profile.devices/profile.telescope fields for everything but the mount
-# coord snapshot) ---
+# --- _do_expose on a tree-only profile (regression: object_name/filter_name/FITS
+# telescope+site metadata used to only ever be looked up via the flat profile.devices/
+# profile.telescope fields, which are always empty for a tree-only profile — dead for
+# everything but the mount coord snapshot, which already had a tree fallback) ---
 
 async def _tree_only_rig(manager: DeviceManager, tmp_path: Path):
-    """site -> mount -> ota -> filter_wheel -> camera, all connected, no flat profile.devices."""
+    """site -> mount -> ota -> filter_wheel -> camera, all connected via the tree."""
     from astrolol.equipment.models import CameraItem, FilterWheelItem, MountItem, OTAItem, SiteItem
     from astrolol.equipment.store import EquipmentStore
     from astrolol.profiles.models import Profile, ProfileNode
@@ -304,8 +305,9 @@ async def test_do_expose_tree_profile_patches_fits_headers_from_ota_and_site(
 async def test_do_expose_tree_profile_resolves_filter_name_for_save_path(
     manager: DeviceManager, event_bus, tmp_path: Path
 ) -> None:
-    """Regression: filter_name was only ever looked up via the flat profile.devices list,
-    so it was always empty ("") for a tree-only profile — dead %f filename token."""
+    """Regression: filter_name used to only ever be looked up via the (now-removed) flat
+    profile.devices list, so it was always empty ("") for a tree-only profile — a dead
+    %f filename token."""
     from astrolol.profiles.store import ProfileStore
 
     inv_store, profile = await _tree_only_rig(manager, tmp_path)

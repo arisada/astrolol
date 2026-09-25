@@ -88,15 +88,6 @@ async def update_profile(profile_id: str, profile: Profile, request: Request) ->
 async def deactivate(request: Request) -> None:
     outgoing: Profile | None = request.app.state.active_profile
     if outgoing is not None:
-        device_manager = request.app.state.device_manager
-        mount_manager = getattr(request.app.state, "mount_manager", None)
-        for pd in outgoing.devices:
-            try:
-                await device_manager.disconnect(pd.config.device_id)
-            except Exception:
-                pass  # best-effort — device may already be disconnected
-            if pd.config.kind == "mount" and mount_manager is not None:
-                mount_manager.stop_automation(pd.config.device_id)
         await disconnect_tree_devices(outgoing, request.app.state)
     request.app.state.active_profile = None
     request.app.state.imager_manager.set_context(None)
@@ -191,9 +182,8 @@ async def disconnect_tree_devices(profile: Profile, state: Any) -> None:
     item in the profile's equipment tree — the disconnect-side counterpart of
     ``connect_tree_devices``, using the same item-to-connected-device matching so a device
     connected via the tree (on activate, on startup restore, or beforehand through the
-    Equipment wizard) is fully torn down on deactivate instead of only the legacy flat
-    ``profile.devices`` list. Mounts also get their automation loop stopped, so it doesn't
-    keep polling a device that no longer exists.
+    Equipment wizard) is fully torn down on deactivate. Mounts also get their automation
+    loop stopped, so it doesn't keep polling a device that no longer exists.
     """
     equipment_store: EquipmentStore | None = getattr(state, "equipment_store", None)
     if equipment_store is None or not profile.roots:
@@ -320,53 +310,6 @@ async def _push_live_context(
         )
 
 
-def _find_mount_for_camera(
-    nodes: list[ProfileNode],
-    equipment_store: EquipmentStore,
-    device_manager,
-    camera_indi_name: str,
-    *,
-    mount_adapter=None,
-):
-    """Return the mount adapter that is an ancestor of the given camera in the tree.
-
-    Used by the imager to resolve the mount coord snapshot for FITS patching when
-    profile.devices is empty (tree-only profiles).  Returns None if not found.
-    """
-    for node in nodes:
-        try:
-            item: EquipmentItem = equipment_store.get(node.item_id)
-        except KeyError:
-            result = _find_mount_for_camera(
-                node.children, equipment_store, device_manager,
-                camera_indi_name, mount_adapter=mount_adapter,
-            )
-            if result is not None:
-                return result
-            continue
-
-        current_mount = mount_adapter
-
-        if item.type == "mount":
-            adapter = _find_device_for_item(device_manager, "mount", item)
-            if adapter is not None:
-                current_mount = adapter
-
-        elif item.type == "camera":
-            indi_name = getattr(item, "indi_device_name", None)
-            if indi_name == camera_indi_name and current_mount is not None:
-                return current_mount
-
-        result = _find_mount_for_camera(
-            node.children, equipment_store, device_manager,
-            camera_indi_name, mount_adapter=current_mount,
-        )
-        if result is not None:
-            return result
-
-    return None
-
-
 # ---------------------------------------------------------------------------
 # Activation
 # ---------------------------------------------------------------------------
@@ -400,36 +343,7 @@ async def activate_profile(profile_id: str, request: Request) -> ActivationResul
     _store(request).set_last_active_id(profile_id)
 
     device_manager = request.app.state.device_manager
-    connected: list[DeviceResult] = []
-    failed: list[DeviceResult] = []
-
-    for pd in profile.devices:
-        device_id = pd.config.device_id
-        # Skip if already connected
-        if device_id in device_manager._devices:
-            connected.append(DeviceResult(device_id=device_id, role=pd.role))
-            continue
-        try:
-            # Strip pre_connect_props when activating a saved profile so that stale
-            # or over-broad property overrides don't clobber driver-managed state
-            # (e.g. alignment data, calibration parameters).  INDI drivers restore
-            # their own configuration from ~/.indi/ at startup — let them do so.
-            #
-            # TODO: replace with a proper per-device allowlist of properties that are
-            # safe to push on each session (e.g. DEVICE_PORT).  Until then, any
-            # pre-connect overrides must be set manually through the INDI properties
-            # panel; INDI will then persist them in its own config.
-            config = pd.config.model_copy(
-                update={"params": {**pd.config.params, "pre_connect_props": None}}
-            )
-            await device_manager.connect(config)
-            connected.append(DeviceResult(device_id=device_id, role=pd.role))
-        except Exception as exc:
-            failed.append(DeviceResult(device_id=device_id, role=pd.role, error=str(exc)))
-
-    tree_connected, tree_failed = await connect_tree_devices(profile, request.app.state)
-    connected.extend(tree_connected)
-    failed.extend(tree_failed)
+    connected, failed = await connect_tree_devices(profile, request.app.state)
 
     # Push context from inventory tree (site → mount location/time, OTA → camera scope info)
     equipment_store: EquipmentStore | None = getattr(request.app.state, "equipment_store", None)
@@ -459,19 +373,6 @@ async def restore_last_profile(state: Any) -> None:
     state.active_profile = profile
     state.imager_manager.set_context(profile)
     equipment_store: EquipmentStore | None = getattr(state, "equipment_store", None)
-    site = find_profile_site(profile, equipment_store) if equipment_store is not None else None
-
-    for pd in profile.devices:  # legacy flat device list
-        try:
-            await state.device_manager.connect(pd.config)
-            if pd.config.kind == "mount":
-                await state.mount_manager.push_site_data(pd.config.device_id, site)
-                state.mount_manager.start_automation(pd.config.device_id)
-        except Exception as exc:
-            logger.warning("startup.device_connect_failed", device_id=pd.config.device_id, error=str(exc))
-        else:
-            if pd.config.kind == "camera":
-                await state.imager_manager.push_scope_info(pd.config.device_id)
 
     connected, failed = await connect_tree_devices(profile, state)
 

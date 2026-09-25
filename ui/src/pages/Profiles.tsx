@@ -385,7 +385,6 @@ function ProfileForm({ initial, onSave, onCancel }: ProfileFormProps) {
         id: initial?.id,
         name,
         telescope: initial?.telescope,
-        devices: initial?.devices ?? [],
         roots: initial?.roots ?? [],
       })
     } catch (e) {
