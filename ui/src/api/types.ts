@@ -386,12 +386,6 @@ export type EquipmentItem =
 
 // --- Equipment profiles ---
 
-export interface Telescope {
-  name: string
-  focal_length: number
-  aperture: number
-}
-
 export interface ProfileNode {
   item_id: string
   role: string | null
@@ -401,7 +395,6 @@ export interface ProfileNode {
 export interface Profile {
   id: string
   name: string
-  telescope?: Telescope
   roots: ProfileNode[]
 }
 

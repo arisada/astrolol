@@ -384,7 +384,6 @@ function ProfileForm({ initial, onSave, onCancel }: ProfileFormProps) {
       await onSave({
         id: initial?.id,
         name,
-        telescope: initial?.telescope,
         roots: initial?.roots ?? [],
       })
     } catch (e) {

@@ -13,7 +13,7 @@ from astrolol.equipment.models import CameraItem, FocuserItem, MountItem, OTAIte
 from astrolol.equipment.store import EquipmentStore
 from astrolol.main import create_app
 from astrolol.mount.manager import MountManager
-from astrolol.profiles.models import Profile, ProfileNode, Telescope
+from astrolol.profiles.models import Profile, ProfileNode
 from astrolol.profiles.store import ProfileStore
 from tests.conftest import FakeCamera, FakeMount, FakeFocuser
 

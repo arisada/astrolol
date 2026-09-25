@@ -35,7 +35,7 @@ if TYPE_CHECKING:
     from astrolol.equipment.models import OTAItem, SiteItem
     from astrolol.equipment.store import EquipmentStore
     from astrolol.mount.manager import MountManager
-    from astrolol.profiles.models import Profile, Telescope
+    from astrolol.profiles.models import Profile
     from astrolol.profiles.store import ProfileStore
 
 logger = structlog.get_logger()
@@ -106,18 +106,16 @@ def _write_imagetyp(fits_path: Path, frame_type: str) -> None:
 
 def _patch_fits_headers(
     fits_path: Path,
-    telescope: "Telescope | OTAItem | None",
+    telescope: "OTAItem | None",
     site: "SiteItem | None",
     coord: "SkyCoord | None",
     object_name: str = "",
 ) -> None:
     """Inject observatory and telescope metadata into an existing FITS file.
 
-    ``telescope``/``site`` are resolved by the caller — from the camera's ancestor OTA
-    and site in the equipment tree when available (per-camera, correct for profiles with
-    more than one optical path), falling back to the profile-level ``Telescope`` for
-    profiles that predate the equipment tree. Both are duck-typed (``Telescope`` and
-    ``OTAItem`` share the same `.name`/`.focal_length`/`.aperture` fields).
+    ``telescope``/``site`` are resolved by the caller from the camera's ancestor OTA and
+    site in the equipment tree — per-camera, correct for profiles with more than one
+    optical path.
     """
     try:
         from astropy.io import fits as astrofits
@@ -182,24 +180,17 @@ class ImagerManager:
     async def push_scope_info(self, device_id: str) -> None:
         """Push telescope optics to the camera's SCOPE_INFO.
 
-        Resolves the camera's ancestor OTA from the active profile's equipment tree when
-        possible (correct per-camera even with multiple optical paths); falls back to the
-        profile-level ``Telescope`` for profiles that predate the equipment tree.
+        Resolves the camera's ancestor OTA from the active profile's equipment tree —
+        correct per-camera even with multiple optical paths.
         """
         profile = self._active_profile
-        if profile is None:
+        if profile is None or not profile.roots or self._equipment_store is None:
             return
-        focal_length: float | None = None
-        aperture: float | None = None
-        if profile.roots and self._equipment_store is not None:
-            paths = resolve_optical_paths(profile, self._equipment_store, self._device_manager)
-            path = find_optical_path_for_camera_device(paths, device_id)
-            if path is not None and path.ota is not None:
-                focal_length, aperture = path.ota.focal_length, path.ota.aperture
-        if focal_length is None and profile.telescope is not None:
-            focal_length, aperture = profile.telescope.focal_length, profile.telescope.aperture
-        if focal_length is None or aperture is None:
+        paths = resolve_optical_paths(profile, self._equipment_store, self._device_manager)
+        path = find_optical_path_for_camera_device(paths, device_id)
+        if path is None or path.ota is None:
             return
+        focal_length, aperture = path.ota.focal_length, path.ota.aperture
         try:
             camera = self._device_manager.get_camera(device_id)
             push = getattr(camera, "push_scope_info", None)
@@ -365,11 +356,9 @@ class ImagerManager:
             except Exception:
                 pass
 
-        # Telescope optics + site for the FITS header patch below: prefer the camera's
-        # ancestor OTA/site from the tree, fall back to the profile-level Telescope.
-        telescope = my_path.ota if my_path is not None and my_path.ota is not None else (
-            profile.telescope if profile is not None else None
-        )
+        # Telescope optics + site for the FITS header patch below, from the camera's
+        # ancestor OTA/site in the tree.
+        telescope = my_path.ota if my_path is not None else None
         site = my_path.site if my_path is not None and my_path.site is not None else (
             find_profile_site(profile, self._equipment_store)
             if profile is not None and profile.roots and self._equipment_store is not None

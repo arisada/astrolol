@@ -234,9 +234,10 @@ def test_patch_fits_headers_no_object_when_empty(tmp_path: Path):
 
 
 # --- _do_expose on a tree-only profile (regression: object_name/filter_name/FITS
-# telescope+site metadata used to only ever be looked up via the flat profile.devices/
-# profile.telescope fields, which are always empty for a tree-only profile — dead for
-# everything but the mount coord snapshot, which already had a tree fallback) ---
+# telescope+site metadata used to only ever be looked up via the (now-removed) flat
+# profile.devices list and profile.telescope field, which were always empty for a
+# tree-only profile — dead for everything but the mount coord snapshot, which already
+# had a tree fallback) ---
 
 async def _tree_only_rig(manager: DeviceManager, tmp_path: Path):
     """site -> mount -> ota -> filter_wheel -> camera, all connected via the tree."""

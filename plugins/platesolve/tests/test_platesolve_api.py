@@ -466,3 +466,126 @@ def test_put_settings_persists(client: TestClient) -> None:
     r2 = client.get("/plugins/platesolve/settings")
     assert r2.json()["camera_id"] == "cam_asi294"
     assert r2.json()["binning"] == 2
+
+
+# ── _compute_fov (equipment-tree resolution) ──────────────────────────────────
+
+async def _fov_rig(tmp_path, focal_length_mm: float = 600.0):
+    """A connected camera sitting on an OTA in the equipment tree, plus a fake request
+    object exposing the app.state _compute_fov reads from."""
+    from types import SimpleNamespace
+
+    from astrolol.config.user_settings import UserSettings
+    from astrolol.core.events import EventBus
+    from astrolol.devices.config import DeviceConfig
+    from astrolol.devices.manager import DeviceManager
+    from astrolol.devices.registry import DeviceRegistry
+    from astrolol.equipment.models import CameraItem, OTAItem
+    from astrolol.equipment.store import EquipmentStore
+    from astrolol.profiles.models import Profile, ProfileNode
+    from tests.conftest import FakeCamera
+
+    registry = DeviceRegistry()
+    registry.register_camera("fake_camera", FakeCamera)  # type: ignore[arg-type]
+    device_manager = DeviceManager(registry=registry, event_bus=EventBus())
+    await device_manager.connect(DeviceConfig(device_id="cam1", kind="camera", adapter_key="fake_camera"))
+
+    inv_store = EquipmentStore(tmp_path / "inventory.json")
+    ota = inv_store.create(OTAItem(name="Main OTA", focal_length=focal_length_mm, aperture=100.0))
+    cam_item = inv_store.create(CameraItem(name="Cam", adapter_key="fake_camera", connect_params={}))
+    profile = Profile(name="rig", roots=[
+        ProfileNode(item_id=ota.id, children=[ProfileNode(item_id=cam_item.id)]),
+    ])
+
+    profile_store = FakeProfileStore()
+    profile_store._settings = UserSettings(plugin_settings={"platesolve": {"pixel_size_um": 3.76}})
+
+    app = SimpleNamespace(state=SimpleNamespace(
+        active_profile=profile,
+        equipment_store=inv_store,
+        device_manager=device_manager,
+        profile_store=profile_store,
+    ))
+    return SimpleNamespace(app=app), inv_store, ota
+
+
+@pytest.mark.asyncio
+async def test_compute_fov_resolves_focal_length_from_the_equipment_tree(tmp_path) -> None:
+    """Regression: FOV computation used to read the (now-removed) profile.telescope.
+    focal_length flat field — must resolve the connected camera's ancestor OTA from the
+    equipment tree instead, since a profile can have more than one optical path."""
+    from plugins.platesolve.api import _compute_fov
+    from tests.conftest import make_fake_fits
+
+    request, _inv_store, _ota = await _fov_rig(tmp_path, focal_length_mm=600.0)
+    fits_path = make_fake_fits(tmp_path / "test.fits", width=64, height=64)
+
+    fov = await _compute_fov(str(fits_path), request)
+
+    assert fov is not None
+    assert fov > 0
+
+
+@pytest.mark.asyncio
+async def test_compute_fov_scales_inversely_with_focal_length(tmp_path) -> None:
+    from plugins.platesolve.api import _compute_fov
+    from tests.conftest import make_fake_fits
+
+    fits_path = make_fake_fits(tmp_path / "test.fits", width=64, height=64)
+
+    short_request, _inv_store, _ota = await _fov_rig(tmp_path / "short", focal_length_mm=300.0)
+    long_request, _inv_store2, _ota2 = await _fov_rig(tmp_path / "long", focal_length_mm=1200.0)
+
+    short_fov = await _compute_fov(str(fits_path), short_request)
+    long_fov = await _compute_fov(str(fits_path), long_request)
+
+    assert short_fov is not None and long_fov is not None
+    assert long_fov < short_fov
+
+
+@pytest.mark.asyncio
+async def test_compute_fov_none_without_an_active_profile(tmp_path) -> None:
+    from types import SimpleNamespace
+
+    from plugins.platesolve.api import _compute_fov
+    from tests.conftest import make_fake_fits
+
+    request = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(
+        active_profile=None, equipment_store=None, device_manager=None, profile_store=FakeProfileStore(),
+    )))
+    fits_path = make_fake_fits(tmp_path / "test.fits")
+
+    assert await _compute_fov(str(fits_path), request) is None
+
+
+@pytest.mark.asyncio
+async def test_compute_fov_none_when_camera_has_no_ota(tmp_path) -> None:
+    """A camera not sitting under any OTA in the tree has nothing to compute FOV from."""
+    from types import SimpleNamespace
+
+    from astrolol.core.events import EventBus
+    from astrolol.devices.config import DeviceConfig
+    from astrolol.devices.manager import DeviceManager
+    from astrolol.devices.registry import DeviceRegistry
+    from astrolol.equipment.models import CameraItem
+    from astrolol.equipment.store import EquipmentStore
+    from astrolol.profiles.models import Profile, ProfileNode
+    from plugins.platesolve.api import _compute_fov
+    from tests.conftest import FakeCamera, make_fake_fits
+
+    registry = DeviceRegistry()
+    registry.register_camera("fake_camera", FakeCamera)  # type: ignore[arg-type]
+    device_manager = DeviceManager(registry=registry, event_bus=EventBus())
+    await device_manager.connect(DeviceConfig(device_id="cam1", kind="camera", adapter_key="fake_camera"))
+
+    inv_store = EquipmentStore(tmp_path / "inventory.json")
+    cam_item = inv_store.create(CameraItem(name="Cam", adapter_key="fake_camera", connect_params={}))
+    profile = Profile(name="rig", roots=[ProfileNode(item_id=cam_item.id)])
+
+    request = SimpleNamespace(app=SimpleNamespace(state=SimpleNamespace(
+        active_profile=profile, equipment_store=inv_store, device_manager=device_manager,
+        profile_store=FakeProfileStore(),
+    )))
+    fits_path = make_fake_fits(tmp_path / "test.fits")
+
+    assert await _compute_fov(str(fits_path), request) is None

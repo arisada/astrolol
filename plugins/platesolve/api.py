@@ -12,6 +12,7 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from astrolol.core.events.models import LogEvent
+from astrolol.equipment.optical_path import find_optical_path_for_camera_device, resolve_optical_paths
 from plugins.platesolve.models import SolveJob, SolveRequest
 from plugins.platesolve.settings import PlatesolveSettings
 from plugins.platesolve.solver import SolveManager
@@ -31,13 +32,32 @@ def _manager(request: Request) -> SolveManager:
 
 
 async def _compute_fov(fits_path: str, request: Request) -> float | None:
-    """Compute field width (degrees) from FITS header + CCD_INFO + active profile."""
+    """Compute field width (degrees) from FITS header + CCD_INFO + the active profile's
+    equipment tree.
+
+    Uses the first connected camera (same choice as the pixel-size lookup below, so both
+    numbers come from the same optical path) and resolves its ancestor OTA's focal length
+    from the equipment tree — there is no profile-level "the" telescope any more, since a
+    profile can have more than one optical path.
+    """
     app = request.app
     try:
         profile = app.state.active_profile
-        if profile is None or not getattr(profile, "telescope", None):
+        equipment_store = getattr(app.state, "equipment_store", None)
+        if profile is None or equipment_store is None or not profile.roots:
             return None
-        focal_length_mm: float = profile.telescope.focal_length
+
+        device_manager = app.state.device_manager
+        cameras = [d for d in device_manager.list_connected() if d["kind"] == "camera"]
+        if not cameras:
+            return None
+        camera_device_id = cameras[0]["device_id"]
+
+        paths = resolve_optical_paths(profile, equipment_store, device_manager)
+        path = find_optical_path_for_camera_device(paths, camera_device_id)
+        if path is None or path.ota is None:
+            return None
+        focal_length_mm: float = path.ota.focal_length
         if not focal_length_mm:
             return None
 
@@ -51,12 +71,9 @@ async def _compute_fov(fits_path: str, request: Request) -> float | None:
 
         # Pixel size: try CCD_INFO first, fall back to user settings
         pixel_size_um: float | None = None
-        device_manager = app.state.device_manager
-        cameras = [d for d in device_manager.list_connected() if d["kind"] == "camera"]
-        if cameras:
-            cam = device_manager.get_camera(cameras[0]["device_id"])
-            if hasattr(cam, "get_pixel_size_um"):
-                pixel_size_um = await cam.get_pixel_size_um()
+        cam = device_manager.get_camera(camera_device_id)
+        if hasattr(cam, "get_pixel_size_um"):
+            pixel_size_um = await cam.get_pixel_size_um()
 
         if pixel_size_um is None:
             raw = app.state.profile_store.get_user_settings().plugin_settings.get("platesolve", {})
