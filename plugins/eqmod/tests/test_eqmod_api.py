@@ -77,14 +77,15 @@ def test_setup_registers_eqmod_sim_adapter(tmp_path) -> None:
 def test_settings_default(client: TestClient) -> None:
     r = client.get("/plugins/eqmod/settings")
     assert r.status_code == 200
-    assert r.json() == {"led_brightness": 50}
+    assert r.json() == {"led_brightness": 50, "indi_proxy_enabled": False,
+                        "indi_proxy_api_url": "http://127.0.0.1:8000"}
 
 
 def test_settings_roundtrip(client: TestClient) -> None:
     r = client.put("/plugins/eqmod/settings", json={"led_brightness": 10})
     assert r.status_code == 200
-    assert r.json() == {"led_brightness": 10}
-    assert client.get("/plugins/eqmod/settings").json() == {"led_brightness": 10}
+    assert r.json()["led_brightness"] == 10
+    assert client.get("/plugins/eqmod/settings").json()["led_brightness"] == 10
 
 
 def test_settings_rejects_out_of_range(client: TestClient) -> None:
@@ -152,3 +153,29 @@ def test_diagnostics_reports_connected_real_mounts_only(tmp_path) -> None:
     assert [d["device_id"] for d in body] == ["real1"]
     assert body[0]["axes"]["RA"]["cpr"] == CPR
     assert body[0]["error"] is None
+
+
+def test_settings_toggle_the_indi_proxy(tmp_path) -> None:
+    from plugins.eqmod.indi_proxy_setup import IndiProxyRegistration
+    from plugins.eqmod.tests.test_indi_proxy_setup import _FakeIndiManager
+
+    app, _ = _make_app(tmp_path)
+    manager = _FakeIndiManager()
+    app.state.eqmod_indi_proxy = IndiProxyRegistration(manager, tmp_path / "run")
+    client = TestClient(app)
+
+    r = client.put("/plugins/eqmod/settings", json={"led_brightness": 50, "indi_proxy_enabled": True})
+    assert r.status_code == 200
+    assert manager.calls == [("add", str(tmp_path / "run" / "astrolol-indi-mount-proxy"))]
+
+    # Saving an unrelated setting must not restart the proxy (PHD2 would drop it).
+    client.put("/plugins/eqmod/settings", json={"led_brightness": 20, "indi_proxy_enabled": True})
+    assert len(manager.calls) == 1
+
+    status = client.get("/plugins/eqmod/indi_proxy").json()
+    assert status["enabled"] is True and status["device_name"] == "astrolol Mount Proxy"
+
+
+def test_settings_reject_a_bad_proxy_url(client: TestClient) -> None:
+    r = client.put("/plugins/eqmod/settings", json={"indi_proxy_api_url": "localhost:8000"})
+    assert r.status_code == 422

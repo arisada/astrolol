@@ -1,6 +1,11 @@
 import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
-import { getDiagnostics, getSettings, putSettings, type AxisDiagnostics, type MountDiagnostics } from './api'
+import { Input } from '@/components/ui/input'
+import { ToggleSwitch } from '@/components/ui/toggle-switch'
+import {
+  getDiagnostics, getIndiProxy, getSettings, putSettings,
+  type AxisDiagnostics, type EqmodSettings, type IndiProxyStatus, type MountDiagnostics,
+} from './api'
 
 const STATUS_FLAGS: { key: string; label: string }[] = [
   { key: 'running', label: 'running' },
@@ -65,6 +70,8 @@ function MountCard({ d }: { d: MountDiagnostics }) {
             <Row label="Timer frequency" value={d.timer_freq?.toLocaleString() ?? '—'} />
             <Row label="Tracking" value={d.tracking ? d.tracking_mode : 'off'} />
             <Row label="Nudging" value={d.nudging.length ? d.nudging.join(', ') : '—'} />
+            <Row label="Guide rate" value={d.guide_rate != null ? `${d.guide_rate}x sidereal` : '—'} />
+            <Row label="Guide pulse" value={d.pulsing.length ? d.pulsing.join(', ') : '—'} />
             <Row
               label="Site"
               value={d.location
@@ -94,21 +101,29 @@ function MountCard({ d }: { d: MountDiagnostics }) {
   )
 }
 
-function LedControl() {
-  const [value, setValue] = useState<number | null>(null)
+function SettingsCard() {
+  const [settings, setSettings] = useState<EqmodSettings | null>(null)
+  const [proxy, setProxy] = useState<IndiProxyStatus | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
-    getSettings().then((s) => setValue(s.led_brightness)).catch((e: Error) => setError(e.message))
+    getSettings().then(setSettings).catch((e: Error) => setError(e.message))
+    let cancelled = false
+    const loadProxy = () => getIndiProxy().then((p) => { if (!cancelled) setProxy(p) }).catch(() => {})
+    loadProxy()
+    const id = setInterval(loadProxy, 2000)
+    return () => { cancelled = true; clearInterval(id) }
   }, [])
 
+  // Always save the whole object: a partial PUT would reset the other fields to defaults.
   const save = async () => {
-    if (value === null) return
+    if (settings === null) return
     setSaving(true)
     setError(null)
     try {
-      await putSettings({ led_brightness: value })
+      setSettings(await putSettings(settings))
+      setProxy(await getIndiProxy())
     } catch (e) {
       setError((e as Error).message)
     } finally {
@@ -116,21 +131,72 @@ function LedControl() {
     }
   }
 
+  const proxyState = !proxy ? '—'
+    : !proxy.enabled ? 'disabled'
+    : !proxy.indi_available ? 'INDI support unavailable'
+    : proxy.loaded ? 'loaded in indiserver'
+    : proxy.indiserver_running ? 'registered, not loaded yet'
+    : 'registered: loads when indiserver starts (first INDI device)'
+
   return (
-    <div className="bg-surface-raised border border-surface-border rounded p-4 flex items-center gap-3 text-sm">
-      <span className="text-slate-400">Polar scope LED</span>
-      <input
-        type="range" min={0} max={100}
-        value={value ?? 0}
-        disabled={value === null}
-        onChange={(e) => setValue(Number(e.target.value))}
-        className="flex-1"
-      />
-      <span className="font-mono text-slate-200 w-10 text-right">{value ?? '—'}%</span>
-      <Button type="button" size="sm" disabled={value === null || saving} onClick={save}>
-        {saving ? 'Applying…' : 'Apply'}
-      </Button>
-      {error && <span className="text-xs text-status-error">{error}</span>}
+    <div className="bg-surface-raised border border-surface-border rounded p-4 flex flex-col gap-4 text-sm">
+      <p className="text-slate-300 font-medium">Settings</p>
+      <div className="flex items-center gap-3">
+        <span className="text-slate-400 w-40">Polar scope LED</span>
+        <input
+          type="range" min={0} max={100}
+          value={settings?.led_brightness ?? 0}
+          disabled={settings === null}
+          onChange={(e) => settings && setSettings({ ...settings, led_brightness: Number(e.target.value) })}
+          className="flex-1"
+        />
+        <span className="font-mono text-slate-200 w-10 text-right">{settings?.led_brightness ?? '—'}%</span>
+      </div>
+
+      <div className="flex flex-col gap-2 border-t border-surface-border pt-4">
+        <div className="flex items-center gap-3">
+          <ToggleSwitch
+            checked={settings?.indi_proxy_enabled ?? false}
+            disabled={settings === null}
+            onChange={() => settings && setSettings({ ...settings, indi_proxy_enabled: !settings.indi_proxy_enabled })}
+            label="INDI mount proxy"
+          />
+          <span className="text-slate-300">INDI mount proxy</span>
+          <span className="text-xs text-slate-500 ml-auto">{proxyState}</span>
+        </div>
+        <label className="flex items-center gap-3 text-xs">
+          <span className="text-slate-500 w-40">astrolol API URL (from the proxy)</span>
+          <Input
+            value={settings?.indi_proxy_api_url ?? ''}
+            disabled={settings === null}
+            onChange={(e) => settings && setSettings({ ...settings, indi_proxy_api_url: e.target.value })}
+            className="font-mono"
+          />
+        </label>
+        <div className="text-xs text-slate-500 space-y-1">
+          <p>
+            Publishes the connected mount on astrolol&apos;s indiserver as{' '}
+            <span className="font-mono text-slate-300">{proxy?.device_name ?? 'astrolol Mount Proxy'}</span>
+            {' '}(a relay to astrolol&apos;s REST API, not a real mount driver).
+          </p>
+          <p>
+            PHD2: connect to this machine&apos;s indiserver (port 7624), pick your INDI guide camera, and
+            pick <span className="font-mono">astrolol Mount Proxy</span> as the mount. Guide pulses run at
+            the mount&apos;s guide rate (connect param <span className="font-mono">guide_rate</span>, 0.5x sidereal by default).
+          </p>
+          <p>
+            INDI drivers that snoop a telescope (e.g. the CCD simulator&apos;s star field, or FITS headers):
+            set their active telescope to <span className="font-mono">astrolol Mount Proxy</span>.
+          </p>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-3">
+        <Button type="button" size="sm" disabled={settings === null || saving} onClick={save}>
+          {saving ? 'Saving…' : 'Save'}
+        </Button>
+        {error && <span className="text-xs text-status-error">{error}</span>}
+      </div>
     </div>
   )
 }
@@ -152,7 +218,7 @@ export function EqmodPage() {
 
   return (
     <div className="p-6 max-w-4xl flex flex-col gap-4">
-      <h1 className="text-lg font-semibold text-slate-100">EQMOD diagnostics</h1>
+      <h1 className="text-lg font-semibold text-slate-100">EQMOD</h1>
       {error && <p className="text-xs text-status-error">{error}</p>}
       {mounts !== null && mounts.length === 0 && (
         <div className="text-sm text-slate-500 space-y-1">
@@ -167,7 +233,7 @@ export function EqmodPage() {
         </div>
       )}
       {mounts?.map((d) => <MountCard key={d.device_id} d={d} />)}
-      <LedControl />
+      <SettingsCard />
     </div>
   )
 }

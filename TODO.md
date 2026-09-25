@@ -66,7 +66,14 @@ baked into the current code/design or a feature left out; revisit when it bites.
   Alt/Az is plain spherical trig without refraction, so nothing needs IERS downloads.
   ICRS↔JNow still uses astropy FK5 (precession only, no IERS needed).
 - **RA nudge while tracking** — the nudge replaces tracking for its duration instead of being
-  added to it (fine for centering; proper guide-rate blending belongs to the PHD2 phase).
+  added to it (fine for centering). Guide pulses do blend with tracking (RA speed changed on
+  the fly, axis never stopped).
+- **INDI mount proxy** (`astrolol_indi_mount_proxy.py`, device "astrolol Mount Proxy") —
+  loaded into astrolol's *managed* indiserver only; with an unmanaged indiserver it must be
+  added by hand (`indiserver … /path/to/astrolol-indi-mount-proxy`). It does not publish
+  `GUIDE_RATE` (PHD2 calibrates without it); the guide rate is the `guide_rate` connect param
+  (0.1–1.0x sidereal, default 0.5). Verified against a stub/real astrolol, not yet against a
+  real indiserver + PHD2.
 
 ## Near-term
 

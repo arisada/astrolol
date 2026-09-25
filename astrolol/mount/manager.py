@@ -222,6 +222,19 @@ class MountManager:
         await mount.stop_move()
         logger.info("mount.move_stopped", device_id=device_id)
 
+    async def pulse_guide(self, device_id: str, direction: str, duration_ms: int) -> None:
+        """Guide pulse; returns once the pulse has completed.
+
+        Optional adapter capability (duck-typed, like set_location). Raises ValueError
+        when the mount cannot guide or is busy with a slew/park/flip.
+        """
+        mount = self._device_manager.get_mount(device_id)
+        if not hasattr(mount, "pulse_guide"):
+            raise ValueError(f"Mount '{device_id}' does not support pulse guiding.")
+        self._require_idle(self._get_or_create(device_id))
+        await mount.pulse_guide(direction, duration_ms)
+        logger.debug("mount.pulse_guided", device_id=device_id, direction=direction, duration_ms=duration_ms)
+
     async def meridian_flip(self, device_id: str) -> None:
         """
         Perform a meridian flip: slew to the current position on the opposite pier side.

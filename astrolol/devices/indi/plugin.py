@@ -61,6 +61,8 @@ class IndiConnectionManager:
         self._loop: asyncio.AbstractEventLoop | None = None
         self._ref_count = 0
         self._started = False
+        # Drivers (re)loaded every time the services start, e.g. plugin-provided shims.
+        self._startup_drivers: list[str] = []
 
     async def acquire(self) -> None:
         """Called by each INDI adapter on connect(). Starts services on first call."""
@@ -73,9 +75,7 @@ class IndiConnectionManager:
             self._started = False
         async with self._lock:
             if not self._started:
-                await self._server.start()
-                await self._client.connect()
-                self._started = True
+                await self._start_services()
             self._ref_count += 1
 
     async def ensure_started(self) -> None:
@@ -92,9 +92,33 @@ class IndiConnectionManager:
             self._started = False
         async with self._lock:
             if not self._started:
-                await self._server.start()
-                await self._client.connect()
-                self._started = True
+                await self._start_services()
+
+    async def _start_services(self) -> None:
+        await self._server.start()
+        await self._client.connect()
+        self._started = True
+        for executable in list(self._startup_drivers):
+            await self._load_startup_driver(executable)
+
+    async def _load_startup_driver(self, executable: str) -> None:
+        try:
+            await self._server.load_driver(executable)
+        except Exception as exc:
+            logger.warning("indi.startup_driver_failed", driver=executable, error=str(exc))
+
+    async def add_startup_driver(self, executable: str) -> None:
+        """Load *executable* now if indiserver is up, and again every time it starts."""
+        if executable not in self._startup_drivers:
+            self._startup_drivers.append(executable)
+        if self._started:
+            await self._load_startup_driver(executable)
+
+    async def remove_startup_driver(self, executable: str) -> None:
+        if executable in self._startup_drivers:
+            self._startup_drivers.remove(executable)
+        if self._started:
+            await self._server.unload_driver(executable)
 
     async def release(self) -> None:
         """Called by each INDI adapter on disconnect()."""

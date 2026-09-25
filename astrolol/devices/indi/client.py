@@ -29,6 +29,14 @@ _indi_logger = logging.getLogger("indipyclient.ipyclient")
 
 logger = structlog.get_logger()
 
+# INDI devices published by astrolol itself (e.g. the eqmod plugin's "astrolol Mount
+# Proxy") are shims over astrolol's own devices; astrolol must never list or manage them.
+ASTROLOL_SHIM_PREFIX = "astrolol "
+
+
+def is_astrolol_shim(device_name: str) -> bool:
+    return device_name.startswith(ASTROLOL_SHIM_PREFIX)
+
 
 @dataclass
 class BlobData:
@@ -307,8 +315,8 @@ class IndiClient(IPyClient):
     # ------------------------------------------------------------------
 
     def list_devices(self) -> list[str]:
-        """Return the names of all devices currently known to the client."""
-        return list(self.data.keys())
+        """Return the names of all devices currently known to the client (astrolol's own shims excluded)."""
+        return [d for d in self.data.keys() if not is_astrolol_shim(d)]
 
     async def wait_for_devices_by_prefix(
         self,
@@ -328,13 +336,13 @@ class IndiClient(IPyClient):
         await self._wait_cond(
             lambda: any(
                 d.startswith(prefix) and d not in known_before
-                for d in self.data.keys()
+                for d in self.list_devices()
             ),
             timeout=timeout,
         )
         # Short extra window to collect additional cameras from the same driver
         await asyncio.sleep(1.0)
-        return [d for d in self.data.keys() if d.startswith(prefix) and d not in known_before]
+        return [d for d in self.list_devices() if d.startswith(prefix) and d not in known_before]
 
     async def wait_for_property(
         self, device_name: str, prop_name: str, timeout: float = 10.0

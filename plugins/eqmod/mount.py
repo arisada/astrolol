@@ -48,6 +48,9 @@ TRACKING_RATES_DEG_PER_SEC = {
 }
 # Multiples of sidereal; "max" exceeds 128x so it uses the controller's high-speed mode.
 NUDGE_RATES_X_SIDEREAL = {"guide": 0.5, "centering": 16.0, "find": 64.0, "max": 400.0}
+DEFAULT_GUIDE_RATE = 0.5          # x sidereal, EQMOD's default
+MIN_GUIDE_RATE, MAX_GUIDE_RATE = 0.1, 1.0
+MAX_PULSE_MS = 10_000
 AXIS_STOP_TIMEOUT = 10.0          # seconds
 AXIS_STOP_POLL_INTERVAL = 0.1     # seconds
 GOTO_TIMEOUT = 240.0              # seconds, per pass
@@ -87,10 +90,12 @@ class EqmodMount:
         baudrate: int | None = None,
         ra_reverse: bool = False,
         dec_reverse: bool = False,
+        guide_rate: float = DEFAULT_GUIDE_RATE,
         state_key: str | None = None,
         transport_factory: Callable[[str, int], Any] = SerialTransport,
         **_kwargs: object,
     ) -> None:
+        self._guide_rate = float(guide_rate)
         self._port = port
         self._requested_baudrate = baudrate
         self._reverse = {Axis.RA: bool(ra_reverse), Axis.DEC: bool(dec_reverse)}
@@ -107,6 +112,10 @@ class EqmodMount:
         self._tracking = False
         self._tracking_mode = TrackingMode.SIDEREAL
         self._nudging: set[Axis] = set()
+        self._pulsing: set[Axis] = set()
+        # Bumped by every command that takes over the motors; a guide pulse only
+        # restores what it changed if nothing else moved the mount meanwhile.
+        self._motion_epoch = 0
         self._slewing = False
         self._is_parked = False
         self._park_counts: tuple[int, int] = (0, 0)
@@ -120,6 +129,8 @@ class EqmodMount:
     async def connect(self) -> None:
         if not self._port:
             raise ValueError('eqmod needs a "port" connect param, e.g. {"port": "/dev/ttyUSB0"}')
+        if not MIN_GUIDE_RATE <= self._guide_rate <= MAX_GUIDE_RATE:
+            raise ValueError(f"guide_rate must be between {MIN_GUIDE_RATE} and {MAX_GUIDE_RATE} (x sidereal)")
         baudrate = self._requested_baudrate or await detect_baudrate(self._port)
         transport = self._transport_factory(self._port, baudrate)
         await transport.open()
@@ -260,16 +271,9 @@ class EqmodMount:
         logger.info("eqmod.park_position_set", ra_counts=self._park_counts[0], dec_counts=self._park_counts[1])
 
     async def start_move(self, direction: str, rate: str) -> None:
-        if direction in ("W", "E"):
-            axis, positive = Axis.RA, direction == "W"  # westward = tracking direction
-        elif direction in ("N", "S"):
-            # Which way the Dec axis must turn for "north" depends on the pier side.
-            ra_c, dec_c = await self._read_counts()
-            side = pier_side_of(self._require_geometry().counts_to_axes(ra_c, dec_c).dec_axis_deg)
-            axis, positive = Axis.DEC, (direction == "N") == (side is PierSide.WEST)
-        else:
-            raise ValueError(f"Invalid direction: {direction!r}")
+        axis, positive = await self._resolve_direction(direction)
         speed = NUDGE_RATES_X_SIDEREAL.get(rate, NUDGE_RATES_X_SIDEREAL["centering"]) * SIDEREAL_DEG_PER_SEC
+        self._motion_epoch += 1
         self._is_parked = False
         await self._run_axis(axis, speed, positive)
         self._nudging.add(axis)
@@ -285,6 +289,7 @@ class EqmodMount:
         self._persist(*await self._read_counts())
 
     async def set_tracking(self, enabled: bool, mode: TrackingMode | None = None) -> None:
+        self._motion_epoch += 1
         if mode is not None:
             self._tracking_mode = mode
         if enabled:
@@ -296,11 +301,76 @@ class EqmodMount:
         self._persist(*await self._read_counts())
 
     async def stop(self) -> None:
+        self._motion_epoch += 1
         self._nudging.clear()
         self._tracking = False
         self._slewing = False
         await self._halt_all()
         self._persist(*await self._read_counts())
+
+    async def pulse_guide(self, direction: str, duration_ms: int) -> None:
+        """Guide pulse at the guide rate; returns when done. ValueError if the mount can't guide now."""
+        if not 0 < duration_ms <= MAX_PULSE_MS:
+            raise ValueError(f"Pulse duration must be 1..{MAX_PULSE_MS} ms")
+        if self._is_parked:
+            raise ValueError("Cannot guide: the mount is parked")
+        if self._slewing:
+            raise ValueError("Cannot guide: the mount is slewing")
+        if self._nudging:
+            raise ValueError("Cannot guide: a nudge is in progress")
+        axis, positive = await self._resolve_direction(direction)
+        if axis in self._pulsing:
+            raise ValueError(f"A guide pulse is already running on the {axis.name} axis")
+        self._pulsing.add(axis)
+        epoch = self._motion_epoch
+        guide = self._guide_rate * SIDEREAL_DEG_PER_SEC
+        seconds = duration_ms / 1000.0
+        try:
+            if axis is Axis.RA and self._tracking:
+                await self._pulse_ra_while_tracking(positive, guide, seconds, epoch)
+            else:
+                await self._run_axis(axis, guide, positive)
+                try:
+                    await asyncio.sleep(seconds)
+                finally:
+                    if self._motion_epoch == epoch:
+                        await self._stop_axis(axis)
+        finally:
+            self._pulsing.discard(axis)
+
+    async def _pulse_ra_while_tracking(self, west: bool, guide: float, seconds: float, epoch: int) -> None:
+        """Shift the RA tracking speed by the guide rate without stopping the axis."""
+        proto = self._require_proto()
+        info = self._axes[Axis.RA]
+        base = TRACKING_RATES_DEG_PER_SEC[self._tracking_mode]
+        rate = base + guide if west else base - guide
+        if rate <= 0.01 * base:
+            # East pulse at (nearly) the tracking rate: stand still for the duration.
+            await self._stop_axis(Axis.RA)
+            try:
+                await asyncio.sleep(seconds)
+            finally:
+                if self._motion_epoch == epoch:
+                    await self._start_tracking()
+            return
+        # Changing T1 on the fly is allowed in low-speed mode (tracking speeds always are).
+        await proto.set_step_period(Axis.RA, step_period_for_rate(rate, info.cpr, self._timer_freq))
+        try:
+            await asyncio.sleep(seconds)
+        finally:
+            if self._motion_epoch == epoch:
+                await proto.set_step_period(Axis.RA, step_period_for_rate(base, info.cpr, self._timer_freq))
+
+    async def _resolve_direction(self, direction: str) -> tuple[Axis, bool]:
+        """Map N/S/E/W to (axis, positive); positive = axis angle increasing."""
+        if direction in ("W", "E"):
+            return Axis.RA, direction == "W"  # westward = tracking direction
+        if direction in ("N", "S"):
+            # Which way the Dec axis must turn for "north" depends on the pier side.
+            ra_c, dec_c = await self._read_counts()
+            side = pier_side_of(self._require_geometry().counts_to_axes(ra_c, dec_c).dec_axis_deg)
+            return Axis.DEC, (direction == "N") == (side is PierSide.WEST)
+        raise ValueError(f"Invalid direction: {direction!r}")
 
     # --- Live coordinate push (duck-typed by DeviceManager, same contract as IndiMount) ---
 
@@ -362,6 +432,8 @@ class EqmodMount:
             "tracking": self._tracking,
             "tracking_mode": self._tracking_mode.value,
             "nudging": sorted(a.name for a in self._nudging),
+            "pulsing": sorted(a.name for a in self._pulsing),
+            "guide_rate": self._guide_rate,
             "location": list(self._location) if self._location else None,
             "parked": self._is_parked,
             "park_counts": list(self._park_counts),
@@ -484,6 +556,7 @@ class EqmodMount:
         self._tracking = True
 
     async def _stop_all_motion(self) -> None:
+        self._motion_epoch += 1
         for axis in (Axis.RA, Axis.DEC):
             await self._stop_axis(axis)
         self._nudging.clear()

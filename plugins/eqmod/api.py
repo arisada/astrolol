@@ -36,6 +36,8 @@ class MountDiagnostics(BaseModel):
     tracking: bool = False
     tracking_mode: str | None = None
     nudging: list[str] = []
+    pulsing: list[str] = []
+    guide_rate: float | None = None
     location: list[float] | None = None  # [lat, lon, alt_m], pushed from the active profile's site
     parked: bool = False
     park_counts: list[int] | None = None
@@ -72,8 +74,28 @@ async def put_settings(body: EqmodSettings, request: Request) -> EqmodSettings:
             except Exception as exc:
                 logger.warning("eqmod.led_brightness_failed", device_id=device_id, error=str(exc))
 
-    logger.info("eqmod.settings_updated", led_brightness=body.led_brightness)
+    proxy = getattr(request.app.state, "eqmod_indi_proxy", None)
+    if proxy is not None:
+        await proxy.apply(body.indi_proxy_enabled, body.indi_proxy_api_url)
+
+    logger.info("eqmod.settings_updated", led_brightness=body.led_brightness,
+                indi_proxy_enabled=body.indi_proxy_enabled)
     return body
+
+
+class IndiProxyStatus(BaseModel):
+    enabled: bool
+    api_url: str | None
+    indi_available: bool
+    indiserver_running: bool
+    loaded: bool
+    launcher: str
+    device_name: str
+
+
+@router.get("/indi_proxy", response_model=IndiProxyStatus)
+async def get_indi_proxy_status(request: Request) -> IndiProxyStatus:
+    return IndiProxyStatus(**request.app.state.eqmod_indi_proxy.status())
 
 
 @router.get("/diagnostics", response_model=list[MountDiagnostics])

@@ -587,3 +587,133 @@ async def test_stop_button_halts_a_goto_even_if_channel_3_is_rejected() -> None:
     status = await devices.get_mount("m").get_status()
     assert not status.is_slewing and not status.is_tracking
     await devices.disconnect("m")
+
+
+# --- Pulse guiding ---
+
+def _period(deg_per_sec: float) -> int:
+    return step_period_for_rate(deg_per_sec, CPR, TIMER_FREQ)
+
+
+async def _mid_pulse(mount: EqmodMount, direction: str, ms: int = 80):
+    """Start a pulse, return (task) after it has applied its speed change."""
+    import asyncio
+    task = asyncio.create_task(mount.pulse_guide(direction, ms))
+    await asyncio.sleep(0.02)
+    return task
+
+
+@pytest.mark.parametrize("direction,factor", [("W", 1.5), ("E", 0.5)])
+async def test_ra_pulse_while_tracking_shifts_speed_without_stopping(direction: str, factor: float) -> None:
+    mount, ctrl = await _connected()
+    await mount.unpark()
+    await mount.set_tracking(True)
+    ctrl.log.clear()
+    task = await _mid_pulse(mount, direction)
+    assert ctrl.axes[1].running
+    assert ctrl.axes[1].period == _period(factor * SIDEREAL_DEG_PER_SEC)
+    await task
+    assert ctrl.axes[1].running and ctrl.axes[1].ccw is False
+    assert ctrl.axes[1].period == _period(SIDEREAL_DEG_PER_SEC)
+    assert not any(cmd.startswith((":K1", ":L1", ":G1")) for cmd in ctrl.log)  # never stopped
+
+
+async def test_east_pulse_at_full_guide_rate_pauses_then_resumes_tracking() -> None:
+    mount, ctrl = await _connected(guide_rate=1.0)
+    await mount.unpark()
+    await mount.set_tracking(True)
+    task = await _mid_pulse(mount, "E")
+    assert not ctrl.axes[1].running
+    await task
+    assert ctrl.axes[1].running and ctrl.axes[1].period == _period(SIDEREAL_DEG_PER_SEC)
+
+
+@pytest.mark.parametrize("dec_counts,direction,ccw", [
+    (0, "N", True), (0, "S", False),                 # east pier side
+    (-CPR // 8, "N", False), (-CPR // 8, "S", True),  # west pier side: N/S swap
+])
+async def test_dec_pulse_runs_at_guide_rate_then_stops(dec_counts: int, direction: str, ccw: bool) -> None:
+    ctrl = _FakeController()
+    ctrl.axes[2].position = dec_counts
+    mount, _ = await _connected(ctrl)
+    await mount.unpark()
+    task = await _mid_pulse(mount, direction)
+    dec = ctrl.axes[2]
+    assert dec.running and dec.ccw is ccw and dec.period == _period(0.5 * SIDEREAL_DEG_PER_SEC)
+    await task
+    assert not ctrl.axes[2].running
+
+
+async def test_ra_pulse_without_tracking_runs_the_axis_briefly() -> None:
+    mount, ctrl = await _connected()
+    await mount.unpark()
+    task = await _mid_pulse(mount, "W")
+    assert ctrl.axes[1].running and ctrl.axes[1].ccw is False
+    await task
+    assert not ctrl.axes[1].running
+
+
+async def test_pulse_lasts_its_duration() -> None:
+    import time as _time
+    mount, _ = await _connected()
+    await mount.unpark()
+    await mount.set_tracking(True)
+    start = _time.monotonic()
+    await mount.pulse_guide("W", 150)
+    assert _time.monotonic() - start >= 0.15
+
+
+@pytest.mark.parametrize("setup,match", [
+    ("parked", "parked"),
+    ("nudging", "nudge"),
+])
+async def test_pulse_refusals(setup: str, match: str) -> None:
+    mount, _ = await _connected()
+    if setup == "nudging":
+        await mount.start_move("N", "centering")
+    with pytest.raises(ValueError, match=match):
+        await mount.pulse_guide("W", 100)
+
+
+async def test_pulse_refused_while_one_runs_on_the_same_axis_but_not_the_other() -> None:
+    mount, _ = await _connected()
+    await mount.unpark()
+    await mount.set_tracking(True)
+    task = await _mid_pulse(mount, "W")
+    with pytest.raises(ValueError, match="already running"):
+        await mount.pulse_guide("E", 50)
+    await mount.pulse_guide("N", 30)  # Dec is free
+    await task
+
+
+@pytest.mark.parametrize("direction,ms", [("X", 100), ("N", 0), ("N", 10_001)])
+async def test_pulse_rejects_bad_arguments(direction: str, ms: int) -> None:
+    mount, _ = await _connected()
+    await mount.unpark()
+    with pytest.raises(ValueError):
+        await mount.pulse_guide(direction, ms)
+
+
+async def test_stop_during_a_pulse_wins() -> None:
+    """Stop mid-pulse must not be undone by the pulse restoring tracking afterwards."""
+    mount, ctrl = await _connected(guide_rate=1.0)
+    await mount.unpark()
+    await mount.set_tracking(True)
+    task = await _mid_pulse(mount, "E", ms=120)  # RA paused, will "resume tracking" at the end
+    await mount.stop()
+    await task
+    assert not ctrl.axes[1].running
+    assert (await mount.get_status()).is_tracking is False
+
+
+async def test_guide_rate_is_validated_on_connect() -> None:
+    ctrl = _FakeController()
+    with pytest.raises(ValueError, match="guide_rate"):
+        await EqmodMount(port="/dev/fake", baudrate=9600, guide_rate=2.0,
+                         transport_factory=lambda p, b: ctrl).connect()
+
+
+async def test_diagnostics_report_guide_rate_and_pulses() -> None:
+    mount, _ = await _connected(guide_rate=0.8)
+    diag = await mount.diagnostics()
+    assert diag["guide_rate"] == 0.8 and diag["pulsing"] == []

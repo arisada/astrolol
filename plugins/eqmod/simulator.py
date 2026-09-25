@@ -86,6 +86,7 @@ _NUDGE_RATES_DEG_PER_SEC = {
     "max": 4.0,
 }
 _NUDGE_STEP_INTERVAL = 0.2  # seconds between intermediate nudge position pushes
+_GUIDE_RATE_X_SIDEREAL = 0.5
 
 
 def _now() -> datetime:
@@ -377,6 +378,29 @@ class EqmodSimMount:
     async def stop_move(self) -> None:
         self._moving_direction = None
         await self._cancel_task("_nudge_task")
+
+    async def pulse_guide(self, direction: str, duration_ms: int) -> None:
+        """Moves the pointing by guide rate x duration (0.5x sidereal), like a real guide pulse."""
+        if direction not in ("N", "S", "E", "W"):
+            raise ValueError(f"Invalid direction: {direction!r}")
+        if self._is_parked:
+            raise ValueError("Cannot guide: the mount is parked")
+        if self._slew_task is not None or self._nudge_task is not None:
+            raise ValueError("Cannot guide: the mount is moving")
+        await asyncio.sleep(duration_ms / 1000.0)
+        step = _GUIDE_RATE_X_SIDEREAL * _SIDEREAL_DEG_PER_SEC * duration_ms / 1000.0
+        ra = self._effective_ra() or 0.0
+        dec = self._dec or 0.0
+        if direction == "N":
+            dec = min(90.0, dec + step)
+        elif direction == "S":
+            dec = max(-90.0, dec - step)
+        elif direction == "E":
+            ra = (ra + step) % 360.0
+        else:
+            ra = (ra - step) % 360.0
+        self._fix_position(ra, dec)
+        self._push_coords()
 
     async def meridian_flip(self) -> None:
         await asyncio.sleep(0.05)

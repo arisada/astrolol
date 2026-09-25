@@ -18,6 +18,8 @@ export interface MountDiagnostics {
   tracking: boolean
   tracking_mode: string | null
   nudging: string[]
+  pulsing: string[]
+  guide_rate: number | null
   location: [number, number, number] | null
   parked: boolean
   park_counts: [number, number] | null
@@ -28,6 +30,18 @@ export interface MountDiagnostics {
 
 export interface EqmodSettings {
   led_brightness: number
+  indi_proxy_enabled: boolean
+  indi_proxy_api_url: string
+}
+
+export interface IndiProxyStatus {
+  enabled: boolean
+  api_url: string | null
+  indi_available: boolean
+  indiserver_running: boolean
+  loaded: boolean
+  launcher: string
+  device_name: string
 }
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
@@ -47,3 +61,4 @@ export const getDiagnostics = () => request<MountDiagnostics[]>('/plugins/eqmod/
 export const getSettings = () => request<EqmodSettings>('/plugins/eqmod/settings')
 export const putSettings = (s: EqmodSettings) =>
   request<EqmodSettings>('/plugins/eqmod/settings', { method: 'PUT', body: JSON.stringify(s) })
+export const getIndiProxy = () => request<IndiProxyStatus>('/plugins/eqmod/indi_proxy')

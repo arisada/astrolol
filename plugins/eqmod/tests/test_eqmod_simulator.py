@@ -383,3 +383,27 @@ async def test_power_cycle_while_parked_is_still_trusted() -> None:
     assert status.is_synced is True
     assert status.is_parked is True
     assert status.dec == pytest.approx(90.0, abs=1e-6)
+
+
+# --- Pulse guiding ---
+
+async def test_pulse_guide_moves_by_guide_rate_times_duration(monkeypatch) -> None:
+    clock = _fake_clock(monkeypatch)
+    mount = EqmodSimMount()
+    await mount.connect()
+    await mount.unpark()
+    await mount.sync(_coord(180.0, 45.0))
+    await mount.set_tracking(True)
+    await mount.pulse_guide("N", 50)
+    status = await mount.get_status()
+    expected = 45.0 + 0.5 * simulator._SIDEREAL_DEG_PER_SEC * 0.05
+    assert status.dec == pytest.approx(expected, abs=1e-9)
+    await mount.disconnect()
+
+
+async def test_pulse_guide_refused_while_parked() -> None:
+    mount = EqmodSimMount()
+    await mount.connect()
+    with pytest.raises(ValueError, match="parked"):
+        await mount.pulse_guide("N", 50)
+    await mount.disconnect()

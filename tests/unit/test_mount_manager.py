@@ -505,3 +505,40 @@ async def test_push_site_data_skips_mount_without_site_methods(
 
     loc = SiteItem(name="Test Site", latitude=48.85, longitude=2.35, altitude=35.0)
     await mm.push_site_data("m1", loc)  # no-op, no exception
+
+
+# --- pulse guiding (optional adapter capability) ---
+
+class _GuidingMount(FakeMount):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.pulses: list[tuple[str, int]] = []
+
+    async def pulse_guide(self, direction: str, duration_ms: int) -> None:
+        self.pulses.append((direction, duration_ms))
+
+
+@pytest.mark.asyncio
+async def test_pulse_guide_calls_the_adapter(mount_manager: MountManager, manager: DeviceManager) -> None:
+    manager.registry.register_mount("guiding", _GuidingMount)  # type: ignore[arg-type]
+    await manager.connect(DeviceConfig(device_id="g", kind="mount", adapter_key="guiding"))
+    await mount_manager.pulse_guide("g", "W", 250)
+    assert manager.get_mount("g").pulses == [("W", 250)]
+
+
+@pytest.mark.asyncio
+async def test_pulse_guide_unsupported_adapter(mount_manager: MountManager, manager: DeviceManager) -> None:
+    await connected_mount(manager)
+    with pytest.raises(ValueError, match="does not support pulse guiding"):
+        await mount_manager.pulse_guide("mount1", "N", 100)
+
+
+@pytest.mark.asyncio
+async def test_pulse_guide_refused_while_slewing(mount_manager: MountManager, manager: DeviceManager) -> None:
+    manager.registry.register_mount("guiding", _GuidingMount)  # type: ignore[arg-type]
+    await manager.connect(DeviceConfig(device_id="g", kind="mount", adapter_key="guiding"))
+    await mount_manager.set_target("g", SkyCoord(ra=1.0 * u.hourangle, dec=0.0 * u.deg, frame="icrs"))
+    await mount_manager.slew("g")
+    with pytest.raises(ValueError, match="busy"):
+        await mount_manager.pulse_guide("g", "N", 100)
+    await mount_manager.stop("g")

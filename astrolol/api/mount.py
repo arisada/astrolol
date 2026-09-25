@@ -1,6 +1,6 @@
 from typing import Literal
 from fastapi import APIRouter, HTTPException, Request
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 import astropy.units as u
 from astropy.coordinates import FK5, SkyCoord
 from astropy.time import Time
@@ -192,6 +192,22 @@ async def stop_move(device_id: str, request: Request) -> None:
         await _manager(request).stop_move(device_id)
     except (DeviceNotFoundError, DeviceKindError) as exc:
         raise HTTPException(status_code=404, detail=str(exc))
+
+
+class PulseGuideRequest(BaseModel):
+    direction: Literal["N", "S", "E", "W"]
+    duration_ms: int = Field(gt=0, le=10_000)
+
+
+@router.post("/{device_id}/pulse_guide", status_code=204)
+async def pulse_guide(device_id: str, body: PulseGuideRequest, request: Request) -> None:
+    """Guide pulse; responds once the pulse has completed. 409 if the mount can't guide now."""
+    try:
+        await _manager(request).pulse_guide(device_id, body.direction, body.duration_ms)
+    except (DeviceNotFoundError, DeviceKindError) as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc))
 
 
 @router.get("/{device_id}/settings", response_model=MountDeviceSettings)
