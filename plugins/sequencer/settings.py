@@ -1,5 +1,6 @@
-"""Sequencer plugin settings."""
-from pydantic import BaseModel
+"""Sequencer plugin settings (implementation-specific; not part of the core interface)."""
+
+from pydantic import BaseModel, Field
 
 
 class SequencerSettings(BaseModel):
@@ -8,27 +9,30 @@ class SequencerSettings(BaseModel):
     park_on_complete: bool = False
 
     # Guiding
-    stop_guide_before_slew: bool = True
-    restart_guide_after_slew: bool = True
-
-    # Meridian flip (checked at every frame boundary)
-    meridian_flip_enabled: bool = True
-    meridian_flip_ha_threshold: float = 0.1   # hours past meridian to trigger flip
-    plate_solve_after_flip: bool = True
-    refocus_after_flip: bool = False           # STUB
-
-    # Autofocus (all STUB — no autofocus plugin yet)
-    autofocus_before_start: bool = False
-    autofocus_on_temp_delta: float | None = 2.0   # °C change triggers refocus
-    autofocus_on_time_min: float | None = None    # minutes elapsed
-
-    # Guiding settle
-    guide_settle_time_s: int = 10
-    guide_settle_timeout_s: int = 60
+    guide_settle_pixels: float = Field(default=1.5, gt=0)
+    guide_settle_time_s: int = Field(default=10, ge=0)
+    guide_settle_timeout_s: int = Field(default=60, ge=1)
 
     # Dither
-    dither_pixels: float = 3.0
+    dither_pixels: float = Field(default=3.0, gt=0)
     dither_ra_only: bool = False
 
-    # Plate solve exposure for sequencer (short, unsaved)
-    plate_solve_duration_s: float = 5.0
+    # Meridian flip (owned by the sequencer while a run is active)
+    meridian_flip_enabled: bool = True
+    meridian_flip_ha_hours: float = Field(default=0.1, ge=0.0, le=2.0)
+    center_after_flip: bool = True
+
+    # Centering (passed to the platesolve plugin's center())
+    center_tolerance_arcsec: float = Field(default=60.0, gt=0)
+    center_max_attempts: int = Field(default=5, ge=1)
+    center_exposure_s: float = Field(default=5.0, gt=0)
+    center_binning: int = Field(default=2, ge=1, le=4)
+
+    # Resume behaviour
+    recenter_after_pause_min: float = Field(default=10.0, ge=0)
+
+    # Step timeouts
+    slew_timeout_s: float = Field(default=300.0, gt=0)
+    flip_timeout_s: float = Field(default=300.0, gt=0)
+    park_timeout_s: float = Field(default=180.0, gt=0)
+    exposure_timeout_margin_s: float = Field(default=120.0, gt=0)

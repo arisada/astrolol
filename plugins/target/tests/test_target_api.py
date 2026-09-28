@@ -292,3 +292,22 @@ def test_compute_ephemeris_moon_separation_range() -> None:
     assert 0.0 <= result.moon_separation <= 180.0
     assert result.moon_illumination is not None
     assert 0.0 <= result.moon_illumination <= 1.0
+
+
+# ── Python service (app.state.target_favorites) ───────────────────────────────
+
+def test_favorites_service_reads_persisted_favorites() -> None:
+    from unittest.mock import MagicMock
+
+    from plugins.target.service import FavoritesService
+
+    store = MagicMock()
+    store.get_user_settings.return_value.plugin_settings = {
+        "target": {"favorites": [{"id": "f1", "name": "Heart", "ra": 38.2, "dec": 61.45}]}
+    }
+    svc = FavoritesService(store)
+    assert [f.name for f in svc.list()] == ["Heart"]
+    fav = svc.get("f1")
+    assert fav is not None and fav.ra == 38.2
+    assert svc.get("missing") is None
+    assert FavoritesService(None).list() == []

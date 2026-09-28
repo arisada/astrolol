@@ -6,20 +6,11 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, BackgroundTasks, HTTPException, Query, Request
 from pydantic import BaseModel
 
-from plugins.object_resolver import simbad, solar_system
+from plugins.object_resolver import solar_system
 from plugins.object_resolver.catalog import ObjectCatalog
+from plugins.object_resolver.service import ObjectMatch, search_objects
 
 router = APIRouter(prefix="/plugins/object_resolver", tags=["object_resolver"])
-
-
-class ObjectMatch(BaseModel):
-    name: str
-    aliases: list[str]
-    ra: float
-    dec: float
-    type: str
-    source: str
-    distance_arcmin: float | None = None
 
 
 class CatalogStatus(BaseModel):
@@ -78,19 +69,7 @@ async def search(
 ) -> list[ObjectMatch]:
     t = _parse_when(when)
     settings = request.app.state.object_resolver_settings
-
-    results: list[dict] = _catalog(request).search(q, limit=limit)
-    for r in results:
-        r.setdefault("source", "catalog")
-
-    results.extend(solar_system.search(q, when=t))
-
-    if not results and settings.simbad_fallback:
-        hit = await simbad.resolve(q)
-        if hit:
-            results.append(hit)
-
-    return [ObjectMatch(**r) for r in results[:limit]]
+    return await search_objects(_catalog(request), settings, q, limit, t)
 
 
 @router.get("/resolve")

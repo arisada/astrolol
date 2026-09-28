@@ -1,4 +1,5 @@
 """Sequencer plugin — task-queue imaging automation."""
+
 from __future__ import annotations
 
 from pathlib import Path
@@ -7,9 +8,11 @@ import structlog
 from fastapi import FastAPI
 
 from astrolol.core.plugin_api import LogScope, PluginContext, PluginManifest
+from astrolol.core.sequencer import Sequencer
 from plugins.sequencer.api import router
-from plugins.sequencer.runner import SequenceRunner
+from plugins.sequencer.service import SequencerServiceImpl
 from plugins.sequencer.settings import SequencerSettings
+from plugins.sequencer.store import QueueStore
 
 logger = structlog.get_logger()
 
@@ -18,46 +21,46 @@ class SequencerPlugin:
     manifest = PluginManifest(
         id="sequencer",
         name="Sequencer",
-        version="0.1.0",
+        version="0.2.0",
         description=(
-            "Task-queue imaging sequencer — run ordered exposure plans with automatic "
-            "slew, plate solve, guiding, dithering, and meridian flip handling."
+            "Task-queue imaging sequencer — ordered exposure plans per target with slew, "
+            "centering, guiding, dithering and meridian flips, resumable at any point."
         ),
-        requires=["platesolve", "phd2"],
+        # Plate solving, PHD2, the target and object_resolver plugins are all optional:
+        # the steps that need them are skipped (and reported) when they are disabled.
+        requires=[],
         log_scopes=[LogScope(key="sequencer", label="Sequencer", logger="plugins.sequencer")],
     )
 
     def __init__(self) -> None:
-        self._runner: SequenceRunner | None = None
+        self._service: SequencerServiceImpl | None = None
 
     def setup(self, app: FastAPI, ctx: PluginContext) -> None:
-        cfg = ctx.get_plugin_settings("sequencer", SequencerSettings)
+        existing = getattr(app.state, "sequencer", None)
+        if existing is not None:
+            raise RuntimeError("Another sequencer implementation is already registered")
 
-        # Locate the state file next to profiles.json
+        cfg = ctx.get_plugin_settings("sequencer", SequencerSettings)
         if ctx.profile_store is not None:
             store_dir = Path(ctx.profile_store._path).parent
         else:
             store_dir = Path.home() / ".local" / "share" / "astrolol"
-        state_path = store_dir / "sequencer_state.json"
+        store = QueueStore(store_dir / "sequencer_queue.json")
 
-        self._runner = SequenceRunner(
-            event_bus=ctx.event_bus,
-            settings=cfg,
-            state_path=state_path,
-        )
-        self._runner.set_app(app)
-        app.state.sequence_runner = self._runner
+        self._service = SequencerServiceImpl(app=app, bus=ctx.event_bus, settings=cfg, store=store)
+        assert isinstance(self._service, Sequencer)
+        app.state.sequencer = self._service
         app.include_router(router)
-        logger.info("sequencer.plugin_setup", state_path=str(state_path))
+        logger.info(
+            "sequencer.plugin_setup", queue_path=str(store.path), tasks=len(self._service.entries)
+        )
 
     async def startup(self) -> None:
-        # Resume logic: restore progress from state file for tasks already in queue.
-        # (Queue is empty at startup; user adds tasks via the API.)
         pass
 
     async def shutdown(self) -> None:
-        if self._runner is not None:
-            await self._runner.cancel()
+        if self._service is not None:
+            await self._service.runner.shutdown()
 
 
 def get_plugin() -> SequencerPlugin:

@@ -12,6 +12,7 @@ from astrolol.core.plugin_api import LogScope, PluginContext, PluginManifest
 
 from plugins.object_resolver.api import router
 from plugins.object_resolver.catalog import ObjectCatalog
+from plugins.object_resolver.service import ObjectResolverService
 from plugins.object_resolver.settings import ObjectResolverSettings
 
 logger = structlog.get_logger()
@@ -48,6 +49,7 @@ class ObjectResolverPlugin:
         app.state.object_resolver_catalog = self._catalog
         app.state.object_resolver_settings = cfg
         app.state.object_resolver_syncing = False
+        app.state.object_resolver = ObjectResolverService(app)
 
         app.include_router(router)
         logger.info("object_resolver.plugin_setup", db_path=str(db_path))

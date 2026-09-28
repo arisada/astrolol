@@ -791,3 +791,19 @@ async def test_auto_flip_only_from_the_wrong_side(
     if task is not None:
         await task
         assert fake._pier_side == "East"
+
+
+@pytest.mark.asyncio
+async def test_auto_flip_suspended(manager: DeviceManager, event_bus) -> None:
+    """A sequencer suspends the automatic flip while it owns the mount; nesting is counted."""
+    mm, fake = await _limits_setup(manager, event_bus, auto_flip_enabled=True, auto_flip_ha_hours=1.0)
+    fake._pier_side, fake._hour_angle = "West", 1.2
+    with mm.suspend_auto_flip("m1"):
+        with mm.suspend_auto_flip("m1"):
+            pass
+        await mm._check_automation("m1")
+        assert mm._get_or_create("m1")._active_task is None
+    await mm._check_automation("m1")
+    task = mm._get_or_create("m1")._active_task
+    assert task is not None
+    await task

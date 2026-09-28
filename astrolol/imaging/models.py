@@ -36,6 +36,10 @@ class ExposureRequest(BaseModel):
         description="Number of exposures for a loop. Omit (or null) for infinite loop.",
     )
     save: bool = Field(default=True, description="Write to save directory; false = preview only")
+    object_name: str | None = Field(
+        default=None,
+        description="Object name for the FITS OBJECT header and %O; null = the mount's target name",
+    )
     dither: DitherConfig | None = Field(
         default=None,
         description="Dither configuration for loop mode. Ignored for single exposures.",

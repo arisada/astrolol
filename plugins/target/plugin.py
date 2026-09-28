@@ -26,7 +26,10 @@ class TargetPlugin:
 
     def setup(self, app: FastAPI, ctx: PluginContext) -> None:
         from plugins.target.api import router
+        from plugins.target.service import FavoritesService
+
         app.include_router(router)
+        app.state.target_favorites = FavoritesService(ctx.profile_store)
         logger.info("target.plugin_setup")
 
     async def startup(self) -> None:

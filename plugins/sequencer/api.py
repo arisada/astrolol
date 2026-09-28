@@ -1,64 +1,82 @@
-"""FastAPI router for the sequencer plugin."""
+"""REST routes for the sequencer — a thin layer over ``app.state.sequencer``.
+
+The router depends only on the core ``Sequencer`` protocol, not on this plugin's
+implementation, except for the settings routes (settings are implementation-specific).
+"""
+
 from __future__ import annotations
 
-from typing import Annotated
+from collections.abc import Awaitable, Callable
+from typing import Annotated, Literal, TypeVar
 
 import structlog
 from fastapi import APIRouter, HTTPException, Query, Request
 from pydantic import BaseModel
 
-from plugins.sequencer.models import ImagingTask, SequencerStatus
-from plugins.sequencer.runner import SequenceRunner
+from astrolol.core.sequencer import (
+    Boundary,
+    ImagingTask,
+    InvalidRequest,
+    PreflightFailed,
+    PreflightReport,
+    QueueEntry,
+    Sequencer,
+    SequencerBusy,
+    SequencerNotRunning,
+    SequencerStatus,
+    TaskLocked,
+    TaskNotFound,
+)
 from plugins.sequencer.settings import SequencerSettings
 
 logger = structlog.get_logger()
 router = APIRouter(prefix="/plugins/sequencer", tags=["sequencer"])
 
-
-def _runner(request: Request) -> SequenceRunner:
-    return request.app.state.sequence_runner  # type: ignore[no-any-return]
+T = TypeVar("T")
 
 
-# ── Queue management ──────────────────────────────────────────────────────────
-
-@router.get("/queue", response_model=list[ImagingTask])
-async def get_queue(request: Request) -> list[ImagingTask]:
-    """Return the full queue (pending, running, and completed tasks)."""
-    return _runner(request).list_tasks()
+def _seq(request: Request) -> Sequencer:
+    return request.app.state.sequencer  # type: ignore[no-any-return]
 
 
-@router.post("/queue", status_code=201, response_model=ImagingTask)
-async def add_task(task: ImagingTask, request: Request) -> ImagingTask:
-    """Append a task to the queue. The server assigns a UUID if not provided."""
-    # Always generate a fresh ID to prevent client-supplied UUID conflicts
-    import uuid
-    task = task.model_copy(update={"id": str(uuid.uuid4())})
-    _runner(request).add_task(task)
-    logger.info("sequencer.task_added", task_id=task.id, name=task.name)
-    return task
-
-
-@router.put("/queue/{task_id}", response_model=ImagingTask)
-async def update_task(task_id: str, task: ImagingTask, request: Request) -> ImagingTask:
-    """Replace a task (full update). Returns 409 if the task is currently running."""
-    task = task.model_copy(update={"id": task_id})
+async def _call(fn: Callable[[], Awaitable[T]]) -> T:
+    """Run a service call, mapping sequencer errors to HTTP status codes."""
     try:
-        return _runner(request).update_task(task_id, task)
-    except KeyError:
-        raise HTTPException(status_code=404, detail="Task not found")
-    except ValueError as exc:
-        raise HTTPException(status_code=409, detail=str(exc))
+        return await fn()
+    except TaskNotFound as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+    except (TaskLocked, SequencerBusy) as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except (InvalidRequest, SequencerNotRunning) as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except PreflightFailed as exc:
+        raise HTTPException(
+            status_code=422,
+            detail={"message": str(exc), "report": exc.report.model_dump(mode="json")},
+        ) from exc
 
 
-@router.delete("/queue/{task_id}", status_code=204)
-async def delete_task(task_id: str, request: Request) -> None:
-    """Remove a task from the queue. Returns 409 if the task is currently running."""
-    try:
-        _runner(request).delete_task(task_id)
-    except KeyError:
-        raise HTTPException(status_code=404, detail="Task not found")
-    except ValueError as exc:
-        raise HTTPException(status_code=409, detail=str(exc))
+class ActorBody(BaseModel):
+    actor: str = "user"
+    reason: str | None = None
+
+
+# ── Queue ─────────────────────────────────────────────────────────────────────
+
+
+@router.get("/queue", response_model=list[QueueEntry])
+async def get_queue(request: Request) -> list[QueueEntry]:
+    return await _seq(request).list_tasks()
+
+
+@router.post("/queue", status_code=201, response_model=QueueEntry)
+async def add_task(task: ImagingTask, request: Request, position: int | None = None) -> QueueEntry:
+    return await _call(lambda: _seq(request).add(task, position=position))
+
+
+@router.post("/queue/insert_next", status_code=201, response_model=QueueEntry)
+async def insert_next(task: ImagingTask, request: Request) -> QueueEntry:
+    return await _call(lambda: _seq(request).insert_next(task))
 
 
 class ReorderBody(BaseModel):
@@ -66,90 +84,149 @@ class ReorderBody(BaseModel):
 
 
 @router.post("/queue/reorder", status_code=204)
-async def reorder_queue(body: ReorderBody, request: Request) -> None:
-    """Reorder pending tasks. Non-pending tasks are unaffected."""
-    _runner(request).reorder_tasks(body.order)
+async def reorder(body: ReorderBody, request: Request) -> None:
+    await _call(lambda: _seq(request).reorder(body.order))
+
+
+_Clearable = Literal["pending", "interrupted", "completed", "failed", "skipped"]
 
 
 @router.delete("/queue", status_code=204)
-async def clear_queue(request: Request) -> None:
-    """Remove all pending (non-running, non-completed) tasks."""
-    _runner(request).clear_pending()
+async def clear_queue(
+    request: Request,
+    status: Annotated[list[_Clearable], Query()] = ["completed", "skipped"],  # noqa: B006
+) -> None:
+    await _call(lambda: _seq(request).clear(list(status)))
+
+
+@router.get("/queue/{task_id}", response_model=QueueEntry)
+async def get_task(task_id: str, request: Request) -> QueueEntry:
+    return await _call(lambda: _seq(request).get(task_id))
+
+
+@router.put("/queue/{task_id}", response_model=QueueEntry)
+async def update_task(task_id: str, task: ImagingTask, request: Request) -> QueueEntry:
+    return await _call(lambda: _seq(request).update(task_id, task))
+
+
+@router.delete("/queue/{task_id}", status_code=204)
+async def remove_task(task_id: str, request: Request) -> None:
+    await _call(lambda: _seq(request).remove(task_id))
+
+
+@router.post("/queue/{task_id}/duplicate", status_code=201, response_model=QueueEntry)
+async def duplicate_task(task_id: str, request: Request) -> QueueEntry:
+    return await _call(lambda: _seq(request).duplicate(task_id))
+
+
+@router.post("/queue/{task_id}/reset_progress", response_model=QueueEntry)
+async def reset_progress(task_id: str, request: Request) -> QueueEntry:
+    return await _call(lambda: _seq(request).reset_progress(task_id))
+
+
+@router.post("/queue/{task_id}/skip", response_model=QueueEntry)
+async def skip_task(task_id: str, request: Request, body: ActorBody | None = None) -> QueueEntry:
+    seq = _seq(request)
+    actor = body.actor if body else "user"
+    if seq.status().current_task_id == task_id:
+        await _call(lambda: seq.skip_current("frame", actor=actor))
+        return await _call(lambda: seq.get(task_id))
+    return await _call(lambda: seq.set_status(task_id, "skipped", actor=actor))
+
+
+@router.post("/queue/{task_id}/unskip", response_model=QueueEntry)
+async def unskip_task(task_id: str, request: Request, body: ActorBody | None = None) -> QueueEntry:
+    actor = body.actor if body else "user"
+    return await _call(lambda: _seq(request).set_status(task_id, "pending", actor=actor))
 
 
 # ── Control ───────────────────────────────────────────────────────────────────
 
+
+class PreflightBody(BaseModel):
+    task_ids: list[str] | None = None
+
+
+@router.post("/preflight", response_model=PreflightReport)
+async def preflight(request: Request, body: PreflightBody | None = None) -> PreflightReport:
+    return await _call(lambda: _seq(request).preflight(body.task_ids if body else None))
+
+
+class StartBody(BaseModel):
+    from_task: str | None = None
+    only: list[str] | None = None
+    actor: str = "user"
+
+
 @router.post("/start", status_code=202)
-async def start(request: Request) -> dict:
-    """Start the sequencer. Returns 409 if already running."""
-    runner = _runner(request)
-    try:
-        await runner.start()
-    except RuntimeError as exc:
-        raise HTTPException(status_code=409, detail=str(exc))
-    logger.info("sequencer.started")
+async def start(request: Request, body: StartBody | None = None) -> dict[str, str]:
+    b = body or StartBody()
+    await _call(lambda: _seq(request).start(from_task=b.from_task, only=b.only, actor=b.actor))
     return {"status": "started"}
 
 
 @router.post("/pause", status_code=204)
-async def pause(
-    request: Request,
-    mode: Annotated[str, Query()] = "after_frame",
-) -> None:
-    """Request a pause. mode = 'after_frame' (default) | 'after_task'."""
-    if mode not in ("after_frame", "after_task"):
-        raise HTTPException(status_code=422, detail="mode must be 'after_frame' or 'after_task'")
-    _runner(request).request_pause(mode)
-    logger.info("sequencer.pause_requested", mode=mode)
+async def pause(request: Request, when: Boundary = "frame", body: ActorBody | None = None) -> None:
+    actor = body.actor if body else "user"
+    await _call(lambda: _seq(request).pause(when, actor=actor))
 
 
 @router.post("/resume", status_code=204)
-async def resume(request: Request) -> None:
-    """Resume after a pause."""
-    _runner(request).resume()
-    logger.info("sequencer.resumed")
+async def resume(request: Request, body: ActorBody | None = None) -> None:
+    actor = body.actor if body else "user"
+    await _call(lambda: _seq(request).resume(actor=actor))
 
 
-@router.post("/cancel", status_code=204)
-async def cancel(request: Request) -> None:
-    """Cancel the running sequence."""
-    await _runner(request).cancel()
-    logger.info("sequencer.cancelled")
+@router.post("/stop", status_code=204)
+async def stop(request: Request, when: Boundary = "frame", body: ActorBody | None = None) -> None:
+    b = body or ActorBody()
+    await _call(lambda: _seq(request).stop(when, actor=b.actor, reason=b.reason))
 
 
-@router.post("/reset", status_code=204)
-async def reset(request: Request) -> None:
-    """Stop the runner, remove completed tasks, and delete the progress file."""
-    await _runner(request).reset()
-    logger.info("sequencer.reset")
+@router.post("/skip_current", status_code=204)
+async def skip_current(
+    request: Request, when: Boundary = "frame", body: ActorBody | None = None
+) -> None:
+    actor = body.actor if body else "user"
+    await _call(lambda: _seq(request).skip_current(when, actor=actor))
+
+
+class SwitchBody(BaseModel):
+    task_id: str
+    when: Boundary = "frame"
+    actor: str = "user"
+    reason: str | None = None
+
+
+@router.post("/switch", status_code=204)
+async def switch(body: SwitchBody, request: Request) -> None:
+    await _call(
+        lambda: _seq(request).switch_to(
+            body.task_id, body.when, actor=body.actor, reason=body.reason
+        )
+    )
 
 
 # ── Status & settings ─────────────────────────────────────────────────────────
 
+
 @router.get("/status", response_model=SequencerStatus)
 async def get_status(request: Request) -> SequencerStatus:
-    """Return current sequencer state and progress."""
-    return _runner(request).get_status()
+    return _seq(request).status()
 
 
 @router.get("/settings", response_model=SequencerSettings)
 async def get_settings(request: Request) -> SequencerSettings:
-    """Return current sequencer settings."""
-    return _runner(request)._settings
+    return request.app.state.sequencer.settings  # type: ignore[no-any-return]
 
 
 @router.put("/settings", response_model=SequencerSettings)
-async def put_settings(settings: SequencerSettings, request: Request) -> SequencerSettings:
-    """Update sequencer settings (persisted to profile store)."""
-    runner = _runner(request)
-    runner.update_settings(settings)
-
-    # Persist via profile store if available
+async def put_settings(body: SequencerSettings, request: Request) -> SequencerSettings:
+    request.app.state.sequencer.update_settings(body)
     store = getattr(request.app.state, "profile_store", None)
     if store is not None:
         current = store.get_user_settings()
-        new_ps = {**current.plugin_settings, "sequencer": settings.model_dump()}
-        store.update_user_settings(current.model_copy(update={"plugin_settings": new_ps}))
-
+        updated = {**current.plugin_settings, "sequencer": body.model_dump()}
+        store.update_user_settings(current.model_copy(update={"plugin_settings": updated}))
     logger.info("sequencer.settings_updated")
-    return settings
+    return body

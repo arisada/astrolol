@@ -1,770 +1,965 @@
-"""SequenceRunner — the async state machine coroutine for the sequencer plugin."""
+"""Runner — executes the queue: one asyncio task per run, one inner task per task body.
+
+Control model
+-------------
+Every control request (pause, stop, skip, switch, cancel) carries a boundary:
+
+- ``frame``/``task``: stored in ``_request``; the task body checks it at each frame
+  boundary (raising ``_BoundaryReached``), the run loop at each task boundary.
+- ``now``: stored the same way, and the inner task-body task is cancelled, which aborts the
+  in-flight exposure (the frame is discarded).
+
+After a boundary, ``_execute`` decides what happens to the current task. Pausing keeps the
+task RUNNING; resuming re-enters the task body, re-running setup (slew/center/guide) only
+when needed. Stopping or switching leaves the task INTERRUPTED with its progress.
+"""
+
 from __future__ import annotations
 
 import asyncio
-import json
-import os
-from pathlib import Path
-from typing import TYPE_CHECKING, Any
+import contextlib
+import math
+import time
+import uuid
+from dataclasses import dataclass, field
+from datetime import UTC, datetime
+from typing import TYPE_CHECKING, Any, Literal, cast
 
 import structlog
 
-from astrolol.mount.manager import meridian_flip_due
-from plugins.sequencer.events import (
-    SequenceCancelled,
-    SequenceCompleted,
-    SequenceFailed,
-    SequenceFrameCompleted,
-    SequencePaused,
-    SequenceResumed,
-    SequenceStarted,
-    SequenceStepChanged,
-    SequenceTaskCompleted,
-    SequenceTaskFailed,
+from astrolol.core.sequencer.errors import (
+    InvalidRequest,
+    PreflightFailed,
+    SequencerBusy,
+    SequencerNotRunning,
 )
-from plugins.sequencer.models import (
-    FilterExposure,
-    ImagingTask,
-    SequencerState,
+from astrolol.core.sequencer.events import (
+    SequencerFrameDiscarded,
+    SequencerFrameSaved,
+    SequencerInterruption,
+    SequencerResumed,
+    SequencerSessionFinished,
+    SequencerSessionStarted,
+    SequencerStatusChanged,
+    SequencerStepFailed,
+    SequencerTaskFinished,
+    SequencerTaskStarted,
+)
+from astrolol.core.sequencer.models import (
+    Activity,
+    Actor,
+    Boundary,
+    Interruption,
+    Lane,
+    LaneRuntime,
+    QueueEntry,
+    RunOutcome,
+    RunState,
     SequencerStatus,
     TaskStatus,
 )
+from astrolol.mount.manager import meridian_flip_due
+from plugins.sequencer.devices import LaneDevices, resolve_lane_devices, run_mount_id
 from plugins.sequencer.settings import SequencerSettings
+from plugins.sequencer.steps import StepError, Steps
+from plugins.sequencer.targets import ResolvedTarget
 
 if TYPE_CHECKING:
-    from astrolol.core.events import EventBus
+    from plugins.sequencer.service import SequencerServiceImpl
 
 logger = structlog.get_logger()
 
+SIDEREAL_RATE = 1.0027379  # hour angle advances this many hours per solar hour
+FLIP_LOOKAHEAD_MARGIN_S = 30.0  # download + overhead allowed after an exposure
+FLIP_POLL_S = 2.0  # mount polling interval while waiting for the flip point
+MAX_INTERRUPTIONS = 50
+RUNNABLE = (TaskStatus.PENDING, TaskStatus.INTERRUPTED)
+SWITCHABLE = (TaskStatus.PENDING, TaskStatus.INTERRUPTED, TaskStatus.FAILED, TaskStatus.SKIPPED)
 
-class SequencerPausedError(Exception):
-    """Raised internally to halt the runner in PAUSED state.
-
-    The runner task stays alive; the frame loop blocks on _resume_event.
-    """
-
-
-# ---------------------------------------------------------------------------
-# Progress persistence
-# ---------------------------------------------------------------------------
-
-class SequenceProgress:
-    """Tracks frame completion per task/group and persists to disk atomically."""
-
-    def __init__(self, state_path: Path) -> None:
-        self._path = state_path
-        self._data: dict[str, dict] = {}  # task_id → {done, group_frames}
-        self._load()
-
-    def _load(self) -> None:
-        if not self._path.exists():
-            return
-        try:
-            raw = json.loads(self._path.read_text())
-            if raw.get("schema_version") == 1:
-                self._data = raw.get("tasks", {})
-        except Exception:
-            self._data = {}
-
-    def frames_done(self, task_id: str, group_idx: int) -> int:
-        frames = self._data.get(task_id, {}).get("group_frames", [])
-        return frames[group_idx] if group_idx < len(frames) else 0
-
-    def is_task_done(self, task_id: str) -> bool:
-        return self._data.get(task_id, {}).get("done", False)
-
-    def record_frame(self, task_id: str, group_idx: int) -> None:
-        if task_id not in self._data:
-            self._data[task_id] = {"done": False, "group_frames": []}
-        frames = self._data[task_id]["group_frames"]
-        while len(frames) <= group_idx:
-            frames.append(0)
-        frames[group_idx] += 1
-        self._save()
-
-    def mark_task_done(self, task_id: str) -> None:
-        if task_id not in self._data:
-            self._data[task_id] = {"done": True, "group_frames": []}
-        else:
-            self._data[task_id]["done"] = True
-        self._save()
-
-    def _save(self) -> None:
-        self._path.parent.mkdir(parents=True, exist_ok=True)
-        payload = {"schema_version": 1, "tasks": self._data}
-        tmp = self._path.with_suffix(".tmp")
-        tmp.write_text(json.dumps(payload, indent=2))
-        os.replace(str(tmp), str(self._path))
-
-    def delete(self) -> None:
-        if self._path.exists():
-            self._path.unlink(missing_ok=True)
-        self._data = {}
+RequestKind = Literal["pause", "stop", "skip", "switch", "cancel"]
+_PRIORITY: dict[str, int] = {"pause": 0, "skip": 1, "switch": 1, "stop": 2, "cancel": 3}
 
 
-# ---------------------------------------------------------------------------
-# SequenceRunner
-# ---------------------------------------------------------------------------
+def _now() -> datetime:
+    return datetime.now(UTC)
 
-class SequenceRunner:
-    """Async state machine that drives the imaging task queue."""
 
-    def __init__(
-        self,
-        event_bus: "EventBus",
-        settings: SequencerSettings,
-        state_path: Path,
-    ) -> None:
-        self._event_bus = event_bus
-        self._settings = settings
-        self._progress = SequenceProgress(state_path)
+@dataclass
+class _Request:
+    kind: RequestKind
+    when: Boundary
+    actor: Actor
+    reason: str | None = None
+    task_id: str | None = None  # switch target
 
-        # Queue
-        self._queue: list[ImagingTask] = []
-        self._task_status: dict[str, TaskStatus] = {}
+    @property
+    def label(self) -> str:
+        return f"{self.kind}@{self.when}"
 
-        # Runtime state
-        self._state: SequencerState = SequencerState.IDLE
-        self._step_message: str | None = None
-        self._error: str | None = None
-        self._current_task_id: str | None = None
-        self._current_task_name: str | None = None
-        self._current_group_idx: int | None = None
-        self._frames_done_in_group: int | None = None
-        self._frames_total_in_group: int | None = None
 
-        # Async control primitives
-        self._run_lock = asyncio.Lock()
-        self._run_task: asyncio.Task | None = None  # the active runner coroutine task
-        self._running = False                        # True while _run_lock is held
-        self._pause_requested = False
-        self._pause_mode = "after_frame"
-        self._resume_event = asyncio.Event()
+class _BoundaryReached(Exception):
+    def __init__(self, request: _Request) -> None:
+        super().__init__(request.label)
+        self.request = request
 
-        # App reference — set by SequencerPlugin.setup()
-        self._app: Any = None
 
-    def set_app(self, app: Any) -> None:
-        self._app = app
+class _AbortRun(Exception):
+    pass
 
-    # ------------------------------------------------------------------
-    # Managers — looked up lazily via app.state (guarded; plugin may be absent)
-    # ------------------------------------------------------------------
 
-    def _imager_manager(self) -> Any:
-        return getattr(self._app.state, "imager_manager", None) if self._app else None
+@dataclass
+class _LaneState:
+    current_filter: str | None = None
+    rr_group: int | None = None
+    rr_taken: int = 0
 
-    def _mount_manager(self) -> Any:
-        return getattr(self._app.state, "mount_manager", None) if self._app else None
 
-    def _device_manager(self) -> Any:
-        return getattr(self._app.state, "device_manager", None) if self._app else None
+@dataclass
+class _TaskState:
+    """In-memory state of a task within one run."""
 
-    def _phd2_client(self) -> Any:
-        return getattr(self._app.state, "phd2_client", None) if self._app else None
+    lanes: dict[str, _LaneState] = field(default_factory=dict)
+    frames_since_dither: int = 0
+    setup_done: bool = False
+    flipped: bool = False
+    target: ResolvedTarget | None = None
+    devices: LaneDevices | None = None
 
-    def _solve_manager(self) -> Any:
-        return getattr(self._app.state, "solve_manager", None) if self._app else None
 
-    def _filter_wheel_manager(self) -> Any:
-        return getattr(self._app.state, "filter_wheel_manager", None) if self._app else None
+@dataclass
+class _Run:
+    actor: Actor
+    only: set[str] | None
+    excluded: set[str]
+    session_id: str = field(default_factory=lambda: uuid.uuid4().hex[:12])
+    forced_next: str | None = None
+    frames_saved: int = 0
+    tasks: dict[str, _TaskState] = field(default_factory=dict)
 
-    def _first_connected(self, kind: str) -> str | None:
-        dm = self._device_manager()
-        if dm is None:
-            return None
-        devices = [d for d in dm.list_connected() if d["kind"] == kind]
-        return devices[0]["device_id"] if devices else None
 
-    def _camera_id(self, task: ImagingTask) -> str | None:
-        return task.camera_device_id or self._first_connected("camera")
+@dataclass
+class _Outcome:
+    """Result of executing one task: continue with the next task, or end the run."""
 
-    def _filter_wheel_id(self, task: ImagingTask) -> str | None:
-        return task.filter_wheel_device_id or self._first_connected("filter_wheel")
+    end_run: bool = False
+    run_outcome: RunOutcome = RunOutcome.STOPPED
 
-    def _mount_id(self) -> str | None:
-        return self._first_connected("mount")
 
-    # ------------------------------------------------------------------
-    # Queue management
-    # ------------------------------------------------------------------
+class Runner:
+    def __init__(self, service: SequencerServiceImpl) -> None:
+        self._svc = service
+        self.app: Any = service.app
+        self.bus: Any = service.bus
+        self._steps = Steps(self)
 
-    def add_task(self, task: ImagingTask, *, restore_progress: bool = True) -> None:
-        self._queue.append(task)
-        # Restore progress from saved state
-        if restore_progress and self._progress.is_task_done(task.id):
-            self._task_status[task.id] = TaskStatus.COMPLETED
-        else:
-            self._task_status[task.id] = TaskStatus.PENDING
+        self._run: _Run | None = None
+        self._run_task: asyncio.Task[None] | None = None
+        self._exec_task: asyncio.Task[None] | None = None
+        self._request: _Request | None = None
+        self._resume_requested = False
+        self._resume_actor: Actor = "api"
+        self._wake = asyncio.Event()
 
-    def get_task(self, task_id: str) -> ImagingTask | None:
-        return next((t for t in self._queue if t.id == task_id), None)
+        self._state = RunState.IDLE
+        self._activity: Activity | None = None
+        self._message: str | None = None
+        self._current: QueueEntry | None = None
+        self._pause_reason: str | None = None
+        self._last_outcome: RunOutcome | None = None
+        self._last_error: str | None = None
+        self._exposure_started_at: datetime | None = None
+        self._exposure_duration: float | None = None
+        self._idle_event = asyncio.Event()
+        self._idle_event.set()
 
-    def get_task_status(self, task_id: str) -> TaskStatus | None:
-        return self._task_status.get(task_id)
+    # ── StepHost ───────────────────────────────────────────────────────────
 
-    def update_task(self, task_id: str, updated: ImagingTask) -> ImagingTask:
-        if self._task_status.get(task_id) == TaskStatus.RUNNING:
-            raise ValueError("Cannot modify a running task")
-        idx = next((i for i, t in enumerate(self._queue) if t.id == task_id), None)
-        if idx is None:
-            raise KeyError(task_id)
-        self._queue[idx] = updated
-        if self._task_status.get(task_id) != TaskStatus.COMPLETED:
-            self._task_status[task_id] = TaskStatus.PENDING
-        return updated
+    @property
+    def settings(self) -> SequencerSettings:
+        return self._svc.settings
 
-    def delete_task(self, task_id: str) -> None:
-        if task_id not in self._task_status:
-            raise KeyError(task_id)
-        if self._task_status.get(task_id) == TaskStatus.RUNNING:
-            raise ValueError("Cannot delete a running task")
-        self._queue = [t for t in self._queue if t.id != task_id]
-        self._task_status.pop(task_id, None)
+    async def set_activity(self, activity: Activity | None, message: str | None) -> None:
+        self._activity = activity
+        self._message = message
+        if self._current is not None and self._current.runtime.lanes:
+            self._current.runtime.lanes[0].activity = activity
+        await self.emit_status()
 
-    def reorder_tasks(self, order: list[str]) -> None:
-        """Reorder pending tasks according to the given ID list."""
-        pending_map = {
-            t.id: t for t in self._queue
-            if self._task_status.get(t.id) == TaskStatus.PENDING
-        }
-        non_pending = [
-            t for t in self._queue
-            if self._task_status.get(t.id) != TaskStatus.PENDING
-        ]
-        reordered = [pending_map[tid] for tid in order if tid in pending_map]
-        # Any pending tasks not mentioned in order stay at the end
-        mentioned = set(order)
-        rest = [t for t in self._queue if t.id in pending_map and t.id not in mentioned]
-        self._queue = non_pending + reordered + rest
+    # ── Status ─────────────────────────────────────────────────────────────
 
-    def clear_pending(self) -> None:
-        removed = {t.id for t in self._queue if self._task_status.get(t.id) == TaskStatus.PENDING}
-        self._queue = [t for t in self._queue if t.id not in removed]
-        for tid in removed:
-            self._task_status.pop(tid, None)
+    @property
+    def is_running(self) -> bool:
+        return self._run_task is not None and not self._run_task.done()
 
-    def list_tasks(self) -> list[ImagingTask]:
-        return list(self._queue)
+    @property
+    def current_task_id(self) -> str | None:
+        return self._current.task.id if self._current is not None else None
 
-    # ------------------------------------------------------------------
-    # Status
-    # ------------------------------------------------------------------
-
-    def get_status(self) -> SequencerStatus:
-        tasks_done = sum(1 for s in self._task_status.values() if s == TaskStatus.COMPLETED)
+    def status(self) -> SequencerStatus:
+        entries = self._svc.entries
+        cur = self._current
         return SequencerStatus(
-            state=self._state,
-            current_task_id=self._current_task_id,
-            current_task_name=self._current_task_name,
-            current_group_idx=self._current_group_idx,
-            frames_done=self._frames_done_in_group,
-            frames_total=self._frames_total_in_group,
-            step_message=self._step_message,
-            error=self._error,
-            queue_length=len(self._queue),
-            tasks_done=tasks_done,
+            run_state=self._state,
+            activity=self._activity,
+            message=self._message,
+            current_task_id=cur.task.id if cur else None,
+            lanes=[lr.model_copy() for lr in cur.runtime.lanes] if cur else [],
+            pause_reason=self._pause_reason,
+            pending_request=self._request.label if self._request else None,
+            stall=cur.runtime.stall if cur else None,
+            last_run_outcome=self._last_outcome,
+            last_error=self._last_error,
+            session_id=self._run.session_id if self._run else None,
+            tasks_total=len(entries),
+            tasks_done=sum(1 for e in entries if e.runtime.status == TaskStatus.COMPLETED),
+            exposure_started_at=self._exposure_started_at,
+            exposure_duration=self._exposure_duration,
+            eta_s=self._eta(),
         )
 
-    def is_running(self) -> bool:
-        return self._running
+    def _eta(self) -> float | None:
+        remaining = 0.0
+        for e in self._svc.entries:
+            if e.runtime.status not in (*RUNNABLE, TaskStatus.RUNNING):
+                continue
+            remaining += remaining_seconds(e)
+        return round(remaining, 1) if remaining > 0 else None
 
-    # ------------------------------------------------------------------
-    # Control
-    # ------------------------------------------------------------------
+    async def emit_status(self) -> None:
+        await self.bus.publish(SequencerStatusChanged(status=self.status()))
+        self._svc.notify()
 
-    async def start(self) -> None:
-        """Launch the runner task. Raises RuntimeError if already running."""
-        if self._running:
-            raise RuntimeError("Sequencer is already running")
-        self._running = True
-        self._error = None
-        self._run_task = asyncio.create_task(self.run(), name="sequencer_run")
+    async def _set_state(self, state: RunState) -> None:
+        self._state = state
+        await self.emit_status()
 
-    def request_pause(self, mode: str = "after_frame") -> None:
-        self._pause_requested = True
-        self._pause_mode = mode
+    # ── Control API (called by the service) ────────────────────────────────
 
-    def resume(self) -> None:
-        self._resume_event.set()
+    async def start(
+        self, candidates: list[QueueEntry], excluded: set[str], only: set[str] | None, actor: Actor
+    ) -> None:
+        if self.is_running:
+            raise SequencerBusy("The sequencer is already running")
+        report = await self._svc.preflight([e.task.id for e in candidates])
+        if not report.ok:
+            raise PreflightFailed(report)
+        self._request = None
+        self._resume_requested = False
+        self._last_error = None
+        self._pause_reason = None
+        self._run = _Run(actor=actor, only=only, excluded=excluded)
+        self._idle_event.clear()
+        self._state = RunState.STARTING
+        self._run_task = asyncio.create_task(self._main(self._run), name="sequencer_run")
+        logger.info(
+            "sequencer.run_started",
+            actor=actor,
+            tasks=len(candidates),
+            session_id=self._run.session_id,
+        )
 
-    async def cancel(self) -> None:
-        if self._run_task and not self._run_task.done():
+    async def request(
+        self,
+        kind: RequestKind,
+        when: Boundary,
+        actor: Actor,
+        reason: str | None = None,
+        task_id: str | None = None,
+    ) -> None:
+        if not self.is_running:
+            if kind in ("stop", "cancel"):
+                return  # nothing to stop — idempotent
+            raise SequencerNotRunning("The sequencer is not running")
+        if kind == "skip" and self._current is None:
+            raise InvalidRequest("No task is running")
+        if kind == "pause" and self._state == RunState.PAUSED:
+            return
+        existing = self._request
+        if existing is not None and _PRIORITY[existing.kind] > _PRIORITY[kind]:
+            logger.info("sequencer.request_ignored", kind=kind, pending=existing.label)
+            return
+        self._request = _Request(kind=kind, when=when, actor=actor, reason=reason, task_id=task_id)
+        logger.info(
+            "sequencer.request", kind=kind, when=when, actor=actor, reason=reason, task_id=task_id
+        )
+        if self._state not in (RunState.PAUSED, RunState.STARTING):
+            if kind == "pause":
+                self._state = RunState.PAUSING
+            elif kind in ("stop", "cancel"):
+                self._state = RunState.STOPPING
+        if when == "now" and self._exec_task is not None and not self._exec_task.done():
+            self._exec_task.cancel()
+        self._wake.set()
+        await self.emit_status()
+
+    async def resume(self, actor: Actor) -> None:
+        if not self.is_running:
+            raise SequencerNotRunning("The sequencer is not running")
+        if self._state == RunState.PAUSING and self._request and self._request.kind == "pause":
+            # Resume before the pause took effect: just drop the pending pause.
+            self._request = None
+            self._state = RunState.RUNNING
+            await self.emit_status()
+            return
+        if self._state != RunState.PAUSED:
+            return
+        self._resume_requested = True
+        self._resume_actor = actor
+        self._wake.set()
+
+    async def wait_idle(self) -> RunOutcome | None:
+        await self._idle_event.wait()
+        return self._last_outcome
+
+    async def shutdown(self) -> None:
+        if self._run_task is not None and not self._run_task.done():
             self._run_task.cancel()
-            try:
+            with contextlib.suppress(asyncio.CancelledError, Exception):
                 await self._run_task
-            except (asyncio.CancelledError, Exception):
-                pass
-        self._run_task = None
 
-    async def reset(self) -> None:
-        """Stop runner, remove completed tasks, delete state file."""
-        await self.cancel()
-        self._queue = [t for t in self._queue if self._task_status.get(t.id) != TaskStatus.COMPLETED]
-        for t in self._queue:
-            self._task_status[t.id] = TaskStatus.PENDING
-        self._progress.delete()
-        self._state = SequencerState.IDLE
-        self._error = None
-        self._step_message = None
-        self._current_task_id = None
-        self._current_task_name = None
-        self._current_group_idx = None
-        self._frames_done_in_group = None
-        self._frames_total_in_group = None
+    # ── Run loop ───────────────────────────────────────────────────────────
 
-    def update_settings(self, settings: SequencerSettings) -> None:
-        self._settings = settings
-
-    # ------------------------------------------------------------------
-    # Top-level runner coroutine
-    # ------------------------------------------------------------------
-
-    async def run(self) -> None:
-        async with self._run_lock:
-            try:
-                pending = [t for t in self._queue if self._task_status.get(t.id) == TaskStatus.PENDING]
-                if not pending:
-                    await self._transition(SequencerState.COMPLETED)
-                    await self._event_bus.publish(SequenceCompleted(tasks_done=self._count_done()))
-                    return
-
-                await self._event_bus.publish(SequenceStarted(task_count=len(pending)))
-
-                if self._settings.unpark_on_start:
-                    await self._step_unpark()
-
-                if self._settings.autofocus_before_start:
-                    await self._step_autofocus()  # STUB
-
-                for task in self._pending_tasks():
-                    await self._execute_task(task)
-
-                if self._settings.park_on_complete:
-                    await self._step_park()
-
-                await self._transition(SequencerState.COMPLETED)
-                await self._event_bus.publish(SequenceCompleted(tasks_done=self._count_done()))
-
-            except asyncio.CancelledError:
-                await self._transition(SequencerState.CANCELLED)
-                await self._event_bus.publish(SequenceCancelled())
-                raise
-            except SequencerPausedError:
-                pass  # state already set to PAUSED; runner task ends
-            except Exception as exc:
-                reason = str(exc)
-                await self._transition(SequencerState.FAILED, reason)
-                self._error = reason
-                await self._event_bus.publish(SequenceFailed(reason=reason))
-            finally:
-                self._running = False
-
-    # ------------------------------------------------------------------
-    # Per-task coroutine
-    # ------------------------------------------------------------------
-
-    async def _execute_task(self, task: ImagingTask) -> None:
-        self._task_status[task.id] = TaskStatus.RUNNING
-        self._current_task_id = task.id
-        self._current_task_name = task.name
-        self._current_group_idx = None
-        self._frames_done_in_group = None
-        self._frames_total_in_group = None
-
+    async def _main(self, run: _Run) -> None:
+        outcome = RunOutcome.COMPLETED
+        error: str | None = None
+        await self.bus.publish(SequencerSessionStarted(session_id=run.session_id, actor=run.actor))
+        mount_id = run_mount_id(self.app)
         try:
-            if task.do_slew and task.target_ra is not None:
-                if self._settings.stop_guide_before_slew:
-                    await self._step_stop_guide()
-                await self._step_slew(task)
-                if task.do_plate_solve:
-                    await self._step_plate_solve(task)
-                if self._settings.restart_guide_after_slew:
-                    await self._step_start_guide()
-
-            for group_idx, group in enumerate(task.exposures):
-                self._current_group_idx = group_idx
-                self._frames_total_in_group = group.count
-                frames_done = self._progress.frames_done(task.id, group_idx)
-                self._frames_done_in_group = frames_done
-
-                for frame_idx in range(frames_done, group.count):
-                    await self._check_pause()            # honours pause_event
-                    await self._check_meridian_flip(task)
-                    await self._check_autofocus_trigger()  # STUB — always skips
-
-                    if group.filter_name is not None:
-                        await self._step_change_filter(task, group.filter_name)
-                        if group.refocus:
-                            await self._step_autofocus()  # STUB
-
-                    fits_path = await self._step_expose(task, group)
-                    self._progress.record_frame(task.id, group_idx)
-                    self._frames_done_in_group = frame_idx + 1
-
-                    await self._event_bus.publish(SequenceFrameCompleted(
-                        task_id=task.id,
-                        group_idx=group_idx,
-                        frame_idx=frame_idx,
-                        frames_total=group.count,
-                        fits_path=fits_path,
-                    ))
-
-                    if task.dither_every and (frame_idx + 1) % task.dither_every == 0:
-                        await self._step_dither()
-
-                    if task.sub_delay_s > 0:
-                        await asyncio.sleep(task.sub_delay_s)
-
-            self._progress.mark_task_done(task.id)
-            self._task_status[task.id] = TaskStatus.COMPLETED
-            await self._event_bus.publish(SequenceTaskCompleted(task_id=task.id))
-
-        except (asyncio.CancelledError, SequencerPausedError):
-            self._task_status[task.id] = TaskStatus.FAILED
+            await self._set_state(RunState.STARTING)
+            if self.settings.unpark_on_start:
+                await self._steps.unpark(mount_id)
+            await self._set_state(RunState.RUNNING)
+            with self._auto_flip_suspended(mount_id):
+                while True:
+                    ended = await self._task_boundary(run)
+                    if ended is not None:
+                        outcome = ended
+                        break
+                    entry = self._next_entry(run)
+                    if entry is None:
+                        break
+                    if remaining_frames(entry) == 0:
+                        await self._finish_task(entry, TaskStatus.COMPLETED)
+                        continue
+                    result = await self._execute(entry, run)
+                    if result.end_run:
+                        outcome = result.run_outcome
+                        break
+            if outcome == RunOutcome.COMPLETED and self.settings.park_on_complete:
+                await self._steps.park(mount_id)
+        except (_AbortRun, StepError) as exc:
+            outcome, error = RunOutcome.FAILED, str(exc)
+        except asyncio.CancelledError:
+            outcome = RunOutcome.CANCELLED
+            await self._interrupt_current("cancel", "system", "sequencer shut down")
             raise
         except Exception as exc:
-            policy = task.on_error
-            if policy == "skip":
-                logger.warning("sequencer.task_skipped", task_id=task.id, error=str(exc))
-                self._task_status[task.id] = TaskStatus.FAILED
-                await self._event_bus.publish(SequenceTaskFailed(task_id=task.id, reason=str(exc)))
-            elif policy == "pause":
-                self._task_status[task.id] = TaskStatus.FAILED
-                await self._event_bus.publish(SequenceTaskFailed(task_id=task.id, reason=str(exc)))
-                self._error = str(exc)
-                await self._transition(SequencerState.PAUSED, str(exc))
-                await self._event_bus.publish(SequencePaused())
-                await self._resume_event.wait()
-                self._resume_event.clear()
-                await self._transition(SequencerState.IMAGING)
-                await self._event_bus.publish(SequenceResumed())
-                raise SequencerPausedError(str(exc)) from exc
-            else:  # abort
-                self._task_status[task.id] = TaskStatus.FAILED
-                await self._event_bus.publish(SequenceTaskFailed(task_id=task.id, reason=str(exc)))
-                raise
-
-    # ------------------------------------------------------------------
-    # Frame-boundary checks
-    # ------------------------------------------------------------------
-
-    async def _check_pause(self) -> None:
-        if not self._pause_requested:
-            return
-        self._pause_requested = False
-        await self._transition(SequencerState.PAUSED)
-        await self._event_bus.publish(SequencePaused())
-        await self._resume_event.wait()
-        self._resume_event.clear()
-        await self._transition(SequencerState.IMAGING)
-        await self._event_bus.publish(SequenceResumed())
-
-    async def _check_meridian_flip(self, task: ImagingTask) -> None:
-        if not self._settings.meridian_flip_enabled:
-            return
-        mount_id = self._mount_id()
-        mount_manager = self._mount_manager()
-        if mount_id is None or mount_manager is None:
-            return
-        try:
-            status = await mount_manager.get_status(mount_id)
-            ha = status.hour_angle
-            if ha is None or ha <= self._settings.meridian_flip_ha_threshold:
-                return
-            if meridian_flip_due(status.pier_side, ha) is False:
-                return  # already on the normal side for a western target
-        except Exception:
-            return
-
-        logger.info("sequencer.meridian_flip_needed", hour_angle=ha)
-        await self._transition(SequencerState.MERIDIAN_FLIP, "Performing meridian flip")
-
-        if self._settings.stop_guide_before_slew:
-            await self._step_stop_guide()
-
-        q = self._event_bus.subscribe()
-        try:
-            await mount_manager.meridian_flip(mount_id)
-            await self._drain_mount_event(
-                q,
-                ("MountMeridianFlipCompleted",),
-                error_types=("MountOperationFailed",),
-                timeout=300.0,
-            )
-        except Exception as exc:
-            logger.warning("sequencer.meridian_flip_failed", error=str(exc))
-            await self._transition(SequencerState.IMAGING)
-            return
+            logger.error("sequencer.run_crashed", error=str(exc), exc_info=True)
+            outcome, error = RunOutcome.FAILED, f"Internal error: {exc}"
+            await self._interrupt_current("crash", "system", error)
         finally:
-            self._event_bus.unsubscribe(q)
-
-        if self._settings.plate_solve_after_flip:
-            await self._step_plate_solve(task)
-
-        if self._settings.refocus_after_flip:
-            await self._step_autofocus()  # STUB
-
-        if self._settings.restart_guide_after_slew:
-            await self._step_start_guide()
-
-        await self._transition(SequencerState.IMAGING)
-
-    async def _check_autofocus_trigger(self) -> None:
-        # STUB — temperature delta and time-based triggers not yet implemented
-        pass
-
-    # ------------------------------------------------------------------
-    # Steps
-    # ------------------------------------------------------------------
-
-    async def _step_unpark(self) -> None:
-        await self._transition(SequencerState.UNPARKING, "Unparking mount")
-        mount_id = self._mount_id()
-        mm = self._mount_manager()
-        if mount_id is None or mm is None:
-            logger.warning("sequencer.unpark_skipped", reason="no mount connected")
-            return
-        try:
-            await mm.unpark(mount_id)
-        except Exception as exc:
-            logger.warning("sequencer.unpark_failed", error=str(exc))
-
-    async def _step_park(self) -> None:
-        await self._transition(SequencerState.PARKING, "Parking mount")
-        mount_id = self._mount_id()
-        mm = self._mount_manager()
-        if mount_id is None or mm is None:
-            logger.warning("sequencer.park_skipped", reason="no mount connected")
-            return
-        q = self._event_bus.subscribe()
-        try:
-            await mm.park(mount_id)
-            await self._drain_mount_event(q, ("MountParked",), timeout=120.0)
-        except Exception as exc:
-            logger.warning("sequencer.park_failed", error=str(exc))
-        finally:
-            self._event_bus.unsubscribe(q)
-
-    async def _step_slew(self, task: ImagingTask) -> None:
-        label = task.target_name or f"RA={task.target_ra:.3f} Dec={task.target_dec:.3f}"
-        await self._transition(SequencerState.SLEWING, f"Slewing to {label}")
-        mount_id = self._mount_id()
-        mm = self._mount_manager()
-        if mount_id is None or mm is None:
-            logger.warning("sequencer.slew_skipped", reason="no mount connected")
-            return
-
-        from astropy.coordinates import SkyCoord
-        import astropy.units as u
-
-        coord = SkyCoord(ra=task.target_ra * u.deg, dec=task.target_dec * u.deg, frame="icrs")
-        await mm.set_target(mount_id, coord, name=task.target_name, source="sequencer")
-        q = self._event_bus.subscribe()
-        try:
-            await mm.slew(mount_id)
-            await self._drain_mount_event(
-                q,
-                ("MountSlewCompleted",),
-                error_types=("MountSlewAborted", "MountOperationFailed"),
-                timeout=300.0,
-            )
-        finally:
-            self._event_bus.unsubscribe(q)
-
-    async def _step_plate_solve(self, task: ImagingTask) -> None:
-        await self._transition(SequencerState.PLATE_SOLVING, "Plate solving")
-        solve_manager = self._solve_manager()
-        imager_manager = self._imager_manager()
-        camera_id = self._camera_id(task)
-
-        if solve_manager is None:
-            logger.warning("sequencer.plate_solve_skipped", reason="solve_manager unavailable")
-            return
-        if imager_manager is None or camera_id is None:
-            logger.warning("sequencer.plate_solve_skipped", reason="no camera connected")
-            return
-
-        from astrolol.imaging.models import ExposureRequest
-        from plugins.platesolve.models import SolveRequest
-
-        try:
-            result = await imager_manager.expose(
-                camera_id,
-                ExposureRequest(duration=self._settings.plate_solve_duration_s, save=False),
-            )
-        except Exception as exc:
-            logger.warning("sequencer.plate_solve_expose_failed", error=str(exc))
-            return
-
-        req = SolveRequest(fits_path=result.fits_path)
-        if task.target_ra is not None and task.target_dec is not None:
-            req = req.model_copy(update={"ra_hint": task.target_ra, "dec_hint": task.target_dec})
-
-        job = await solve_manager.submit(req)
-
-        # Poll until the job reaches a terminal state
-        loop = asyncio.get_event_loop()
-        deadline = loop.time() + 120.0
-        while True:
-            current = solve_manager.get(job.id)
-            if current and current.status in ("completed", "failed", "cancelled"):
-                job = current
-                break
-            if loop.time() > deadline:
-                logger.warning("sequencer.plate_solve_timeout")
-                return
-            await asyncio.sleep(0.5)
-
-        if job.status != "completed" or job.result is None:
-            logger.warning("sequencer.plate_solve_failed", error=job.error or "unknown")
-            return
-
-        # Sync mount to the solved position
-        mount_id = self._mount_id()
-        mm = self._mount_manager()
-        if mount_id and mm:
-            from astropy.coordinates import SkyCoord
-            import astropy.units as u
-            coord = SkyCoord(ra=job.result.ra * u.deg, dec=job.result.dec * u.deg, frame="icrs")
-            try:
-                await mm.sync(mount_id, coord)
-                logger.info(
-                    "sequencer.plate_solved",
-                    ra=job.result.ra,
-                    dec=job.result.dec,
+            self._run = None
+            self._request = None
+            self._current = None
+            self._activity = None
+            self._message = None
+            self._exposure_started_at = None
+            self._exposure_duration = None
+            self._pause_reason = None
+            self._last_outcome = outcome
+            self._last_error = error
+            self._state = RunState.IDLE
+            self._idle_event.set()
+            await self.bus.publish(
+                SequencerSessionFinished(
+                    session_id=run.session_id,
+                    outcome=outcome,
+                    error=error,
+                    frames_saved=run.frames_saved,
                 )
-            except Exception as exc:
-                logger.warning("sequencer.plate_solve_sync_failed", error=str(exc))
-
-    async def _step_start_guide(self) -> None:
-        await self._transition(SequencerState.GUIDING, "Starting PHD2 guiding")
-        phd2 = self._phd2_client()
-        if phd2 is None:
-            logger.warning("sequencer.guide_skipped", reason="phd2_client unavailable")
-            return
-        try:
-            await phd2.guide(
-                settle_pixels=1.5,
-                settle_time=self._settings.guide_settle_time_s,
-                settle_timeout=self._settings.guide_settle_timeout_s,
             )
-        except Exception as exc:
-            logger.warning("sequencer.guide_start_failed", error=str(exc))
-
-    async def _step_stop_guide(self) -> None:
-        phd2 = self._phd2_client()
-        if phd2 is None:
-            return
-        try:
-            await phd2.stop_capture()
-        except Exception as exc:
-            logger.warning("sequencer.guide_stop_failed", error=str(exc))
-
-    async def _step_dither(self) -> None:
-        await self._transition(SequencerState.DITHERING, "Dithering")
-        phd2 = self._phd2_client()
-        if phd2 is None:
-            logger.warning("sequencer.dither_skipped", reason="phd2_client unavailable")
-            await self._transition(SequencerState.IMAGING)
-            return
-        try:
-            await phd2.dither(
-                pixels=self._settings.dither_pixels,
-                ra_only=self._settings.dither_ra_only,
-                settle_pixels=1.5,
-                settle_time=self._settings.guide_settle_time_s,
-                settle_timeout=self._settings.guide_settle_timeout_s,
-            )
-        except Exception as exc:
-            logger.warning("sequencer.dither_failed", error=str(exc))
-        await self._transition(SequencerState.IMAGING)
-
-    async def _step_change_filter(self, task: ImagingTask, filter_name: str) -> None:
-        fw_id = self._filter_wheel_id(task)
-        fw_manager = self._filter_wheel_manager()
-        dm = self._device_manager()
-        if fw_id is None or fw_manager is None or dm is None:
-            logger.warning("sequencer.filter_skipped", reason="no filter wheel connected")
-            return
-        try:
-            fw = dm.get_filter_wheel(fw_id)
-            status = await fw.get_status()
-            names = status.filter_names or []
-            try:
-                slot = names.index(filter_name) + 1  # 1-based
-            except ValueError:
-                logger.warning("sequencer.filter_not_found", filter_name=filter_name, available=names)
-                return
-            await fw_manager.select_filter(fw_id, slot)
-        except Exception as exc:
-            logger.warning("sequencer.filter_change_failed", error=str(exc))
-
-    async def _step_expose(self, task: ImagingTask, group: FilterExposure) -> str:
-        await self._transition(SequencerState.IMAGING, "Exposing")
-        camera_id = self._camera_id(task)
-        imager_manager = self._imager_manager()
-        if camera_id is None or imager_manager is None:
-            raise RuntimeError("No camera available for exposure")
-
-        from astrolol.imaging.models import ExposureRequest
-
-        req = ExposureRequest(
-            duration=group.duration,
-            gain=group.gain,
-            binning=group.binning,
-            save=True,
-        )
-        result = await imager_manager.expose(camera_id, req)
-        return result.fits_path
-
-    async def _step_autofocus(self) -> None:
-        """STUB — autofocus plugin not yet available."""
-        logger.info("sequencer.autofocus_stub", message="Autofocus not yet available — skipping")
-
-    # ------------------------------------------------------------------
-    # Helpers
-    # ------------------------------------------------------------------
-
-    async def _transition(self, state: SequencerState, message: str | None = None) -> None:
-        self._state = state
-        if message is not None:
-            self._step_message = message
-        if message:
-            await self._event_bus.publish(
-                SequenceStepChanged(state=state.value, message=message)
+            await self.emit_status()
+            logger.info(
+                "sequencer.run_finished", outcome=outcome, error=error, frames=run.frames_saved
             )
 
-    async def _drain_mount_event(
-        self,
-        q: asyncio.Queue,
-        success_types: tuple[str, ...],
-        error_types: tuple[str, ...] = (),
-        timeout: float = 300.0,
-    ) -> None:
-        """Drain *q* until a matching mount event arrives.
+    async def _task_boundary(self, run: _Run) -> RunOutcome | None:
+        """Handle a request pending between tasks. Returns an outcome to end the run."""
+        req = self._take_request()
+        while req is not None:
+            if req.kind in ("stop", "cancel"):
+                await self._publish_interruption(None, req)
+                return RunOutcome.CANCELLED if req.kind == "cancel" else RunOutcome.STOPPED
+            if req.kind == "switch":
+                run.forced_next = req.task_id
+                return None
+            if req.kind == "skip":
+                return None  # the task it aimed at has finished already
+            # pause between tasks
+            await self._publish_interruption(None, req)
+            self._pause_reason = "user"
+            req, paused_s = await self._wait_paused()
+            if req is None:
+                await self.bus.publish(
+                    SequencerResumed(
+                        task_id=None,
+                        actor=self._resume_actor,
+                        paused_s=paused_s,
+                        setup_rerun=False,
+                    )
+                )
+                await self._set_state(RunState.RUNNING)
+        return None
 
-        The caller must subscribe to the event bus BEFORE triggering the hardware
-        action so that events published synchronously inside the action are captured.
-        """
-        loop = asyncio.get_event_loop()
-        deadline = loop.time() + timeout
-        while True:
-            remaining = deadline - loop.time()
-            if remaining <= 0:
-                raise TimeoutError("Timed out waiting for mount event")
-            try:
-                event = await asyncio.wait_for(q.get(), timeout=min(remaining, 5.0))
-            except asyncio.TimeoutError:
+    def _next_entry(self, run: _Run) -> QueueEntry | None:
+        if run.forced_next is not None:
+            tid, run.forced_next = run.forced_next, None
+            entry = self._svc.find(tid)
+            if entry is not None and entry.runtime.status in SWITCHABLE:
+                return entry
+        for entry in self._svc.entries:
+            tid = entry.task.id
+            if entry.runtime.status not in RUNNABLE or tid in run.excluded:
                 continue
-            class_name = type(event).__name__
-            if class_name in success_types:
+            if run.only is not None and tid not in run.only:
+                continue
+            return entry
+        return None
+
+    # ── One task ───────────────────────────────────────────────────────────
+
+    async def _execute(self, entry: QueueEntry, run: _Run) -> _Outcome:
+        task, rt = entry.task, entry.runtime
+        ts = run.tasks.setdefault(task.id, _TaskState())
+        resumed = rt.status == TaskStatus.INTERRUPTED or rt.frames_done() > 0
+        rt.status = TaskStatus.RUNNING
+        rt.started_at = rt.started_at or _now()
+        rt.finished_at = None
+        rt.last_error = None
+        rt.stall = None
+        self._current = entry
+        await self._svc.commit()
+        await self.bus.publish(
+            SequencerTaskStarted(task_id=task.id, name=task.display_name, resumed=resumed)
+        )
+        logger.info(
+            "sequencer.task_started", task_id=task.id, name=task.display_name, resumed=resumed
+        )
+
+        setup_needed = True
+        while True:
+            request: _Request | None = None
+            error: StepError | None = None
+            self._exec_task = asyncio.create_task(
+                self._task_body(entry, ts, setup_needed),
+                name=f"sequencer_task_{task.id[:8]}",
+            )
+            try:
+                await self._exec_task
+            except _BoundaryReached as br:
+                request = br.request
+            except asyncio.CancelledError:
+                current = asyncio.current_task()
+                if current is not None and current.cancelling():
+                    raise  # the whole run is being cancelled
+                request = self._request or _Request(kind="cancel", when="now", actor="system")
+            except StepError as exc:
+                error = exc
+            finally:
+                self._exec_task = None
+                self._exposure_started_at = None
+                self._exposure_duration = None
+
+            if request is None and error is None:
+                await self._finish_task(entry, TaskStatus.COMPLETED)
+                return _Outcome()
+
+            if error is not None:
+                decision = await self._on_error(entry, ts, error, run)
+            else:
+                assert request is not None
+                if self._request is request:
+                    self._request = None
+                decision = await self._on_request(entry, ts, request, run)
+            if isinstance(decision, _Outcome):
+                return decision
+            setup_needed = decision  # retry/resume the same task
+
+    async def _on_request(
+        self, entry: QueueEntry, ts: _TaskState, req: _Request, run: _Run
+    ) -> _Outcome | bool:
+        """Act on a request at a boundary of the current task.
+
+        Returns an _Outcome (task done with, continue or end the run), or a bool meaning
+        "re-enter the task body", with whether setup must be re-run.
+        """
+        task = entry.task
+        if req.kind == "pause":
+            await self._publish_interruption(task.id, req, record_on=entry)
+            self._pause_reason = "user"
+            pointing = await self._pointing()
+            nreq, paused_s = await self._wait_paused()
+            if nreq is None:
+                return await self._resumed(entry, ts, paused_s, pointing, force_setup=False)
+            return await self._on_request(entry, ts, nreq, run)
+
+        if req.kind in ("stop", "cancel"):
+            interruption = await self._publish_interruption(task.id, req)
+            await self._finish_task(entry, TaskStatus.INTERRUPTED, interruption)
+            return _Outcome(
+                end_run=True,
+                run_outcome=(RunOutcome.CANCELLED if req.kind == "cancel" else RunOutcome.STOPPED),
+            )
+
+        if req.kind == "skip":
+            interruption = await self._publish_interruption(task.id, req)
+            await self._finish_task(entry, TaskStatus.SKIPPED, interruption)
+            return _Outcome()
+
+        # switch
+        if req.task_id == task.id:
+            return False  # switching to the running task: carry on
+        interruption = await self._publish_interruption(task.id, req)
+        await self._finish_task(entry, TaskStatus.INTERRUPTED, interruption)
+        run.excluded.add(task.id)
+        run.forced_next = req.task_id
+        return _Outcome()
+
+    async def _on_error(
+        self, entry: QueueEntry, ts: _TaskState, err: StepError, run: _Run
+    ) -> _Outcome | bool:
+        task, rt = entry.task, entry.runtime
+        policy = task.on_error
+        rt.last_error = str(err)
+        await self.bus.publish(
+            SequencerStepFailed(
+                task_id=task.id,
+                step=err.step,
+                error=str(err),
+                handling=policy,
+            )
+        )
+        logger.warning(
+            "sequencer.step_failed", task_id=task.id, step=err.step, error=str(err), handling=policy
+        )
+
+        if policy == "skip":
+            await self._finish_task(entry, TaskStatus.FAILED)
+            return _Outcome()
+        if policy == "defer":
+            interruption = Interruption(
+                at=_now(),
+                kind="defer",
+                actor="system",
+                reason=str(err),
+                stall_kind=err.stall_kind,
+            )
+            await self.bus.publish(
+                SequencerInterruption(
+                    task_id=task.id,
+                    kind="defer",
+                    actor="system",
+                    reason=str(err),
+                    stall_kind=err.stall_kind,
+                )
+            )
+            await self._finish_task(entry, TaskStatus.INTERRUPTED, interruption)
+            run.excluded.add(task.id)
+            return _Outcome()
+        if policy == "abort":
+            await self._finish_task(entry, TaskStatus.FAILED)
+            raise _AbortRun(str(err))
+
+        # pause: the task stays RUNNING; resume retries the failed step
+        self._pause_reason = str(err)
+        pointing = await self._pointing()
+        nreq, paused_s = await self._wait_paused()
+        if nreq is None:
+            rt.last_error = None
+            return await self._resumed(entry, ts, paused_s, pointing, force_setup=err.needs_setup)
+        return await self._on_request(entry, ts, nreq, run)
+
+    async def _resumed(
+        self,
+        entry: QueueEntry,
+        ts: _TaskState,
+        paused_s: float,
+        pointing_before: tuple[float, float] | None,
+        *,
+        force_setup: bool,
+    ) -> bool:
+        moved = False
+        if pointing_before is not None:
+            after = await self._pointing()
+            if after is not None and _separation_deg(pointing_before, after) > 0.25:
+                moved = True
+        setup = (
+            force_setup
+            or not ts.setup_done
+            or moved
+            or paused_s > self.settings.recenter_after_pause_min * 60
+        )
+        self._pause_reason = None
+        await self.bus.publish(
+            SequencerResumed(
+                task_id=entry.task.id,
+                actor=self._resume_actor,
+                paused_s=round(paused_s, 1),
+                setup_rerun=setup,
+            )
+        )
+        logger.info(
+            "sequencer.resumed", task_id=entry.task.id, paused_s=round(paused_s, 1), setup=setup
+        )
+        await self._set_state(RunState.RUNNING)
+        return setup
+
+    async def _wait_paused(self) -> tuple[_Request | None, float]:
+        """Block in PAUSED until resumed (→ None) or another request arrives."""
+        t0 = time.monotonic()
+        self._resume_requested = False
+        await self.set_activity(None, "Paused")
+        await self._set_state(RunState.PAUSED)
+        while True:
+            req = self._take_request()
+            if req is not None and req.kind != "pause":
+                return req, time.monotonic() - t0
+            if self._resume_requested:
+                self._resume_requested = False
+                return None, time.monotonic() - t0
+            self._wake.clear()
+            await self._wake.wait()
+
+    def _take_request(self) -> _Request | None:
+        req, self._request = self._request, None
+        return req
+
+    # ── Task body ──────────────────────────────────────────────────────────
+
+    async def _task_body(self, entry: QueueEntry, ts: _TaskState, setup_needed: bool) -> None:
+        task = entry.task
+        lane = task.lanes[0]
+        ts.devices = resolve_lane_devices(self.app, lane)
+        if ts.devices.camera_id is None:
+            raise StepError("expose", f"Camera '{lane.camera_id or 'main'}' is not connected")
+        if setup_needed or not ts.setup_done:
+            await self._setup(entry, ts)
+        await self._primary_lane(entry, ts, lane)
+
+    async def _setup(self, entry: QueueEntry, ts: _TaskState) -> None:
+        task, rt = entry.task, entry.runtime
+        assert ts.devices is not None
+        ts.setup_done = False
+        ts.target = await self._steps.resolve_target(task)
+        rt.resolved_ra, rt.resolved_dec = ts.target.ra, ts.target.dec
+        has_coords = ts.target.ra is not None
+        if task.slew and has_coords:
+            await self._steps.stop_guiding(task.id)
+            await self._steps.slew(task, ts.target, ts.devices.mount_id)
+            ts.flipped = False
+        if task.center:
+            if has_coords:
+                await self._steps.center(task, ts.target, ts.devices)
+            else:
+                await self._steps.skipped(
+                    task.id, "center", "the target has no coordinates (current pointing)"
+                )
+        if task.start_guiding:
+            await self._steps.start_guiding(task.id)
+        if task.autofocus_at_start:
+            await self._steps.skipped(
+                task.id, "autofocus", "autofocus integration is not implemented yet"
+            )
+        ts.frames_since_dither = 0
+        for ls in ts.lanes.values():
+            ls.current_filter = None
+        ts.setup_done = True
+
+    async def _primary_lane(self, entry: QueueEntry, ts: _TaskState, lane: Lane) -> None:
+        task = entry.task
+        devices = ts.devices
+        assert devices is not None
+        lrt = lane_runtime(entry, lane.id)
+        ls = ts.lanes.setdefault(lane.id, _LaneState())
+        while True:
+            gidx = next_group(lane, lrt, ls)
+            if gidx is None:
                 return
-            if class_name in error_types:
-                raise RuntimeError(f"Mount operation failed: {class_name}")
+            group = lane.groups[gidx]
+            self._check_boundary()
+            await self._maybe_flip(entry, ts, group.duration)
+            if group.filter_name is not None and ls.current_filter != group.filter_name:
+                await self._steps.change_filter(task.id, devices, group.filter_name)
+                ls.current_filter = group.filter_name
+            lrt.current_group = gidx
+            done = lrt.groups[gidx].frames_done
+            label = f"{group.filter_name} " if group.filter_name else ""
+            self._exposure_started_at = _now()
+            self._exposure_duration = group.duration
+            await self.set_activity(
+                Activity.EXPOSING,
+                f"Exposing {label}{done + 1}/{group.count} ({group.duration:g} s)",
+            )
+            try:
+                fits_path = await self._steps.expose(task, devices, group)
+            except asyncio.CancelledError:
+                await self.bus.publish(
+                    SequencerFrameDiscarded(
+                        task_id=task.id,
+                        lane_id=lane.id,
+                        group_idx=gidx,
+                        reason="exposure aborted",
+                    )
+                )
+                raise
+            finally:
+                self._exposure_started_at = None
+                self._exposure_duration = None
+            lrt.groups[gidx].frames_done += 1
+            if lane.order == "round_robin":
+                ls.rr_taken += 1
+            if self._run is not None:
+                self._run.frames_saved += 1
+            await self.bus.publish(
+                SequencerFrameSaved(
+                    task_id=task.id,
+                    lane_id=lane.id,
+                    group_idx=gidx,
+                    frame_idx=done,
+                    frames_total=group.count,
+                    filter_name=group.filter_name,
+                    duration=group.duration,
+                    fits_path=fits_path,
+                )
+            )
+            await self._svc.commit()
+            ts.frames_since_dither += 1
 
-    def _pending_tasks(self) -> list[ImagingTask]:
-        return [t for t in self._queue if self._task_status.get(t.id) == TaskStatus.PENDING]
+            if next_group(lane, lrt, ls, peek=True) is None:
+                return
+            self._check_boundary()
+            if task.dither_every and ts.frames_since_dither >= task.dither_every:
+                await self._steps.dither(task.id)
+                ts.frames_since_dither = 0
+            if task.sub_delay_s > 0:
+                await self._sleep(task.sub_delay_s, Activity.WAITING, "Waiting between frames")
 
-    def _count_done(self) -> int:
-        return sum(1 for s in self._task_status.values() if s == TaskStatus.COMPLETED)
+    def _check_boundary(self) -> None:
+        req = self._request
+        if req is not None and req.when in ("frame", "now"):
+            raise _BoundaryReached(req)
+
+    async def _sleep(self, seconds: float, activity: Activity, message: str) -> None:
+        """Sleep while honouring frame-boundary requests."""
+        await self.set_activity(activity, message)
+        deadline = time.monotonic() + seconds
+        while True:
+            self._check_boundary()
+            left = deadline - time.monotonic()
+            if left <= 0:
+                return
+            await asyncio.sleep(min(left, 1.0))
+
+    # ── Meridian flip ──────────────────────────────────────────────────────
+
+    async def _maybe_flip(self, entry: QueueEntry, ts: _TaskState, duration: float) -> None:
+        """Flip now if due; if the next exposure would cross the flip point, wait for it."""
+        cfg = self.settings
+        mm = getattr(self.app.state, "mount_manager", None)
+        mount_id = ts.devices.mount_id if ts.devices else None
+        if not cfg.meridian_flip_enabled or mm is None or mount_id is None:
+            return
+        status = await self._mount_status(mount_id)
+        if status is None or status.hour_angle is None:
+            return
+        ha = (status.hour_angle + 12.0) % 24.0 - 12.0
+        threshold = cfg.meridian_flip_ha_hours
+        known_pier = status.pier_side in ("East", "West")
+        if not known_pier and ts.flipped:
+            return  # unknown pier side: flip at most once per target
+        if ha >= threshold:
+            if meridian_flip_due(status.pier_side, ha) is not False:
+                await self._flip(entry, ts, mount_id)
+            return
+        if status.pier_side == "East":
+            return  # already on the side used for western targets: no flip coming
+        ha_end = ha + (duration + FLIP_LOOKAHEAD_MARGIN_S) / 3600.0 * SIDEREAL_RATE
+        if ha_end <= threshold:
+            return
+        wait_s = (threshold - ha) * 3600.0 / SIDEREAL_RATE
+        await self.set_activity(
+            Activity.WAITING, f"Waiting {math.ceil(wait_s / 60)} min for the meridian flip"
+        )
+        # Poll the mount rather than trusting a computed sleep: it's the mount's HA that
+        # decides, and frame-boundary requests stay responsive meanwhile.
+        while True:
+            self._check_boundary()
+            status = await self._mount_status(mount_id)
+            if status is None or status.hour_angle is None:
+                return
+            ha = (status.hour_angle + 12.0) % 24.0 - 12.0
+            if ha >= threshold:
+                break
+            left_s = (threshold - ha) * 3600.0 / SIDEREAL_RATE
+            await asyncio.sleep(min(max(left_s, 0.05), FLIP_POLL_S))
+        if meridian_flip_due(status.pier_side, ha) is not False:
+            await self._flip(entry, ts, mount_id)
+
+    async def _flip(self, entry: QueueEntry, ts: _TaskState, mount_id: str) -> None:
+        task = entry.task
+        await self._steps.stop_guiding(task.id)
+        flipped = await self._steps.meridian_flip(task, mount_id)
+        ts.flipped = True
+        if (
+            flipped
+            and self.settings.center_after_flip
+            and ts.target is not None
+            and ts.target.ra is not None
+        ):
+            assert ts.devices is not None
+            await self._steps.center(task, ts.target, ts.devices)
+        if task.start_guiding:
+            await self._steps.start_guiding(task.id)
+        ts.frames_since_dither = 0
+
+    async def _mount_status(self, mount_id: str) -> Any:
+        mm = getattr(self.app.state, "mount_manager", None)
+        if mm is None:
+            return None
+        try:
+            return await mm.get_status(mount_id)
+        except Exception as exc:
+            logger.warning("sequencer.mount_status_failed", mount_id=mount_id, error=str(exc))
+            return None
+
+    async def _pointing(self) -> tuple[float, float] | None:
+        """Current mount RA/Dec in degrees (to detect a mount moved during a pause)."""
+        mount_id = run_mount_id(self.app)
+        if mount_id is None:
+            return None
+        status = await self._mount_status(mount_id)
+        if status is None or status.ra is None or status.dec is None:
+            return None
+        return status.ra * 15.0, status.dec
+
+    def _auto_flip_suspended(self, mount_id: str | None) -> contextlib.AbstractContextManager[None]:
+        mm = getattr(self.app.state, "mount_manager", None)
+        if mm is None or mount_id is None or not hasattr(mm, "suspend_auto_flip"):
+            return contextlib.nullcontext()
+        return cast(contextlib.AbstractContextManager[None], mm.suspend_auto_flip(mount_id))
+
+    # ── Bookkeeping ────────────────────────────────────────────────────────
+
+    async def _publish_interruption(
+        self, task_id: str | None, req: _Request, record_on: QueueEntry | None = None
+    ) -> Interruption:
+        kind = "switch" if req.kind == "switch" else req.kind
+        interruption = Interruption(at=_now(), kind=kind, actor=req.actor, reason=req.reason)
+        await self.bus.publish(
+            SequencerInterruption(
+                task_id=task_id,
+                kind=kind,
+                actor=req.actor,
+                reason=req.reason,
+                boundary=req.when,
+            )
+        )
+        logger.info(
+            "sequencer.interruption", task_id=task_id, kind=kind, actor=req.actor, reason=req.reason
+        )
+        if record_on is not None:
+            _record(record_on, interruption)
+            await self._svc.commit()
+        return interruption
+
+    async def _finish_task(
+        self, entry: QueueEntry, status: TaskStatus, interruption: Interruption | None = None
+    ) -> None:
+        rt = entry.runtime
+        rt.status = status
+        rt.stall = None
+        for lr in rt.lanes:
+            lr.activity = None
+            lr.current_group = None
+        if status in (TaskStatus.COMPLETED, TaskStatus.FAILED, TaskStatus.SKIPPED):
+            rt.finished_at = _now()
+        if interruption is not None:
+            _record(entry, interruption)
+        if self._current is entry:
+            self._current = None
+            self._activity = None
+            self._message = None
+        self._svc.task_left(entry.task.id)
+        await self._svc.commit()
+        await self.bus.publish(
+            SequencerTaskFinished(task_id=entry.task.id, status=status, error=rt.last_error)
+        )
+        logger.info(
+            "sequencer.task_finished", task_id=entry.task.id, status=status, error=rt.last_error
+        )
+        await self.emit_status()
+
+    async def _interrupt_current(
+        self, kind: Literal["cancel", "crash"], actor: Actor, reason: str
+    ) -> None:
+        entry = self._current
+        if entry is None or entry.runtime.status != TaskStatus.RUNNING:
+            return
+        interruption = Interruption(at=_now(), kind=kind, actor=actor, reason=reason)
+        with contextlib.suppress(Exception):
+            await self._finish_task(entry, TaskStatus.INTERRUPTED, interruption)
+
+
+# ── Helpers (pure) ─────────────────────────────────────────────────────────────
+
+
+def _record(entry: QueueEntry, interruption: Interruption) -> None:
+    items = entry.runtime.interruptions
+    items.append(interruption)
+    del items[:-MAX_INTERRUPTIONS]
+
+
+def _separation_deg(a: tuple[float, float], b: tuple[float, float]) -> float:
+    ra1, dec1 = map(math.radians, a)
+    ra2, dec2 = map(math.radians, b)
+    cos_sep = math.sin(dec1) * math.sin(dec2) + math.cos(dec1) * math.cos(dec2) * math.cos(
+        ra1 - ra2
+    )
+    return math.degrees(math.acos(max(-1.0, min(1.0, cos_sep))))
+
+
+def lane_runtime(entry: QueueEntry, lane_id: str) -> LaneRuntime:
+    return next(lr for lr in entry.runtime.lanes if lr.lane_id == lane_id)
+
+
+def next_group(lane: Lane, lrt: LaneRuntime, ls: _LaneState, *, peek: bool = False) -> int | None:
+    """Index of the group the lane's next frame belongs to, or None when the lane is done."""
+    incomplete = [i for i, g in enumerate(lane.groups) if lrt.groups[i].frames_done < g.count]
+    if not incomplete:
+        return None
+    if lane.order == "sequential":
+        return incomplete[0]
+    cur = ls.rr_group
+    if cur is not None and cur in incomplete and ls.rr_taken < lane.round_robin_batch:
+        return cur
+    nxt = incomplete[0] if cur is None else next((i for i in incomplete if i > cur), incomplete[0])
+    if not peek:
+        ls.rr_group, ls.rr_taken = nxt, 0
+    return nxt
+
+
+def remaining_frames(entry: QueueEntry) -> int:
+    lane = entry.task.lanes[0]
+    lrt = lane_runtime(entry, lane.id)
+    return sum(
+        max(0, g.count - p.frames_done) for g, p in zip(lane.groups, lrt.groups, strict=True)
+    )
+
+
+def remaining_seconds(entry: QueueEntry) -> float:
+    lane = entry.task.lanes[0]
+    lrt = lane_runtime(entry, lane.id)
+    return sum(
+        max(0, g.count - p.frames_done) * g.duration
+        for g, p in zip(lane.groups, lrt.groups, strict=True)
+    )

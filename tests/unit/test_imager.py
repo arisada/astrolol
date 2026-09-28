@@ -328,3 +328,57 @@ async def test_do_expose_tree_profile_resolves_filter_name_for_save_path(
     result = await imager_manager.expose("cam1", ExposureRequest(duration=1.0, save=True))
 
     assert Path(result.fits_path).name == "R_000001.fits"
+
+
+@pytest.mark.asyncio
+async def test_request_object_name_overrides_the_mount_target(
+    manager: DeviceManager, event_bus, tmp_path: Path
+) -> None:
+    """A sequencer names frames after its task target, even when it didn't slew."""
+    from astropy.coordinates import SkyCoord
+    from astropy.io import fits as astrofits
+    from astrolol.mount.manager import MountManager
+
+    inv_store, profile = await _tree_only_rig(manager, tmp_path)
+    mount_manager = MountManager(device_manager=manager, event_bus=event_bus)
+    await mount_manager.set_target("mount1", SkyCoord(ra=83.8, dec=-5.4, unit="deg"), name="M42")
+    imager_manager = ImagerManager(
+        device_manager=manager, event_bus=event_bus, images_dir=tmp_path,
+        equipment_store=inv_store, mount_manager=mount_manager,
+    )
+    imager_manager.set_context(profile)
+
+    result = await imager_manager.expose(
+        "cam1", ExposureRequest(duration=1.0, save=False, object_name="Horsehead")
+    )
+    with astrofits.open(result.fits_path) as hdul:
+        assert hdul[0].header["OBJECT"] == "Horsehead"
+
+
+@pytest.mark.asyncio
+async def test_cancelled_expose_aborts_and_frees_the_camera(
+    imager_manager: ImagerManager, manager: DeviceManager
+) -> None:
+    """Cancelling expose() (e.g. a sequencer "stop now") must not leave the camera EXPOSING."""
+    await connected_camera(manager)
+    camera = manager.get_camera("cam1")
+    started = asyncio.Event()
+    aborted: list[bool] = []
+
+    async def slow_expose(params):  # type: ignore[no-untyped-def]
+        started.set()
+        await asyncio.sleep(10)
+
+    async def abort() -> None:
+        aborted.append(True)
+
+    camera.expose = slow_expose  # type: ignore[method-assign]
+    camera.abort = abort  # type: ignore[method-assign]
+
+    task = asyncio.create_task(imager_manager.expose("cam1", ExposureRequest(duration=5.0)))
+    await started.wait()
+    task.cancel()
+    with pytest.raises(asyncio.CancelledError):
+        await task
+    assert aborted == [True]
+    assert imager_manager.get_status("cam1").state == ImagerState.IDLE

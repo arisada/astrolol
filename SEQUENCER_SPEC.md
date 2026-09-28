@@ -360,7 +360,7 @@ status codes.
 ```python
 class Sequencer(Protocol):
     # ── Queue ─────────────────────────────────────────────────────────────
-    async def list(self) -> list[QueueEntry]
+    async def list_tasks(self) -> list[QueueEntry]
     async def get(self, task_id: str) -> QueueEntry
     async def add(self, task: ImagingTask, *, position: int | None = None) -> QueueEntry
     async def insert_next(self, task: ImagingTask) -> QueueEntry   # right after the current task

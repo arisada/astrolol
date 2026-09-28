@@ -205,7 +205,18 @@ class ImagerManager:
         """Take a single exposure. Raises if camera is already busy."""
         imager = self._get_or_create(device_id)
         self._require_idle(imager)
-        return await self._do_expose(imager, request)
+        try:
+            return await self._do_expose(imager, request)
+        except asyncio.CancelledError:
+            # Cancelled by the caller (e.g. a sequencer "stop now"): abort the hardware
+            # exposure and free the camera, otherwise it stays EXPOSING forever.
+            imager.state = ImagerState.IDLE
+            try:
+                await self._device_manager.get_camera(device_id).abort()
+            except Exception as exc:
+                logger.warning("imager.cancel_abort_failed", device_id=device_id, error=str(exc))
+            logger.info("imager.exposure_cancelled", device_id=device_id)
+            raise
 
     async def start_loop(self, device_id: str, request: ExposureRequest) -> None:
         """Start a looping exposure sequence. Returns immediately; events stream results."""
@@ -339,8 +350,13 @@ class ImagerManager:
                 pass  # best-effort — never block an exposure
 
         # Snapshot metadata for filename tokens and FITS OBJECT header.
-        object_name = ""
-        if self._mount_manager is not None and my_path is not None and my_path.mount_device_id is not None:
+        object_name = request.object_name or ""
+        if (
+            not object_name
+            and self._mount_manager is not None
+            and my_path is not None
+            and my_path.mount_device_id is not None
+        ):
             target = self._mount_manager.get_target(my_path.mount_device_id)
             if target and target.name:
                 object_name = target.name

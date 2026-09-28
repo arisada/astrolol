@@ -300,3 +300,19 @@ def test_simbad_not_called_when_local_results_exist(tmp_path: Path) -> None:
             c.get("/plugins/object_resolver/search", params={"q": "Andromeda"})
     cat.close()
     mock_resolve.assert_not_called()
+
+
+# ── Python service (app.state.object_resolver) ────────────────────────────────
+
+async def test_service_lookup_exact_name_or_alias(catalog: ObjectCatalog) -> None:
+    from plugins.object_resolver.service import ObjectResolverService
+
+    svc = ObjectResolverService(_make_app(catalog))
+    by_alias = await svc.lookup("m31")
+    assert by_alias is not None and abs(by_alias.ra - 10.685) < 0.01
+    by_common = await svc.lookup("crab nebula")
+    assert by_common is not None and abs(by_common.dec - 22.015) < 0.01
+    planet = await svc.lookup("Jupiter")
+    assert planet is not None and planet.source == "solar_system"
+    # A substring hit is not an exact match: no silent wrong guess
+    assert await svc.lookup("Andromeda") is None

@@ -1,4 +1,6 @@
 import asyncio
+import contextlib
+from collections.abc import Iterator
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Callable
@@ -88,6 +90,7 @@ class MountManager:
         self._auto_flip_triggered: set[str] = set()       # device_ids that flipped this transit
         self._auto_park_last: dict[str, tuple[int, int]] = {}  # device_id → (h, m) last parked
         self._horizon_triggered: set[str] = set()          # device_ids that crossed the horizon limit
+        self._flip_suspended: dict[str, int] = {}          # device_id → suspend_auto_flip depth
 
     # --- Public API ---
 
@@ -377,6 +380,26 @@ class MountManager:
         raw = self._profile_store.get_user_settings().mount_settings.get(device_id, {})
         return MountDeviceSettings(**raw)
 
+    @contextlib.contextmanager
+    def suspend_auto_flip(self, device_id: str) -> Iterator[None]:
+        """Suspend the automatic meridian flip for *device_id* while the context is active.
+
+        Used by a sequencer that performs flips itself at frame boundaries, so two
+        components never flip the mount at once. Nestable. Horizon checks and auto-park
+        stay active.
+        """
+        self._flip_suspended[device_id] = self._flip_suspended.get(device_id, 0) + 1
+        logger.info("mount.auto_flip_suspended", device_id=device_id)
+        try:
+            yield
+        finally:
+            depth = self._flip_suspended.get(device_id, 1) - 1
+            if depth <= 0:
+                self._flip_suspended.pop(device_id, None)
+                logger.info("mount.auto_flip_restored", device_id=device_id)
+            else:
+                self._flip_suspended[device_id] = depth
+
     def start_automation(self, device_id: str) -> None:
         """Start the automation loop for *device_id* — idempotent, safe to call repeatedly."""
         task = self._automation_tasks.get(device_id)
@@ -444,7 +467,7 @@ class MountManager:
         await self._check_horizon(device_id, cfg, status)
 
         # ── Auto meridian flip when HA exceeds threshold ──────────────────────
-        if cfg.auto_flip_enabled:
+        if cfg.auto_flip_enabled and device_id not in self._flip_suspended:
             ha = status.hour_angle
             if ha is None:
                 return

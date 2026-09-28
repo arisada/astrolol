@@ -1,0 +1,255 @@
+"""Fake managers for sequencer tests — no hardware, controllable timing and failures."""
+
+from __future__ import annotations
+
+import asyncio
+import contextlib
+import time
+from collections.abc import Callable, Iterator
+from pathlib import Path
+from types import SimpleNamespace
+from typing import Any
+
+from astrolol.core.events import (
+    EventBus,
+    MountMeridianFlipCompleted,
+    MountParked,
+    MountSlewCompleted,
+)
+from astrolol.core.sequencer.models import ExposureGroup, ImagingTask, Lane, TargetRef
+from plugins.phd2.events import Phd2Settled
+from plugins.sequencer.service import SequencerServiceImpl
+from plugins.sequencer.settings import SequencerSettings
+from plugins.sequencer.store import QueueStore
+
+
+async def wait_until(cond: Callable[[], bool], timeout: float = 3.0) -> None:
+    deadline = time.monotonic() + timeout
+    while not cond():
+        if time.monotonic() > deadline:
+            raise AssertionError("condition not met in time")
+        await asyncio.sleep(0.002)
+
+
+class FakeImager:
+    def __init__(self) -> None:
+        self.requests: list[tuple[str, Any]] = []
+        self.fail_next: list[Exception] = []
+        self.gate: asyncio.Event | None = None  # when set: exposures wait for it
+        self.exposing = False
+        self.cancelled = 0
+        self.saved = 0
+
+    async def expose(self, camera_id: str, req: Any) -> Any:
+        self.requests.append((camera_id, req))
+        if self.fail_next:
+            raise self.fail_next.pop(0)
+        self.exposing = True
+        try:
+            if self.gate is not None:
+                await self.gate.wait()
+            else:
+                await asyncio.sleep(0.003)
+        except asyncio.CancelledError:
+            self.cancelled += 1
+            raise
+        finally:
+            self.exposing = False
+        self.saved += 1
+        return SimpleNamespace(fits_path=f"/tmp/frame_{self.saved}.fits")
+
+
+class FakeMountManager:
+    def __init__(self, bus: EventBus) -> None:
+        self._bus = bus
+        self.ha0 = -2.0
+        self.ha_speed = 0.0  # hours of HA per real second
+        self._t0 = time.monotonic()
+        self.pier: str | None = "West"
+        self.parked = False
+        self.ra_h = 1.0
+        self.dec = 40.0
+        self.slews: list[tuple[float, float, str | None]] = []
+        self.flips = 0
+        self.fail_slew: list[str] = []
+        self.suspended = 0
+        self.events: list[str] = []
+
+    def set_ha(self, ha: float, speed: float = 0.0) -> None:
+        self.ha0, self.ha_speed, self._t0 = ha, speed, time.monotonic()
+
+    @property
+    def ha(self) -> float:
+        return self.ha0 + (time.monotonic() - self._t0) * self.ha_speed
+
+    async def get_status(self, mount_id: str) -> Any:
+        return SimpleNamespace(
+            hour_angle=self.ha,
+            pier_side=self.pier,
+            is_parked=self.parked,
+            ra=self.ra_h,
+            dec=self.dec,
+        )
+
+    async def set_target(
+        self, mount_id: str, coord: Any, name: str | None = None, source: str | None = None
+    ) -> None:
+        self._target = (coord.ra.deg, coord.dec.deg, name)
+
+    async def slew(self, mount_id: str) -> None:
+        if self.fail_slew:
+            raise ValueError(self.fail_slew.pop(0))
+        self.slews.append(self._target)
+        self.ra_h, self.dec = self._target[0] / 15.0, self._target[1]
+        self.events.append("slew")
+        await self._bus.publish(
+            MountSlewCompleted(device_id=mount_id, ra=self._target[0], dec=self._target[1])
+        )
+
+    async def meridian_flip(self, mount_id: str) -> None:
+        self.flips += 1
+        self.pier = "East"
+        self.events.append("flip")
+        await self._bus.publish(MountMeridianFlipCompleted(device_id=mount_id))
+
+    async def unpark(self, mount_id: str) -> None:
+        self.parked = False
+        self.events.append("unpark")
+
+    async def park(self, mount_id: str) -> None:
+        self.parked = True
+        self.events.append("park")
+        await self._bus.publish(MountParked(device_id=mount_id))
+
+    @contextlib.contextmanager
+    def suspend_auto_flip(self, mount_id: str) -> Iterator[None]:
+        self.suspended += 1
+        try:
+            yield
+        finally:
+            self.suspended -= 1
+
+
+class FakePhd2:
+    def __init__(self, bus: EventBus) -> None:
+        self._bus = bus
+        self.connected = True
+        self.state = "Stopped"
+        self.guides = 0
+        self.dithers = 0
+        self.stops = 0
+        self.settle_error: str | None = None
+
+    def get_status(self) -> Any:
+        return SimpleNamespace(connected=self.connected, state=self.state)
+
+    async def guide(self, **kwargs: Any) -> None:
+        self.guides += 1
+        self.state = "Guiding"
+        await self._bus.publish(Phd2Settled(error=self.settle_error))
+
+    async def stop_capture(self) -> None:
+        self.stops += 1
+        self.state = "Stopped"
+
+    async def dither(self, **kwargs: Any) -> None:
+        self.dithers += 1
+
+
+class FakeSolveManager:
+    def __init__(self) -> None:
+        self.calls: list[dict[str, Any]] = []
+        self.results: list[Any] = []
+
+    async def center(self, **kwargs: Any) -> Any:
+        self.calls.append(kwargs)
+        if self.results:
+            return self.results.pop(0)
+        return SimpleNamespace(
+            success=True, failure=None, attempts=[1], final_error_arcsec=12.0, message=None
+        )
+
+
+class FakeFilterWheelManager:
+    def __init__(self, names: list[str]) -> None:
+        self.names = names
+        self.slot: int | None = 1
+        self.selected: list[int] = []
+
+    async def get_status(self, fw_id: str) -> Any:
+        return SimpleNamespace(filter_names=self.names, current_slot=self.slot)
+
+    async def select_filter(self, fw_id: str, slot: int) -> None:
+        self.selected.append(slot)
+        self.slot = slot
+
+
+class FakeDeviceManager:
+    def __init__(self, devices: list[tuple[str, str]]) -> None:
+        self.devices = devices  # (device_id, kind)
+
+    def list_connected(self) -> list[dict[str, str]]:
+        return [{"device_id": d, "kind": k} for d, k in self.devices]
+
+
+class Rig:
+    """A fake app wired with every manager the sequencer can use."""
+
+    def __init__(self, tmp_path: Path, settings: SequencerSettings | None = None) -> None:
+        self.bus = EventBus()
+        self.imager = FakeImager()
+        self.mount = FakeMountManager(self.bus)
+        self.phd2 = FakePhd2(self.bus)
+        self.solver = FakeSolveManager()
+        self.fwm = FakeFilterWheelManager(["L", "R", "G", "B", "Ha"])
+        self.dm = FakeDeviceManager(
+            [("cam1", "camera"), ("mount1", "mount"), ("fw1", "filter_wheel")]
+        )
+        self.app = SimpleNamespace(
+            state=SimpleNamespace(
+                device_manager=self.dm,
+                imager_manager=self.imager,
+                mount_manager=self.mount,
+                filter_wheel_manager=self.fwm,
+                phd2_client=self.phd2,
+                solve_manager=self.solver,
+                active_profile=None,
+                equipment_store=None,
+            )
+        )
+        self.store_path = tmp_path / "sequencer_queue.json"
+        self.settings = settings or SequencerSettings()
+        self.svc = SequencerServiceImpl(
+            self.app, self.bus, self.settings, QueueStore(self.store_path)
+        )
+        self.events: list[Any] = []
+        self._q = self.bus.subscribe()
+
+    def drain(self) -> list[Any]:
+        while not self._q.empty():
+            self.events.append(self._q.get_nowait())
+        return self.events
+
+    def of(self, type_: str) -> list[Any]:
+        return [e for e in self.drain() if e.type == type_]
+
+    def reload(self) -> SequencerServiceImpl:
+        """A fresh service on the same store (simulated restart)."""
+        return SequencerServiceImpl(self.app, self.bus, self.settings, QueueStore(self.store_path))
+
+
+def make_task(
+    name: str = "M 42",
+    groups: list[ExposureGroup] | None = None,
+    *,
+    ra: float | None = 83.8,
+    dec: float | None = -5.4,
+    kind: str = "coordinates",
+    **kwargs: Any,
+) -> ImagingTask:
+    target = TargetRef(kind=kind, name=name, ra=ra, dec=dec)  # type: ignore[arg-type]
+    return ImagingTask(
+        target=target,
+        lanes=[Lane(groups=groups or [ExposureGroup(duration=1.0, count=2)])],
+        **kwargs,
+    )
