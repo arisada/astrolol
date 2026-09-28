@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import math
 import shutil
 import tempfile
@@ -23,6 +24,8 @@ from plugins.platesolve.events import (
     PlatesolveStarted,
 )
 from astrolol.core.events.models import LogEvent
+from plugins.platesolve.centering import CenterRequest, CenterResult, CenterRun, Centerer
+from plugins.platesolve.enrich import enrich_request
 from plugins.platesolve.models import SolveJob, SolveRequest, SolveResult
 
 logger = structlog.get_logger()
@@ -121,6 +124,68 @@ class SolveManager:
         self._astap_bin = astap_bin
         self._astap_db_path = astap_db_path
         self._jobs: dict[str, _Job] = {}
+        self._app: Any = None
+        self._center_run: CenterRun | None = None
+        self._center_task: asyncio.Task[None] | None = None
+
+    def attach_app(self, app: Any) -> None:
+        """Give the manager access to app.state (mount, imager, profile) for centering."""
+        self._app = app
+
+    # ------------------------------------------------------------------
+    # Centering
+    # ------------------------------------------------------------------
+
+    def _centerer(self) -> Centerer:
+        if self._app is None:
+            raise RuntimeError("SolveManager.attach_app() was not called")
+        app = self._app
+
+        async def enrich(req: SolveRequest, camera_id: str) -> SolveRequest:
+            return await enrich_request(req, app, camera_id)
+
+        return Centerer(app, self._event_bus, solve=self._solve, enrich=enrich)
+
+    async def center(self, **kwargs: Any) -> CenterResult:
+        """Center a target (see CenterRequest for the arguments). Awaitable and cancellable;
+        returns a CenterResult, raises on mount errors."""
+        return await self._centerer().run(CenterRequest(**kwargs))
+
+    async def start_center(self, req: CenterRequest) -> CenterRun:
+        """Start a centering run in the background (REST). ValueError if one is running."""
+        if self._center_task is not None and not self._center_task.done():
+            raise ValueError("A centering run is already in progress")
+        run = CenterRun(id=uuid4().hex[:12], status="running", request=req, started_at=_now())
+        self._center_run = run
+
+        async def _go() -> None:
+            try:
+                run.result = await self._centerer().run(req, run_id=run.id)
+                run.status = "completed" if run.result.success else "failed"
+                run.error = None if run.result.success else run.result.message
+            except asyncio.CancelledError:
+                run.status = "cancelled"
+                raise
+            except Exception as exc:
+                run.status = "failed"
+                run.error = str(exc)
+                logger.warning("platesolve.center_error", run_id=run.id, error=str(exc))
+
+        self._center_task = asyncio.create_task(_go(), name=f"platesolve_center_{run.id}")
+        return run.model_copy()
+
+    def center_run(self) -> CenterRun | None:
+        return self._center_run.model_copy() if self._center_run is not None else None
+
+    async def cancel_center(self) -> None:
+        task = self._center_task
+        if task is not None and not task.done():
+            task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await task
+        # A task cancelled before it first ran never reaches its own handler.
+        if self._center_run is not None and self._center_run.status == "running":
+            self._center_run.status = "cancelled"
 
     # ------------------------------------------------------------------
     # Public API

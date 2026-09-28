@@ -272,6 +272,8 @@ class Steps:
                 camera_id=devices.camera_id,
                 ra=target.ra,
                 dec=target.dec,
+                name=target.name,
+                slew_first=False,  # the task setup (or the flip) has just slewed
                 tolerance_arcsec=cfg.center_tolerance_arcsec,
                 max_attempts=cfg.center_max_attempts,
                 exposure_s=cfg.center_exposure_s,

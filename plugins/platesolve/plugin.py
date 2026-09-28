@@ -37,6 +37,7 @@ class PlatesolvePlugin:
             astap_bin=cfg.astap_bin,
             astap_db_path=cfg.astap_db_path,
         )
+        self._manager.attach_app(app)
         app.state.solve_manager = self._manager
 
         app.include_router(router)
@@ -56,6 +57,7 @@ class PlatesolvePlugin:
         for job in self._manager._jobs.values():
             if job.task is not None and not job.task.done():
                 job.task.cancel()
+        await self._manager.cancel_center()
 
 
 def get_plugin() -> PlatesolvePlugin:

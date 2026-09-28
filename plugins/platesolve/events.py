@@ -33,3 +33,31 @@ class PlatesolveFailed(BaseEvent):
 class PlatesolveCancelled(BaseEvent):
     type: Literal["platesolve.cancelled"] = "platesolve.cancelled"
     solve_id: str
+
+
+class PlatesolveCenterStarted(BaseEvent):
+    type: Literal["platesolve.center_started"] = "platesolve.center_started"
+    run_id: str
+    ra: float           # target, degrees
+    dec: float
+    tolerance_arcsec: float
+
+
+class PlatesolveCenterAttempt(BaseEvent):
+    type: Literal["platesolve.center_attempt"] = "platesolve.center_attempt"
+    run_id: str
+    attempt: int
+    solved_ra: float | None = None
+    solved_dec: float | None = None
+    error_arcsec: float | None = None
+    solve_error: str | None = None
+    duration_s: float
+
+
+class PlatesolveCenterFinished(BaseEvent):
+    type: Literal["platesolve.center_finished"] = "platesolve.center_finished"
+    run_id: str
+    success: bool
+    failure: str | None = None
+    final_error_arcsec: float | None = None
+    message: str | None = None
