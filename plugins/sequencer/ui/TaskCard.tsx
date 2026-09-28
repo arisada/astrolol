@@ -1,0 +1,143 @@
+// One queue entry: name, status, progress, per-group bars, issues, and its actions menu.
+import { useState } from 'react'
+import { AlertTriangle, ChevronDown, ChevronRight, GripVertical } from 'lucide-react'
+import type { SequencerPreflightIssue, SequencerQueueEntry, SequencerRunState } from '@/api/types'
+import { fmtSeconds, groupLabel, STATUS_STYLE, taskName, taskProgress } from './format'
+import { MoreMenu, type MenuItem } from './Menu'
+
+export interface TaskActions {
+  edit: () => void
+  duplicate: () => void
+  startFrom: () => void
+  switchTo: () => void
+  resetProgress: () => void
+  skip: () => void
+  unskip: () => void
+  remove: () => void
+}
+
+function ProgressBar({ value, className = '' }: { value: number; className?: string }) {
+  return (
+    <div className={`h-1.5 rounded-full bg-surface-border overflow-hidden ${className}`}>
+      <div className="h-full bg-accent transition-all" style={{ width: `${Math.min(100, Math.max(0, value * 100))}%` }} />
+    </div>
+  )
+}
+
+export function TaskCard({
+  entry, isCurrent, runState, issues, actions, dragProps,
+}: {
+  entry: SequencerQueueEntry
+  isCurrent: boolean
+  runState: SequencerRunState
+  issues: SequencerPreflightIssue[]
+  actions: TaskActions
+  dragProps: React.HTMLAttributes<HTMLDivElement> & { draggable: boolean }
+}) {
+  const [expanded, setExpanded] = useState(isCurrent)
+  const { task, runtime } = entry
+  const status = runtime.status
+  const running = status === 'running'
+  const idle = runState === 'idle'
+  const runnable = status === 'pending' || status === 'interrupted'
+  const switchable = runnable || status === 'failed' || status === 'skipped'
+  const p = taskProgress(entry)
+  const lane = task.lanes[0]
+  const lrt = runtime.lanes[0]
+  const lastInterruption = runtime.interruptions[runtime.interruptions.length - 1]
+  const hasErrors = issues.some((i) => i.severity === 'error')
+
+  const menu: MenuItem[] = [
+    { label: 'Edit', onSelect: actions.edit, disabled: running },
+    { label: 'Duplicate', onSelect: actions.duplicate },
+    idle
+      ? { label: 'Start from here', onSelect: actions.startFrom, disabled: !runnable,
+          hint: 'Earlier pending tasks are left for later' }
+      : { label: 'Switch to this task', onSelect: actions.switchTo, disabled: !switchable || isCurrent,
+          hint: 'After the current frame; the current task keeps its progress' },
+    status === 'skipped'
+      ? { label: 'Unskip', onSelect: actions.unskip }
+      : { label: running ? 'Skip (after this frame)' : 'Skip', onSelect: actions.skip,
+          disabled: status === 'completed' },
+    { label: 'Reset progress', onSelect: actions.resetProgress, disabled: running || p.done === 0 },
+    { label: 'Delete', onSelect: actions.remove, disabled: running, danger: true },
+  ]
+
+  return (
+    <div
+      {...dragProps}
+      className={`rounded border px-3 py-2 transition-colors
+        ${isCurrent ? 'border-accent/60 bg-surface-overlay' : 'border-surface-border bg-surface-raised'}
+        ${status === 'completed' || status === 'skipped' ? 'opacity-70' : ''}`}
+    >
+      <div className="flex items-center gap-2">
+        <GripVertical size={14} className={`shrink-0 ${dragProps.draggable ? 'text-slate-600 cursor-grab' : 'text-transparent'}`} />
+        <button type="button" onClick={() => setExpanded((e) => !e)} className="text-slate-500 hover:text-slate-300">
+          {expanded ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+        </button>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="text-sm font-medium text-slate-100 truncate">{taskName(entry)}</span>
+            {task.name && task.name !== task.target.name && (
+              <span className="text-xs text-slate-500 truncate">{task.target.name}</span>
+            )}
+            {hasErrors && <AlertTriangle size={12} className="text-status-error shrink-0" />}
+          </div>
+          <div className="flex items-center gap-2 mt-1">
+            <ProgressBar value={p.total ? p.done / p.total : 0} className="w-32 shrink-0" />
+            <span className="text-xs text-slate-500 truncate">
+              {p.done}/{p.total} frames · {fmtSeconds(p.doneS)} / {fmtSeconds(p.totalS)}
+              {' · '}{lane.groups.map(groupLabel).join(', ')}
+            </span>
+          </div>
+        </div>
+        <span className={`text-xs px-2 py-0.5 rounded-full shrink-0 ${STATUS_STYLE[status]}`}>{status}</span>
+        <MoreMenu items={menu} />
+      </div>
+
+      {runtime.last_error && status !== 'completed' && (
+        <p className="text-xs text-status-error mt-1 ml-10">{runtime.last_error}</p>
+      )}
+      {status === 'interrupted' && lastInterruption && (
+        <p className="text-xs text-amber-300/80 mt-1 ml-10">
+          {lastInterruption.kind} by {lastInterruption.actor}
+          {lastInterruption.reason ? ` — ${lastInterruption.reason}` : ''}
+        </p>
+      )}
+      {issues.length > 0 && (
+        <ul className="mt-1 ml-10 flex flex-col gap-0.5">
+          {issues.map((i, k) => (
+            <li key={k} className={`text-xs ${i.severity === 'error' ? 'text-status-error' : 'text-yellow-400/90'}`}>
+              {i.message.replace(`${taskName(entry)}: `, '')}
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {expanded && (
+        <div className="mt-2 ml-10 flex flex-col gap-1.5">
+          {lane.groups.map((g, i) => {
+            const done = Math.min(lrt?.groups[i]?.frames_done ?? 0, g.count)
+            const active = isCurrent && lrt?.current_group === i
+            return (
+              <div key={i} className="flex items-center gap-2 text-xs">
+                <span className={`w-28 truncate ${active ? 'text-accent' : 'text-slate-400'}`}>{groupLabel(g)}</span>
+                <ProgressBar value={done / g.count} className="w-40" />
+                <span className="text-slate-500 font-mono">{done}/{g.count}</span>
+              </div>
+            )
+          })}
+          <p className="text-[11px] text-slate-500">
+            {[
+              task.target.kind === 'current' ? 'no slew' : [task.slew && 'slew', task.center && 'center'].filter(Boolean).join(' + '),
+              task.start_guiding && 'guide',
+              task.dither_every ? `dither every ${task.dither_every}` : 'no dither',
+              lane.order === 'round_robin' && `round robin ×${lane.round_robin_batch}`,
+              `on error: ${task.on_error}`,
+            ].filter(Boolean).join(' · ')}
+          </p>
+        </div>
+      )}
+    </div>
+  )
+}

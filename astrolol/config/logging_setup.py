@@ -136,6 +136,7 @@ _COMPONENT_MAP = {
     "api":        "api",
     "phd2":       "phd2",
     "platesolve": "platesolve",
+    "sequencer":  "sequencer",
 }
 
 

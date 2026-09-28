@@ -133,6 +133,7 @@ async def test_skips_loggers_in_skip_list():
     ("astrolol.devices.indi.client", "indi"),
     ("astrolol.api.mount",           "api"),
     ("astrolol.profiles.store",  "profiles"),
+    ("plugins.sequencer.runner", "sequencer"),
     ("astrolol.unknown.thing",   "thing"),
     ("",                         "app"),
 ])

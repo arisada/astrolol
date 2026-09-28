@@ -206,6 +206,153 @@ export interface AutofocusRun {
   image_height: number | null
 }
 
+// --- Sequencer (mirrors astrolol/core/sequencer/models.py) ---
+
+export interface SequencerTargetRef {
+  kind: 'favorite' | 'catalog' | 'coordinates' | 'current'
+  name: string
+  favorite_id?: string | null
+  catalog_id?: string | null
+  ra?: number | null   // ICRS degrees (snapshot)
+  dec?: number | null
+}
+
+export interface SequencerExposureGroup {
+  filter_name: string | null
+  duration: number
+  count: number
+  binning: number
+  gain: number | null
+  frame_type: 'light' | 'dark' | 'flat' | 'bias'
+}
+
+export interface SequencerLane {
+  id?: string
+  camera_id: string | null
+  groups: SequencerExposureGroup[]
+  order: 'sequential' | 'round_robin'
+  round_robin_batch: number
+  autofocus_on_filter_change: boolean
+}
+
+export interface SequencerTask {
+  id?: string
+  name: string | null
+  target: SequencerTargetRef
+  lanes: SequencerLane[]
+  slew: boolean
+  center: boolean
+  start_guiding: boolean
+  autofocus_at_start: boolean
+  dither_every: number | null
+  sub_delay_s: number
+  on_error: 'skip' | 'defer' | 'pause' | 'abort'
+}
+
+export type SequencerTaskStatus = 'pending' | 'running' | 'interrupted' | 'completed' | 'failed' | 'skipped'
+export type SequencerRunState = 'idle' | 'starting' | 'running' | 'pausing' | 'paused' | 'stopping'
+export type SequencerActivity =
+  | 'unparking' | 'slewing' | 'centering' | 'starting_guiding' | 'focusing' | 'changing_filter'
+  | 'exposing' | 'dithering' | 'waiting_for_primary' | 'waiting_for_guiding' | 'meridian_flip'
+  | 'parking' | 'waiting'
+export type SequencerStallKind = 'guiding' | 'centering' | 'autofocus'
+export type SequencerBoundary = 'now' | 'frame' | 'task'
+
+export interface SequencerStall {
+  kind: SequencerStallKind
+  since: string
+  attempts: number
+  last_error: string | null
+  next_attempt_at: string | null
+}
+
+export interface SequencerInterruption {
+  at: string
+  kind: 'pause' | 'stop' | 'switch' | 'defer' | 'skip' | 'cancel' | 'crash'
+  actor: string
+  reason: string | null
+  stall_kind: SequencerStallKind | null
+}
+
+export interface SequencerLaneRuntime {
+  lane_id: string
+  groups: { frames_done: number }[]
+  current_group: number | null
+  activity: SequencerActivity | null
+}
+
+export interface SequencerTaskRuntime {
+  task_id: string
+  status: SequencerTaskStatus
+  lanes: SequencerLaneRuntime[]
+  started_at: string | null
+  finished_at: string | null
+  last_error: string | null
+  resolved_ra: number | null
+  resolved_dec: number | null
+  stall: SequencerStall | null
+  interruptions: SequencerInterruption[]
+}
+
+export interface SequencerQueueEntry {
+  task: SequencerTask & { id: string }
+  runtime: SequencerTaskRuntime
+}
+
+export interface SequencerStatus {
+  run_state: SequencerRunState
+  activity: SequencerActivity | null
+  message: string | null
+  current_task_id: string | null
+  lanes: SequencerLaneRuntime[]
+  pause_reason: string | null
+  pending_request: string | null
+  stall: SequencerStall | null
+  last_run_outcome: 'completed' | 'stopped' | 'cancelled' | 'failed' | null
+  last_error: string | null
+  session_id: string | null
+  tasks_total: number
+  tasks_done: number
+  exposure_started_at: string | null
+  exposure_duration: number | null
+  eta_s: number | null
+}
+
+export interface SequencerPreflightIssue {
+  severity: 'error' | 'warning'
+  task_id: string | null
+  lane_id: string | null
+  code: string
+  message: string
+}
+
+export interface SequencerPreflightReport {
+  ok: boolean
+  issues: SequencerPreflightIssue[]
+}
+
+export interface SequencerSettings {
+  unpark_on_start: boolean
+  park_on_complete: boolean
+  guide_settle_pixels: number
+  guide_settle_time_s: number
+  guide_settle_timeout_s: number
+  dither_pixels: number
+  dither_ra_only: boolean
+  meridian_flip_enabled: boolean
+  meridian_flip_ha_hours: number
+  center_after_flip: boolean
+  center_tolerance_arcsec: number
+  center_max_attempts: number
+  center_exposure_s: number
+  center_binning: number
+  recenter_after_pause_min: number
+  slew_timeout_s: number
+  flip_timeout_s: number
+  park_timeout_s: number
+  exposure_timeout_margin_s: number
+}
+
 // --- Plate solving ---
 
 export interface SolveRequest {
@@ -654,6 +801,36 @@ export interface PlatesolveCompletedEvent extends BaseEvent {
 export interface PlatesolveFailedEvent extends BaseEvent { type: 'platesolve.failed'; solve_id: string; reason: string }
 export interface PlatesolveCancelledEvent extends BaseEvent { type: 'platesolve.cancelled'; solve_id: string }
 
+export interface SequencerStatusEvent extends BaseEvent { type: 'sequencer.status'; status: SequencerStatus }
+export interface SequencerQueueChangedEvent extends BaseEvent {
+  type: 'sequencer.queue_changed'
+  entries: SequencerQueueEntry[]
+}
+export interface SequencerFrameSavedEvent extends BaseEvent {
+  type: 'sequencer.frame_saved'
+  task_id: string
+  lane_id: string
+  group_idx: number
+  frame_idx: number
+  frames_total: number
+  filter_name: string | null
+  duration: number
+  fits_path: string
+}
+export interface SequencerTaskFinishedEvent extends BaseEvent {
+  type: 'sequencer.task_finished'
+  task_id: string
+  status: SequencerTaskStatus
+  error: string | null
+}
+export interface SequencerStepFailedEvent extends BaseEvent {
+  type: 'sequencer.step_failed'
+  task_id: string | null
+  step: string
+  error: string
+  handling: string
+}
+
 // --- System management plugin ---
 
 export type NetworkMode = 'wifi' | 'hotspot' | 'disconnected' | 'unknown'
@@ -775,4 +952,6 @@ export type AstrolollEvent =
   | PlatesolveStartedEvent | PlatesolveCompletedEvent | PlatesolveFailedEvent | PlatesolveCancelledEvent
   | AutofocusStartedEvent | AutofocusDataPointEvent | AutofocusCompletedEvent
   | AutofocusAbortedEvent | AutofocusFailedEvent
+  | SequencerStatusEvent | SequencerQueueChangedEvent | SequencerFrameSavedEvent
+  | SequencerTaskFinishedEvent | SequencerStepFailedEvent
   | LogEvent

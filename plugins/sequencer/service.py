@@ -117,7 +117,8 @@ class SequencerServiceImpl:
         await self.bus.publish(
             SequencerQueueChanged(entries=[e.model_copy(deep=True) for e in self._entries])
         )
-        self.notify()
+        # Queue edits change status counters (tasks_total, eta) too.
+        await self.runner.emit_status()
 
     def notify(self) -> None:
         self._changed.set()
