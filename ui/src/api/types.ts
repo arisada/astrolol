@@ -816,6 +816,10 @@ export interface SequencerFrameSavedEvent extends BaseEvent {
   filter_name: string | null
   duration: number
   fits_path: string
+  counted: boolean
+  guide_rms_total: number | null
+  unguided_s: number | null
+  guiding_losses: number | null
 }
 export interface SequencerTaskFinishedEvent extends BaseEvent {
   type: 'sequencer.task_finished'

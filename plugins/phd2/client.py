@@ -24,7 +24,8 @@ from plugins.phd2.events import (
     Phd2StateChanged,
     Phd2Settled,
 )
-from plugins.phd2.models import Phd2Status
+from plugins.phd2.health import GuidingHealthTracker
+from plugins.phd2.models import GuidingHealth, GuidingStats, Phd2Status
 
 logger = structlog.get_logger()
 
@@ -53,6 +54,9 @@ class Phd2Client:
         self._pixel_scale: float | None = None
         self._star_snr: float | None = None
         self._pixel_scale_fetched = False  # True once we've gotten a reliable scale
+
+        # Guiding health / per-window statistics
+        self._health = GuidingHealthTracker()
 
         # Rolling RMS window (raw guide-camera pixels)
         self._ra_steps: deque[float] = deque(maxlen=_RMS_WINDOW)
@@ -149,9 +153,17 @@ class Phd2Client:
         settle_time: int = 10,
         settle_timeout: int = 60,
         recalibrate: bool = False,
+        wait_settle: bool = False,
     ) -> None:
+        """Start guiding. With *wait_settle*, block until PHD2 reports SettleDone
+        (raises TimeoutError / RuntimeError when settling fails)."""
         settle = {"pixels": settle_pixels, "time": settle_time, "timeout": settle_timeout}
-        await self._call("guide", [settle, recalibrate])
+        if not wait_settle:
+            await self._call("guide", [settle, recalibrate])
+            return
+        if not self._connected:
+            raise ConnectionError("Not connected to PHD2")
+        await self._call_and_settle("guide", [settle, recalibrate], settle_timeout)
 
     async def stop_capture(self) -> None:
         await self._call("stop_capture")
@@ -171,23 +183,44 @@ class Phd2Client:
             raise RuntimeError("Dither already in progress")
 
         self._dithering = True
+        try:
+            settle = {"pixels": settle_pixels, "time": settle_time, "timeout": settle_timeout}
+            await self._call_and_settle("dither", [pixels, ra_only, settle], settle_timeout)
+        finally:
+            self._dithering = False
+
+    async def _call_and_settle(self, method: str, params: Any, settle_timeout: int) -> None:
+        """Call *method* then wait for PHD2's SettleDone event."""
+        if self._settle_event is not None:
+            raise RuntimeError("Another PHD2 settle is already in progress")
         event = asyncio.Event()
         self._settle_event = event
         self._settle_error = None
-
         try:
-            settle = {"pixels": settle_pixels, "time": settle_time, "timeout": settle_timeout}
-            await self._call("dither", [pixels, ra_only, settle])
+            await self._call(method, params)
             await asyncio.wait_for(event.wait(), timeout=settle_timeout + 60)
-        except asyncio.TimeoutError:
-            raise TimeoutError("PHD2 settle timed out")
+        except TimeoutError:
+            raise TimeoutError("PHD2 settle timed out") from None
         finally:
-            self._dithering = False
             if self._settle_event is event:
                 self._settle_event = None
-
         if self._settle_error:
             raise RuntimeError(f"PHD2 settle failed: {self._settle_error}")
+
+    # ------------------------------------------------------------------
+    # Guiding health
+    # ------------------------------------------------------------------
+
+    def guiding_health(self) -> GuidingHealth:
+        return self._health.health()
+
+    def mark(self) -> float:
+        """A point in time to measure guiding from (see guiding_stats)."""
+        return self._health.mark()
+
+    def guiding_stats(self, since: float, until: float | None = None) -> GuidingStats:
+        """RMS, unguided seconds and guiding losses between two marks."""
+        return self._health.stats(since, until)
 
     async def pause(self) -> None:
         await self._call("pause", [True])
@@ -253,6 +286,7 @@ class Phd2Client:
         self._writer = None
         self._state = "Disconnected"
         self._pixel_scale_fetched = False
+        self._health.on_lost("disconnected")
 
         for fut in self._pending.values():
             if not fut.done():
@@ -305,6 +339,8 @@ class Phd2Client:
 
         if event_name == "AppState":
             self._state = msg.get("State", "Unknown")
+            if self._state != "Guiding":
+                self._health.on_lost(self._state.lower())
             await self._event_bus.publish(Phd2StateChanged(state=self._state))
 
         elif event_name == "GuideStep":
@@ -328,6 +364,7 @@ class Phd2Client:
                 self._pixel_scale_fetched = True  # don't retry until next connect
 
             scale = self._pixel_scale or 1.0
+            self._health.on_step(ra_raw * scale, dec_raw * scale)
             await self._event_bus.publish(
                 Phd2GuideStep(
                     frame=int(msg.get("Frame") or 0),
@@ -358,10 +395,12 @@ class Phd2Client:
 
         elif event_name == "GuidingStopped":
             self._state = "Stopped"
+            self._health.on_lost("stopped")
             await self._event_bus.publish(Phd2StateChanged(state=self._state))
 
         elif event_name == "Paused":
             self._state = "Paused"
+            self._health.on_lost("paused")
             await self._event_bus.publish(Phd2StateChanged(state=self._state))
 
         elif event_name == "Resumed":
@@ -370,6 +409,7 @@ class Phd2Client:
 
         elif event_name == "StarLost":
             self._state = "Star loss"
+            self._health.on_lost("star_lost")
             await self._event_bus.publish(Phd2StateChanged(state=self._state))
 
         elif event_name == "StarSelected":
@@ -385,6 +425,7 @@ class Phd2Client:
 
         elif event_name == "CalibrationFailed":
             self._state = "Stopped"
+            self._health.on_lost("calibration_failed")
             await self._event_bus.publish(Phd2StateChanged(state=self._state))
 
     # ------------------------------------------------------------------

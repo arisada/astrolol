@@ -33,3 +33,27 @@ class DitherRequest(BaseModel):
 
 class DebugRequest(BaseModel):
     enabled: bool
+
+
+class GuidingHealth(BaseModel):
+    """Is guiding active right now (valid guide steps arriving)?"""
+    guiding: bool
+    guiding_for_s: float | None = None     # continuous guiding so far
+    unguided_for_s: float | None = None    # time since guiding stopped / the star was lost
+    reason: str | None = None              # star_lost, stopped, paused, disconnected, …
+
+
+class GuidingStats(BaseModel):
+    """Guiding quality over a time window (e.g. one exposure)."""
+    duration_s: float
+    steps: int
+    rms_ra: float | None = None      # arcsec (pixels if the pixel scale is unknown)
+    rms_dec: float | None = None
+    rms_total: float | None = None
+    unguided_s: float               # seconds of the window without active guiding
+    losses: int                     # times active guiding was interrupted in the window
+
+
+class GuidingHealthReport(BaseModel):
+    health: GuidingHealth
+    window: GuidingStats

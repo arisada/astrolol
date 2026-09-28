@@ -700,6 +700,7 @@ class Runner:
                 Activity.EXPOSING,
                 f"Exposing {label}{done + 1}/{group.count} ({group.duration:g} s)",
             )
+            guide_mark = self._steps.guiding_mark()
             try:
                 fits_path = await self._steps.expose(task, devices, group)
             except asyncio.CancelledError:
@@ -730,6 +731,7 @@ class Runner:
                     filter_name=group.filter_name,
                     duration=group.duration,
                     fits_path=fits_path,
+                    **self._steps.guiding_stats(guide_mark),
                 )
             )
             await self._svc.commit()

@@ -121,6 +121,10 @@ class SequencerFrameSaved(BaseEvent):
     duration: float
     fits_path: str
     counted: bool = True
+    # Guiding during the exposure (None when there is no guider)
+    guide_rms_total: float | None = None  # arcsec
+    unguided_s: float | None = None  # seconds without active guiding
+    guiding_losses: int | None = None  # times guiding was interrupted
 
 
 class SequencerFrameDiscarded(BaseEvent):

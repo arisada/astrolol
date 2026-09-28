@@ -17,7 +17,6 @@ from astrolol.core.events import (
     MountSlewCompleted,
 )
 from astrolol.core.sequencer.models import ExposureGroup, ImagingTask, Lane, TargetRef
-from plugins.phd2.events import Phd2Settled
 from plugins.sequencer.service import SequencerServiceImpl
 from plugins.sequencer.settings import SequencerSettings
 from plugins.sequencer.store import QueueStore
@@ -139,14 +138,24 @@ class FakePhd2:
         self.dithers = 0
         self.stops = 0
         self.settle_error: str | None = None
+        self.unguided_s = 0.0
+        self.losses = 0
 
     def get_status(self) -> Any:
         return SimpleNamespace(connected=self.connected, state=self.state)
 
     async def guide(self, **kwargs: Any) -> None:
+        assert kwargs.get("wait_settle") is True
         self.guides += 1
         self.state = "Guiding"
-        await self._bus.publish(Phd2Settled(error=self.settle_error))
+        if self.settle_error:
+            raise RuntimeError(f"PHD2 settle failed: {self.settle_error}")
+
+    def mark(self) -> float:
+        return time.monotonic()
+
+    def guiding_stats(self, since: float, until: float | None = None) -> Any:
+        return SimpleNamespace(rms_total=0.8, unguided_s=self.unguided_s, losses=self.losses)
 
     async def stop_capture(self) -> None:
         self.stops += 1

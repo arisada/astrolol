@@ -537,3 +537,20 @@ async def test_flip_disabled(tmp_path: Path) -> None:
     await rig.svc.add(make_task())
     await _run_to_end(rig)
     assert rig.mount.flips == 0
+
+
+async def test_frames_carry_guiding_stats(rig: Rig) -> None:
+    rig.phd2.unguided_s = 12.5
+    rig.phd2.losses = 1
+    await rig.svc.add(make_task(groups=[ExposureGroup(duration=1, count=1)]))
+    await _run_to_end(rig)
+    frame = rig.of("sequencer.frame_saved")[0]
+    assert (frame.guide_rms_total, frame.unguided_s, frame.guiding_losses) == (0.8, 12.5, 1)
+
+
+async def test_frames_without_guider_have_no_guiding_stats(rig: Rig) -> None:
+    rig.app.state.phd2_client = None
+    await rig.svc.add(make_task(groups=[ExposureGroup(duration=1, count=1)]))
+    await _run_to_end(rig)
+    frame = rig.of("sequencer.frame_saved")[0]
+    assert frame.unguided_s is None

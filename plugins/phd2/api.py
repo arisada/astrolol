@@ -3,7 +3,13 @@ import structlog
 from fastapi import APIRouter, HTTPException, Request
 
 from plugins.phd2.client import Phd2Client
-from plugins.phd2.models import DebugRequest, DitherRequest, GuideRequest, Phd2Status
+from plugins.phd2.models import (
+    DebugRequest,
+    DitherRequest,
+    GuideRequest,
+    GuidingHealthReport,
+    Phd2Status,
+)
 from plugins.phd2.settings import Phd2Settings
 
 logger = structlog.get_logger()
@@ -43,6 +49,17 @@ async def disconnect(request: Request) -> None:
 async def get_status(request: Request) -> Phd2Status:
     """Return current PHD2 connection state and guiding metrics."""
     return _client(request).get_status()
+
+
+@router.get("/health", response_model=GuidingHealthReport)
+async def get_health(request: Request, window_s: float = 60.0) -> GuidingHealthReport:
+    """Whether guiding is active now, plus guiding statistics over the last *window_s*."""
+    client = _client(request)
+    now = client.mark()
+    return GuidingHealthReport(
+        health=client.guiding_health(),
+        window=client.guiding_stats(now - max(0.0, window_s), now),
+    )
 
 
 @router.post("/guide", status_code=204)

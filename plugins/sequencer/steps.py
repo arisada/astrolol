@@ -327,32 +327,45 @@ class Steps:
         t0 = await self._started(
             task_id, "start_guiding", Activity.STARTING_GUIDING, "Starting guiding"
         )
-        q = self._host.bus.subscribe()
         try:
             await phd2.guide(
                 settle_pixels=cfg.guide_settle_pixels,
                 settle_time=cfg.guide_settle_time_s,
                 settle_timeout=cfg.guide_settle_timeout_s,
+                wait_settle=True,
             )
-            async with asyncio.timeout(cfg.guide_settle_timeout_s + 30):
-                while True:
-                    event = await q.get()
-                    if getattr(event, "type", "") == "phd2.settled":
-                        break
         except TimeoutError:
             raise StepError(
                 "start_guiding", "Guiding did not settle in time", StallKind.GUIDING
             ) from None
         except Exception as exc:
             raise StepError(
-                "start_guiding", f"Starting guiding failed: {exc}", StallKind.GUIDING
+                "start_guiding", f"Guiding did not start or settle: {exc}", StallKind.GUIDING
             ) from exc
-        finally:
-            self._host.bus.unsubscribe(q)
-        error = getattr(event, "error", None)
-        if error:
-            raise StepError("start_guiding", f"Guiding did not settle: {error}", StallKind.GUIDING)
         await self._finished(task_id, "start_guiding", t0)
+
+    def guiding_mark(self) -> float | None:
+        """Start of a guiding-statistics window (None without a guider that supports it)."""
+        phd2 = self._phd2()
+        if phd2 is None or not hasattr(phd2, "mark"):
+            return None
+        return float(phd2.mark())
+
+    def guiding_stats(self, mark: float | None) -> dict[str, Any]:
+        """Guiding RMS / unguided time / losses since *mark*, as SequencerFrameSaved fields."""
+        phd2 = self._phd2()
+        if mark is None or phd2 is None:
+            return {}
+        try:
+            stats = phd2.guiding_stats(mark)
+        except Exception as exc:
+            logger.warning("sequencer.guiding_stats_failed", error=str(exc))
+            return {}
+        return {
+            "guide_rms_total": stats.rms_total,
+            "unguided_s": stats.unguided_s,
+            "guiding_losses": stats.losses,
+        }
 
     async def dither(self, task_id: str) -> None:
         phd2 = self._phd2()
