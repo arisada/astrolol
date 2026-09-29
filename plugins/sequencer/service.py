@@ -354,7 +354,9 @@ class SequencerServiceImpl:
                 )
             elif not guider.status().connected:
                 issue(
-                    "warning", "guider_disconnected", f"the guider ({guider.name}) is not connected"
+                    "warning",
+                    "guider_disconnected",
+                    f"the guider ({guider.name}) is not connected: the run will wait for guiding",
                 )
         if task.autofocus_at_start or any(lane.autofocus_on_filter_change for lane in task.lanes):
             issue("warning", "no_autofocus", "autofocus integration is not implemented yet")

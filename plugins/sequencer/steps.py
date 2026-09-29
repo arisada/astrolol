@@ -369,6 +369,25 @@ class Steps:
             "guiding_losses": stats.losses,
         }
 
+    async def record_guiding_in_fits(self, fits_path: str, guiding: dict[str, Any]) -> None:
+        """Write the frame's guiding figures into its FITS header (best effort)."""
+        if not guiding:
+            return
+        from astrolol.imaging.imager import add_fits_header_cards
+
+        cards: dict[str, tuple[Any, str]] = {
+            "GUIDLOST": (guiding["unguided_s"], "[s] time without active guiding"),
+            "GUIDLOSN": (guiding["guiding_losses"], "times guiding was interrupted"),
+        }
+        if guiding.get("guide_rms_total") is not None:
+            cards["GUIDRMS"] = (guiding["guide_rms_total"], "[arcsec] total guiding RMS")
+        try:
+            await asyncio.to_thread(add_fits_header_cards, fits_path, cards)
+        except Exception as exc:
+            logger.warning(
+                "sequencer.fits_guiding_cards_failed", fits_path=fits_path, error=str(exc)
+            )
+
     async def dither(self, task_id: str) -> None:
         guider = self._guider()
         if guider is None:
@@ -377,6 +396,11 @@ class Steps:
         if not guider.status().connected:
             await self.failed_continue(
                 task_id, "dither", f"The guider ({guider.name}) is not connected"
+            )
+            return
+        if not guider.health().guiding:
+            await self.skipped(
+                task_id, "dither", "guiding is down; restarting it will move the star anyway"
             )
             return
         cfg = self._host.settings

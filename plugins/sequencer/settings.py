@@ -28,6 +28,30 @@ class SequencerSettings(BaseModel):
     center_exposure_s: float = Field(default=5.0, gt=0)
     center_binning: int = Field(default=2, ge=1, le=4)
 
+    # Guiding loss and stalls
+    guide_healthy_after_s: float = Field(
+        default=10.0, ge=0, description="Continuous guiding needed before a new frame starts"
+    )
+    guide_retry_interval_s: float = Field(
+        default=60.0, gt=0, description="Retry starting guiding this often while it's down"
+    )
+    recenter_after_guide_loss_min: float = Field(
+        default=15.0, ge=0, description="Re-centre once when guiding has been down this long"
+    )
+    center_retry_interval_s: float = Field(
+        default=120.0, gt=0, description="Retry centering this often when nothing solves"
+    )
+    stall_timeout_min: float | None = Field(
+        default=None,
+        gt=0,
+        description="Give up on a stall after this long (task error policy); null = never",
+    )
+    uncount_if_unguided_s: float | None = Field(
+        default=None,
+        gt=0,
+        description="Retake frames unguided for longer than this (file kept); null = count all",
+    )
+
     # Resume behaviour
     recenter_after_pause_min: float = Field(default=10.0, ge=0)
 

@@ -381,6 +381,12 @@ export interface SequencerSettings {
   center_max_attempts: number
   center_exposure_s: number
   center_binning: number
+  guide_healthy_after_s: number
+  guide_retry_interval_s: number
+  recenter_after_guide_loss_min: number
+  center_retry_interval_s: number
+  stall_timeout_min: number | null
+  uncount_if_unguided_s: number | null
   recenter_after_pause_min: number
   slew_timeout_s: number
   flip_timeout_s: number

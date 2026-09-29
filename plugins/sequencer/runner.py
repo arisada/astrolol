@@ -60,6 +60,7 @@ from astrolol.core.sequencer.models import (
 )
 from astrolol.mount.manager import meridian_flip_due
 from plugins.sequencer.devices import LaneDevices, resolve_lane_devices, run_mount_id
+from plugins.sequencer.guiding import center_with_retries, ensure_guiding
 from plugins.sequencer.settings import SequencerSettings
 from plugins.sequencer.steps import StepError, Steps
 from plugins.sequencer.targets import ResolvedTarget
@@ -224,6 +225,10 @@ class Runner:
                 continue
             remaining += remaining_seconds(e)
         return round(remaining, 1) if remaining > 0 else None
+
+    async def commit(self) -> None:
+        """Persist and announce the queue (runtime changed)."""
+        await self._svc.commit()
 
     async def emit_status(self) -> None:
         await self.bus.publish(SequencerStatusChanged(status=self.status()))
@@ -659,13 +664,16 @@ class Runner:
             ts.flipped = False
         if task.center:
             if has_coords:
-                await self._steps.center(task, ts.target, ts.devices)
+                await center_with_retries(self, entry, ts)
             else:
                 await self._steps.skipped(
                     task.id, "center", "the target has no coordinates (current pointing)"
                 )
         if task.start_guiding:
-            await self._steps.start_guiding(task.id)
+            if getattr(self.app.state, "guider", None) is None:
+                await self._steps.start_guiding(task.id)  # reported as skipped
+            else:
+                await ensure_guiding(self, entry, ts)
         if task.autofocus_at_start:
             await self._steps.skipped(
                 task.id, "autofocus", "autofocus integration is not implemented yet"
@@ -691,6 +699,9 @@ class Runner:
             if group.filter_name is not None and ls.current_filter != group.filter_name:
                 await self._steps.change_filter(task.id, devices, group.filter_name)
                 ls.current_filter = group.filter_name
+            # No new frame without healthy guiding (a frame in progress is never interrupted)
+            await ensure_guiding(self, entry, ts)
+            self._check_boundary()
             lrt.current_group = gidx
             done = lrt.groups[gidx].frames_done
             label = f"{group.filter_name} " if group.filter_name else ""
@@ -716,9 +727,23 @@ class Runner:
             finally:
                 self._exposure_started_at = None
                 self._exposure_duration = None
-            lrt.groups[gidx].frames_done += 1
-            if lane.order == "round_robin":
-                ls.rr_taken += 1
+            guiding = self._steps.guiding_stats(guide_mark)
+            await self._steps.record_guiding_in_fits(fits_path, guiding)
+            limit = self.settings.uncount_if_unguided_s
+            unguided = guiding.get("unguided_s")
+            counted = limit is None or unguided is None or unguided <= limit
+            if counted:
+                lrt.groups[gidx].frames_done += 1
+                if lane.order == "round_robin":
+                    ls.rr_taken += 1
+            else:
+                logger.warning(
+                    "sequencer.frame_not_counted",
+                    task_id=task.id,
+                    fits_path=fits_path,
+                    unguided_s=unguided,
+                    limit_s=limit,
+                )
             if self._run is not None:
                 self._run.frames_saved += 1
             await self.bus.publish(
@@ -731,7 +756,8 @@ class Runner:
                     filter_name=group.filter_name,
                     duration=group.duration,
                     fits_path=fits_path,
-                    **self._steps.guiding_stats(guide_mark),
+                    counted=counted,
+                    **guiding,
                 )
             )
             await self._svc.commit()
@@ -818,10 +844,8 @@ class Runner:
             and ts.target is not None
             and ts.target.ra is not None
         ):
-            assert ts.devices is not None
-            await self._steps.center(task, ts.target, ts.devices)
-        if task.start_guiding:
-            await self._steps.start_guiding(task.id)
+            await center_with_retries(self, entry, ts)
+        # Guiding restarts through ensure_guiding() before the next frame.
         ts.frames_since_dither = 0
 
     async def _mount_status(self, mount_id: str) -> Any:

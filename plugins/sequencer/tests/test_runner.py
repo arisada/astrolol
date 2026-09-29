@@ -385,25 +385,27 @@ async def test_on_error_skip(rig: Rig) -> None:
     assert (await rig.svc.get(b.task.id)).runtime.status == TaskStatus.COMPLETED
 
 
-async def test_on_error_defer(rig: Rig) -> None:
+async def test_on_error_defer(tmp_path: Path) -> None:
+    # Centering keeps finding no stars; after the stall timeout the task is set aside.
+    rig = Rig(tmp_path, SequencerSettings(center_retry_interval_s=0.02, stall_timeout_min=0.002))
     a = await rig.svc.add(
         make_task("A", on_error="defer", groups=[ExposureGroup(duration=1, count=3)])
     )
-    b = await rig.svc.add(make_task("B"))
-    rig.solver.results = [
-        __import__("types").SimpleNamespace(
-            success=False,
-            failure="no_solution",
-            attempts=[1, 2],
-            final_error_arcsec=None,
-            message="no stars",
-        )
-    ]
+    b = await rig.svc.add(make_task("B", center=False))
+    no_stars = __import__("types").SimpleNamespace(
+        success=False,
+        failure="no_solution",
+        attempts=[1],
+        final_error_arcsec=None,
+        message="no stars",
+    )
+    rig.solver.results = [no_stars] * 1000
     assert await _run_to_end(rig) == RunOutcome.COMPLETED
     rt_a = (await rig.svc.get(a.task.id)).runtime
     assert rt_a.status == TaskStatus.INTERRUPTED
     assert rt_a.interruptions[-1].kind == "defer"
     assert rt_a.interruptions[-1].stall_kind == "centering"
+    assert rt_a.stall is None
     assert (await rig.svc.get(b.task.id)).runtime.status == TaskStatus.COMPLETED
 
 
@@ -415,15 +417,6 @@ async def test_on_error_abort(rig: Rig) -> None:
     assert (await rig.svc.get(a.task.id)).runtime.status == TaskStatus.FAILED
     assert (await rig.svc.get(b.task.id)).runtime.status == TaskStatus.PENDING
     assert "boom" in (rig.svc.status().last_error or "")
-
-
-async def test_guiding_settle_failure_is_a_step_error(rig: Rig) -> None:
-    entry = await rig.svc.add(make_task(on_error="skip"))
-    rig.guider.settle_error = "timed out"
-    await _run_to_end(rig)
-    rt = (await rig.svc.get(entry.task.id)).runtime
-    assert rt.status == TaskStatus.FAILED
-    assert "settle" in (rt.last_error or "")
 
 
 # ── Switching and waiting (scheduler API) ─────────────────────────────────────

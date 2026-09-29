@@ -95,6 +95,12 @@ export function TaskCard({
         <MoreMenu items={menu} />
       </div>
 
+      {runtime.stall && (
+        <p className="text-xs text-amber-300 mt-1 ml-10">
+          {runtime.stall.kind} stalled · {runtime.stall.attempts} attempt(s)
+          {runtime.stall.last_error ? ` — ${runtime.stall.last_error}` : ''}
+        </p>
+      )}
       {runtime.last_error && status !== 'completed' && (
         <p className="text-xs text-status-error mt-1 ml-10">{runtime.last_error}</p>
       )}

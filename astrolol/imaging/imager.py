@@ -104,6 +104,20 @@ def _write_imagetyp(fits_path: Path, frame_type: str) -> None:
         logger.warning("imager.fits_imagetyp_failed", fits=str(fits_path))
 
 
+def add_fits_header_cards(fits_path: str | Path, cards: dict[str, tuple[Any, str]]) -> None:
+    """Add or replace header cards (``KEY: (value, comment)``) in a saved FITS file.
+
+    Blocking — call through asyncio.to_thread. Used for metadata only known after the
+    exposure, e.g. how long it was unguided.
+    """
+    from astropy.io import fits as astrofits
+
+    with astrofits.open(str(fits_path), mode="update") as hdul:
+        for key, (value, comment) in cards.items():
+            hdul[0].header[key] = (value, comment)
+        hdul.flush()
+
+
 def _patch_fits_headers(
     fits_path: Path,
     telescope: "OTAItem | None",

@@ -6,7 +6,10 @@ import { ToggleSwitch } from '@/components/ui/toggle-switch'
 import type { SequencerSettings } from '@/api/types'
 import { getSettings, putSettings } from './api'
 
-type NumKey = { [K in keyof SequencerSettings]: SequencerSettings[K] extends number ? K : never }[keyof SequencerSettings]
+type NumKey = {
+  [K in keyof SequencerSettings]: SequencerSettings[K] extends number | null ? (SequencerSettings[K] extends boolean ? never : K) : never
+}[keyof SequencerSettings]
+const NULLABLE = new Set<string>(['stall_timeout_min', 'uncount_if_unguided_s'])
 type BoolKey = { [K in keyof SequencerSettings]: SequencerSettings[K] extends boolean ? K : never }[keyof SequencerSettings]
 
 const GROUPS: { title: string; bools?: [BoolKey, string][]; nums?: [NumKey, string, string][] }[] = [
@@ -42,6 +45,17 @@ const GROUPS: { title: string; bools?: [BoolKey, string][]; nums?: [NumKey, stri
     ],
   },
   {
+    title: 'Guiding loss and stalls',
+    nums: [
+      ['guide_healthy_after_s', 'Guiding must be steady for', 's before a frame'],
+      ['guide_retry_interval_s', 'Retry starting guiding every', 's'],
+      ['recenter_after_guide_loss_min', 'Re-centre once after guiding is down for', 'min'],
+      ['center_retry_interval_s', 'Retry centering (no stars) every', 's'],
+      ['stall_timeout_min', 'Give up on a stall after', 'min (empty = never)'],
+      ['uncount_if_unguided_s', 'Retake frames unguided for more than', 's (empty = keep all)'],
+    ],
+  },
+  {
     title: 'Resume and timeouts',
     nums: [
       ['recenter_after_pause_min', 'Re-center after a pause longer than', 'min'],
@@ -67,6 +81,10 @@ export function SettingsPanel() {
   const save = async () => {
     const next = { ...settings }
     for (const [k, v] of Object.entries(draft)) {
+      if (v.trim() === '' && NULLABLE.has(k)) {
+        ;(next as Record<string, unknown>)[k] = null
+        continue
+      }
       const n = Number(v)
       if (v.trim() === '' || Number.isNaN(n)) { setMessage(`Invalid value for ${k}`); return }
       ;(next as Record<string, unknown>)[k] = n
@@ -95,9 +113,9 @@ export function SettingsPanel() {
           ))}
           {g.nums?.map(([key, label, unit]) => (
             <label key={key} className="flex items-center gap-3 py-1">
-              <span className="text-sm text-slate-300 w-64">{label}</span>
+              <span className="text-sm text-slate-300 w-72">{label}</span>
               <div className="w-24">
-                <Input inputSize="sm" value={draft[key] ?? String(settings[key])}
+                <Input inputSize="sm" value={draft[key] ?? (settings[key] == null ? '' : String(settings[key]))}
                   onChange={(e) => setDraft({ ...draft, [key]: e.target.value })} />
               </div>
               <span className="text-xs text-slate-500">{unit}</span>

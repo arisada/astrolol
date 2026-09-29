@@ -17,6 +17,7 @@ from astrolol.core.events import (
     MountSlewCompleted,
 )
 from astrolol.core.guiding import (
+    GuiderNotConnected,
     GuiderStatus,
     GuidingHealth,
     GuidingStats,
@@ -27,6 +28,7 @@ from astrolol.core.sequencer.models import ExposureGroup, ImagingTask, Lane, Tar
 from plugins.sequencer.service import SequencerServiceImpl
 from plugins.sequencer.settings import SequencerSettings
 from plugins.sequencer.store import QueueStore
+from tests.conftest import make_fake_fits
 
 
 async def wait_until(cond: Callable[[], bool], timeout: float = 3.0) -> None:
@@ -38,7 +40,8 @@ async def wait_until(cond: Callable[[], bool], timeout: float = 3.0) -> None:
 
 
 class FakeImager:
-    def __init__(self) -> None:
+    def __init__(self, frames_dir: Path) -> None:
+        self.frames_dir = frames_dir
         self.requests: list[tuple[str, Any]] = []
         self.fail_next: list[Exception] = []
         self.gate: asyncio.Event | None = None  # when set: exposures wait for it
@@ -62,7 +65,9 @@ class FakeImager:
         finally:
             self.exposing = False
         self.saved += 1
-        return SimpleNamespace(fits_path=f"/tmp/frame_{self.saved}.fits")
+        path = self.frames_dir / f"frame_{self.saved}.fits"
+        make_fake_fits(path, width=8, height=8)
+        return SimpleNamespace(fits_path=str(path))
 
 
 class FakeMountManager:
@@ -151,6 +156,10 @@ class FakeGuider:
         self.settle_error: str | None = None
         self.unguided_s = 0.0
         self.losses = 0
+        self.star_lost = False
+        self.guiding_for_s = 1e6  # healthy for ages unless a test says otherwise
+        self.unguided_for_s = 0.0
+        self.fail_guides = 0  # the next N guide() calls fail (not connected)
 
     def status(self) -> GuiderStatus:
         return GuiderStatus(
@@ -162,7 +171,13 @@ class FakeGuider:
         )
 
     def health(self) -> GuidingHealth:
-        return GuidingHealth(guiding=self.guiding)
+        if self.guiding and not self.star_lost:
+            return GuidingHealth(guiding=True, guiding_for_s=self.guiding_for_s)
+        return GuidingHealth(
+            guiding=False,
+            unguided_for_s=self.unguided_for_s,
+            reason="star_lost" if self.guiding else "stopped",
+        )
 
     def mark(self) -> float:
         return time.monotonic()
@@ -177,6 +192,9 @@ class FakeGuider:
     ) -> None:
         assert wait_settle is True
         self.guides += 1
+        if not self.connected or self.fail_guides > 0:
+            self.fail_guides = max(0, self.fail_guides - 1)
+            raise GuiderNotConnected("fake guider not connected")
         self.guiding = True
         if self.settle_error:
             raise SettleFailed(f"settle failed: {self.settle_error}")
@@ -236,7 +254,7 @@ class Rig:
 
     def __init__(self, tmp_path: Path, settings: SequencerSettings | None = None) -> None:
         self.bus = EventBus()
-        self.imager = FakeImager()
+        self.imager = FakeImager(tmp_path / "frames")
         self.mount = FakeMountManager(self.bus)
         self.guider = FakeGuider(self.bus)
         self.solver = FakeSolveManager()

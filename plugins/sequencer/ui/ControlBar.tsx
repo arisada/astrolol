@@ -38,6 +38,18 @@ function boundaryItems(verb: string, act: (w: SequencerBoundary) => void, withTa
   ]
 }
 
+const STALL_LABEL: Record<'guiding' | 'centering' | 'autofocus', string> = {
+  guiding: 'Guiding is down',
+  centering: 'Centering finds no stars',
+  autofocus: 'Autofocus is failing',
+}
+
+function sinceLabel(iso: string, now: number, future = false): string {
+  const s = Math.max(0, Math.round(((future ? Date.parse(iso) - now : now - Date.parse(iso))) / 1000))
+  const text = s < 90 ? `${s} s` : `${Math.round(s / 60)} min`
+  return future ? `in ${text}` : `for ${text}`
+}
+
 function useNow(active: boolean): number {
   const [now, setNow] = useState(() => Date.now())
   useEffect(() => {
@@ -63,7 +75,7 @@ export function ControlBar({
 }) {
   const rs = status.run_state
   const current = entries.find((e) => e.task.id === status.current_task_id) ?? null
-  const now = useNow(status.exposure_started_at != null)
+  const now = useNow(status.exposure_started_at != null || status.stall != null)
   const runnable = entries.filter((e) => e.runtime.status === 'pending' || e.runtime.status === 'interrupted')
   const errors = preflightIssues.filter((i) => i.severity === 'error')
   const errorPause = rs === 'paused' && status.pause_reason && status.pause_reason !== 'user'
@@ -116,6 +128,20 @@ export function ControlBar({
           {status.pending_request.startsWith('stop') && (
             <button className="underline ml-auto" onClick={() => onStop('now')}>Stop now</button>
           )}
+        </div>
+      )}
+
+      {status.stall && (
+        <div className="text-xs text-amber-200 bg-amber-500/10 border border-amber-500/30 rounded px-3 py-2">
+          <p className="font-medium">
+            {STALL_LABEL[status.stall.kind]} — stalled {sinceLabel(status.stall.since, now)}
+            {status.stall.attempts > 0 && `, ${status.stall.attempts} attempt${status.stall.attempts > 1 ? 's' : ''}`}
+          </p>
+          {status.stall.last_error && <p className="text-amber-300/80">{status.stall.last_error}</p>}
+          <p className="text-amber-300/60 mt-1">
+            Retrying automatically{status.stall.next_attempt_at ? ` (next ${sinceLabel(status.stall.next_attempt_at, now, true)})` : ''}.
+            New frames wait; switch to another task or stop if the sky won't clear.
+          </p>
         </div>
       )}
 
