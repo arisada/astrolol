@@ -4,15 +4,6 @@ Items designed for but not yet built. Ordered roughly by priority.
 
 ## Known bugs
 
-- **Autofocus does not work correctly in the field** — reported from real telescope use;
-  behaviour has not reproduced or been diagnosed yet (unlike the rest of this section, which
-  was confirmed by reading the code). Star analysis is also disabled per-frame in the main
-  imaging loop today (`imaging/imager.py::_do_expose`, the commented-out `_star_analyzer_fn`
-  block — too expensive on a Raspberry Pi), so autofocus is the only consumer of
-  `star_detector.py`/`algorithms.py` and hasn't been cross-checked against noisy real skies,
-  varying seeing, or hot pixels the way the simulator/tests exercise it. Needs a repro log
-  from an actual run (curve fit points, FWHM/star-count per step, HFR trend) before a fix can
-  be scoped.
 - **INDI items connected from the tree are untested on real indiserver** — the mapping
   (`indi_<kind>` + `{device_name, executable}`) matches what the wizard sends and the INDI
   adapters load the driver themselves, but only non-INDI items were verified end to end.
