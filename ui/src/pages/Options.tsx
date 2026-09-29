@@ -201,16 +201,20 @@ export function Options() {
   }
 
   const togglePlugin = async (plugin: PluginInfo) => {
-    const updated = pluginInfos.map((p) =>
-      p.id === plugin.id ? { ...p, enabled: !p.enabled } : p,
-    )
-    const enabledIds = updated.filter((p) => p.enabled).map((p) => p.id)
+    const enabledIds = pluginInfos
+      .map((p) => (p.id === plugin.id ? { ...p, enabled: !p.enabled } : p))
+      .filter((p) => p.enabled)
+      .map((p) => p.id)
     try {
       const current = await api.settings.get()
       await api.settings.put({ ...current, enabled_plugins: enabledIds })
-      setPluginInfos(updated)
+      // Re-fetch rather than patch optimistically: a hot-reloadable plugin may
+      // already be live, while others still need a restart — GET /plugins is
+      // the source of truth for both.
+      const fresh = await api.plugins.list()
+      setPluginInfos(fresh)
       setPluginSaveStatus('saved')
-      setRestartNeeded(true)
+      setRestartNeeded(fresh.some((p) => p.pending_restart))
       setTimeout(() => setPluginSaveStatus('idle'), 2000)
     } catch {
       setPluginSaveStatus('error')
@@ -371,7 +375,11 @@ export function Options() {
               <Row
                 key={plugin.id}
                 label={plugin.name}
-                hint={plugin.description || undefined}
+                hint={
+                  plugin.pending_restart
+                    ? 'Restart required to take effect'
+                    : plugin.description || undefined
+                }
               >
                 <ToggleSwitch checked={plugin.enabled} onChange={() => togglePlugin(plugin)} label={plugin.name} />
               </Row>

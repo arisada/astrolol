@@ -9,6 +9,7 @@ export function useEvents() {
   const applyEvent = useStore((s) => s.applyEvent)
   const setWsConnected = useStore((s) => s.setWsConnected)
   const setConnectedDevices = useStore((s) => s.setConnectedDevices)
+  const setPluginInfos = useStore((s) => s.setPluginInfos)
   const wsRef = useRef<WebSocket | null>(null)
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -33,6 +34,9 @@ export function useEvents() {
           .catch(console.error)
         // Sync device list
         api.devices.connected().then(setConnectedDevices).catch(console.error)
+        // Re-fetch plugin list — enablement may have changed since we last connected
+        // (backend restart, or another tab toggling a plugin)
+        api.plugins.list().then(setPluginInfos).catch(console.error)
       }
 
       ws.onmessage = (msg: MessageEvent<string>) => {
@@ -65,5 +69,5 @@ export function useEvents() {
       reconnectTimer.current && clearTimeout(reconnectTimer.current)
       wsRef.current?.close()
     }
-  }, [applyEvent, setConnectedDevices, setWsConnected])
+  }, [applyEvent, setConnectedDevices, setPluginInfos, setWsConnected])
 }

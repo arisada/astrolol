@@ -24,6 +24,9 @@ class Lx200Plugin:
             "GoTo / Sync commands."
         ),
         log_scopes=[LogScope(key="lx200", label="LX200 Server", logger="plugins.lx200")],
+        # Not hot_reloadable: startup() binds a TCP server socket and setup()
+        # reads app.state.mount_manager unguarded — both assume boot-time
+        # ordering and a restart-clean process.
     )
 
     def __init__(self) -> None:

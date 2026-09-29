@@ -15,6 +15,7 @@ class HelloPlugin:
         name="Hello World",
         version="0.1.0",
         description="Proof-of-concept plugin with a single toggle property.",
+        hot_reloadable=True,
     )
 
     def setup(self, app: "FastAPI", ctx: PluginContext) -> None:

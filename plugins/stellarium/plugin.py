@@ -24,6 +24,9 @@ class StellariumPlugin:
             "and GoTo commands from Stellarium slew the mount."
         ),
         log_scopes=[LogScope(key="stellarium", label="Stellarium Server", logger="plugins.stellarium")],
+        # Not hot_reloadable: startup() binds a TCP server socket and setup()
+        # reads app.state.mount_manager unguarded — both assume boot-time
+        # ordering and a restart-clean process.
     )
 
     def __init__(self) -> None:

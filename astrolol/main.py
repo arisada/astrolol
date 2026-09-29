@@ -149,6 +149,7 @@ def create_app() -> FastAPI:
 
     app.state.discovered_plugins = discovered_plugins
     app.state.enabled_plugin_ids = set(resolved_enabled)
+    app.state.plugin_ctx = plugin_ctx
 
     # Collect log scopes: core always present, plus scopes declared by enabled plugins
     plugin_scopes = [
@@ -259,6 +260,8 @@ def create_app() -> FastAPI:
         """Return all discovered plugins with their enabled state."""
         discovered: dict = request.app.state.discovered_plugins
         enabled: set = request.app.state.enabled_plugin_ids
+        persisted = request.app.state.profile_store.get_user_settings().enabled_plugins
+        desired = set(resolve_enabled_plugins(discovered, persisted))
         return [
             {
                 "id": p.manifest.id,
@@ -268,6 +271,12 @@ def create_app() -> FastAPI:
                 "enabled": p.manifest.id in enabled,
                 "nav_order": p.manifest.nav_order,
                 "nav_before": p.manifest.nav_before,
+                "hot_reloadable": p.manifest.hot_reloadable,
+                # True whenever the persisted desired state (from user settings)
+                # disagrees with what's actually live — covers both a newly
+                # enabled plugin that couldn't be hot-loaded and a disabled
+                # plugin that's still running until the next restart.
+                "pending_restart": (p.manifest.id in desired) != (p.manifest.id in enabled),
             }
             for p in discovered.values()
         ]

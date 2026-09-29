@@ -21,6 +21,7 @@ class AutofocusPlugin:
         ),
         nav_order=21,
         log_scopes=[LogScope(key="autofocus", label="Autofocus", logger="plugins.autofocus")],
+        hot_reloadable=True,
     )
 
     def __init__(self) -> None:

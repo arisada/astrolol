@@ -520,6 +520,8 @@ export interface PluginInfo {
   enabled: boolean
   nav_order: number
   nav_before: string | null
+  hot_reloadable: boolean
+  pending_restart: boolean
 }
 
 export interface LogScopeEntry {

@@ -135,3 +135,41 @@ def setup_plugins(
             logger.info("plugin.setup_ok", plugin_id=plugin_id, name=plugin.manifest.name)
         except Exception as exc:
             logger.error("plugin.setup_failed", plugin_id=plugin_id, error=str(exc), exc_info=True)
+
+
+async def sync_enabled_plugins(
+    app: "FastAPI",  # type: ignore[name-defined]
+    ctx: PluginContext,
+    discovered: dict[str, Plugin],
+    target_enabled: list[str],
+) -> None:
+    """Live-activate any newly-requested plugin that is ``hot_reloadable``.
+
+    Called after ``enabled_plugins`` is persisted (see ``PUT /settings``) to
+    reconcile the live app with the user's new intent, without a restart.
+    Never disables or tears down a plugin that's already live — disabling
+    always requires a restart (FastAPI has no clean route-removal path, and
+    most plugins have no real teardown). A plugin that isn't hot_reloadable,
+    or whose ``requires`` aren't already live, is left alone: the persisted
+    settings still record the user's intent, and ``GET /plugins`` reports it
+    as ``pending_restart`` until the next full restart picks it up via the
+    normal ``setup_plugins()`` boot path.
+    """
+    resolved = resolve_enabled_plugins(discovered, target_enabled)
+    for plugin_id in resolved:
+        if plugin_id in app.state.enabled_plugin_ids:
+            continue
+        plugin = discovered.get(plugin_id)
+        if plugin is None or not plugin.manifest.hot_reloadable:
+            continue
+        if not all(req in app.state.enabled_plugin_ids for req in plugin.manifest.requires):
+            continue
+        try:
+            plugin.setup(app, ctx)
+            await plugin.startup()
+        except Exception as exc:
+            logger.error("plugin.hot_enable_failed", plugin_id=plugin_id, error=str(exc), exc_info=True)
+            continue
+        app.state.enabled_plugin_ids.add(plugin_id)
+        app.state.log_scopes = app.state.log_scopes + list(plugin.manifest.log_scopes)
+        logger.info("plugin.hot_enabled", plugin_id=plugin_id, name=plugin.manifest.name)

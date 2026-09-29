@@ -9,7 +9,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from fastapi import FastAPI
 
-from astrolol.app import discover_plugins, resolve_enabled_plugins, setup_plugins
+from astrolol.app import discover_plugins, resolve_enabled_plugins, setup_plugins, sync_enabled_plugins
 from astrolol.core.plugin_api import Plugin, PluginContext, PluginManifest
 
 
@@ -17,9 +17,16 @@ from astrolol.core.plugin_api import Plugin, PluginContext, PluginManifest
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _make_plugin(plugin_id: str = "test_plugin") -> MagicMock:
+def _make_plugin(
+    plugin_id: str = "test_plugin",
+    hot_reloadable: bool = False,
+    requires: list[str] | None = None,
+) -> MagicMock:
     plugin = MagicMock(spec=Plugin)
-    plugin.manifest = PluginManifest(id=plugin_id, name="Test", version="0.1.0")
+    plugin.manifest = PluginManifest(
+        id=plugin_id, name="Test", version="0.1.0",
+        hot_reloadable=hot_reloadable, requires=requires or [],
+    )
     return plugin
 
 
@@ -212,3 +219,91 @@ def test_setup_order_matches_enabled_list() -> None:
 
     setup_plugins(app, ctx, discovered, ["gamma", "alpha", "beta"])
     assert calls == ["gamma", "alpha", "beta"]
+
+
+# ---------------------------------------------------------------------------
+# sync_enabled_plugins
+# ---------------------------------------------------------------------------
+
+def _app_with_state(enabled: set[str] | None = None) -> FastAPI:
+    app = FastAPI()
+    app.state.enabled_plugin_ids = set(enabled or set())
+    app.state.log_scopes = []
+    return app
+
+
+async def test_sync_skips_already_live_plugin() -> None:
+    app = _app_with_state(enabled={"alpha"})
+    ctx = PluginContext(event_bus=None, device_manager=None, device_registry=None)
+    p = _make_plugin("alpha", hot_reloadable=True)
+
+    await sync_enabled_plugins(app, ctx, {"alpha": p}, ["alpha"])
+
+    p.setup.assert_not_called()
+
+
+async def test_sync_skips_non_hot_reloadable_plugin() -> None:
+    app = _app_with_state()
+    ctx = PluginContext(event_bus=None, device_manager=None, device_registry=None)
+    p = _make_plugin("alpha", hot_reloadable=False)
+
+    await sync_enabled_plugins(app, ctx, {"alpha": p}, ["alpha"])
+
+    p.setup.assert_not_called()
+    assert "alpha" not in app.state.enabled_plugin_ids
+
+
+async def test_sync_skips_hot_reloadable_plugin_with_unmet_dependency() -> None:
+    app = _app_with_state()
+    ctx = PluginContext(event_bus=None, device_manager=None, device_registry=None)
+    child = _make_plugin("child", hot_reloadable=True, requires=["parent"])
+
+    await sync_enabled_plugins(app, ctx, {"child": child}, ["child"])
+
+    child.setup.assert_not_called()
+    assert "child" not in app.state.enabled_plugin_ids
+
+
+async def test_sync_activates_hot_reloadable_plugin() -> None:
+    app = _app_with_state()
+    ctx = PluginContext(event_bus=None, device_manager=None, device_registry=None)
+    p = _make_plugin("alpha", hot_reloadable=True)
+
+    await sync_enabled_plugins(app, ctx, {"alpha": p}, ["alpha"])
+
+    p.setup.assert_called_once_with(app, ctx)
+    p.startup.assert_awaited_once()
+    assert "alpha" in app.state.enabled_plugin_ids
+
+
+async def test_sync_activates_dependent_once_dependency_is_live() -> None:
+    app = _app_with_state(enabled={"parent"})
+    ctx = PluginContext(event_bus=None, device_manager=None, device_registry=None)
+    child = _make_plugin("child", hot_reloadable=True, requires=["parent"])
+
+    await sync_enabled_plugins(app, ctx, {"child": child}, ["child"])
+
+    child.setup.assert_called_once_with(app, ctx)
+    assert "child" in app.state.enabled_plugin_ids
+
+
+async def test_sync_catches_setup_error_and_leaves_plugin_disabled() -> None:
+    app = _app_with_state()
+    ctx = PluginContext(event_bus=None, device_manager=None, device_registry=None)
+    p = _make_plugin("alpha", hot_reloadable=True)
+    p.setup.side_effect = RuntimeError("boom")
+
+    await sync_enabled_plugins(app, ctx, {"alpha": p}, ["alpha"])
+
+    assert "alpha" not in app.state.enabled_plugin_ids
+
+
+async def test_sync_catches_startup_error_and_leaves_plugin_disabled() -> None:
+    app = _app_with_state()
+    ctx = PluginContext(event_bus=None, device_manager=None, device_registry=None)
+    p = _make_plugin("alpha", hot_reloadable=True)
+    p.startup.side_effect = RuntimeError("boom")
+
+    await sync_enabled_plugins(app, ctx, {"alpha": p}, ["alpha"])
+
+    assert "alpha" not in app.state.enabled_plugin_ids

@@ -34,6 +34,11 @@ class PluginManifest:
     nav_order: int = 0                   # sidebar sort key — lower = higher in the list
     nav_before: str | None = None        # insert before a named core page ("mount", "imaging", "logs")
     log_scopes: list[LogScope] = field(default_factory=list)  # verbosity scopes for this plugin
+    # True only if setup()+startup() are safe to call on an already-serving app
+    # (no port binding, no unguarded background task/singleton re-registration,
+    # no dependency on boot-time ordering). Enabling a non-hot-reloadable plugin
+    # still requires a full restart; disabling always does, regardless of this flag.
+    hot_reloadable: bool = False
 
 
 @dataclass

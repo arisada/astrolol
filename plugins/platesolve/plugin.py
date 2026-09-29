@@ -24,6 +24,7 @@ class PlatesolvePlugin:
         ),
         nav_order=20,
         log_scopes=[LogScope(key="platesolve", label="Plate Solving", logger="plugins.platesolve")],
+        hot_reloadable=True,
     )
 
     def __init__(self) -> None:

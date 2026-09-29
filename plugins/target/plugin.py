@@ -22,6 +22,9 @@ class TargetPlugin:
         nav_order=5,
         nav_before="mount",
         log_scopes=[LogScope(key="target", label="Target", logger="plugins.target")],
+        # Hot-reloadable itself, but its "requires" dep (object_resolver) is not,
+        # so it only actually hot-enables once object_resolver is already live.
+        hot_reloadable=True,
     )
 
     def setup(self, app: FastAPI, ctx: PluginContext) -> None:
