@@ -23,12 +23,12 @@ export function groupLabel(g: SequencerExposureGroup): string {
   return `${f ? `${f} ` : ''}${g.count}×${g.duration}s`
 }
 
-/** Frames and seconds of the primary lane: done / total. */
-export function taskProgress(entry: SequencerQueueEntry) {
-  const lane = entry.task.lanes[0]
-  const lrt = entry.runtime.lanes[0]
+/** Frames and seconds of a lane (the primary by default): done / total. */
+export function taskProgress(entry: SequencerQueueEntry, laneIndex = 0) {
+  const lane = entry.task.lanes[laneIndex]
+  const lrt = entry.runtime.lanes[laneIndex]
   let done = 0, total = 0, doneS = 0, totalS = 0
-  lane.groups.forEach((g, i) => {
+  lane?.groups.forEach((g, i) => {
     const d = Math.min(lrt?.groups[i]?.frames_done ?? 0, g.count)
     done += d; total += g.count
     doneS += d * g.duration; totalS += g.count * g.duration

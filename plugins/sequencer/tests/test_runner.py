@@ -172,7 +172,7 @@ async def test_preflight_camera_and_lanes(rig: Rig) -> None:
     ]
     await rig.svc.add(task)
     codes = {i.code for i in (await rig.svc.preflight()).issues}
-    assert {"camera_not_connected", "multi_lane_unsupported"} <= codes
+    assert "camera_not_connected" in codes
 
 
 async def test_preflight_warns_when_guider_disconnected(rig: Rig) -> None:

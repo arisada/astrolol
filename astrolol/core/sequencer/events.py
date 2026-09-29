@@ -114,6 +114,7 @@ class SequencerFrameSaved(BaseEvent):
     type: Literal["sequencer.frame_saved"] = "sequencer.frame_saved"
     task_id: str
     lane_id: str
+    camera_id: str | None = None
     group_idx: int
     frame_idx: int  # 0-based index within the group
     frames_total: int
@@ -131,6 +132,15 @@ class SequencerFrameSaved(BaseEvent):
     guide_rms_total: float | None = None  # arcsec
     unguided_s: float | None = None  # seconds without active guiding
     guiding_losses: int | None = None  # times guiding was interrupted
+
+
+class SequencerRigWait(BaseEvent):
+    """The primary lane waited for secondary lanes before a mount operation."""
+    type: Literal["sequencer.rig_wait"] = "sequencer.rig_wait"
+    task_id: str
+    lane_id: str
+    waited_for: str
+    duration_s: float
 
 
 class SequencerFrameDiscarded(BaseEvent):

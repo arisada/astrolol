@@ -43,7 +43,6 @@ export function TaskCard({
   const switchable = runnable || status === 'failed' || status === 'skipped'
   const p = taskProgress(entry)
   const lane = task.lanes[0]
-  const lrt = runtime.lanes[0]
   const lastInterruption = runtime.interruptions[runtime.interruptions.length - 1]
   const hasErrors = issues.some((i) => i.severity === 'error')
 
@@ -122,14 +121,27 @@ export function TaskCard({
 
       {expanded && (
         <div className="mt-2 ml-10 flex flex-col gap-1.5">
-          {lane.groups.map((g, i) => {
-            const done = Math.min(lrt?.groups[i]?.frames_done ?? 0, g.count)
-            const active = isCurrent && lrt?.current_group === i
+          {task.lanes.map((ln, li) => {
+            const lr = runtime.lanes[li]
             return (
-              <div key={i} className="flex items-center gap-2 text-xs">
-                <span className={`w-28 truncate ${active ? 'text-accent' : 'text-slate-400'}`}>{groupLabel(g)}</span>
-                <ProgressBar value={done / g.count} className="w-40" />
-                <span className="text-slate-500 font-mono">{done}/{g.count}</span>
+              <div key={ln.id ?? li} className="flex flex-col gap-1">
+                {task.lanes.length > 1 && (
+                  <span className="text-[11px] text-slate-400">
+                    {li === 0 ? 'Primary' : 'Camera'} · {ln.camera_id ?? 'main camera'}
+                    {isCurrent && lr?.activity ? ` · ${lr.activity.replace(/_/g, ' ')}` : ''}
+                  </span>
+                )}
+                {ln.groups.map((g, i) => {
+                  const done = Math.min(lr?.groups[i]?.frames_done ?? 0, g.count)
+                  const active = isCurrent && lr?.current_group === i
+                  return (
+                    <div key={i} className="flex items-center gap-2 text-xs">
+                      <span className={`w-28 truncate ${active ? 'text-accent' : 'text-slate-400'}`}>{groupLabel(g)}</span>
+                      <ProgressBar value={done / g.count} className="w-40" />
+                      <span className="text-slate-500 font-mono">{done}/{g.count}</span>
+                    </div>
+                  )
+                })}
               </div>
             )
           })}

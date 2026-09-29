@@ -708,8 +708,21 @@ moved forward.
 - **Secondary lanes can't have their own dither cadence.** If a secondary needs more
   frequent dithering, it should be the primary, or the primary should dither more often.
 - **Once the primary has finished its plan,** there are no more dithers. Secondaries still
-  running go on undithered, until the flip deadline or their own completion (pre-flight
-  warns about this). The task completes when every lane has finished.
+  running go on undithered (pre-flight warns about this). The primary lane keeps owning the
+  mount meanwhile: it still flips at the flip point and restarts guiding if it drops. The
+  task completes when every lane has finished.
+- **Estimate** (pre-flight, task editor): a secondary fits
+  `floor((interval − duration − margin) / duration) + 1` frames per dither interval (the
+  allowance is charged once per start decision; real download time is not modelled, so
+  real runs usually do a little better).
+- **Autofocus on a secondary lane** marks the lane busy: the primary waits for it before its
+  next dither (the one case where the primary waits for a secondary). Autofocus runs one at
+  a time across lanes (the autofocus engine runs one run at a time).
+- **Boundaries:** at a frame boundary with a pause/stop/skip/switch pending, each lane stops
+  on its own once its current frame is done (a lane never aborts another lane's exposure);
+  the request takes effect when every lane has stopped. "Now" aborts every lane's
+  exposure. An *error* in one lane stops the others (their in-flight frames are discarded)
+  and goes through the task's error policy.
 
 ### Guiding loss
 

@@ -107,6 +107,20 @@ export function ControlBar({
             <Bar value={p.total ? p.done / p.total : 0} />
             <span className="text-slate-300 w-48 shrink-0 truncate">{taskName(current)} · {p.done}/{p.total}</span>
           </div>
+          {current.task.lanes.slice(1).map((ln, k) => {
+            const i = k + 1
+            const lp = taskProgress(current, i)
+            const activity = status.lanes[i]?.activity
+            return (
+              <div key={ln.id ?? i} className="flex items-center gap-2 text-xs">
+                <span className="text-slate-400 w-20 shrink-0 truncate" title={ln.camera_id ?? ''}>{ln.camera_id ?? `Camera ${i + 1}`}</span>
+                <Bar value={lp.total ? lp.done / lp.total : 0} />
+                <span className="text-slate-300 w-48 shrink-0 truncate">
+                  {lp.done}/{lp.total} · {activity ? ACTIVITY_LABEL[activity].toLowerCase() : 'idle'}
+                </span>
+              </div>
+            )
+          })}
           {exposure && (
             <div className="flex items-center gap-2 text-xs">
               <span className="text-slate-400 w-20 shrink-0">Exposure</span>

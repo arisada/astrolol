@@ -34,6 +34,7 @@ from astrolol.core.sequencer.models import (
     TaskStatus,
 )
 from plugins.sequencer.devices import resolve_lane_devices
+from plugins.sequencer.lanes import LaneEstimate, estimate_lanes
 from plugins.sequencer.runner import RUNNABLE, SWITCHABLE, Runner, remaining_frames
 from plugins.sequencer.settings import SequencerSettings
 from plugins.sequencer.store import QueueStore
@@ -283,10 +284,6 @@ class SequencerServiceImpl:
                 )
             )
 
-        if len(task.lanes) > 1:
-            issue(
-                "error", "multi_lane_unsupported", "several cameras per task are not supported yet"
-            )
         cameras: set[str] = set()
         mount_id: str | None = None
         for lane in task.lanes:
@@ -307,12 +304,21 @@ class SequencerServiceImpl:
                     lane.id,
                 )
             cameras.add(devices.camera_id)
+            if mount_id and devices.mount_id and devices.mount_id != mount_id:
+                issue(
+                    "error",
+                    "different_mounts",
+                    f"camera '{devices.camera_id}' is on another mount than the primary camera",
+                    lane.id,
+                )
             mount_id = mount_id or devices.mount_id
             wanted = {g.filter_name for g in lane.groups if g.filter_name is not None}
             if wanted:
                 await self._preflight_filters(
                     devices.filter_wheel_id, devices.camera_id, wanted, issue, lane.id
                 )
+
+        self._preflight_lanes(task, issue)
 
         target = task.target
         if target.kind != "current" and (task.slew or task.center):
@@ -373,6 +379,42 @@ class SequencerServiceImpl:
                 )
         return issues
 
+    def _preflight_lanes(self, task: ImagingTask, issue: Any) -> None:
+        """Fit-rule checks for secondary lanes (see lanes.estimate_lanes)."""
+        if len(task.lanes) < 2:
+            return
+        cfg = self.settings
+        estimates = estimate_lanes(task, cfg.download_margin_s)
+        primary = estimates[0]
+        for est in estimates[1:]:
+            if not est.can_start:
+                issue(
+                    "error",
+                    "secondary_never_fits",
+                    f"a {est.longest_s:g} s exposure on a secondary camera can never start: the "
+                    f"primary dithers every {task.dither_every} frame(s), which leaves less time "
+                    "than that between dithers",
+                    est.lane_id,
+                )
+                continue
+            if est.efficiency < cfg.secondary_efficiency_warn:
+                issue(
+                    "warning",
+                    "secondary_efficiency",
+                    f"a secondary camera would expose only {est.efficiency:.0%} of the time: its "
+                    "frames wait for the primary's dithers",
+                    est.lane_id,
+                )
+            if est.wall_s > primary.wall_s * 1.05:
+                extra = (est.wall_s - primary.wall_s) / 60
+                issue(
+                    "warning",
+                    "secondary_outlasts_primary",
+                    f"a secondary camera needs ~{extra:.0f} min more than the primary; its last "
+                    "frames are taken without dithering",
+                    est.lane_id,
+                )
+
     async def _preflight_filters(
         self, fw_id: str | None, camera_id: str, wanted: set[str], issue: Any, lane_id: str
     ) -> None:
@@ -404,6 +446,10 @@ class SequencerServiceImpl:
                 f"({', '.join(status.filter_names or []) or 'no names'})",
                 lane_id,
             )
+
+    def estimate(self, task: ImagingTask) -> list[LaneEstimate]:
+        """Per-lane exposure, efficiency and duration (implementation-specific helper)."""
+        return estimate_lanes(task, self.settings.download_margin_s)
 
     # ── Control ────────────────────────────────────────────────────────────
 

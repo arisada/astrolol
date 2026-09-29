@@ -137,8 +137,8 @@ async def test_exports(journaled: Rig) -> None:
     records = read_records(session_files(rig.journal_dir)[0])  # type: ignore[attr-defined]
     csv_text = frames_csv(records)
     lines = csv_text.strip().splitlines()
-    assert lines[0].startswith("timestamp,object_name,filter_name,duration")
-    assert len(lines) == 3 and ",L,10.0," in lines[1]
+    assert lines[0].startswith("timestamp,object_name,camera_id,filter_name,duration")
+    assert len(lines) == 3 and ",cam1,L,10.0," in lines[1]
 
 
 def test_a_crash_leaves_a_readable_file(tmp_path: Path) -> None:

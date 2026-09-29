@@ -52,6 +52,13 @@ const GROUPS: {
     ],
   },
   {
+    title: 'Several cameras',
+    nums: [
+      ['download_margin_s', 'Allowance after a secondary frame', 's'],
+      ['secondary_efficiency_warn', 'Warn when a secondary exposes less than', '(0–1)'],
+    ],
+  },
+  {
     title: 'Guiding loss and stalls',
     nums: [
       ['guide_healthy_after_s', 'Guiding must be steady for', 's before a frame'],

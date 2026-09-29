@@ -34,8 +34,6 @@ from astrolol.core.sequencer.errors import (
     SequencerNotRunning,
 )
 from astrolol.core.sequencer.events import (
-    SequencerFrameDiscarded,
-    SequencerFrameSaved,
     SequencerInterruption,
     SequencerResumed,
     SequencerSessionFinished,
@@ -60,8 +58,9 @@ from astrolol.core.sequencer.models import (
 )
 from astrolol.mount.manager import meridian_flip_due
 from plugins.sequencer.devices import LaneDevices, resolve_lane_devices, run_mount_id
-from plugins.sequencer.focusing import autofocus_triggers, run_autofocus
+from plugins.sequencer.focusing import run_autofocus
 from plugins.sequencer.guiding import center_with_retries, ensure_guiding
+from plugins.sequencer.lanes import mount_operation, run_lanes
 from plugins.sequencer.settings import SequencerSettings
 from plugins.sequencer.steps import StepError, Steps
 from plugins.sequencer.targets import ResolvedTarget
@@ -114,6 +113,9 @@ class _LaneState:
     current_filter: str | None = None
     rr_group: int | None = None
     rr_taken: int = 0
+    af_due: str | None = None  # autofocus requested before the next frame (reason)
+    af_retry_at: float | None = None  # monotonic time to retry a failed autofocus
+    af_tracker: Any = None  # StallTracker for autofocus stalls
 
 
 @dataclass
@@ -125,10 +127,9 @@ class _TaskState:
     setup_done: bool = False
     flipped: bool = False
     target: ResolvedTarget | None = None
-    devices: LaneDevices | None = None
-    af_due: str | None = None  # autofocus requested before the next frame (reason)
-    af_retry_at: float | None = None  # monotonic time to retry a failed autofocus
-    af_tracker: Any = None  # StallTracker for autofocus stalls
+    devices: LaneDevices | None = None  # the primary lane's devices (mount, centering camera)
+    lane_devices: dict[str, LaneDevices] = field(default_factory=dict)
+    schedule: Any = None  # lanes.RigSchedule
 
 
 @dataclass
@@ -179,6 +180,7 @@ class Runner:
         self._exposure_duration: float | None = None
         self._idle_event = asyncio.Event()
         self._idle_event.set()
+        self.af_lock = asyncio.Lock()  # the autofocus engine runs one autofocus at a time
 
     # ── StepHost ───────────────────────────────────────────────────────────
 
@@ -650,13 +652,16 @@ class Runner:
 
     async def _task_body(self, entry: QueueEntry, ts: _TaskState, setup_needed: bool) -> None:
         task = entry.task
-        lane = task.lanes[0]
-        ts.devices = resolve_lane_devices(self.app, lane)
-        if ts.devices.camera_id is None:
-            raise StepError("expose", f"Camera '{lane.camera_id or 'main'}' is not connected")
+        ts.lane_devices = {}
+        for lane in task.lanes:
+            devices = resolve_lane_devices(self.app, lane)
+            if devices.camera_id is None:
+                raise StepError("expose", f"Camera '{lane.camera_id or 'main'}' is not connected")
+            ts.lane_devices[lane.id] = devices
+        ts.devices = ts.lane_devices[task.lanes[0].id]
         if setup_needed or not ts.setup_done:
             await self._setup(entry, ts)
-        await self._primary_lane(entry, ts, lane)
+        await run_lanes(self, entry, ts)
 
     async def _setup(self, entry: QueueEntry, ts: _TaskState) -> None:
         task, rt = entry.task, entry.runtime
@@ -682,105 +687,36 @@ class Runner:
             else:
                 await ensure_guiding(self, entry, ts)
         if task.autofocus_at_start:
-            await run_autofocus(self, entry, ts, "task start")
+            for idx, lane in enumerate(task.lanes):
+                ls = ts.lanes.setdefault(lane.id, _LaneState())
+                await run_autofocus(self, entry, ls, ts.lane_devices[lane.id], "task start", idx)
         ts.frames_since_dither = 0
         for ls in ts.lanes.values():
             ls.current_filter = None
         ts.setup_done = True
 
-    async def _primary_lane(self, entry: QueueEntry, ts: _TaskState, lane: Lane) -> None:
-        task = entry.task
-        devices = ts.devices
-        assert devices is not None
-        lrt = lane_runtime(entry, lane.id)
-        ls = ts.lanes.setdefault(lane.id, _LaneState())
-        while True:
-            gidx = next_group(lane, lrt, ls)
-            if gidx is None:
-                return
-            group = lane.groups[gidx]
-            self._check_boundary()
-            await self._maybe_flip(entry, ts, group.duration)
-            if group.filter_name is not None and ls.current_filter != group.filter_name:
-                await self._steps.change_filter(task.id, devices, group.filter_name)
-                ls.current_filter = group.filter_name
-                if lane.autofocus_on_filter_change:
-                    ts.af_due = f"filter {group.filter_name}"
-            await autofocus_triggers(self, entry, ts)
-            # No new frame without healthy guiding (a frame in progress is never interrupted)
-            await ensure_guiding(self, entry, ts)
-            self._check_boundary()
-            lrt.current_group = gidx
-            done = lrt.groups[gidx].frames_done
-            label = f"{group.filter_name} " if group.filter_name else ""
-            self._exposure_started_at = _now()
-            self._exposure_duration = group.duration
-            await self.set_activity(
-                Activity.EXPOSING,
-                f"Exposing {label}{done + 1}/{group.count} ({group.duration:g} s)",
-            )
-            guide_mark = self._steps.guiding_mark()
-            try:
-                fits_path = await self._steps.expose(task, devices, group)
-            except asyncio.CancelledError:
-                await self.bus.publish(
-                    SequencerFrameDiscarded(
-                        task_id=task.id,
-                        lane_id=lane.id,
-                        group_idx=gidx,
-                        reason="exposure aborted",
-                    )
-                )
-                raise
-            finally:
-                self._exposure_started_at = None
-                self._exposure_duration = None
-            guiding = self._steps.guiding_stats(guide_mark)
-            await self._steps.record_guiding_in_fits(fits_path, guiding)
-            limit = self.settings.uncount_if_unguided_s
-            unguided = guiding.get("unguided_s")
-            counted = limit is None or unguided is None or unguided <= limit
-            if counted:
-                lrt.groups[gidx].frames_done += 1
-                if lane.order == "round_robin":
-                    ls.rr_taken += 1
-            else:
-                logger.warning(
-                    "sequencer.frame_not_counted",
-                    task_id=task.id,
-                    fits_path=fits_path,
-                    unguided_s=unguided,
-                    limit_s=limit,
-                )
-            if self._run is not None:
-                self._run.frames_saved += 1
-            await self.bus.publish(
-                SequencerFrameSaved(
-                    task_id=task.id,
-                    lane_id=lane.id,
-                    group_idx=gidx,
-                    frame_idx=done,
-                    frames_total=group.count,
-                    filter_name=group.filter_name,
-                    duration=group.duration,
-                    fits_path=fits_path,
-                    counted=counted,
-                    object_name=task.target.name,
-                    **await self._steps.frame_context(devices),
-                    **guiding,
-                )
-            )
-            await self._svc.commit()
-            ts.frames_since_dither += 1
+    def pending_frame_request(self) -> _Request | None:
+        """A request that takes effect at the next frame boundary (or now), if any."""
+        req = self._request
+        return req if req is not None and req.when in ("frame", "now") else None
 
-            if next_group(lane, lrt, ls, peek=True) is None:
-                return
-            self._check_boundary()
-            if task.dither_every and ts.frames_since_dither >= task.dither_every:
-                await self._steps.dither(task.id)
-                ts.frames_since_dither = 0
-            if task.sub_delay_s > 0:
-                await self._sleep(task.sub_delay_s, Activity.WAITING, "Waiting between frames")
+    async def set_lane_activity(
+        self, entry: QueueEntry, index: int, activity: Activity | None
+    ) -> None:
+        """Activity of a secondary lane (the primary's is set_activity)."""
+        lanes = entry.runtime.lanes
+        if 0 <= index < len(lanes) and lanes[index].activity != activity:
+            lanes[index].activity = activity
+            await self.emit_status()
+
+    def exposure_started(self, duration: float | None) -> None:
+        """The primary lane started (duration) or ended (None) an exposure."""
+        self._exposure_started_at = _now() if duration is not None else None
+        self._exposure_duration = duration
+
+    def frame_saved(self) -> None:
+        if self._run is not None:
+            self._run.frames_saved += 1
 
     def _check_boundary(self) -> None:
         req = self._request
@@ -813,6 +749,15 @@ class Runner:
         ha = (status.hour_angle + 12.0) % 24.0 - 12.0
         threshold = cfg.meridian_flip_ha_hours
         known_pier = status.pier_side in ("East", "West")
+        flip_coming = not (status.pier_side == "East" or (not known_pier and ts.flipped))
+        if ts.schedule is not None:
+            # Secondary lanes don't start frames that would still run at the flip point
+            ts.schedule.flip_at = (
+                time.monotonic() + max(0.0, threshold - ha) * 3600.0 / SIDEREAL_RATE
+                if flip_coming
+                else None
+            )
+            ts.schedule.notify()
         if not known_pier and ts.flipped:
             return  # unknown pier side: flip at most once per target
         if ha >= threshold:
@@ -844,10 +789,15 @@ class Runner:
             await self._flip(entry, ts, mount_id)
 
     async def _flip(self, entry: QueueEntry, ts: _TaskState, mount_id: str) -> None:
+        await mount_operation(self, entry, ts, "meridian flip", self._flip_now(entry, ts, mount_id))
+
+    async def _flip_now(self, entry: QueueEntry, ts: _TaskState, mount_id: str) -> None:
         task = entry.task
         await self._steps.stop_guiding(task.id)
         flipped = await self._steps.meridian_flip(task, mount_id)
         ts.flipped = True
+        if ts.schedule is not None:
+            ts.schedule.flip_at = None
         if (
             flipped
             and self.settings.center_after_flip
@@ -858,7 +808,8 @@ class Runner:
         # Guiding restarts through ensure_guiding() before the next frame.
         ts.frames_since_dither = 0
         if flipped and self.settings.refocus_after_flip:
-            ts.af_due = "after the meridian flip"
+            for ls in ts.lanes.values():
+                ls.af_due = "after the meridian flip"
 
     async def _mount_status(self, mount_id: str) -> Any:
         mm = getattr(self.app.state, "mount_manager", None)

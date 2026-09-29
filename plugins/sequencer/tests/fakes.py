@@ -44,26 +44,39 @@ class FakeImager:
         self.frames_dir = frames_dir
         self.requests: list[tuple[str, Any]] = []
         self.fail_next: list[Exception] = []
+        self.fail_camera: dict[str, Exception] = {}   # camera_id → error on its next exposure
         self.gate: asyncio.Event | None = None  # when set: exposures wait for it
-        self.exposing = False
+        self.real_durations = False             # sleep the requested duration
+        self.active: set[str] = set()
+        self.log: list[tuple[str, float, float]] = []   # (camera, start, end), monotonic
         self.cancelled = 0
         self.saved = 0
 
+    @property
+    def exposing(self) -> bool:
+        return bool(self.active)
+
     async def expose(self, camera_id: str, req: Any) -> Any:
         self.requests.append((camera_id, req))
+        if camera_id in self.fail_camera:
+            raise self.fail_camera.pop(camera_id)
         if self.fail_next:
             raise self.fail_next.pop(0)
-        self.exposing = True
+        self.active.add(camera_id)
+        start = time.monotonic()
         try:
             if self.gate is not None:
                 await self.gate.wait()
+            elif self.real_durations:
+                await asyncio.sleep(req.duration)
             else:
                 await asyncio.sleep(0.003)
         except asyncio.CancelledError:
             self.cancelled += 1
             raise
         finally:
-            self.exposing = False
+            self.active.discard(camera_id)
+        self.log.append((camera_id, start, time.monotonic()))
         self.saved += 1
         path = self.frames_dir / f"frame_{self.saved}.fits"
         make_fake_fits(path, width=8, height=8)
@@ -82,6 +95,7 @@ class FakeMountManager:
         self.dec = 40.0
         self.slews: list[tuple[float, float, str | None]] = []
         self.flips = 0
+        self.flip_times: list[float] = []
         self.fail_slew: list[str] = []
         self.suspended = 0
         self.events: list[str] = []
@@ -119,6 +133,7 @@ class FakeMountManager:
 
     async def meridian_flip(self, mount_id: str) -> None:
         self.flips += 1
+        self.flip_times.append(time.monotonic())
         self.pier = "East"
         self.events.append("flip")
         await self._bus.publish(MountMeridianFlipCompleted(device_id=mount_id))
@@ -160,6 +175,7 @@ class FakeGuider:
         self.guiding_for_s = 1e6  # healthy for ages unless a test says otherwise
         self.unguided_for_s = 0.0
         self.fail_guides = 0  # the next N guide() calls fail (not connected)
+        self.dither_times: list[float] = []
 
     def status(self) -> GuiderStatus:
         return GuiderStatus(
@@ -205,6 +221,7 @@ class FakeGuider:
 
     async def dither(self, pixels: float, ra_only: bool, settle: SettleParams) -> None:
         self.dithers += 1
+        self.dither_times.append(time.monotonic())
 
     async def pause(self) -> None:
         pass

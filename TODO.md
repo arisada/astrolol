@@ -95,7 +95,8 @@ centering, core `Guider` protocol (PHD2 + guide simulator implement it), guiding
 per-frame guiding stats (events + FITS cards), guiding check before each frame, guiding
 recovery loop, stalls (guiding, centering, autofocus) with timeout, retaking badly unguided
 frames, autofocus (task start, filter change, after flip, temperature / time triggers),
-session journal (JSONL per run, sessions API, time breakdown, CSV/Markdown export, Journal tab).
+session journal (JSONL per run, sessions API, time breakdown, CSV/Markdown export, Journal tab),
+multi-camera lanes (primary-driven fit rule, per-lane autofocus, estimates, multi-camera editor).
 
 - **Frame analysis + FWHM autofocus trigger** — measure star FWHM/HFR on science frames
   (every Nth frame or a downsampled copy, to stay cheap on a Pi; the imager's per-frame star
@@ -107,8 +108,9 @@ session journal (JSONL per run, sessions API, time breakdown, CSV/Markdown expor
 - **Journal — later** — per-frame FWHM/HFR once frame analysis exists; guiding RMS graph per
   session (needs guide steps in the journal, sampled); a "night report" across several
   sessions of the same target.
-- **Phase 4 — multi-camera lanes** (`RigSchedule`, fit rule, efficiency estimate and
-  pre-flight checks, multi-lane editor and progress).
+- **Lanes — later** — a secondary-lane error currently stops every lane (in-flight frames
+  discarded); a per-lane error policy could let the other cameras carry on. The efficiency
+  estimate ignores download time (real runs usually do a little better than shown).
 - **Phase 5** — named sequences, one runner per mount, MCP tool surface.
 - **Decided** — a disconnected guider doesn't block the start (pre-flight warns); the run
   waits for guiding like any outage. The flip hour angle stays a sequencer setting.

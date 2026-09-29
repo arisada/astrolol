@@ -92,7 +92,16 @@ async def ensure_guiding(runner: Runner, entry: QueueEntry, ts: _TaskState) -> N
                     recentered = True
                     await runner._steps.stop_guiding(task.id)
                     assert ts.target is not None and ts.devices is not None
-                    await runner._steps.center(task, ts.target, ts.devices)
+                    # the re-centering slews: wait until no secondary lane is exposing
+                    from plugins.sequencer.lanes import mount_operation
+
+                    await mount_operation(
+                        runner,
+                        entry,
+                        ts,
+                        "re-centering",
+                        runner._steps.center(task, ts.target, ts.devices),
+                    )
                 await runner._steps.start_guiding(task.id)
             except StepError as exc:
                 error = str(exc)
@@ -109,6 +118,25 @@ async def ensure_guiding(runner: Runner, entry: QueueEntry, ts: _TaskState) -> N
         ts.frames_since_dither = (
             0  # guiding restarted on a freshly selected star: counts as a dither
         )
+
+
+async def wait_guiding_healthy(runner: Runner, entry: QueueEntry, lane_index: int) -> bool:
+    """Secondary lanes: wait until guiding is healthy (the primary lane runs the recovery).
+
+    Returns False if a frame-boundary request arrived while waiting.
+    """
+    guider: Any = getattr(runner.app.state, "guider", None)
+    if not entry.task.start_guiding or guider is None:
+        return True
+    cfg = runner.settings
+    while True:
+        if runner.pending_frame_request() is not None:
+            return False
+        health = guider.health()
+        if health.guiding and (health.guiding_for_s or 0.0) >= cfg.guide_healthy_after_s:
+            return True
+        await runner.set_lane_activity(entry, lane_index, Activity.WAITING_FOR_GUIDING)
+        await asyncio.sleep(POLL_S)
 
 
 async def center_with_retries(runner: Runner, entry: QueueEntry, ts: _TaskState) -> None:

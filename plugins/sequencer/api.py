@@ -39,6 +39,7 @@ from plugins.sequencer.journal import (
     summarize,
     summary_markdown,
 )
+from plugins.sequencer.lanes import LaneEstimate
 from plugins.sequencer.settings import SequencerSettings
 
 logger = structlog.get_logger()
@@ -162,6 +163,12 @@ class PreflightBody(BaseModel):
 @router.post("/preflight", response_model=PreflightReport)
 async def preflight(request: Request, body: PreflightBody | None = None) -> PreflightReport:
     return await _call(lambda: _seq(request).preflight(body.task_ids if body else None))
+
+
+@router.post("/estimate", response_model=list[LaneEstimate])
+async def estimate(task: ImagingTask, request: Request) -> list[LaneEstimate]:
+    """Per-lane exposure time, efficiency and duration for a task definition (editor aid)."""
+    return request.app.state.sequencer.estimate(task)  # type: ignore[no-any-return]
 
 
 class StartBody(BaseModel):

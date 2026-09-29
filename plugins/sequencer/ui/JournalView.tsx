@@ -171,15 +171,17 @@ function SessionDetail({ summary }: { summary: SequencerSessionSummary }) {
           <table className="w-full text-xs">
             <thead className="text-slate-500 text-left">
               <tr>
-                <th className="font-normal py-1">Target</th><th className="font-normal">Filter</th>
+                <th className="font-normal py-1">Target</th><th className="font-normal">Camera</th>
+                <th className="font-normal">Filter</th>
                 <th className="font-normal text-right">Frames</th><th className="font-normal text-right">Time</th>
                 <th className="font-normal text-right">Not counted</th>
               </tr>
             </thead>
             <tbody>
               {summary.integration.map((row) => (
-                <tr key={`${row.object_name}/${row.filter_name}`} className="border-t border-surface-border text-slate-300">
-                  <td className="py-1">{row.object_name}</td><td>{row.filter_name ?? '—'}</td>
+                <tr key={`${row.object_name}/${row.camera_id}/${row.filter_name}`} className="border-t border-surface-border text-slate-300">
+                  <td className="py-1">{row.object_name}</td><td>{row.camera_id ?? '—'}</td>
+                  <td>{row.filter_name ?? '—'}</td>
                   <td className="text-right font-mono">{row.frames}</td>
                   <td className="text-right font-mono">{fmtSeconds(row.seconds)}</td>
                   <td className="text-right font-mono">{row.uncounted || ''}</td>
@@ -212,7 +214,7 @@ function SessionDetail({ summary }: { summary: SequencerSessionSummary }) {
               <thead className="text-slate-500 text-left sticky top-0 bg-surface">
                 <tr>
                   <th className="font-normal py-1">Time</th><th className="font-normal">Target</th>
-                  <th className="font-normal">Filter</th><th className="font-normal text-right">Exp.</th>
+                  <th className="font-normal">Camera</th><th className="font-normal">Filter</th><th className="font-normal text-right">Exp.</th>
                   <th className="font-normal text-right">Guide RMS</th><th className="font-normal text-right">Unguided</th>
                   <th className="font-normal text-right">Alt.</th><th className="font-normal text-right">Focus</th>
                   <th className="font-normal text-right">Sensor</th>
@@ -224,6 +226,7 @@ function SessionDetail({ summary }: { summary: SequencerSessionSummary }) {
                     title={String(f.fits_path ?? '')}>
                     <td className="py-1">{clock(f.timestamp)}</td>
                     <td className="font-sans">{String(f.object_name ?? '')}</td>
+                    <td className="font-sans">{String(f.camera_id ?? '—')}</td>
                     <td className="font-sans">{String(f.filter_name ?? '—')}</td>
                     <td className="text-right">{num(f.duration, 0)} s</td>
                     <td className="text-right">{num(f.guide_rms_total, 2, '″')}</td>

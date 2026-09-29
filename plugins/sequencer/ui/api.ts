@@ -3,6 +3,7 @@
 import type {
   SequencerBoundary,
   SequencerPreflightReport,
+  SequencerLaneEstimate,
   SequencerQueueEntry,
   SequencerSessionSummary,
   SequencerSettings,
@@ -53,6 +54,8 @@ export const unskipTask = (id: string) => post<SequencerQueueEntry>(`/queue/${id
 export const reorder = (order: string[]) => post<void>('/queue/reorder', { order })
 export const clearQueue = (statuses: string[]) =>
   request<void>(`${BASE}/queue?${statuses.map((s) => `status=${s}`).join('&')}`, { method: 'DELETE' })
+
+export const estimate = (task: SequencerTask) => post<SequencerLaneEstimate[]>('/estimate', task)
 
 // ── Control ──
 export const preflight = (taskIds?: string[]) =>

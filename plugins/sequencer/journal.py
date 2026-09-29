@@ -187,6 +187,7 @@ def default_journal_dir(save_dir_template: str | None, fallback: Path) -> Path:
 
 class IntegrationRow(BaseModel):
     object_name: str
+    camera_id: str | None = None
     filter_name: str | None
     frames: int
     seconds: float
@@ -267,7 +268,7 @@ def summarize(path: Path, records: list[dict[str, Any]]) -> SessionSummary:
         task = entry.get("task", entry)
         names[task["id"]] = task.get("name") or task["target"]["name"]
 
-    rows: dict[tuple[str, str | None], IntegrationRow] = {}
+    rows: dict[tuple[str, str | None, str | None], IntegrationRow] = {}
     summary = SessionSummary(
         session_id=session_id,
         file=str(path),
@@ -282,9 +283,12 @@ def summarize(path: Path, records: list[dict[str, Any]]) -> SessionSummary:
         rtype = r["type"]
         if rtype == "sequencer.frame_saved":
             obj = r.get("object_name") or names.get(r["task_id"], r["task_id"][:8])
-            key = (obj, r.get("filter_name"))
+            key = (obj, r.get("camera_id"), r.get("filter_name"))
             row = rows.setdefault(
-                key, IntegrationRow(object_name=obj, filter_name=key[1], frames=0, seconds=0)
+                key,
+                IntegrationRow(
+                    object_name=obj, camera_id=key[1], filter_name=key[2], frames=0, seconds=0
+                ),
             )
             summary.frames_saved += 1
             if r.get("counted", True):
@@ -307,7 +311,7 @@ def summarize(path: Path, records: list[dict[str, Any]]) -> SessionSummary:
             if name and name not in summary.tasks:
                 summary.tasks.append(name)
     summary.integration = sorted(
-        rows.values(), key=lambda row: (row.object_name, row.filter_name or "")
+        rows.values(), key=lambda row: (row.object_name, row.camera_id or "", row.filter_name or "")
     )
     summary.integration_s = round(summary.integration_s, 1)
     summary.time = time_breakdown(records, t_end)
@@ -349,6 +353,7 @@ def time_breakdown(records: list[dict[str, Any]], t_end: datetime | None) -> lis
 FRAME_COLUMNS = [
     "timestamp",
     "object_name",
+    "camera_id",
     "filter_name",
     "duration",
     "counted",
@@ -409,12 +414,13 @@ def summary_markdown(summary: SessionSummary, records: list[dict[str, Any]]) -> 
         "",
         "## Integration",
         "",
-        "| Target | Filter | Frames | Time | Not counted |",
-        "|---|---|---|---|---|",
+        "| Target | Camera | Filter | Frames | Time | Not counted |",
+        "|---|---|---|---|---|---|",
     ]
     for row in summary.integration:
         cells = [
             row.object_name,
+            row.camera_id or "—",
             row.filter_name or "—",
             row.frames,
             _hms(row.seconds),

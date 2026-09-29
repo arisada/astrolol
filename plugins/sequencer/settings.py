@@ -28,6 +28,14 @@ class SequencerSettings(BaseModel):
     center_exposure_s: float = Field(default=5.0, gt=0)
     center_binning: int = Field(default=2, ge=1, le=4)
 
+    # Several cameras (lanes)
+    download_margin_s: float = Field(
+        default=10.0, ge=0, description="Allowance after a secondary exposure (download, overhead)"
+    )
+    secondary_efficiency_warn: float = Field(
+        default=0.8, ge=0, le=1, description="Pre-flight warns below this secondary efficiency"
+    )
+
     # Guiding loss and stalls
     guide_healthy_after_s: float = Field(
         default=10.0, ge=0, description="Continuous guiding needed before a new frame starts"

@@ -353,6 +353,16 @@ export interface SequencerStatus {
   eta_s: number | null
 }
 
+export interface SequencerLaneEstimate {
+  lane_id: string
+  primary: boolean
+  exposure_s: number
+  efficiency: number
+  wall_s: number
+  can_start: boolean
+  longest_s: number
+}
+
 export interface SequencerPreflightIssue {
   severity: 'error' | 'warning'
   task_id: string | null
@@ -387,6 +397,8 @@ export interface SequencerSettings {
   center_retry_interval_s: number
   stall_timeout_min: number | null
   uncount_if_unguided_s: number | null
+  download_margin_s: number
+  secondary_efficiency_warn: number
   refocus_after_flip: boolean
   autofocus_on_temp_delta: number | null
   autofocus_every_min: number | null
@@ -401,6 +413,7 @@ export interface SequencerSettings {
 
 export interface SequencerIntegrationRow {
   object_name: string
+  camera_id: string | null
   filter_name: string | null
   frames: number
   seconds: number
