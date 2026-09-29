@@ -96,6 +96,13 @@ per-frame guiding stats (events + FITS cards), guiding check before each frame, 
 recovery loop, stalls (guiding, centering, autofocus) with timeout, retaking badly unguided
 frames, autofocus (task start, filter change, after flip, temperature / time triggers).
 
+- **Frame analysis + FWHM autofocus trigger** — measure star FWHM/HFR on science frames
+  (every Nth frame or a downsampled copy, to stay cheap on a Pi; the imager's per-frame star
+  analysis is disabled today), record it per frame (events, journal, FITS), and refocus when
+  FWHM rises above the post-autofocus baseline (e.g. +20 %) rather than a fixed value.
+- **Global sequencer settings vs the meta-scheduler** — the autofocus time/temperature
+  triggers (and other global "when" policies) overlap with what the meta-scheduler will
+  decide; they may move into it or become per-task. Undecided.
 - **Phase 3 — session journal** (JSONL per run next to the images, sessions API, time
   breakdown, UI journal tab).
 - **Phase 4 — multi-camera lanes** (`RigSchedule`, fit rule, efficiency estimate and
