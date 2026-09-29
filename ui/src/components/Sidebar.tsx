@@ -53,7 +53,7 @@ export function Sidebar() {
     <aside className="flex flex-col w-14 lg:w-48 shrink-0 bg-surface-raised border-r border-surface-border h-full">
       {/* Logo */}
       <div className="flex items-center gap-2 px-3 py-4 border-b border-surface-border">
-        <span className="text-accent font-bold text-lg">✦</span>
+        <img src="/favicon-32x32.png" alt="" className="h-5 w-5 shrink-0" />
         <span className="hidden lg:block text-slate-200 font-semibold text-sm tracking-wide">astrolol</span>
       </div>
 
