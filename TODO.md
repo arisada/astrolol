@@ -83,15 +83,42 @@ baked into the current code/design or a feature left out; revisit when it bites.
 
 - **Target persistence across restart** — store the last-set target in `profiles.json` so
   it survives a backend restart.
-- **No imaging scheduler** — no plan/sequence concept exists (target list with per-target
-  exposure counts/filters/altitude or time gates, autofocus-on-filter-change or temperature
-  drift, meridian-flip-aware run continuation, dawn/weather stop). Every exposure today is a
-  single manual `expose`/`start_loop` call from the UI; anything resembling a multi-target
-  night plan has to be driven by hand. Likely a `plugins/sequencer/` plugin — its previous
-  blocker (reliably knowing which filter wheel/focuser goes with which camera per target) is
-  resolved: `astrolol.equipment.optical_path.resolve_optical_paths` and
-  `GET /profiles/active/optical-paths` now give exactly that, per camera, from the active
-  profile's equipment tree.
+- **Meta-scheduler (name TBD)** — decides what to image when (altitude, twilight, meridian,
+  weather, blocked sky) and drives the sequencer through `app.state.sequencer`
+  (`astrolol.core.sequencer.Sequencer`: `switch_to`, `insert_next`, `wait_for_task`,
+  `subscribe`, interruption history per task). Not designed yet.
+
+## Sequencer — remaining work
+
+Design: `SEQUENCER_SPEC.md`. Done: phase 1 (core interface, queue/runner, UI), platesolve
+centering, PHD2 settle-wait + guiding health, per-frame guiding stats in `frame_saved`.
+
+- **Phase 2 — guiding and stalls**
+  - Use the core `Guider` protocol (`app.state.guider`) everywhere instead of `phd2_client`
+    (in progress with the guide simulator).
+  - Guiding gate: no new frame starts until guiding has been healthy for
+    `guide_healthy_after_s`; `WAITING_FOR_GUIDING` activity.
+  - Guiding recovery loop: retry `guide()` every `guide_retry_interval_s`, one re-centre after
+    `recenter_after_guide_loss_min`, dither counter reset on recovery.
+  - Stalls: `Stall` on status/runtime, `task_stalled` / `stall_attempt` / `task_unstalled`
+    events, centering "no solution" and autofocus as stalls, `stall_timeout_min`.
+  - `uncount_if_unguided_s` (retake badly unguided frames, keep the file).
+  - FITS header cards `GUIDLOST` / `GUIDLOSN` via an `ImagerManager` extra-header hook.
+  - Autofocus integration (at start, on filter change, after flip, temperature/time
+    triggers) — needs a callable, awaitable autofocus engine API per camera/focuser.
+- **Phase 3 — session journal** (JSONL per run next to the images, sessions API, time
+  breakdown, UI journal tab).
+- **Phase 4 — multi-camera lanes** (`RigSchedule`, fit rule, efficiency estimate and
+  pre-flight checks, multi-lane editor and progress).
+- **Phase 5** — named sequences, one runner per mount, MCP tool surface.
+- **Open decisions**
+  - Guiding on by default: with the guider disconnected pre-flight only warns and the run
+    then pauses on the error — block the start instead?
+  - The flip hour angle is a sequencer setting (`meridian_flip_ha_hours`) separate from the
+    mount's `auto_flip_ha_hours` — merge them?
+- **Test isolation** — integration tests build real apps on the default data dir: they log
+  into `~/.astrolol/astrolol.log` and use `/tmp/astrolol`. Point them at a tmp data dir.
+- **UI** — a "slew & center" button (platesolve `POST /center`) on the Mount/Target pages.
 
 ## Profiles — deferred
 
