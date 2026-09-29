@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Focus, StopCircle } from 'lucide-react'
+import { ChevronDown, ChevronUp, Contrast, Focus, StopCircle } from 'lucide-react'
 import { api } from '@/api/client'
 import * as autofocusApi from './api'
 import { useStore } from '@/store'
@@ -10,6 +10,7 @@ import { DurationStepper } from '@/components/ui/duration-stepper'
 import { Input } from '@/components/ui/input'
 import { PillGroup } from '@/components/ui/pill-group'
 import { StatusPill } from '@/components/ui/badge'
+import { ToggleSwitch } from '@/components/ui/toggle-switch'
 import type { StatusPillVariant } from '@/components/ui/badge'
 import type {
   AutofocusConfig,
@@ -26,6 +27,74 @@ import type {
 // ── Autofocus exposure steps ──────────────────────────────────────────────────
 
 const AUTOFOCUS_EXPOSURE_STEPS = [0.5, 1, 1.5, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20, 30]
+
+const STEP_SIZE_PROGRESSION = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000]
+
+// ── Integer field with progression up/down buttons ────────────────────────────
+// Plain <input type=number> can't be cleared to retype a leading digit (parseInt('')
+// falls back to the min and instantly repopulates the field), and its native
+// spinner only ever does +/-1. This keeps a local editable string that commits on
+// blur/Enter, and steps through `progression` instead of +/-1.
+
+function IntegerStepper({
+  label, unit, value, onChange, progression, min = 0,
+}: {
+  label: string
+  unit?: string
+  value: number
+  onChange: (v: number) => void
+  progression: number[]
+  min?: number
+}) {
+  const [raw, setRaw] = useState(String(value))
+  const editingRef = useRef(false)
+
+  useEffect(() => {
+    if (!editingRef.current) setRaw(String(value))
+  }, [value])
+
+  const commit = () => {
+    editingRef.current = false
+    const n = parseInt(raw, 10)
+    if (!isNaN(n)) onChange(Math.max(min, n))
+    else setRaw(String(value))
+  }
+
+  const stepDown = () => {
+    const lower = progression.filter((v) => v < value)
+    onChange(lower.length ? lower[lower.length - 1] : progression[0])
+  }
+  const stepUp = () => {
+    const higher = progression.filter((v) => v > value)
+    onChange(higher.length ? higher[0] : progression[progression.length - 1])
+  }
+
+  return (
+    <div className="flex flex-col gap-1">
+      <label className="text-xs text-slate-400">{label}</label>
+      <div className="flex items-center gap-1">
+        <Button size="icon" variant="outline" onClick={stepDown} title="Decrease">
+          <ChevronDown size={14} />
+        </Button>
+        <input
+          type="text" inputMode="numeric" value={raw}
+          onFocus={() => { editingRef.current = true }}
+          onChange={(e) => { editingRef.current = true; setRaw(e.target.value.replace(/[^0-9]/g, '')) }}
+          onBlur={commit}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+            if (e.key === 'Escape') { setRaw(String(value)); editingRef.current = false; (e.target as HTMLInputElement).blur() }
+          }}
+          className="flex-1 min-w-0 text-center text-xs font-mono text-slate-200 bg-surface-overlay border border-surface-border rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-accent"
+        />
+        <Button size="icon" variant="outline" onClick={stepUp} title="Increase">
+          <ChevronUp size={14} />
+        </Button>
+        {unit && <span className="text-xs text-slate-500">{unit}</span>}
+      </div>
+    </div>
+  )
+}
 
 // ── U-curve SVG chart ─────────────────────────────────────────────────────────
 
@@ -151,6 +220,7 @@ const DEFAULT_SETTINGS: AutofocusSettings = {
   filter_slot: null,
   fit_algo: 'parabola',
   metric: 'fwhm',
+  lock_stars: false,
 }
 
 // ── Main page component ───────────────────────────────────────────────────────
@@ -206,6 +276,12 @@ export function AutofocusPage() {
 
   const [previewStep, setPreviewStep] = useState<number | null>(null)
   const [previewKey,  setPreviewKey]  = useState(0)
+  const [stretchMode, setStretchMode] = useState<'auto' | 'linear'>('auto')
+
+  // Manual starting position — empty string means "use the focuser's current position".
+  const [startPositionRaw, setStartPositionRaw] = useState('')
+  const focuserStatuses = useStore((s) => s.focuserStatuses)
+  const focuserPosition = focuserId ? focuserStatuses[focuserId]?.position ?? null : null
 
   // ── Load persisted settings on mount ──────────────────────────────────────
   useEffect(() => {
@@ -284,6 +360,7 @@ export function AutofocusPage() {
       camera_id: cameraId,
       focuser_id: focuserId,
       filter_wheel_id: resolvedFilterWheel?.device_id ?? null,
+      start_position: startPositionRaw ? parseInt(startPositionRaw, 10) : null,
       ...settings,
     }
 
@@ -295,7 +372,7 @@ export function AutofocusPage() {
       setBusy(false)
       setError(err instanceof Error ? err.message : 'Failed to start autofocus')
     }
-  }, [cameraId, focuserId, resolvedFilterWheel, settings, fetchRun])
+  }, [cameraId, focuserId, resolvedFilterWheel, settings, startPositionRaw, fetchRun])
 
   const handleAbort = useCallback(async () => {
     try { await autofocusApi.abort(); await fetchRun() }
@@ -307,7 +384,7 @@ export function AutofocusPage() {
   // start of each iteration before exposure/preview are ready.
   const lastDp      = run?.data_points.length ? run.data_points[run.data_points.length - 1] : null
   const displayStep = previewStep ?? lastDp?.step ?? null
-  const previewUrl  = displayStep ? `${autofocusApi.previewUrl(displayStep)}?k=${previewKey}` : null
+  const previewUrl  = displayStep ? `${autofocusApi.previewUrl(displayStep, stretchMode)}&k=${previewKey}` : null
 
   const bestDataPoint = run?.data_points.filter((d) => d.fwhm > 0).reduce(
     (best, dp) => (!best || dp.fwhm < best.fwhm ? dp : best), null as FocusDataPoint | null,
@@ -321,6 +398,17 @@ export function AutofocusPage() {
 
       {/* ── Left: image preview ── */}
       <div className="flex-1 flex flex-col items-center justify-center bg-black min-w-0 relative">
+        {previewUrl && (
+          <Button
+            size="sm" variant="outline"
+            onClick={() => setStretchMode((m) => (m === 'auto' ? 'linear' : 'auto'))}
+            title="Toggle auto-stretch / linear preview"
+            className="absolute top-2 right-2 z-10 bg-black/60 backdrop-blur-sm"
+          >
+            <Contrast size={13} className="mr-1.5" />
+            {stretchMode === 'auto' ? 'Auto-stretch' : 'Linear'}
+          </Button>
+        )}
         {previewUrl ? (
           <img src={previewUrl} alt="Focus step" className="max-w-full max-h-full object-contain" />
         ) : (
@@ -411,19 +499,14 @@ export function AutofocusPage() {
             />
 
             {/* Step size */}
-            <div className="flex flex-col gap-1">
-              <label className="text-xs text-slate-400">Step size</label>
-              <div className="flex items-center gap-1">
-                <Input
-                  inputSize="sm"
-                  type="number" min={1}
-                  value={settings.step_size}
-                  onChange={(e) => patchSettings('step_size', Math.max(1, parseInt(e.target.value, 10) || 1))}
-                  className="flex-1"
-                />
-                <span className="text-xs text-slate-500">steps</span>
-              </div>
-            </div>
+            <IntegerStepper
+              label="Step size"
+              unit="steps"
+              value={settings.step_size}
+              onChange={(v) => patchSettings('step_size', Math.max(1, v))}
+              progression={STEP_SIZE_PROGRESSION}
+              min={1}
+            />
 
             {/* Steps each side */}
             <div className="flex flex-col gap-1">
@@ -438,6 +521,43 @@ export function AutofocusPage() {
                 />
                 <span className="text-xs text-slate-300 w-4 text-center">{settings.num_steps}</span>
               </div>
+            </div>
+
+            {/* Manual starting position */}
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-slate-400">
+                Start position <span className="text-slate-600">(optional)</span>
+              </label>
+              <div className="flex items-center gap-1">
+                <Input
+                  inputSize="sm"
+                  type="text" inputMode="numeric"
+                  placeholder={focuserPosition !== null ? `current: ${focuserPosition}` : 'current position'}
+                  value={startPositionRaw}
+                  onChange={(e) => setStartPositionRaw(e.target.value.replace(/[^0-9]/g, ''))}
+                  className="flex-1"
+                />
+                {startPositionRaw && (
+                  <Button size="icon" variant="outline" onClick={() => setStartPositionRaw('')} title="Use current position">
+                    ×
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            {/* Lock onto the same stars for every step */}
+            <div className="flex items-center justify-between gap-2 pt-1">
+              <label className="text-xs text-slate-400 leading-tight">
+                Track the same stars
+                <span className="block text-[10px] text-slate-600">
+                  Prefer the stars found on the first exposure over a fresh set each step
+                </span>
+              </label>
+              <ToggleSwitch
+                label="Track the same stars across the sweep"
+                checked={settings.lock_stars}
+                onChange={() => patchSettings('lock_stars', !settings.lock_stars)}
+              />
             </div>
           </div>
         </SidebarSection>

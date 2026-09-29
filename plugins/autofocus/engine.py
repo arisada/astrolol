@@ -57,7 +57,11 @@ def _annotate_preview(
     downscaled by fits_to_jpeg, so we apply the same scale factor.
     """
     from PIL import Image, ImageDraw
-    img = Image.open(jpeg_path)
+    # fits_to_jpeg/fits_to_jpeg_linear save grayscale ("L" mode) JPEGs. Drawing a
+    # colour outline directly on an "L" image silently converts it to a grayscale
+    # luminance value (PIL has no color to draw with), which is why the circles
+    # rendered as near-black regardless of the outline colour requested below.
+    img = Image.open(jpeg_path).convert("RGB")
     jpeg_w, jpeg_h = img.size
     sx = jpeg_w / fits_w if fits_w else 1.0
     sy = jpeg_h / fits_h if fits_h else 1.0
@@ -66,7 +70,10 @@ def _annotate_preview(
         cx = star["x"] * sx
         cy = star["y"] * sy
         r  = star["fwhm"] * max(sx, sy) * 2.5
-        draw.ellipse([cx - r, cy - r, cx + r, cy + r], outline="#00ff00", width=2)
+        # Bright magenta reads clearly against both dark sky and stretched star
+        # cores (green/cyan tend to blend into star halos); width=1 keeps the
+        # circle from eating into small/faint stars.
+        draw.ellipse([cx - r, cy - r, cx + r, cy + r], outline="#ff2ec8", width=1)
     img.save(jpeg_path, format="JPEG", quality=90)
 
 
@@ -101,15 +108,15 @@ class AutofocusEngine:
         self._settings_provider = settings_provider or AutofocusSettings
         self._current_run: AutofocusRun | None = None
         self._task: asyncio.Task | None = None
-        # Maps step number (1-indexed) → server-side preview JPEG path
-        self._preview_paths: dict[int, str] = {}
+        # Maps step number (1-indexed) → {"auto": path, "linear": path}
+        self._preview_paths: dict[int, dict[str, str]] = {}
 
     @property
     def current_run(self) -> AutofocusRun | None:
         return self._current_run
 
-    def preview_path(self, step: int) -> str | None:
-        return self._preview_paths.get(step)
+    def preview_path(self, step: int, stretch: str = "auto") -> str | None:
+        return self._preview_paths.get(step, {}).get(stretch)
 
     async def start(self, config: AutofocusConfig) -> AutofocusRun:
         if self._task is not None and not self._task.done():
@@ -141,6 +148,7 @@ class AutofocusEngine:
             gain=s.gain,
             fit_algo=s.fit_algo,
             metric=s.metric,
+            lock_stars=s.lock_stars,
         )
         run = await self.start(config)
         task = self._task
@@ -176,10 +184,18 @@ class AutofocusEngine:
             if config.filter_slot is not None:
                 await self._select_filter(config.filter_slot, config.filter_wheel_id)
 
-            # Determine starting position
+            # Determine starting position. restore_to is always the position the
+            # focuser was at *before this run touched it* — even when a manual
+            # start_position is given — so a failed/aborted run always lands back
+            # where the user actually was, not at the requested sweep centre.
             focuser_status = await focuser.get_status()
-            start_pos = focuser_status.position or 0
-            restore_to = start_pos
+            restore_to = focuser_status.position or 0
+            start_pos = restore_to
+
+            if config.start_position is not None:
+                logger.info("autofocus.moving_to_start_position", position=config.start_position)
+                await asyncio.wait_for(focuser.move_to(config.start_position), timeout=_MOVE_TIMEOUT)
+                start_pos = config.start_position
 
             positions = [
                 start_pos + (i - config.num_steps) * config.step_size
@@ -200,6 +216,12 @@ class AutofocusEngine:
                 binning=config.binning,
                 frame_type="light",
             )
+
+            # When lock_stars is set, frozen after the first step that detects any
+            # stars, and reused as the preferred population for every later step —
+            # see star_detector.detect_stars() for how a step falls back to a fresh
+            # detection if none of these stars can be matched.
+            reference_stars: list[dict] | None = None
 
             for step_idx, position in enumerate(positions):
                 run.current_step = step_idx + 1
@@ -232,32 +254,41 @@ class AutofocusEngine:
                 # serialised with other memory-intensive tasks on low-RAM hosts.
                 logger.info("autofocus.detecting_stars", step=run.current_step, metric=config.metric)
                 async with mem_guard():
-                    fwhm, star_count, raw_stars = await detect_stars(image.fits_path, metric=config.metric)
+                    fwhm, star_count, raw_stars = await detect_stars(
+                        image.fits_path,
+                        metric=config.metric,
+                        reference_stars=reference_stars if config.lock_stars else None,
+                    )
+
+                if config.lock_stars and reference_stars is None and raw_stars:
+                    reference_stars = raw_stars
 
                 run.latest_stars = [StarInfo(x=s["x"], y=s["y"], fwhm=s["fwhm"]) for s in raw_stars]
 
-                # 4. Generate preview JPEG with star circles burned in.
-                # Done AFTER star detection so circles are always in the final
-                # file.  _preview_paths is registered here too, so the API
-                # endpoint never serves a circle-free version.
-                preview_path = str(preview_dir / f"step_{run.current_step:02d}.jpg")
+                # 4. Generate preview JPEGs (auto-stretch + linear) with star
+                # circles burned in. Done AFTER star detection so circles are
+                # always in the final file. _preview_paths is registered here
+                # too, so the API endpoint never serves a circle-free version.
+                auto_path = str(preview_dir / f"step_{run.current_step:02d}.jpg")
+                linear_path = str(preview_dir / f"step_{run.current_step:02d}_linear.jpg")
                 try:
-                    from astrolol.imaging.preview import fits_to_jpeg
+                    from astrolol.imaging.preview import fits_to_jpeg, fits_to_jpeg_linear
                     await asyncio.to_thread(
                         fits_to_jpeg,
                         Path(image.fits_path),
-                        Path(preview_path),
+                        Path(auto_path),
+                        settings.jpeg_quality,
+                    )
+                    await asyncio.to_thread(
+                        fits_to_jpeg_linear,
+                        Path(image.fits_path),
+                        Path(linear_path),
                         settings.jpeg_quality,
                     )
                     if raw_stars:
-                        await asyncio.to_thread(
-                            _annotate_preview,
-                            preview_path,
-                            raw_stars,
-                            fits_w,
-                            fits_h,
-                        )
-                    self._preview_paths[run.current_step] = preview_path
+                        for p in (auto_path, linear_path):
+                            await asyncio.to_thread(_annotate_preview, p, raw_stars, fits_w, fits_h)
+                    self._preview_paths[run.current_step] = {"auto": auto_path, "linear": linear_path}
                 except Exception as exc:
                     logger.warning("autofocus.preview_failed", step=run.current_step, error=str(exc))
 
@@ -301,12 +332,19 @@ class AutofocusEngine:
                     "Check exposure time, focus range, or star detection threshold."
                 )
 
-            if run.curve_fit is not None:
-                optimal_position = max(0, round(run.curve_fit.optimal_position))
-            else:
-                # No valid parabola — use the position with the lowest FWHM
-                optimal_position = min(valid, key=lambda dp: dp.fwhm).position
+            if run.curve_fit is None:
+                # No valid parabola/hyperbola fit — the sampled points don't form a
+                # real V/U shape (too noisy, range too narrow, or genuinely no focus
+                # minimum in range). Silently picking the lowest-FWHM sample here
+                # would report success on data that isn't a real focus curve, so
+                # this is treated as a failure and the focuser is restored below.
+                raise RuntimeError(
+                    "Focus curve did not fit a valid V shape — the measured points "
+                    "don't converge to a minimum in range. Try a larger step size, "
+                    "more steps, or a longer exposure."
+                )
 
+            optimal_position = max(0, round(run.curve_fit.optimal_position))
             run.optimal_position = optimal_position
             logger.info("autofocus.moving_to_optimal", position=optimal_position)
             await asyncio.wait_for(focuser.move_to(optimal_position), timeout=_MOVE_TIMEOUT)
@@ -357,6 +395,13 @@ class AutofocusEngine:
         if result is not None:
             a, b, c, optimal = result
             run.curve_fit = CurveFit(a=a, b=b, c=c, optimal_position=optimal)
+        else:
+            # A fit that was valid on an earlier (smaller) subset of points can
+            # stop being valid once more data arrives — e.g. a good-looking early
+            # V shape gets swamped by noisy points later in the sweep. Without
+            # this, run.curve_fit would keep reporting that stale early fit
+            # (and its optimal_position) all the way to the end of the run.
+            run.curve_fit = None
 
     async def _select_filter(self, slot: int, filter_wheel_id: str | None) -> None:
         """Move the requested filter wheel to the requested slot (best-effort).

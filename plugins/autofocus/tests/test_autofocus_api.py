@@ -129,6 +129,17 @@ def test_parabola_fit_returns_none_for_downward_parabola() -> None:
     assert result is None
 
 
+def test_parabola_fit_returns_none_for_flat_noisy_data() -> None:
+    """Regression: real-world noise can produce a>0 with the vertex technically
+    inside the sampled range even when the data is essentially flat (no real V
+    shape) — that used to be silently accepted as a successful focus."""
+    from plugins.autofocus.algorithms import fit_parabola
+
+    positions = [26700, 28700, 30700, 32700, 34700, 36700, 38700, 40700, 42700, 44700, 46700]
+    fwhms = [2.27, 2.05, 2.23, 2.18, 2.18, 2.10, 2.16, 2.08, 2.00, 2.16, 2.19]
+    assert fit_parabola(positions, fwhms) is None
+
+
 def test_parabola_fit_returns_none_when_optimal_outside_range() -> None:
     from plugins.autofocus.algorithms import fit_parabola
 
@@ -156,6 +167,37 @@ def test_engine_refit_curve_skipped_when_few_points() -> None:
     run.data_points = [
         FocusDataPoint(step=1, position=900, fwhm=3.5, star_count=10),
         FocusDataPoint(step=2, position=1000, fwhm=3.0, star_count=12),
+    ]
+    engine._refit_curve(run)
+    assert run.curve_fit is None
+
+
+def test_engine_refit_curve_clears_a_stale_fit_once_it_stops_being_valid() -> None:
+    """Regression: a good-looking fit from an early subset of points used to survive
+    unchanged even after later, noisier points made the full dataset stop fitting a
+    real V shape — reporting a stale optimal_position from data that no longer
+    supports it."""
+    from plugins.autofocus.engine import AutofocusEngine
+    from plugins.autofocus.models import FocusDataPoint
+
+    engine = AutofocusEngine(event_bus=MagicMock(), device_manager=MagicMock())
+    config = AutofocusConfig(camera_id="cam_1", focuser_id="foc_1")
+    run = AutofocusRun(config=config, status="running", total_steps=11)
+
+    # A clean early V shape fits...
+    run.data_points = [
+        FocusDataPoint(step=1, position=800, fwhm=4.0, star_count=10),
+        FocusDataPoint(step=2, position=900, fwhm=2.5, star_count=12),
+        FocusDataPoint(step=3, position=1000, fwhm=2.0, star_count=14),
+    ]
+    engine._refit_curve(run)
+    assert run.curve_fit is not None
+
+    # ...but noisy later points break it (no real minimum in the full dataset).
+    run.data_points += [
+        FocusDataPoint(step=4, position=1100, fwhm=16.0, star_count=12),
+        FocusDataPoint(step=5, position=1200, fwhm=3.0, star_count=10),
+        FocusDataPoint(step=6, position=1300, fwhm=18.0, star_count=11),
     ]
     engine._refit_curve(run)
     assert run.curve_fit is None

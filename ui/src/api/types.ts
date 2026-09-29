@@ -151,6 +151,7 @@ export interface AutofocusSettings {
   filter_slot: number | null
   fit_algo: FitAlgo
   metric: FocusMetric
+  lock_stars: boolean
 }
 
 export interface AutofocusConfig {
@@ -163,8 +164,10 @@ export interface AutofocusConfig {
   gain?: number | null
   filter_slot?: number | null
   filter_wheel_id?: string | null
+  start_position?: number | null
   fit_algo?: FitAlgo
   metric?: FocusMetric
+  lock_stars?: boolean
 }
 
 export interface StarInfo {

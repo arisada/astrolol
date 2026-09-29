@@ -30,6 +30,13 @@ class AutofocusSettings(BaseModel):
     filter_slot: int | None = None
     fit_algo: Literal["parabola", "hyperbola"] = "parabola"
     metric: Literal["fwhm", "hfd"] = "fwhm"
+    lock_stars: bool = Field(
+        default=False,
+        description="Keep measuring the same stars detected on the first exposure "
+        "(preferred, not required — a star that drops below the detection floor "
+        "as it defocuses is just skipped for that step) instead of a fresh "
+        "unrelated population each step.",
+    )
 
 
 # ── Configuration ─────────────────────────────────────────────────────────────
@@ -48,8 +55,19 @@ class AutofocusConfig(BaseModel):
         description="Filter wheel to select the slot on. None = whichever filter wheel is "
         "connected (only correct with exactly one on the whole rig).",
     )
+    start_position: int | None = Field(
+        default=None,
+        ge=0,
+        description="Focuser position to move to before sweeping. None = use the focuser's "
+        "current position as the centre of the sweep.",
+    )
     fit_algo: Literal["parabola", "hyperbola"] = "parabola"
     metric: Literal["fwhm", "hfd"] = "fwhm"
+    lock_stars: bool = Field(
+        default=False,
+        description="Keep measuring the same stars detected on the first exposure "
+        "instead of a fresh population each step (see AutofocusSettings.lock_stars).",
+    )
 
 
 # ── Result types ──────────────────────────────────────────────────────────────

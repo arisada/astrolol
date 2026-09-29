@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Literal
 
 import structlog
 from fastapi import APIRouter, HTTPException, Request
@@ -63,15 +64,23 @@ async def get_run(request: Request) -> AutofocusRun:
 
 
 @router.get("/run/preview/{step}")
-async def get_step_preview(step: int, request: Request) -> FileResponse:
-    """Return the JPEG preview for a specific step (1-indexed)."""
+async def get_step_preview(
+    step: int,
+    request: Request,
+    stretch: Literal["auto", "linear"] = "auto",
+) -> FileResponse:
+    """Return the JPEG preview for a specific step (1-indexed).
+
+    ``stretch=linear`` returns the unclipped min/max-stretched variant instead of
+    the default auto-stretched (median/99th-percentile) one.
+    """
     engine = _engine(request)
     run = engine.current_run
     if run is None:
         raise HTTPException(status_code=404, detail="No autofocus run found")
     if step < 1 or step > run.total_steps:
         raise HTTPException(status_code=400, detail=f"Step must be between 1 and {run.total_steps}")
-    preview = engine.preview_path(step)
+    preview = engine.preview_path(step, stretch)
     if preview is None:
         raise HTTPException(status_code=404, detail=f"Preview for step {step} not yet available")
     path = Path(preview)

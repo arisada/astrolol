@@ -16,6 +16,41 @@ on ``run.config.fit_algo``.
 """
 from __future__ import annotations
 
+# A real V/U curve should explain most of the variance in the sampled data. Without
+# this check, a nearly-flat noisy dataset can still yield a>0 with the vertex
+# technically inside the range (curvature dominated by noise rather than actual
+# defocus), and get accepted as a valid focus curve. R² is scale- and
+# position-invariant, unlike an edge-vs-minimum ratio, so it doesn't misfire when
+# the true minimum happens to sit close to one edge of an otherwise well-formed
+# sampled range.
+_MIN_R_SQUARED = 0.6
+
+# R² alone isn't sufficient: a handful of noisy samples can still land close enough
+# to *some* parabola (decent R²) whose vertex is nowhere near where the data
+# actually bottoms out — e.g. a wavy/non-V-shaped sweep where the true lowest
+# sample is in the middle but noise elsewhere in the range skews the fit and
+# extrapolates the vertex toward (or past) an edge. Requiring the fitted optimum
+# to land near the position of the best *measured* sample catches that.
+_MAX_OPTIMAL_DEVIATION_FRACTION = 0.35
+
+
+def _r_squared(y: "np.ndarray", y_pred: "np.ndarray") -> float:  # type: ignore[name-defined]
+    import numpy as np
+    ss_res = float(np.sum((y - y_pred) ** 2))
+    ss_tot = float(np.sum((y - np.mean(y)) ** 2))
+    if ss_tot <= 0:
+        return 0.0
+    return 1.0 - ss_res / ss_tot
+
+
+def _optimal_near_best_sample(
+    positions: "np.ndarray", fwhms: "np.ndarray", optimal: float, x_min: float, x_max: float,  # type: ignore[name-defined]
+) -> bool:
+    import numpy as np
+    best_sample_pos = float(positions[int(np.argmin(fwhms))])
+    max_deviation = (x_max - x_min) * _MAX_OPTIMAL_DEVIATION_FRACTION
+    return abs(optimal - best_sample_pos) <= max_deviation
+
 
 def fit_parabola(
     positions: list[int],
@@ -24,8 +59,10 @@ def fit_parabola(
     """Fit y = a·x² + b·x + c to (position, fwhm) data.
 
     Returns ``(a, b, c, optimal_position)`` or ``None`` when the fit is
-    invalid (fewer than 3 points, downward parabola, or minimum outside
-    the sampled range with 20 % margin).
+    invalid (fewer than 3 points, downward parabola, minimum outside the
+    sampled range with 20 % margin, or R² below ``_MIN_R_SQUARED`` — i.e.
+    the parabola doesn't actually explain the data, which is what a
+    flat/noisy non-V-shaped sweep looks like).
     """
     if len(positions) < 3:
         return None
@@ -41,6 +78,10 @@ def fit_parabola(
         x_min, x_max = float(x.min()), float(x.max())
         margin = (x_max - x_min) * 0.20
         if optimal < x_min - margin or optimal > x_max + margin:
+            return None
+        if _r_squared(y, a * x * x + b * x + c) < _MIN_R_SQUARED:
+            return None
+        if not _optimal_near_best_sample(x, y, optimal, x_min, x_max):
             return None
         return a, b, c, optimal
     except Exception:
@@ -64,7 +105,8 @@ def fit_hyperbola(
     try:
         import numpy as np
         x = np.array(positions, dtype=float)
-        y2 = np.array(fwhms, dtype=float) ** 2
+        y = np.array(fwhms, dtype=float)
+        y2 = y ** 2
         coeffs = np.polyfit(x, y2, 2)
         a, b, c = float(coeffs[0]), float(coeffs[1]), float(coeffs[2])
         if a <= 0:
@@ -76,6 +118,10 @@ def fit_hyperbola(
         x_min, x_max = float(x.min()), float(x.max())
         margin = (x_max - x_min) * 0.20
         if optimal < x_min - margin or optimal > x_max + margin:
+            return None
+        if _r_squared(y2, a * x * x + b * x + c) < _MIN_R_SQUARED:
+            return None
+        if not _optimal_near_best_sample(x, y, optimal, x_min, x_max):
             return None
         return a, b, c, optimal
     except Exception:

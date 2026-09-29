@@ -34,5 +34,5 @@ export const abort = () =>
 export const run = () =>
   request<AutofocusRun>('/plugins/autofocus/run')
 
-export const previewUrl = (step: number) =>
-  `/plugins/autofocus/run/preview/${step}`
+export const previewUrl = (step: number, stretch: 'auto' | 'linear' = 'auto') =>
+  `/plugins/autofocus/run/preview/${step}?stretch=${stretch}`
