@@ -94,7 +94,8 @@ Design: `SEQUENCER_SPEC.md`. Done: phase 1 (core interface, queue/runner, UI), p
 centering, core `Guider` protocol (PHD2 + guide simulator implement it), guiding health,
 per-frame guiding stats (events + FITS cards), guiding check before each frame, guiding
 recovery loop, stalls (guiding, centering, autofocus) with timeout, retaking badly unguided
-frames, autofocus (task start, filter change, after flip, temperature / time triggers).
+frames, autofocus (task start, filter change, after flip, temperature / time triggers),
+session journal (JSONL per run, sessions API, time breakdown, CSV/Markdown export, Journal tab).
 
 - **Frame analysis + FWHM autofocus trigger** — measure star FWHM/HFR on science frames
   (every Nth frame or a downsampled copy, to stay cheap on a Pi; the imager's per-frame star
@@ -103,8 +104,9 @@ frames, autofocus (task start, filter change, after flip, temperature / time tri
 - **Global sequencer settings vs the meta-scheduler** — the autofocus time/temperature
   triggers (and other global "when" policies) overlap with what the meta-scheduler will
   decide; they may move into it or become per-task. Undecided.
-- **Phase 3 — session journal** (JSONL per run next to the images, sessions API, time
-  breakdown, UI journal tab).
+- **Journal — later** — per-frame FWHM/HFR once frame analysis exists; guiding RMS graph per
+  session (needs guide steps in the journal, sampled); a "night report" across several
+  sessions of the same target.
 - **Phase 4 — multi-camera lanes** (`RigSchedule`, fit rule, efficiency estimate and
   pre-flight checks, multi-lane editor and progress).
 - **Phase 5** — named sequences, one runner per mount, MCP tool surface.

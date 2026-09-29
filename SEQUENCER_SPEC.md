@@ -837,7 +837,9 @@ tonight*, in a structured form, for the user.
 ### Storage
 
 - One session = one run (`start()` → back to `IDLE`). Stored as JSONL at
-  `<images_dir>/journal/<YYYY-MM-DD>_<HHMM>_<session-id>.jsonl`, next to the images.
+  `<journal dir>/<YYYY-MM-DD>_<HHMM>_<session-id>.jsonl`. The journal dir defaults to
+  `journal` in the fixed part of the image save template (`~/astrolol_pictures/%D` →
+  `~/astrolol_pictures/journal`); the `journal_dir` setting overrides it.
 - Append-only, one record per line, flushed per record (survives a crash).
 - The journal is the persisted form of the sequencer's EventBus events: the same Pydantic
   models, one serialisation. Anything a WebSocket client sees live can be replayed from

@@ -10,12 +10,13 @@ import type {
 } from '@/api/types'
 import * as seq from './api'
 import { ControlBar } from './ControlBar'
+import { JournalView } from './JournalView'
 import { SettingsPanel } from './SettingsPanel'
 import { TaskCard } from './TaskCard'
 import { TaskEditor } from './TaskEditor'
 import { patchSequencerState, useSequencer } from './state'
 
-type Tab = 'queue' | 'settings'
+type Tab = 'queue' | 'journal' | 'settings'
 
 export function SequencerPage() {
   const { status, entries } = useSequencer()
@@ -91,7 +92,7 @@ export function SequencerPage() {
           <div className="flex items-center gap-4">
             <h1 className="text-lg font-semibold text-slate-100">Sequencer</h1>
             <div className="flex gap-1">
-              {(['queue', 'settings'] as const).map((t) => (
+              {(['queue', 'journal', 'settings'] as const).map((t) => (
                 <button key={t} type="button" onClick={() => setTab(t)}
                   className={`px-3 py-1 text-xs rounded capitalize ${tab === t ? 'bg-surface-overlay text-slate-100' : 'text-slate-400 hover:text-slate-200'}`}>
                   {t}
@@ -104,7 +105,7 @@ export function SequencerPage() {
             <p className="text-xs text-status-error bg-status-error/10 rounded px-3 py-2">{error}</p>
           )}
 
-          {tab === 'settings' ? <SettingsPanel /> : (
+          {tab === 'settings' ? <SettingsPanel /> : tab === 'journal' ? <JournalView /> : (
             <>
               <ControlBar
                 status={status}

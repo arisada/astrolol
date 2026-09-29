@@ -8,6 +8,7 @@ the task's error policy). Nothing fails silently.
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import time
 from collections.abc import Awaitable, Callable
 from typing import Any, Protocol, cast
@@ -453,6 +454,30 @@ class Steps:
             },
         )
         return True
+
+    async def frame_context(self, devices: LaneDevices) -> dict[str, Any]:
+        """Altitude, hour angle, focuser position and sensor temperature, best effort —
+        recorded with each frame (events, journal)."""
+        ctx: dict[str, Any] = {}
+        mm = self._state("mount_manager")
+        dm = self._state("device_manager")
+        if mm is not None and devices.mount_id is not None:
+            try:
+                st = await mm.get_status(devices.mount_id)
+                alt, ha = getattr(st, "alt", None), getattr(st, "hour_angle", None)
+                ctx["altitude"] = round(alt, 2) if alt is not None else None
+                ctx["hour_angle"] = round(ha, 4) if ha is not None else None
+            except Exception:
+                pass
+        if dm is not None and devices.focuser_id is not None:
+            with contextlib.suppress(Exception):
+                focuser_status = await dm.get_focuser(devices.focuser_id).get_status()
+                ctx["focuser_position"] = focuser_status.position
+        if dm is not None and devices.camera_id is not None:
+            with contextlib.suppress(Exception):
+                camera_status = await dm.get_camera(devices.camera_id).get_status()
+                ctx["sensor_temperature"] = camera_status.temperature
+        return ctx
 
     async def focuser_temperature(self, focuser_id: str | None) -> float | None:
         dm = self._state("device_manager")

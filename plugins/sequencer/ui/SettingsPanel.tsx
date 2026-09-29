@@ -14,7 +14,12 @@ const NULLABLE = new Set<string>([
 ])
 type BoolKey = { [K in keyof SequencerSettings]: SequencerSettings[K] extends boolean ? K : never }[keyof SequencerSettings]
 
-const GROUPS: { title: string; bools?: [BoolKey, string][]; nums?: [NumKey, string, string][] }[] = [
+const GROUPS: {
+  title: string
+  bools?: [BoolKey, string][]
+  nums?: [NumKey, string, string][]
+  texts?: ['journal_dir', string, string][]
+}[] = [
   {
     title: 'Mount',
     bools: [['unpark_on_start', 'Unpark when a run starts'], ['park_on_complete', 'Park when the queue is done']],
@@ -65,6 +70,10 @@ const GROUPS: { title: string; bools?: [BoolKey, string][]; nums?: [NumKey, stri
       ['autofocus_every_min', 'Refocus every', 'min (empty = off)'],
       ['autofocus_retry_interval_s', 'Retry a failed autofocus (no stars) every', 's'],
     ],
+  },
+  {
+    title: 'Session journal',
+    texts: [['journal_dir', 'Journal folder', 'empty = "journal" next to the saved images']],
   },
   {
     title: 'Resume and timeouts',
@@ -121,6 +130,15 @@ export function SettingsPanel() {
                 onChange={() => setSettings({ ...settings, [key]: !settings[key] })} />
               <span className="text-sm text-slate-300">{label}</span>
             </div>
+          ))}
+          {g.texts?.map(([key, label, hint]) => (
+            <label key={key} className="flex items-center gap-3 py-1">
+              <span className="text-sm text-slate-300 w-72">{label}</span>
+              <div className="w-72">
+                <Input inputSize="sm" placeholder={hint} value={settings[key] ?? ''}
+                  onChange={(e) => setSettings({ ...settings, [key]: e.target.value.trim() || null })} />
+              </div>
+            </label>
           ))}
           {g.nums?.map(([key, label, unit]) => (
             <label key={key} className="flex items-center gap-3 py-1">

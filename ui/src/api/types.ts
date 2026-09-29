@@ -391,11 +391,41 @@ export interface SequencerSettings {
   autofocus_on_temp_delta: number | null
   autofocus_every_min: number | null
   autofocus_retry_interval_s: number
+  journal_dir: string | null
   recenter_after_pause_min: number
   slew_timeout_s: number
   flip_timeout_s: number
   park_timeout_s: number
   exposure_timeout_margin_s: number
+}
+
+export interface SequencerIntegrationRow {
+  object_name: string
+  filter_name: string | null
+  frames: number
+  seconds: number
+  uncounted: number
+}
+
+export interface SequencerSessionSummary {
+  session_id: string
+  file: string
+  started_at: string | null
+  finished_at: string | null
+  duration_s: number
+  outcome: string | null
+  error: string | null
+  actor: string | null
+  tasks: string[]
+  frames_saved: number
+  frames_uncounted: number
+  frames_discarded: number
+  integration_s: number
+  integration: SequencerIntegrationRow[]
+  time: { activity: string; seconds: number }[]
+  interruptions: number
+  stalls: number
+  step_failures: number
 }
 
 // --- Plate solving ---

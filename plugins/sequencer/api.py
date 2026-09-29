@@ -6,11 +6,14 @@ implementation, except for the settings routes (settings are implementation-spec
 
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Awaitable, Callable
-from typing import Annotated, Literal, TypeVar
+from pathlib import Path
+from typing import Annotated, Any, Literal, TypeVar
 
 import structlog
 from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel
 
 from astrolol.core.sequencer import (
@@ -26,6 +29,15 @@ from astrolol.core.sequencer import (
     SequencerStatus,
     TaskLocked,
     TaskNotFound,
+)
+from plugins.sequencer.journal import (
+    SessionSummary,
+    find_session,
+    frames_csv,
+    read_records,
+    session_files,
+    summarize,
+    summary_markdown,
 )
 from plugins.sequencer.settings import SequencerSettings
 
@@ -230,3 +242,67 @@ async def put_settings(body: SequencerSettings, request: Request) -> SequencerSe
         store.update_user_settings(current.model_copy(update={"plugin_settings": updated}))
     logger.info("sequencer.settings_updated")
     return body
+
+
+# ── Session journal ───────────────────────────────────────────────────────────
+
+
+def _journal_dir(request: Request) -> Path:
+    journal = getattr(request.app.state, "sequencer_journal", None)
+    if journal is None:
+        raise HTTPException(status_code=404, detail="The session journal is not available")
+    return journal.directory()  # type: ignore[no-any-return]
+
+
+def _session(request: Request, session_id: str) -> tuple[Path, list[dict[str, Any]]]:
+    path = find_session(_journal_dir(request), session_id)
+    if path is None:
+        raise HTTPException(status_code=404, detail="Session not found")
+    return path, read_records(path)
+
+
+@router.get("/sessions", response_model=list[SessionSummary])
+async def list_sessions(
+    request: Request, limit: int = Query(default=50, ge=1, le=500)
+) -> list[SessionSummary]:
+    """Past runs, newest first."""
+    directory = _journal_dir(request)
+
+    def _load() -> list[SessionSummary]:
+        return [summarize(p, read_records(p)) for p in session_files(directory)[:limit]]
+
+    return await asyncio.to_thread(_load)
+
+
+@router.get("/sessions/{session_id}")
+async def get_session(session_id: str, request: Request) -> list[dict[str, Any]]:
+    """Every journal record of a session."""
+    _, records = await asyncio.to_thread(_session, request, session_id)
+    return records
+
+
+@router.get("/sessions/{session_id}/summary", response_model=SessionSummary)
+async def get_session_summary(session_id: str, request: Request) -> SessionSummary:
+    path, records = await asyncio.to_thread(_session, request, session_id)
+    return summarize(path, records)
+
+
+@router.get("/sessions/{session_id}/export")
+async def export_session(
+    session_id: str, request: Request, format: Literal["csv", "md"] = "md"
+) -> PlainTextResponse:
+    """Frames as CSV, or a Markdown report."""
+    path, records = await asyncio.to_thread(_session, request, session_id)
+    if format == "csv":
+        body, media, ext = frames_csv(records), "text/csv", "csv"
+    else:
+        body, media, ext = (
+            summary_markdown(summarize(path, records), records),
+            "text/markdown",
+            "md",
+        )
+    return PlainTextResponse(
+        body,
+        media_type=media,
+        headers={"Content-Disposition": f'attachment; filename="{path.stem}.{ext}"'},
+    )

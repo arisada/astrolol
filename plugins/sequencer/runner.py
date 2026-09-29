@@ -765,6 +765,8 @@ class Runner:
                     duration=group.duration,
                     fits_path=fits_path,
                     counted=counted,
+                    object_name=task.target.name,
+                    **await self._steps.frame_context(devices),
                     **guiding,
                 )
             )

@@ -33,7 +33,7 @@ def _connected(app: Any, kind: str) -> list[str]:
     return [d["device_id"] for d in dm.list_connected() if d["kind"] == kind]
 
 
-def _optical_paths(app: Any) -> list[OpticalPath]:
+def optical_paths(app: Any) -> list[OpticalPath]:
     profile = getattr(app.state, "active_profile", None)
     equipment_store = getattr(app.state, "equipment_store", None)
     dm = getattr(app.state, "device_manager", None)
@@ -49,7 +49,7 @@ def _optical_paths(app: Any) -> list[OpticalPath]:
 def main_camera_id(app: Any) -> str | None:
     """The profile's main camera: the first optical path with a connected camera,
     else the first connected camera."""
-    for path in _optical_paths(app):
+    for path in optical_paths(app):
         if path.camera_device_id is not None:
             return path.camera_device_id
     cameras = _connected(app, "camera")
@@ -60,7 +60,7 @@ def run_mount_id(app: Any) -> str | None:
     """The mount a run uses: the main camera's mount, else the only connected mount."""
     camera_id = main_camera_id(app)
     if camera_id is not None:
-        path = find_optical_path_for_camera_device(_optical_paths(app), camera_id)
+        path = find_optical_path_for_camera_device(optical_paths(app), camera_id)
         if path is not None:
             return path.mount_device_id
     mounts = _connected(app, "mount")
@@ -76,7 +76,7 @@ def resolve_lane_devices(app: Any, lane: Lane) -> LaneDevices:
         camera_id = None
 
     path = (
-        find_optical_path_for_camera_device(_optical_paths(app), camera_id) if camera_id else None
+        find_optical_path_for_camera_device(optical_paths(app), camera_id) if camera_id else None
     )
     if path is not None:
         return LaneDevices(

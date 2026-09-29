@@ -121,6 +121,12 @@ class SequencerFrameSaved(BaseEvent):
     duration: float
     fits_path: str
     counted: bool = True
+    object_name: str | None = None
+    # Conditions at the end of the exposure (None when unknown)
+    altitude: float | None = None           # degrees
+    hour_angle: float | None = None         # hours
+    focuser_position: int | None = None
+    sensor_temperature: float | None = None  # °C
     # Guiding during the exposure (None when there is no guider)
     guide_rms_total: float | None = None  # arcsec
     unguided_s: float | None = None  # seconds without active guiding

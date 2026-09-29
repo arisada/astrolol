@@ -4,6 +4,7 @@ import type {
   SequencerBoundary,
   SequencerPreflightReport,
   SequencerQueueEntry,
+  SequencerSessionSummary,
   SequencerSettings,
   SequencerStatus,
   SequencerTask,
@@ -70,6 +71,13 @@ export const getStatus = () => request<SequencerStatus>(`${BASE}/status`)
 export const getSettings = () => request<SequencerSettings>(`${BASE}/settings`)
 export const putSettings = (s: SequencerSettings) =>
   request<SequencerSettings>(`${BASE}/settings`, { method: 'PUT', body: JSON.stringify(s) })
+
+// ── Session journal ──
+export type JournalRecord = { type: string; timestamp: string } & Record<string, unknown>
+export const getSessions = () => request<SequencerSessionSummary[]>(`${BASE}/sessions`)
+export const getSessionSummary = (id: string) => request<SequencerSessionSummary>(`${BASE}/sessions/${id}/summary`)
+export const getSessionRecords = (id: string) => request<JournalRecord[]>(`${BASE}/sessions/${id}`)
+export const sessionExportUrl = (id: string, format: 'csv' | 'md') => `${BASE}/sessions/${id}/export?format=${format}`
 
 // ── Other plugins, for the target picker (REST only — no cross-plugin imports) ──
 export interface ObjectMatch {

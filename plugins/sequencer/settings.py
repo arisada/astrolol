@@ -64,6 +64,12 @@ class SequencerSettings(BaseModel):
         default=300.0, gt=0, description="Retry a failed (no stars) autofocus this often"
     )
 
+    # Session journal
+    journal_dir: str | None = Field(
+        default=None,
+        description="Where session journals go; null = 'journal' next to the saved images",
+    )
+
     # Resume behaviour
     recenter_after_pause_min: float = Field(default=10.0, ge=0)
 
