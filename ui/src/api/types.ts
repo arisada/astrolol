@@ -363,6 +363,25 @@ export interface SequencerLaneEstimate {
   longest_s: number
 }
 
+export interface SequencerSequenceInfo {
+  id: string
+  name: string
+  saved_at: string
+  description: string | null
+  tasks: number
+  targets: string[]
+  exposure_s: number
+}
+
+export interface SequencerSequenceDocument {
+  format: 'astrolol-sequence'
+  version: 1
+  name: string
+  saved_at?: string
+  description?: string | null
+  tasks: SequencerTask[]
+}
+
 export interface SequencerPreflightIssue {
   severity: 'error' | 'warning'
   task_id: string | null

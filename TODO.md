@@ -96,7 +96,8 @@ per-frame guiding stats (events + FITS cards), guiding check before each frame, 
 recovery loop, stalls (guiding, centering, autofocus) with timeout, retaking badly unguided
 frames, autofocus (task start, filter change, after flip, temperature / time triggers),
 session journal (JSONL per run, sessions API, time breakdown, CSV/Markdown export, Journal tab),
-multi-camera lanes (primary-driven fit rule, per-lane autofocus, estimates, multi-camera editor).
+multi-camera lanes (primary-driven fit rule, per-lane autofocus, estimates, multi-camera editor),
+named sequences (server library) and task file download/upload.
 
 - **Frame analysis + FWHM autofocus trigger** — measure star FWHM/HFR on science frames
   (every Nth frame or a downsampled copy, to stay cheap on a Pi; the imager's per-frame star
@@ -111,9 +112,6 @@ multi-camera lanes (primary-driven fit rule, per-lane autofocus, estimates, mult
 - **Lanes — later** — a secondary-lane error currently stops every lane (in-flight frames
   discarded); a per-lane error policy could let the other cameras carry on. The efficiency
   estimate ignores download time (real runs usually do a little better than shown).
-- **Named sequences** — save the queue's task definitions under a name and load them back
-  later as fresh tasks (new ids, no progress): reusable plans across nights. Spec'd in
-  `SEQUENCER_SPEC.md` (`/sequences` routes), not built.
 - **One runner per mount** — rigs with several mounts: one independent queue/runner per
   mount (models and routes are keyed so `runner_id = mount_id` can be added later).
 - **MCP tool surface** — expose the `Sequencer` protocol methods as MCP tools

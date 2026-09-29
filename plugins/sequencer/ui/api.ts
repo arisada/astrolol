@@ -5,6 +5,8 @@ import type {
   SequencerPreflightReport,
   SequencerLaneEstimate,
   SequencerQueueEntry,
+  SequencerSequenceDocument,
+  SequencerSequenceInfo,
   SequencerSessionSummary,
   SequencerSettings,
   SequencerStatus,
@@ -74,6 +76,22 @@ export const getStatus = () => request<SequencerStatus>(`${BASE}/status`)
 export const getSettings = () => request<SequencerSettings>(`${BASE}/settings`)
 export const putSettings = (s: SequencerSettings) =>
   request<SequencerSettings>(`${BASE}/settings`, { method: 'PUT', body: JSON.stringify(s) })
+
+// ── Named sequences, file download / upload ──
+export const listSequences = () => request<SequencerSequenceInfo[]>(`${BASE}/sequences`)
+export const saveSequence = (body: {
+  name: string; description?: string | null; task_ids?: string[] | null; include_completed?: boolean; overwrite?: boolean
+}) => post<SequencerSequenceInfo>('/sequences', body)
+export const deleteSequence = (id: string) =>
+  request<void>(`${BASE}/sequences/${encodeURIComponent(id)}`, { method: 'DELETE' })
+export const loadSequence = (id: string) =>
+  post<SequencerQueueEntry[]>(`/sequences/${encodeURIComponent(id)}/load`)
+export const sequenceDownloadUrl = (id: string) => `${BASE}/sequences/${encodeURIComponent(id)}`
+export const exportUrl = (taskIds?: string[]) =>
+  `${BASE}/export${taskIds?.length ? `?${taskIds.map((id) => `ids=${encodeURIComponent(id)}`).join('&')}` : ''}`
+export const importDocument = (doc: SequencerSequenceDocument) => post<SequencerQueueEntry[]>('/import', doc)
+export const uploadToLibrary = (doc: SequencerSequenceDocument, overwrite = false) =>
+  request<SequencerSequenceInfo>(`${BASE}/sequences?overwrite=${overwrite}`, { method: 'PUT', body: JSON.stringify(doc) })
 
 // ── Session journal ──
 export type JournalRecord = { type: string; timestamp: string } & Record<string, unknown>

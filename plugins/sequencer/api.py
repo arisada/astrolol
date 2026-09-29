@@ -13,7 +13,7 @@ from typing import Annotated, Any, Literal, TypeVar
 
 import structlog
 from fastapi import APIRouter, HTTPException, Query, Request
-from fastapi.responses import PlainTextResponse
+from fastapi.responses import JSONResponse, PlainTextResponse
 from pydantic import BaseModel
 
 from astrolol.core.sequencer import (
@@ -40,6 +40,15 @@ from plugins.sequencer.journal import (
     summary_markdown,
 )
 from plugins.sequencer.lanes import LaneEstimate
+from plugins.sequencer.sequences import (
+    SequenceDocument,
+    SequenceExists,
+    SequenceInfo,
+    SequenceLibrary,
+    SequenceNotFound,
+    slug,
+    strip_ids,
+)
 from plugins.sequencer.settings import SequencerSettings
 
 logger = structlog.get_logger()
@@ -313,3 +322,132 @@ async def export_session(
         media_type=media,
         headers={"Content-Disposition": f'attachment; filename="{path.stem}.{ext}"'},
     )
+
+
+# ── Named sequences and file import/export ────────────────────────────────────
+
+
+def _library(request: Request) -> SequenceLibrary:
+    library = getattr(request.app.state, "sequencer_library", None)
+    if library is None:
+        raise HTTPException(status_code=404, detail="The sequence library is not available")
+    return library  # type: ignore[no-any-return]
+
+
+async def _append(request: Request, tasks: list[ImagingTask]) -> list[QueueEntry]:
+    seq = _seq(request)
+    return [await seq.add(t) for t in tasks]
+
+
+async def _document(
+    request: Request, name: str, task_ids: list[str] | None, include_completed: bool = True
+) -> SequenceDocument:
+    entries = await _seq(request).list_tasks()
+    if task_ids is not None:
+        wanted = set(task_ids)
+        missing = wanted - {e.task.id for e in entries}
+        if missing:
+            raise HTTPException(
+                status_code=404, detail=f"Task(s) not found: {', '.join(sorted(missing))}"
+            )
+        entries = [e for e in entries if e.task.id in wanted]
+    if not include_completed:
+        entries = [e for e in entries if e.runtime.status != "completed"]
+    if not entries:
+        raise HTTPException(status_code=422, detail="No task to save")
+    return SequenceDocument(name=name, tasks=[e.task for e in entries])
+
+
+@router.get("/export", response_model=SequenceDocument)
+async def export_queue(
+    request: Request,
+    ids: Annotated[list[str] | None, Query()] = None,
+    name: str | None = None,
+) -> JSONResponse:
+    """Download tasks (all, or the given ids) as a sequence file."""
+    entries = await _seq(request).list_tasks()
+    default = next((e.task.display_name for e in entries if ids and e.task.id == ids[0]), None)
+    title = name or (default if ids and len(ids) == 1 else "astrolol queue")
+    doc = await _document(request, title or "astrolol queue", ids)
+    doc = doc.model_copy(update={"tasks": strip_ids(doc.tasks)})
+    return JSONResponse(
+        doc.model_dump(mode="json"),
+        headers={"Content-Disposition": f'attachment; filename="{slug(doc.name)}.json"'},
+    )
+
+
+@router.post("/import", status_code=201, response_model=list[QueueEntry])
+async def import_tasks(doc: SequenceDocument, request: Request) -> list[QueueEntry]:
+    """Append the tasks of an uploaded sequence file to the queue (fresh copies)."""
+    return await _append(request, doc.tasks)
+
+
+@router.get("/sequences", response_model=list[SequenceInfo])
+async def list_sequences(request: Request) -> list[SequenceInfo]:
+    library = _library(request)
+    return await asyncio.to_thread(library.list)
+
+
+class SaveSequenceBody(BaseModel):
+    name: str
+    description: str | None = None
+    task_ids: list[str] | None = None  # None = the whole queue
+    include_completed: bool = True
+    overwrite: bool = False
+
+
+@router.post("/sequences", status_code=201, response_model=SequenceInfo)
+async def save_sequence(body: SaveSequenceBody, request: Request) -> SequenceInfo:
+    """Save queue tasks (definitions only) as a named sequence. 409 if the name exists."""
+    doc = await _document(request, body.name.strip(), body.task_ids, body.include_completed)
+    doc = doc.model_copy(update={"description": body.description})
+    try:
+        return await asyncio.to_thread(_library(request).save, doc, overwrite=body.overwrite)
+    except SequenceExists as exc:
+        raise HTTPException(
+            status_code=409, detail=f"A sequence named '{exc}' already exists"
+        ) from exc
+
+
+@router.put("/sequences", status_code=201, response_model=SequenceInfo)
+async def upload_sequence(
+    doc: SequenceDocument, request: Request, overwrite: bool = False
+) -> SequenceInfo:
+    """Store an uploaded sequence file in the library."""
+    try:
+        return await asyncio.to_thread(_library(request).save, doc, overwrite=overwrite)
+    except SequenceExists as exc:
+        raise HTTPException(
+            status_code=409, detail=f"A sequence named '{exc}' already exists"
+        ) from exc
+
+
+def _get_sequence(request: Request, name: str) -> SequenceDocument:
+    try:
+        return _library(request).get(name)
+    except SequenceNotFound as exc:
+        raise HTTPException(status_code=404, detail=f"Sequence '{name}' not found") from exc
+
+
+@router.get("/sequences/{name}", response_model=SequenceDocument)
+async def get_sequence(name: str, request: Request) -> JSONResponse:
+    doc = await asyncio.to_thread(_get_sequence, request, name)
+    return JSONResponse(
+        doc.model_dump(mode="json"),
+        headers={"Content-Disposition": f'attachment; filename="{slug(doc.name)}.json"'},
+    )
+
+
+@router.delete("/sequences/{name}", status_code=204)
+async def delete_sequence(name: str, request: Request) -> None:
+    try:
+        await asyncio.to_thread(_library(request).delete, name)
+    except SequenceNotFound as exc:
+        raise HTTPException(status_code=404, detail=f"Sequence '{name}' not found") from exc
+
+
+@router.post("/sequences/{name}/load", status_code=201, response_model=list[QueueEntry])
+async def load_sequence(name: str, request: Request) -> list[QueueEntry]:
+    """Append the sequence's tasks to the queue as fresh tasks (new ids, no progress)."""
+    doc = await asyncio.to_thread(_get_sequence, request, name)
+    return await _append(request, doc.tasks)

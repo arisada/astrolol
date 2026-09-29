@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Plus, Trash2 } from 'lucide-react'
+import { FolderOpen, Plus, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { EventLog } from '@/components/ui/event-log'
 import { useStore } from '@/store'
@@ -11,6 +11,7 @@ import type {
 import * as seq from './api'
 import { ControlBar } from './ControlBar'
 import { JournalView } from './JournalView'
+import { SequencesDialog } from './SequencesDialog'
 import { SettingsPanel } from './SettingsPanel'
 import { TaskCard } from './TaskCard'
 import { TaskEditor } from './TaskEditor'
@@ -25,6 +26,7 @@ export function SequencerPage() {
   const [editing, setEditing] = useState<SequencerQueueEntry | 'new' | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
+  const [showSequences, setShowSequences] = useState(false)
   const [issues, setIssues] = useState<SequencerPreflightIssue[]>([])
   const dragId = useRef<string | null>(null)
 
@@ -144,6 +146,7 @@ export function SequencerPage() {
                       actions={{
                         edit: () => setEditing(entry),
                         duplicate: () => act(() => seq.duplicateTask(id)),
+                        download: () => { window.location.href = seq.exportUrl([id]) },
                         startFrom: () => act(() => seq.start({ from_task: id })),
                         switchTo: () => act(() => seq.switchTo(id, 'frame')),
                         resetProgress: () => act(() => seq.resetProgress(id)),
@@ -162,6 +165,9 @@ export function SequencerPage() {
                   <Button size="sm" onClick={() => setEditing('new')}>
                     <Plus size={13} className="mr-1" /> Add task
                   </Button>
+                  <Button size="sm" variant="ghost" onClick={() => setShowSequences(true)}>
+                    <FolderOpen size={13} className="mr-1" /> Sequences…
+                  </Button>
                   {done.length > 0 && (
                     <Button size="sm" variant="ghost" onClick={() => act(() => seq.clearQueue(['completed', 'skipped']))}>
                       <Trash2 size={13} className="mr-1" /> Clear done ({done.length})
@@ -176,6 +182,13 @@ export function SequencerPage() {
       </div>
       <EventLog filter={['sequencer']} />
 
+      {showSequences && (
+        <SequencesDialog
+          queueSize={entries.length}
+          hasCompleted={entries.some((e) => e.runtime.status === 'completed')}
+          onClose={() => setShowSequences(false)}
+        />
+      )}
       {editing && (
         <TaskEditor entry={editing === 'new' ? null : editing} onClose={() => setEditing(null)} />
       )}

@@ -13,6 +13,7 @@ from astrolol.core.sequencer import Sequencer
 from plugins.sequencer.api import router
 from plugins.sequencer.devices import optical_paths
 from plugins.sequencer.journal import JournalWriter, default_journal_dir
+from plugins.sequencer.sequences import SequenceLibrary
 from plugins.sequencer.service import SequencerServiceImpl
 from plugins.sequencer.settings import SequencerSettings
 from plugins.sequencer.store import QueueStore
@@ -72,6 +73,8 @@ class SequencerPlugin:
                 "equipment": [p.model_dump(mode="json") for p in optical_paths(app)],
                 "tasks": [e.model_dump(mode="json") for e in service.entries],
             }
+
+        app.state.sequencer_library = SequenceLibrary(store_dir / "sequences")
 
         self._journal = JournalWriter(ctx.event_bus, journal_directory, journal_context)
         app.state.sequencer_journal = self._journal

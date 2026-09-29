@@ -8,6 +8,7 @@ import { MoreMenu, type MenuItem } from './Menu'
 export interface TaskActions {
   edit: () => void
   duplicate: () => void
+  download: () => void
   startFrom: () => void
   switchTo: () => void
   resetProgress: () => void
@@ -49,6 +50,7 @@ export function TaskCard({
   const menu: MenuItem[] = [
     { label: 'Edit', onSelect: actions.edit, disabled: running },
     { label: 'Duplicate', onSelect: actions.duplicate },
+    { label: 'Download as a file', onSelect: actions.download, hint: 'Its definition, to add back later or elsewhere' },
     idle
       ? { label: 'Start from here', onSelect: actions.startFrom, disabled: !runnable,
           hint: 'Earlier pending tasks are left for later' }

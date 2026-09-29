@@ -320,8 +320,12 @@ and runtime together), so a restart loses nothing.
 - On startup: load the file. Any task left `running` (crash or power loss) becomes
   `interrupted`. The runner starts `IDLE`; the UI shows *Resume* when resumable work exists.
 - The old `sequencer_state.json` (schema 1) is ignored and deleted.
-- Named sequences (save / load a queue as a template): `sequences/<name>.json` with
-  definitions only, no runtime. Loading appends fresh copies with new ids.
+- Named sequences (reusable plans): the queue's task definitions — no progress, no
+  history — saved as `<data dir>/sequences/<slug>.json`. The same document format is used
+  for browser downloads and uploads (`{"format": "astrolol-sequence", "version": 1, "name",
+  "saved_at", "description", "tasks": [...]}`, task and lane ids blanked), so a downloaded
+  file can go into the library or the queue, and back. Loading always appends fresh copies
+  (new ids, zero progress); the queue is never replaced.
 
 ---
 
@@ -943,10 +947,18 @@ POST   /queue/{id}/unskip             → QueueEntry
 POST   /queue/reorder                 body: {order: [ids]} → 204
 DELETE /queue?status=completed|skipped|all_not_running → 204
 
-# Named sequences
-GET    /sequences                     → list[str]
-POST   /sequences/{name}              → save current queue definitions
-POST   /sequences/{name}/load         → append to queue
+# Named sequences (addressed by slug, e.g. "autumn-galaxies")
+GET    /sequences                     → list[SequenceInfo] (id, name, tasks, targets, exposure)
+POST   /sequences                     body: {name, description?, task_ids?, include_completed?,
+                                             overwrite?} → save queue definitions (409 if exists)
+PUT    /sequences?overwrite=          body: sequence document → store an uploaded file
+GET    /sequences/{id}                → sequence document (as a download)
+DELETE /sequences/{id}                → 204
+POST   /sequences/{id}/load           → append fresh copies to the queue
+
+# Files
+GET    /export?ids=…                  → sequence document of the given tasks (or the whole queue)
+POST   /import                        body: sequence document → append fresh copies
 
 # Control
 POST   /preflight                     body: {task_ids?} → PreflightReport
@@ -1176,7 +1188,8 @@ Per the project rules, every feature gets tests. At minimum:
    sequencer-owned meridian flip.
 3. **Session journal:** records, storage, API, UI journal tab.
 4. **Parallel lanes:** RigSchedule and the fit rule, secondary lane loop, efficiency estimate and pre-flight checks, multi-lane editor and progress UI.
-5. **(Later)** Named sequences, multiple mounts (runner per mount), MCP tool surface.
+5. **Done:** named sequences and file import/export. **Later:** multiple mounts (runner per
+   mount), MCP tool surface.
 
 ## Known v1 defects this spec replaces
 
