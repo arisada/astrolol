@@ -387,6 +387,10 @@ export interface SequencerSettings {
   center_retry_interval_s: number
   stall_timeout_min: number | null
   uncount_if_unguided_s: number | null
+  refocus_after_flip: boolean
+  autofocus_on_temp_delta: number | null
+  autofocus_every_min: number | null
+  autofocus_retry_interval_s: number
   recenter_after_pause_min: number
   slew_timeout_s: number
   flip_timeout_s: number

@@ -60,6 +60,7 @@ from astrolol.core.sequencer.models import (
 )
 from astrolol.mount.manager import meridian_flip_due
 from plugins.sequencer.devices import LaneDevices, resolve_lane_devices, run_mount_id
+from plugins.sequencer.focusing import autofocus_triggers, run_autofocus
 from plugins.sequencer.guiding import center_with_retries, ensure_guiding
 from plugins.sequencer.settings import SequencerSettings
 from plugins.sequencer.steps import StepError, Steps
@@ -125,6 +126,9 @@ class _TaskState:
     flipped: bool = False
     target: ResolvedTarget | None = None
     devices: LaneDevices | None = None
+    af_due: str | None = None  # autofocus requested before the next frame (reason)
+    af_retry_at: float | None = None  # monotonic time to retry a failed autofocus
+    af_tracker: Any = None  # StallTracker for autofocus stalls
 
 
 @dataclass
@@ -136,6 +140,9 @@ class _Run:
     forced_next: str | None = None
     frames_saved: int = 0
     tasks: dict[str, _TaskState] = field(default_factory=dict)
+    # focuser_id → (monotonic time, focuser temperature) of the last autofocus (or the
+    # baseline when none ran yet this run) — for the time / temperature triggers
+    af_last: dict[str, tuple[float, float | None]] = field(default_factory=dict)
 
 
 @dataclass
@@ -675,9 +682,7 @@ class Runner:
             else:
                 await ensure_guiding(self, entry, ts)
         if task.autofocus_at_start:
-            await self._steps.skipped(
-                task.id, "autofocus", "autofocus integration is not implemented yet"
-            )
+            await run_autofocus(self, entry, ts, "task start")
         ts.frames_since_dither = 0
         for ls in ts.lanes.values():
             ls.current_filter = None
@@ -699,6 +704,9 @@ class Runner:
             if group.filter_name is not None and ls.current_filter != group.filter_name:
                 await self._steps.change_filter(task.id, devices, group.filter_name)
                 ls.current_filter = group.filter_name
+                if lane.autofocus_on_filter_change:
+                    ts.af_due = f"filter {group.filter_name}"
+            await autofocus_triggers(self, entry, ts)
             # No new frame without healthy guiding (a frame in progress is never interrupted)
             await ensure_guiding(self, entry, ts)
             self._check_boundary()
@@ -847,6 +855,8 @@ class Runner:
             await center_with_retries(self, entry, ts)
         # Guiding restarts through ensure_guiding() before the next frame.
         ts.frames_since_dither = 0
+        if flipped and self.settings.refocus_after_flip:
+            ts.af_due = "after the meridian flip"
 
     async def _mount_status(self, mount_id: str) -> Any:
         mm = getattr(self.app.state, "mount_manager", None)

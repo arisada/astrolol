@@ -90,6 +90,9 @@ class AutofocusRun(BaseModel):
     curve_fit: CurveFit | None = None
     optimal_position: int | None = None
     error: str | None = None
+    # True when the run failed because of the sky (no stars found), not the hardware:
+    # a sequencer retries those later instead of treating them as errors.
+    sky_problem: bool = False
     started_at: datetime = Field(default_factory=_now)
     completed_at: datetime | None = None
     # Latest step image metadata (for the star-overlay UI panel)

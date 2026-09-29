@@ -213,6 +213,44 @@ class FakeGuider:
         pass
 
 
+class FakeAutofocus:
+    """AutofocusEngine.focus() stand-in: queued results, then success."""
+
+    def __init__(self) -> None:
+        self.calls: list[tuple[str, str]] = []
+        self.results: list[Any] = []
+
+    async def focus(self, camera_id: str, focuser_id: str) -> Any:
+        self.calls.append((camera_id, focuser_id))
+        if self.results:
+            return self.results.pop(0)
+        return SimpleNamespace(
+            status="completed",
+            error=None,
+            sky_problem=False,
+            optimal_position=1000,
+            data_points=[SimpleNamespace(fwhm=2.5)],
+        )
+
+
+def af_no_stars() -> Any:
+    return SimpleNamespace(
+        status="failed",
+        error="No stars detected",
+        sky_problem=True,
+        optimal_position=None,
+        data_points=[],
+    )
+
+
+class FakeFocuser:
+    def __init__(self) -> None:
+        self.temperature: float | None = 10.0
+
+    async def get_status(self) -> Any:
+        return SimpleNamespace(temperature=self.temperature)
+
+
 class FakeSolveManager:
     def __init__(self) -> None:
         self.calls: list[dict[str, Any]] = []
@@ -244,6 +282,10 @@ class FakeFilterWheelManager:
 class FakeDeviceManager:
     def __init__(self, devices: list[tuple[str, str]]) -> None:
         self.devices = devices  # (device_id, kind)
+        self.focuser = FakeFocuser()
+
+    def get_focuser(self, device_id: str) -> FakeFocuser:
+        return self.focuser
 
     def list_connected(self) -> list[dict[str, str]]:
         return [{"device_id": d, "kind": k} for d, k in self.devices]
@@ -260,8 +302,9 @@ class Rig:
         self.solver = FakeSolveManager()
         self.fwm = FakeFilterWheelManager(["L", "R", "G", "B", "Ha"])
         self.dm = FakeDeviceManager(
-            [("cam1", "camera"), ("mount1", "mount"), ("fw1", "filter_wheel")]
+            [("cam1", "camera"), ("mount1", "mount"), ("fw1", "filter_wheel"), ("foc1", "focuser")]
         )
+        self.autofocus = FakeAutofocus()
         self.app = SimpleNamespace(
             state=SimpleNamespace(
                 device_manager=self.dm,
@@ -270,6 +313,7 @@ class Rig:
                 filter_wheel_manager=self.fwm,
                 guider=self.guider,
                 solve_manager=self.solver,
+                autofocus_engine=self.autofocus,
                 active_profile=None,
                 equipment_store=None,
             )

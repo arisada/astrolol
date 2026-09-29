@@ -140,7 +140,9 @@ export function ControlBar({
           {status.stall.last_error && <p className="text-amber-300/80">{status.stall.last_error}</p>}
           <p className="text-amber-300/60 mt-1">
             Retrying automatically{status.stall.next_attempt_at ? ` (next ${sinceLabel(status.stall.next_attempt_at, now, true)})` : ''}.
-            New frames wait; switch to another task or stop if the sky won't clear.
+            {status.stall.kind === 'autofocus'
+              ? ' Imaging continues at the last good focus.'
+              : " New frames wait; switch to another task or stop if the sky won't clear."}
           </p>
         </div>
       )}

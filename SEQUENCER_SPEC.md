@@ -1088,9 +1088,9 @@ class SequencerSettings(BaseModel):
 | `MountManager` | `suspend_automation(mount_id)` context manager (pauses auto-flip; horizon checks stay active) |
 | `ImagerManager` / `ExposureRequest` | Optional `object_name` override, so frames are named after the task target even without a slew. `abort` on cancellation verified. |
 | `astrolol/core/guiding/` | Done: `Guider` protocol (`app.state.guider`, one active guider) with settle-waiting `guide()`/`dither()`, guiding health and per-window stats (RMS, unguided seconds, losses). Implemented by the PHD2 plugin and the `guide_simulator` plugin (fault injection for tests) |
-| `ImagerManager` | Hook for extra FITS header cards per exposure (`GUIDLOST`, `GUIDLOSN`, and later other per-frame metadata) |
+| `ImagerManager` | Done: `add_fits_header_cards()` — the sequencer writes `GUIDLOST`, `GUIDLOSN`, `GUIDRMS` after each frame |
 | `astrolol/core/sequencer/` | New: the `Sequencer` protocol, public models, events and errors (interface only) |
-| `autofocus` | Callable engine API for a given camera/focuser, awaitable, cancellable |
+| `autofocus` | Done: `engine.focus(camera_id, focuser_id)` — awaitable, cancellable, uses the plugin's saved settings; a failed or aborted run restores the focuser; `sky_problem` marks no-star failures |
 
 ---
 

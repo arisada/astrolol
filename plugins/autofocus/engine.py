@@ -12,6 +12,7 @@ Algorithm
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Callable
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -30,6 +31,7 @@ from plugins.autofocus.models import (
     AutofocusDataPointEvent,
     AutofocusFailedEvent,
     AutofocusRun,
+    AutofocusSettings,
     AutofocusStartedEvent,
     CurveFit,
     FocusDataPoint,
@@ -88,9 +90,15 @@ def _read_fits_shape(fits_path: str) -> tuple[int, int]:
 class AutofocusEngine:
     """Manages one autofocus run at a time."""
 
-    def __init__(self, event_bus: EventBus, device_manager: DeviceManager) -> None:
+    def __init__(
+        self,
+        event_bus: EventBus,
+        device_manager: DeviceManager,
+        settings_provider: Callable[[], AutofocusSettings] | None = None,
+    ) -> None:
         self._bus = event_bus
         self._device_manager = device_manager
+        self._settings_provider = settings_provider or AutofocusSettings
         self._current_run: AutofocusRun | None = None
         self._task: asyncio.Task | None = None
         # Maps step number (1-indexed) → server-side preview JPEG path
@@ -115,6 +123,35 @@ class AutofocusEngine:
         self._task = asyncio.create_task(self._run(run), name=f"autofocus_{run.id}")
         return run
 
+    async def focus(self, camera_id: str, focuser_id: str) -> AutofocusRun:
+        """Run autofocus with the saved autofocus settings and wait for the result.
+
+        For automation (the sequencer): the filter is left as it is. Cancelling the caller
+        aborts the run (the focuser returns to where it started). Raises ValueError when a
+        run is already in progress; a failed run is returned with status "failed".
+        """
+        s = self._settings_provider()
+        config = AutofocusConfig(
+            camera_id=camera_id,
+            focuser_id=focuser_id,
+            step_size=s.step_size,
+            num_steps=s.num_steps,
+            exposure_time=s.exposure_time,
+            binning=s.binning,
+            gain=s.gain,
+            fit_algo=s.fit_algo,
+            metric=s.metric,
+        )
+        run = await self.start(config)
+        task = self._task
+        assert task is not None
+        try:
+            await asyncio.shield(task)
+        except asyncio.CancelledError:
+            await self.abort()
+            raise
+        return run
+
     async def abort(self) -> None:
         if self._task is not None and not self._task.done():
             self._task.cancel()
@@ -130,6 +167,7 @@ class AutofocusEngine:
         preview_dir = Path(settings.images_dir) / "autofocus" / run.id
         preview_dir.mkdir(parents=True, exist_ok=True)
 
+        restore_to: int | None = None
         try:
             camera = self._device_manager.get_camera(config.camera_id)
             focuser = self._device_manager.get_focuser(config.focuser_id)
@@ -141,6 +179,7 @@ class AutofocusEngine:
             # Determine starting position
             focuser_status = await focuser.get_status()
             start_pos = focuser_status.position or 0
+            restore_to = start_pos
 
             positions = [
                 start_pos + (i - config.num_steps) * config.step_size
@@ -256,6 +295,7 @@ class AutofocusEngine:
 
             valid = [dp for dp in run.data_points if dp.fwhm > 0 and dp.star_count > 0]
             if not valid:
+                run.sky_problem = True
                 raise RuntimeError(
                     "No stars detected at any focuser position. "
                     "Check exposure time, focus range, or star detection threshold."
@@ -283,6 +323,7 @@ class AutofocusEngine:
         except asyncio.CancelledError:
             run.status = "aborted"
             run.completed_at = datetime.now(timezone.utc)
+            await self._restore_focus(config.focuser_id, restore_to)
             await self._bus.publish(AutofocusAbortedEvent(run_id=run.id))
             logger.info("autofocus.aborted", run_id=run.id)
             raise
@@ -291,8 +332,21 @@ class AutofocusEngine:
             run.status = "failed"
             run.error = str(exc)
             run.completed_at = datetime.now(timezone.utc)
+            await self._restore_focus(config.focuser_id, restore_to)
             await self._bus.publish(AutofocusFailedEvent(run_id=run.id, reason=str(exc)))
             logger.error("autofocus.failed", run_id=run.id, error=str(exc), exc_info=True)
+
+    async def _restore_focus(self, focuser_id: str, position: int | None) -> None:
+        """After a failed or aborted run, put the focuser back where it started — the last
+        good focus — instead of leaving it at the end of the sweep. Best effort."""
+        if position is None:
+            return
+        try:
+            focuser = self._device_manager.get_focuser(focuser_id)
+            await asyncio.wait_for(focuser.move_to(position), timeout=_MOVE_TIMEOUT)
+            logger.info("autofocus.focus_restored", position=position)
+        except Exception as exc:
+            logger.warning("autofocus.focus_restore_failed", position=position, error=str(exc))
 
     def _refit_curve(self, run: AutofocusRun) -> None:
         valid = [(dp.position, dp.fwhm) for dp in run.data_points if dp.fwhm > 0]

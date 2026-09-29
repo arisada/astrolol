@@ -9,7 +9,9 @@ import { getSettings, putSettings } from './api'
 type NumKey = {
   [K in keyof SequencerSettings]: SequencerSettings[K] extends number | null ? (SequencerSettings[K] extends boolean ? never : K) : never
 }[keyof SequencerSettings]
-const NULLABLE = new Set<string>(['stall_timeout_min', 'uncount_if_unguided_s'])
+const NULLABLE = new Set<string>([
+  'stall_timeout_min', 'uncount_if_unguided_s', 'autofocus_on_temp_delta', 'autofocus_every_min',
+])
 type BoolKey = { [K in keyof SequencerSettings]: SequencerSettings[K] extends boolean ? K : never }[keyof SequencerSettings]
 
 const GROUPS: { title: string; bools?: [BoolKey, string][]; nums?: [NumKey, string, string][] }[] = [
@@ -53,6 +55,15 @@ const GROUPS: { title: string; bools?: [BoolKey, string][]; nums?: [NumKey, stri
       ['center_retry_interval_s', 'Retry centering (no stars) every', 's'],
       ['stall_timeout_min', 'Give up on a stall after', 'min (empty = never)'],
       ['uncount_if_unguided_s', 'Retake frames unguided for more than', 's (empty = keep all)'],
+    ],
+  },
+  {
+    title: 'Autofocus',
+    bools: [['refocus_after_flip', 'Refocus after a meridian flip']],
+    nums: [
+      ['autofocus_on_temp_delta', 'Refocus when the temperature moved', '°C (empty = off)'],
+      ['autofocus_every_min', 'Refocus every', 'min (empty = off)'],
+      ['autofocus_retry_interval_s', 'Retry a failed autofocus (no stars) every', 's'],
     ],
   },
   {

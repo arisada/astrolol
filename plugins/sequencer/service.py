@@ -359,7 +359,18 @@ class SequencerServiceImpl:
                     f"the guider ({guider.name}) is not connected: the run will wait for guiding",
                 )
         if task.autofocus_at_start or any(lane.autofocus_on_filter_change for lane in task.lanes):
-            issue("warning", "no_autofocus", "autofocus integration is not implemented yet")
+            if getattr(state, "autofocus_engine", None) is None:
+                issue(
+                    "warning",
+                    "no_autofocus",
+                    "autofocus is requested but its plugin is not enabled",
+                )
+            elif any(
+                resolve_lane_devices(self.app, lane).focuser_id is None for lane in task.lanes
+            ):
+                issue(
+                    "warning", "no_focuser", "autofocus is requested but the camera has no focuser"
+                )
         return issues
 
     async def _preflight_filters(

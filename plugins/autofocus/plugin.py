@@ -31,9 +31,13 @@ class AutofocusPlugin:
         from plugins.autofocus.engine import AutofocusEngine
         from plugins.autofocus.star_detector import detect_stars
 
+        from plugins.autofocus.models import AutofocusSettings
+
         engine = AutofocusEngine(
             event_bus=ctx.event_bus,
             device_manager=ctx.device_manager,
+            # read on every run, so settings saved from the page apply to automated runs
+            settings_provider=lambda: ctx.get_plugin_settings("autofocus", AutofocusSettings),
         )
         app.state.autofocus_engine = engine
         self._engine = engine

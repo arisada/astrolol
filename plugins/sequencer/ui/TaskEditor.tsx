@@ -84,6 +84,8 @@ export function TaskEditor({ entry, onClose }: {
   const [slew, setSlew] = useState(base?.slew ?? true)
   const [center, setCenter] = useState(base?.center ?? true)
   const [guide, setGuide] = useState(base?.start_guiding ?? true)
+  const [afStart, setAfStart] = useState(base?.autofocus_at_start ?? false)
+  const [afFilter, setAfFilter] = useState(lane?.autofocus_on_filter_change ?? false)
   const [ditherOn, setDitherOn] = useState(base ? base.dither_every != null : true)
   const [ditherEvery, setDitherEvery] = useState(String(base?.dither_every ?? 1))
   const [subDelay, setSubDelay] = useState(String(base?.sub_delay_s ?? 0))
@@ -144,10 +146,10 @@ export function TaskEditor({ entry, onClose }: {
         groups: parsed as SequencerExposureGroup[],
         order,
         round_robin_batch: order === 'round_robin' ? batchN : 1,
-        autofocus_on_filter_change: lane?.autofocus_on_filter_change ?? false,
+        autofocus_on_filter_change: afFilter,
       }],
       slew, center, start_guiding: guide,
-      autofocus_at_start: base?.autofocus_at_start ?? false,
+      autofocus_at_start: afStart,
       dither_every: ditherOn ? every : null,
       sub_delay_s: delay,
       on_error: onError,
@@ -308,10 +310,12 @@ export function TaskEditor({ entry, onClose }: {
             <Toggle label="Slew to the target" checked={slew && !isCurrent} disabled={isCurrent} onChange={() => setSlew((v) => !v)} />
             <Toggle label="Center with plate solving" checked={center && !isCurrent} disabled={isCurrent} onChange={() => setCenter((v) => !v)} />
             <Toggle label="Start guiding (wait for settle)" checked={guide} onChange={() => setGuide((v) => !v)} />
+            <Toggle label="Autofocus" checked={afStart} onChange={() => setAfStart((v) => !v)} />
             {isCurrent && <p className="text-xs text-slate-500">"Mount pointing" targets never slew or center.</p>}
           </Section>
 
           <Section title="While imaging">
+            <Toggle label="Autofocus after each filter change" checked={afFilter} onChange={() => setAfFilter((v) => !v)} />
             <div className="flex items-center gap-3">
               <ToggleSwitch label="Dither" checked={ditherOn} onChange={() => setDitherOn((v) => !v)} />
               <span className="text-sm text-slate-300 whitespace-nowrap">Dither every</span>

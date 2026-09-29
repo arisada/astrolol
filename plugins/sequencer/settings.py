@@ -52,6 +52,18 @@ class SequencerSettings(BaseModel):
         description="Retake frames unguided for longer than this (file kept); null = count all",
     )
 
+    # Autofocus (autofocus plugin; its own settings define the sweep)
+    refocus_after_flip: bool = False
+    autofocus_on_temp_delta: float | None = Field(
+        default=None, gt=0, description="Refocus when the focuser temperature moved this much (°C)"
+    )
+    autofocus_every_min: float | None = Field(
+        default=None, gt=0, description="Refocus after this many minutes"
+    )
+    autofocus_retry_interval_s: float = Field(
+        default=300.0, gt=0, description="Retry a failed (no stars) autofocus this often"
+    )
+
     # Resume behaviour
     recenter_after_pause_min: float = Field(default=10.0, ge=0)
 

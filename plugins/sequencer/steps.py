@@ -412,6 +412,59 @@ class Steps:
             return
         await self._finished(task_id, "dither", t0)
 
+    # ── Autofocus ──────────────────────────────────────────────────────────
+
+    async def autofocus(self, task: ImagingTask, devices: LaneDevices, reason: str) -> bool:
+        """Run autofocus. Returns False when it can't run here (reported as skipped).
+
+        A run that found no stars raises a StepError with stall_kind=AUTOFOCUS (the focuser
+        is back at its last good position); other failures raise a plain StepError.
+        """
+        engine = self._state("autofocus_engine")
+        if engine is None or not hasattr(engine, "focus"):
+            await self.skipped(task.id, "autofocus", "autofocus plugin not enabled")
+            return False
+        if devices.focuser_id is None or devices.camera_id is None:
+            await self.skipped(task.id, "autofocus", "no focuser in this camera's optical path")
+            return False
+        t0 = await self._started(task.id, "autofocus", Activity.FOCUSING, f"Autofocus ({reason})")
+        try:
+            run = await engine.focus(devices.camera_id, devices.focuser_id)
+        except ValueError as exc:
+            raise StepError("autofocus", f"Autofocus could not start: {exc}") from exc
+        except Exception as exc:
+            raise StepError("autofocus", f"Autofocus failed: {exc}") from exc
+        if run.status != "completed":
+            raise StepError(
+                "autofocus",
+                f"Autofocus failed: {run.error or run.status}",
+                stall_kind=StallKind.AUTOFOCUS if getattr(run, "sky_problem", False) else None,
+            )
+        best = min((dp.fwhm for dp in run.data_points if dp.fwhm > 0), default=None)
+        await self._finished(
+            task.id,
+            "autofocus",
+            t0,
+            {
+                "reason": reason,
+                "position": run.optimal_position,
+                "best_fwhm": round(best, 2) if best is not None else None,
+                "samples": len(run.data_points),
+            },
+        )
+        return True
+
+    async def focuser_temperature(self, focuser_id: str | None) -> float | None:
+        dm = self._state("device_manager")
+        if focuser_id is None or dm is None:
+            return None
+        try:
+            status = await dm.get_focuser(focuser_id).get_status()
+        except Exception:
+            return None
+        temp = getattr(status, "temperature", None)
+        return float(temp) if temp is not None else None
+
     # ── Imaging ────────────────────────────────────────────────────────────
 
     async def resolve_target(self, task: ImagingTask) -> ResolvedTarget:

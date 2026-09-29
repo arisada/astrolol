@@ -93,12 +93,9 @@ baked into the current code/design or a feature left out; revisit when it bites.
 Design: `SEQUENCER_SPEC.md`. Done: phase 1 (core interface, queue/runner, UI), platesolve
 centering, core `Guider` protocol (PHD2 + guide simulator implement it), guiding health,
 per-frame guiding stats (events + FITS cards), guiding check before each frame, guiding
-recovery loop, stalls (guiding, centering) with timeout, retaking badly unguided frames.
+recovery loop, stalls (guiding, centering, autofocus) with timeout, retaking badly unguided
+frames, autofocus (task start, filter change, after flip, temperature / time triggers).
 
-- **Phase 2 — remaining**
-  - Autofocus integration (at start, on filter change, after flip, temperature/time
-    triggers; autofocus failures as stalls) — needs a callable, awaitable autofocus engine
-    API per camera/focuser.
 - **Phase 3 — session journal** (JSONL per run next to the images, sessions API, time
   breakdown, UI journal tab).
 - **Phase 4 — multi-camera lanes** (`RigSchedule`, fit rule, efficiency estimate and
@@ -108,6 +105,11 @@ recovery loop, stalls (guiding, centering) with timeout, retaking badly unguided
   waits for guiding like any outage. The flip hour angle stays a sequencer setting.
 - **Test isolation** — integration tests build real apps on the default data dir: they log
   into `~/.astrolol/astrolol.log` and use `/tmp/astrolol`. Point them at a tmp data dir.
+- **Simulator setup for autofocus** — the CCD simulator only draws stars when it snoops a
+  telescope: with the eqmod simulator, enable the eqmod INDI proxy and set the camera's
+  `ACTIVE_DEVICES.ACTIVE_TELESCOPE` to "astrolol Mount Proxy" (a live INDI setting astrolol
+  doesn't set yet — worth doing automatically when the proxy is enabled). Needs the `gsc`
+  package (INDI PPA).
 - **Guiding UI** — PHD2's page is PHD2-specific; a guider-independent guiding page (graph from
   `guiding.*` events) should come with the integrated guiding module.
 - **UI** — a "slew & center" button (platesolve `POST /center`) on the Mount/Target pages.

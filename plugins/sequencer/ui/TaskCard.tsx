@@ -137,6 +137,8 @@ export function TaskCard({
             {[
               task.target.kind === 'current' ? 'no slew' : [task.slew && 'slew', task.center && 'center'].filter(Boolean).join(' + '),
               task.start_guiding && 'guide',
+              task.autofocus_at_start && 'autofocus',
+              lane.autofocus_on_filter_change && 'refocus per filter',
               task.dither_every ? `dither every ${task.dither_every}` : 'no dither',
               lane.order === 'round_robin' && `round robin ×${lane.round_robin_batch}`,
               `on error: ${task.on_error}`,
