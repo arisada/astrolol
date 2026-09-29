@@ -137,6 +137,7 @@ _COMPONENT_MAP = {
     "phd2":       "phd2",
     "platesolve": "platesolve",
     "sequencer":  "sequencer",
+    "guide_simulator": "guide_simulator",
 }
 
 

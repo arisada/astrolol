@@ -91,11 +91,12 @@ baked into the current code/design or a feature left out; revisit when it bites.
 ## Sequencer — remaining work
 
 Design: `SEQUENCER_SPEC.md`. Done: phase 1 (core interface, queue/runner, UI), platesolve
-centering, PHD2 settle-wait + guiding health, per-frame guiding stats in `frame_saved`.
+centering, core `Guider` protocol (PHD2 + guide simulator implement it), guiding health,
+per-frame guiding stats in `frame_saved`.
 
 - **Phase 2 — guiding and stalls**
-  - Use the core `Guider` protocol (`app.state.guider`) everywhere instead of `phd2_client`
-    (in progress with the guide simulator).
+  - Test the guiding gate / recovery / stalls against the `guide_simulator` plugin (fault
+    injection: star loss, guiding stops, settle failures, disconnect).
   - Guiding gate: no new frame starts until guiding has been healthy for
     `guide_healthy_after_s`; `WAITING_FOR_GUIDING` activity.
   - Guiding recovery loop: retry `guide()` every `guide_retry_interval_s`, one re-centre after
@@ -118,6 +119,8 @@ centering, PHD2 settle-wait + guiding health, per-frame guiding stats in `frame_
     mount's `auto_flip_ha_hours` — merge them?
 - **Test isolation** — integration tests build real apps on the default data dir: they log
   into `~/.astrolol/astrolol.log` and use `/tmp/astrolol`. Point them at a tmp data dir.
+- **Guiding UI** — PHD2's page is PHD2-specific; a guider-independent guiding page (graph from
+  `guiding.*` events) should come with the integrated guiding module.
 - **UI** — a "slew & center" button (platesolve `POST /center`) on the Mount/Target pages.
 
 ## Profiles — deferred

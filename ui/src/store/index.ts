@@ -463,6 +463,12 @@ function eventSummary(event: AstrolollEvent): string {
     case 'phd2.state_changed': return `PHD2 ${event.state}`
     case 'phd2.guide_step': return `Guide step #${event.frame}: RA ${event.ra_dist.toFixed(3)}" Dec ${event.dec_dist.toFixed(3)}"`
     case 'phd2.settled': return event.error ? `PHD2 settle failed: ${event.error}` : 'PHD2 settled'
+    case 'guiding.state_changed': return event.guiding
+      ? `Guiding (${event.guider})`
+      : `Guiding interrupted (${event.guider}): ${event.reason ?? 'unknown'}`
+    case 'guiding.settled': return event.error
+      ? `Settle after ${event.after} failed (${event.guider}): ${event.error}`
+      : `Settled after ${event.after} (${event.guider})`
     case 'platesolve.started': return `Plate solve started: ${event.fits_path.split('/').pop()}`
     case 'platesolve.completed': return `Plate solve done: RA ${(event.ra / 15).toFixed(4)}h Dec ${event.dec.toFixed(4)}° (${event.duration_ms}ms)`
     case 'platesolve.failed': return `Plate solve failed: ${event.reason}`

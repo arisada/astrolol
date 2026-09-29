@@ -72,7 +72,7 @@ plugins/sequencer/
 | `mount_manager`, `imager_manager`, `filter_wheel_manager`, `device_manager` | `app.state` (core) | yes |
 | Optical paths (camera → mount / filter wheel / focuser) | `astrolol.equipment.optical_path` | yes |
 | `solve_manager` (platesolve plugin) — incl. new `center()` | `app.state` | optional |
-| `phd2_client` (phd2 plugin) | `app.state` | optional |
+| Guider — `astrolol.core.guiding.Guider` (PHD2 or guide simulator plugin) | `app.state.guider` | optional |
 | `autofocus_engine` (autofocus plugin) | `app.state` | optional |
 | Favorites (target plugin), catalogue (object_resolver plugin) | `app.state` | optional |
 
@@ -1087,7 +1087,7 @@ class SequencerSettings(BaseModel):
 | `target` | Service accessor for favorites on `app.state` |
 | `MountManager` | `suspend_automation(mount_id)` context manager (pauses auto-flip; horizon checks stay active) |
 | `ImagerManager` / `ExposureRequest` | Optional `object_name` override, so frames are named after the task target even without a slew. `abort` on cancellation verified. |
-| `phd2` | `guide()` optionally awaits `SettleDone` (same mechanism as `dither()`); a guiding-health API: current state, `healthy_since`, and per-interval stats (RMS, unguided seconds, loss count) between two marks, so a frame can query its own exposure window |
+| `astrolol/core/guiding/` | Done: `Guider` protocol (`app.state.guider`, one active guider) with settle-waiting `guide()`/`dither()`, guiding health and per-window stats (RMS, unguided seconds, losses). Implemented by the PHD2 plugin and the `guide_simulator` plugin (fault injection for tests) |
 | `ImagerManager` | Hook for extra FITS header cards per exposure (`GUIDLOST`, `GUIDLOSN`, and later other per-frame metadata) |
 | `astrolol/core/sequencer/` | New: the `Sequencer` protocol, public models, events and errors (interface only) |
 | `autofocus` | Callable engine API for a given camera/focuser, awaitable, cancellable |

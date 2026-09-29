@@ -206,6 +206,41 @@ export interface AutofocusRun {
   image_height: number | null
 }
 
+// --- Guiding (mirrors astrolol/core/guiding/models.py) ---
+
+export interface GuiderStatus {
+  guider: string
+  connected: boolean
+  state: string
+  guiding: boolean
+  active: boolean
+  settling: boolean
+  pixel_scale: number | null
+}
+
+export interface GuidingHealth {
+  guiding: boolean
+  guiding_for_s: number | null
+  unguided_for_s: number | null
+  reason: string | null
+}
+
+export interface GuidingStats {
+  duration_s: number
+  steps: number
+  rms_ra: number | null
+  rms_dec: number | null
+  rms_total: number | null
+  unguided_s: number
+  losses: number
+}
+
+export interface SettleParams {
+  pixels: number
+  time: number
+  timeout: number
+}
+
 // --- Sequencer (mirrors astrolol/core/sequencer/models.py) ---
 
 export interface SequencerTargetRef {
@@ -801,6 +836,18 @@ export interface PlatesolveCompletedEvent extends BaseEvent {
 export interface PlatesolveFailedEvent extends BaseEvent { type: 'platesolve.failed'; solve_id: string; reason: string }
 export interface PlatesolveCancelledEvent extends BaseEvent { type: 'platesolve.cancelled'; solve_id: string }
 
+export interface GuidingStateChangedEvent extends BaseEvent {
+  type: 'guiding.state_changed'
+  guider: string
+  guiding: boolean
+  reason: string | null
+}
+export interface GuidingSettledEvent extends BaseEvent {
+  type: 'guiding.settled'
+  guider: string
+  after: 'guide' | 'dither'
+  error: string | null
+}
 export interface SequencerStatusEvent extends BaseEvent { type: 'sequencer.status'; status: SequencerStatus }
 export interface SequencerQueueChangedEvent extends BaseEvent {
   type: 'sequencer.queue_changed'
@@ -956,6 +1003,7 @@ export type AstrolollEvent =
   | PlatesolveStartedEvent | PlatesolveCompletedEvent | PlatesolveFailedEvent | PlatesolveCancelledEvent
   | AutofocusStartedEvent | AutofocusDataPointEvent | AutofocusCompletedEvent
   | AutofocusAbortedEvent | AutofocusFailedEvent
+  | GuidingStateChangedEvent | GuidingSettledEvent
   | SequencerStatusEvent | SequencerQueueChangedEvent | SequencerFrameSavedEvent
   | SequencerTaskFinishedEvent | SequencerStepFailedEvent
   | LogEvent

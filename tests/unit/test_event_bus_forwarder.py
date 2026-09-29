@@ -134,6 +134,7 @@ async def test_skips_loggers_in_skip_list():
     ("astrolol.api.mount",           "api"),
     ("astrolol.profiles.store",  "profiles"),
     ("plugins.sequencer.runner", "sequencer"),
+    ("plugins.guide_simulator.simulator", "guide_simulator"),
     ("astrolol.unknown.thing",   "thing"),
     ("",                         "app"),
 ])
