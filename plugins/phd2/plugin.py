@@ -6,7 +6,9 @@ from fastapi import FastAPI
 
 from astrolol.core.plugin_api import LogScope, PluginContext, PluginManifest
 from plugins.phd2.api import router
+from astrolol.core.guiding import register_guider, unregister_guider
 from plugins.phd2.client import Phd2Client
+from plugins.phd2.guider import Phd2Guider
 from plugins.phd2.settings import Phd2Settings
 
 logger = structlog.get_logger()
@@ -27,7 +29,8 @@ class Phd2Plugin:
 
     def __init__(self) -> None:
         self._client: Phd2Client | None = None
-        self._imager_manager = None
+        self._guider: Phd2Guider | None = None
+        self._app: FastAPI | None = None
 
     def setup(self, app: FastAPI, ctx: PluginContext) -> None:
         cfg = ctx.get_plugin_settings("phd2", Phd2Settings)
@@ -39,9 +42,10 @@ class Phd2Plugin:
         )
         app.state.phd2_client = self._client
 
-        # Wire the dither hook into ImagerManager so the loop can trigger dithers
-        self._imager_manager = app.state.imager_manager
-        self._imager_manager._dither_fn = self._dither_fn
+        # The core guider interface (sequencer, imager loop dithering) goes through PHD2
+        self._guider = Phd2Guider(self._client)
+        self._app = app
+        register_guider(app, self._guider)
 
         app.include_router(router)
         logger.info("phd2.plugin_setup", host=cfg.host, port=cfg.port)
@@ -52,20 +56,8 @@ class Phd2Plugin:
     async def shutdown(self) -> None:
         if self._client is not None:
             await self._client.stop()
-        if self._imager_manager is not None:
-            self._imager_manager._dither_fn = None
-
-    async def _dither_fn(self, config: "DitherConfig") -> None:  # type: ignore[name-defined]
-        """Called by ImagerManager between loop frames when dither conditions are met."""
-        if self._client is None:
-            raise RuntimeError("PHD2 client not initialised")
-        await self._client.dither(
-            pixels=config.pixels,
-            ra_only=config.ra_only,
-            settle_pixels=config.settle_pixels,
-            settle_time=config.settle_time,
-            settle_timeout=config.settle_timeout,
-        )
+        if self._app is not None and self._guider is not None:
+            unregister_guider(self._app, self._guider)
 
 
 def get_plugin() -> Phd2Plugin:

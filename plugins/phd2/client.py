@@ -14,7 +14,7 @@ import json
 import math
 import structlog
 from collections import deque
-from typing import Any
+from typing import Any, Literal
 
 from astrolol.core.events import EventBus
 from plugins.phd2.events import (
@@ -24,7 +24,8 @@ from plugins.phd2.events import (
     Phd2StateChanged,
     Phd2Settled,
 )
-from plugins.phd2.health import GuidingHealthTracker
+from astrolol.core.guiding.events import GuidingSettled, GuidingStateChanged
+from astrolol.core.guiding.health import GuidingHealthTracker
 from plugins.phd2.models import GuidingHealth, GuidingStats, Phd2Status
 
 logger = structlog.get_logger()
@@ -190,6 +191,7 @@ class Phd2Client:
             self._dithering = False
 
     async def _call_and_settle(self, method: str, params: Any, settle_timeout: int) -> None:
+        after: Literal["guide", "dither"] = "dither" if method == "dither" else "guide"
         """Call *method* then wait for PHD2's SettleDone event."""
         if self._settle_event is not None:
             raise RuntimeError("Another PHD2 settle is already in progress")
@@ -200,16 +202,28 @@ class Phd2Client:
             await self._call(method, params)
             await asyncio.wait_for(event.wait(), timeout=settle_timeout + 60)
         except TimeoutError:
+            await self._event_bus.publish(
+                GuidingSettled(guider="phd2", after=after, error="settle timed out")
+            )
             raise TimeoutError("PHD2 settle timed out") from None
         finally:
             if self._settle_event is event:
                 self._settle_event = None
+        await self._event_bus.publish(
+            GuidingSettled(guider="phd2", after=after, error=self._settle_error)
+        )
         if self._settle_error:
             raise RuntimeError(f"PHD2 settle failed: {self._settle_error}")
 
     # ------------------------------------------------------------------
     # Guiding health
     # ------------------------------------------------------------------
+
+    async def _lost(self, reason: str) -> None:
+        if self._health.on_lost(reason):
+            await self._event_bus.publish(
+                GuidingStateChanged(guider="phd2", guiding=False, reason=reason)
+            )
 
     def guiding_health(self) -> GuidingHealth:
         return self._health.health()
@@ -286,7 +300,12 @@ class Phd2Client:
         self._writer = None
         self._state = "Disconnected"
         self._pixel_scale_fetched = False
-        self._health.on_lost("disconnected")
+        if self._health.on_lost("disconnected"):
+            asyncio.get_event_loop().create_task(
+                self._event_bus.publish(
+                    GuidingStateChanged(guider="phd2", guiding=False, reason="disconnected")
+                )
+            )
 
         for fut in self._pending.values():
             if not fut.done():
@@ -340,7 +359,7 @@ class Phd2Client:
         if event_name == "AppState":
             self._state = msg.get("State", "Unknown")
             if self._state != "Guiding":
-                self._health.on_lost(self._state.lower())
+                await self._lost(self._state.lower())
             await self._event_bus.publish(Phd2StateChanged(state=self._state))
 
         elif event_name == "GuideStep":
@@ -364,7 +383,8 @@ class Phd2Client:
                 self._pixel_scale_fetched = True  # don't retry until next connect
 
             scale = self._pixel_scale or 1.0
-            self._health.on_step(ra_raw * scale, dec_raw * scale)
+            if self._health.on_step(ra_raw * scale, dec_raw * scale):
+                await self._event_bus.publish(GuidingStateChanged(guider="phd2", guiding=True))
             await self._event_bus.publish(
                 Phd2GuideStep(
                     frame=int(msg.get("Frame") or 0),
@@ -395,12 +415,12 @@ class Phd2Client:
 
         elif event_name == "GuidingStopped":
             self._state = "Stopped"
-            self._health.on_lost("stopped")
+            await self._lost("stopped")
             await self._event_bus.publish(Phd2StateChanged(state=self._state))
 
         elif event_name == "Paused":
             self._state = "Paused"
-            self._health.on_lost("paused")
+            await self._lost("paused")
             await self._event_bus.publish(Phd2StateChanged(state=self._state))
 
         elif event_name == "Resumed":
@@ -409,7 +429,7 @@ class Phd2Client:
 
         elif event_name == "StarLost":
             self._state = "Star loss"
-            self._health.on_lost("star_lost")
+            await self._lost("star_lost")
             await self._event_bus.publish(Phd2StateChanged(state=self._state))
 
         elif event_name == "StarSelected":
@@ -425,7 +445,7 @@ class Phd2Client:
 
         elif event_name == "CalibrationFailed":
             self._state = "Stopped"
-            self._health.on_lost("calibration_failed")
+            await self._lost("calibration_failed")
             await self._event_bus.publish(Phd2StateChanged(state=self._state))
 
     # ------------------------------------------------------------------

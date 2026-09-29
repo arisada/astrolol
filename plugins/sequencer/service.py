@@ -344,16 +344,18 @@ class SequencerServiceImpl:
                     "no_centering",
                     "centering is unavailable (plate solving plugin); slew only",
                 )
-        phd2 = getattr(state, "phd2_client", None)
+        guider = getattr(state, "guider", None)
         if task.start_guiding or task.dither_every:
-            if phd2 is None:
+            if guider is None:
                 issue(
                     "warning",
                     "no_guider",
-                    "the PHD2 plugin is not enabled: no guiding or dithering",
+                    "no guider enabled (PHD2 or guide simulator): no guiding or dithering",
                 )
-            elif not phd2.get_status().connected:
-                issue("warning", "guider_disconnected", "PHD2 is not connected")
+            elif not guider.status().connected:
+                issue(
+                    "warning", "guider_disconnected", f"the guider ({guider.name}) is not connected"
+                )
         if task.autofocus_at_start or any(lane.autofocus_on_filter_change for lane in task.lanes):
             issue("warning", "no_autofocus", "autofocus integration is not implemented yet")
         return issues

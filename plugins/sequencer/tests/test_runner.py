@@ -43,9 +43,9 @@ async def test_run_completes_and_records_progress(rig: Rig) -> None:
     assert rig.imager.saved == 3
     assert len(rig.mount.slews) == 1
     assert len(rig.solver.calls) == 1
-    assert rig.phd2.guides == 1
+    assert rig.guider.guides == 1
     # dither_every=1: between frames, not after the last one
-    assert rig.phd2.dithers == 2
+    assert rig.guider.dithers == 2
     assert [e.frame_idx for e in rig.of("sequencer.frame_saved")] == [0, 1, 2]
     assert rig.svc.status().run_state == RunState.IDLE
 
@@ -88,7 +88,7 @@ async def test_round_robin_order(rig: Rig) -> None:
 async def test_dither_cadence(rig: Rig) -> None:
     await rig.svc.add(make_task(groups=[ExposureGroup(duration=1, count=7)], dither_every=3))
     await _run_to_end(rig)
-    assert rig.phd2.dithers == 2  # after frames 3 and 6
+    assert rig.guider.dithers == 2  # after frames 3 and 6
 
 
 async def test_current_target_does_not_slew_or_center(rig: Rig) -> None:
@@ -100,7 +100,7 @@ async def test_current_target_does_not_slew_or_center(rig: Rig) -> None:
 
 
 async def test_missing_plugins_are_reported_not_fatal(rig: Rig) -> None:
-    rig.app.state.phd2_client = None
+    rig.app.state.guider = None
     rig.app.state.solve_manager = None
     await rig.svc.add(make_task())
     assert await _run_to_end(rig) == RunOutcome.COMPLETED
@@ -176,7 +176,7 @@ async def test_preflight_camera_and_lanes(rig: Rig) -> None:
 
 
 async def test_preflight_warns_when_guider_disconnected(rig: Rig) -> None:
-    rig.phd2.connected = False
+    rig.guider.connected = False
     await rig.svc.add(make_task())
     report = await rig.svc.preflight()
     assert report.ok
@@ -419,7 +419,7 @@ async def test_on_error_abort(rig: Rig) -> None:
 
 async def test_guiding_settle_failure_is_a_step_error(rig: Rig) -> None:
     entry = await rig.svc.add(make_task(on_error="skip"))
-    rig.phd2.settle_error = "timed out"
+    rig.guider.settle_error = "timed out"
     await _run_to_end(rig)
     rt = (await rig.svc.get(entry.task.id)).runtime
     assert rt.status == TaskStatus.FAILED
@@ -505,7 +505,7 @@ async def test_flip_when_past_threshold(rig: Rig) -> None:
     await _run_to_end(rig)
     assert rig.mount.flips == 1
     assert len(rig.solver.calls) == 2  # setup + after the flip
-    assert rig.phd2.guides == 2
+    assert rig.guider.guides == 2
 
 
 async def test_no_flip_on_normal_side(rig: Rig) -> None:
@@ -540,8 +540,8 @@ async def test_flip_disabled(tmp_path: Path) -> None:
 
 
 async def test_frames_carry_guiding_stats(rig: Rig) -> None:
-    rig.phd2.unguided_s = 12.5
-    rig.phd2.losses = 1
+    rig.guider.unguided_s = 12.5
+    rig.guider.losses = 1
     await rig.svc.add(make_task(groups=[ExposureGroup(duration=1, count=1)]))
     await _run_to_end(rig)
     frame = rig.of("sequencer.frame_saved")[0]
@@ -549,7 +549,7 @@ async def test_frames_carry_guiding_stats(rig: Rig) -> None:
 
 
 async def test_frames_without_guider_have_no_guiding_stats(rig: Rig) -> None:
-    rig.app.state.phd2_client = None
+    rig.app.state.guider = None
     await rig.svc.add(make_task(groups=[ExposureGroup(duration=1, count=1)]))
     await _run_to_end(rig)
     frame = rig.of("sequencer.frame_saved")[0]

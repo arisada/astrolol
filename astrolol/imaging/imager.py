@@ -173,6 +173,11 @@ class ImagerManager:
         # Signature: async (fits_path: str) -> tuple[float, int]  (fwhm, star_count)
         self._star_analyzer_fn: Callable[[str], Awaitable[tuple[float, int]]] | None = None
 
+    def set_dither_hook(self, fn: Callable[[DitherConfig], Awaitable[None]] | None) -> None:
+        """Set (or clear) the function looping exposures call to dither — set by the
+        active guider (see astrolol.core.guiding.register_guider)."""
+        self._dither_fn = fn
+
     def set_context(self, profile: "Profile | None") -> None:
         """Called when a profile is activated or cleared."""
         self._active_profile = profile

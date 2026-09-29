@@ -1,4 +1,4 @@
-"""Guiding health tracking and the client's settle-waiting guide()."""
+"""PHD2 client: guiding health wiring, settle-waiting guide(), the Guider adapter."""
 
 from __future__ import annotations
 
@@ -10,77 +10,10 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
 from astrolol.core.events import EventBus
+from astrolol.core.guiding import Guider, GuiderNotConnected, SettleFailed, SettleParams
 from plugins.phd2.api import router
 from plugins.phd2.client import Phd2Client
-from plugins.phd2.health import GuidingHealthTracker
-
-
-class Clock:
-    def __init__(self) -> None:
-        self.t = 1000.0
-
-    def __call__(self) -> float:
-        return self.t
-
-
-def test_starts_unguided() -> None:
-    clock = Clock()
-    h = GuidingHealthTracker(clock)
-    clock.t += 30
-    health = h.health()
-    assert not health.guiding
-    assert health.unguided_for_s == 30
-    assert health.reason == "not_guiding"
-
-
-def test_short_loss_mid_window() -> None:
-    clock = Clock()
-    h = GuidingHealthTracker(clock)
-    h.on_step(0.0, 0.0)  # guiding from t=1000
-    clock.t += 1
-    start = h.mark()  # t=1001
-    for _ in range(5):
-        clock.t += 2
-        h.on_step(0.3, -0.4)
-    h.on_lost("star_lost")  # t=1011
-    h.on_lost("star_lost")  # repeated StarLost events: same gap
-    clock.t += 10
-    h.on_step(0.3, 0.4)  # recovered at t=1021
-    clock.t += 5
-    stats = h.stats(start)
-    assert stats.duration_s == 25
-    assert stats.unguided_s == 10
-    assert stats.losses == 1
-    assert stats.steps == 6
-    assert stats.rms_ra == pytest.approx(0.3)
-    assert stats.rms_total == pytest.approx(0.5)
-    health = h.health()
-    assert health.guiding and health.guiding_for_s == 5
-
-
-def test_window_clips_gaps() -> None:
-    clock = Clock()
-    h = GuidingHealthTracker(clock)
-    h.on_step(0.0, 0.0)
-    clock.t += 10
-    h.on_lost("stopped")  # 1010 → still open
-    clock.t += 100  # now 1110
-    stats = h.stats(1050.0)
-    assert stats.unguided_s == 60
-    assert stats.losses == 0  # the loss started before the window
-    assert h.stats(1000.0).losses == 1
-
-
-def test_never_guided_window_is_fully_unguided() -> None:
-    clock = Clock()
-    h = GuidingHealthTracker(clock)
-    start = h.mark()
-    clock.t += 42
-    stats = h.stats(start)
-    assert stats.unguided_s == 42
-    assert stats.losses == 0  # it never was guiding: nothing was lost
-    assert stats.rms_total is None
-
+from plugins.phd2.guider import Phd2Guider
 
 # ── Client wiring ─────────────────────────────────────────────────────────────
 
@@ -167,3 +100,35 @@ def test_health_route() -> None:
     body = TestClient(app).get("/plugins/phd2/health?window_s=30").json()
     assert body["health"]["guiding"] is False
     assert body["window"]["losses"] == 0
+
+
+# ── Guider adapter ────────────────────────────────────────────────────────────
+
+
+async def test_adapter_implements_the_protocol_and_maps_errors() -> None:
+    c, calls = await _settling_client("timed out")
+    g = Phd2Guider(c)
+    assert isinstance(g, Guider)
+    with pytest.raises(SettleFailed):
+        await g.guide(SettleParams(), wait_settle=True)
+    c._connected = False
+    with pytest.raises(GuiderNotConnected):
+        await g.dither(3.0, False, SettleParams())
+    await g.stop()  # not connected: no-op
+    assert g.status().connected is False and g.status().active is False
+
+
+async def test_adapter_status_and_generic_events() -> None:
+    c = _client()
+    q = c._event_bus.subscribe()
+    g = Phd2Guider(c)
+    c._state = "Guiding"
+    await c._handle_event({"Event": "GuideStep", "RADistanceRaw": 0.1, "DECDistanceRaw": 0.1})
+    st = g.status()
+    assert st.guiding and st.active and st.pixel_scale == 2.0
+    await c._handle_event({"Event": "StarLost"})
+    types = []
+    while not q.empty():
+        types.append(q.get_nowait())
+    changes = [e for e in types if getattr(e, "type", "") == "guiding.state_changed"]
+    assert [(e.guiding, e.reason) for e in changes] == [(True, None), (False, "star_lost")]

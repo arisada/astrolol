@@ -15,6 +15,7 @@ from typing import Any, Protocol, cast
 import structlog
 
 from astrolol.core.events.models import BaseEvent
+from astrolol.core.guiding import Guider, GuiderNotConnected, SettleParams
 from astrolol.core.sequencer.events import (
     SequencerStepFailed,
     SequencerStepFinished,
@@ -298,46 +299,49 @@ class Steps:
 
     # ── Guiding ────────────────────────────────────────────────────────────
 
-    def _phd2(self) -> Any:
-        return self._state("phd2_client")
+    def _guider(self) -> Guider | None:
+        guider: Guider | None = self._state("guider")
+        return guider
+
+    def _settle(self) -> SettleParams:
+        cfg = self._host.settings
+        return SettleParams(
+            pixels=cfg.guide_settle_pixels,
+            time=cfg.guide_settle_time_s,
+            timeout=cfg.guide_settle_timeout_s,
+        )
 
     async def stop_guiding(self, task_id: str | None) -> None:
-        phd2 = self._phd2()
-        if phd2 is None:
+        guider = self._guider()
+        if guider is None:
             return
-        status = phd2.get_status()
-        if not status.connected or status.state in ("Stopped", "Disconnected"):
+        status = guider.status()
+        if not status.connected or not status.active:
             return
         t0 = await self._started(task_id, "stop_guiding", None, "Stopping guiding")
         try:
-            await phd2.stop_capture()
+            await guider.stop()
         except Exception as exc:
             await self.failed_continue(task_id, "stop_guiding", str(exc))
             return
         await self._finished(task_id, "stop_guiding", t0)
 
     async def start_guiding(self, task_id: str) -> None:
-        phd2 = self._phd2()
-        if phd2 is None:
-            await self.skipped(task_id, "start_guiding", "PHD2 plugin not enabled")
+        guider = self._guider()
+        if guider is None:
+            await self.skipped(
+                task_id, "start_guiding", "no guider enabled (PHD2 or guide simulator)"
+            )
             return
-        if not phd2.get_status().connected:
-            raise StepError("start_guiding", "PHD2 is not connected", stall_kind=None)
-        cfg = self._host.settings
+        if not guider.status().connected:
+            raise StepError("start_guiding", f"The guider ({guider.name}) is not connected")
         t0 = await self._started(
             task_id, "start_guiding", Activity.STARTING_GUIDING, "Starting guiding"
         )
         try:
-            await phd2.guide(
-                settle_pixels=cfg.guide_settle_pixels,
-                settle_time=cfg.guide_settle_time_s,
-                settle_timeout=cfg.guide_settle_timeout_s,
-                wait_settle=True,
-            )
-        except TimeoutError:
-            raise StepError(
-                "start_guiding", "Guiding did not settle in time", StallKind.GUIDING
-            ) from None
+            await guider.guide(self._settle(), wait_settle=True)
+        except GuiderNotConnected as exc:
+            raise StepError("start_guiding", f"The guider is not connected: {exc}") from exc
         except Exception as exc:
             raise StepError(
                 "start_guiding", f"Guiding did not start or settle: {exc}", StallKind.GUIDING
@@ -345,19 +349,17 @@ class Steps:
         await self._finished(task_id, "start_guiding", t0)
 
     def guiding_mark(self) -> float | None:
-        """Start of a guiding-statistics window (None without a guider that supports it)."""
-        phd2 = self._phd2()
-        if phd2 is None or not hasattr(phd2, "mark"):
-            return None
-        return float(phd2.mark())
+        """Start of a guiding-statistics window (None without a guider)."""
+        guider = self._guider()
+        return None if guider is None else guider.mark()
 
     def guiding_stats(self, mark: float | None) -> dict[str, Any]:
         """Guiding RMS / unguided time / losses since *mark*, as SequencerFrameSaved fields."""
-        phd2 = self._phd2()
-        if mark is None or phd2 is None:
+        guider = self._guider()
+        if mark is None or guider is None:
             return {}
         try:
-            stats = phd2.guiding_stats(mark)
+            stats = guider.stats(mark)
         except Exception as exc:
             logger.warning("sequencer.guiding_stats_failed", error=str(exc))
             return {}
@@ -368,23 +370,19 @@ class Steps:
         }
 
     async def dither(self, task_id: str) -> None:
-        phd2 = self._phd2()
-        if phd2 is None:
-            await self.skipped(task_id, "dither", "PHD2 plugin not enabled")
+        guider = self._guider()
+        if guider is None:
+            await self.skipped(task_id, "dither", "no guider enabled (PHD2 or guide simulator)")
             return
-        if not phd2.get_status().connected:
-            await self.failed_continue(task_id, "dither", "PHD2 is not connected")
+        if not guider.status().connected:
+            await self.failed_continue(
+                task_id, "dither", f"The guider ({guider.name}) is not connected"
+            )
             return
         cfg = self._host.settings
         t0 = await self._started(task_id, "dither", Activity.DITHERING, "Dithering")
         try:
-            await phd2.dither(
-                pixels=cfg.dither_pixels,
-                ra_only=cfg.dither_ra_only,
-                settle_pixels=cfg.guide_settle_pixels,
-                settle_time=cfg.guide_settle_time_s,
-                settle_timeout=cfg.guide_settle_timeout_s,
-            )
+            await guider.dither(cfg.dither_pixels, cfg.dither_ra_only, self._settle())
         except Exception as exc:
             await self.failed_continue(task_id, "dither", str(exc))
             return

@@ -16,6 +16,13 @@ from astrolol.core.events import (
     MountParked,
     MountSlewCompleted,
 )
+from astrolol.core.guiding import (
+    GuiderStatus,
+    GuidingHealth,
+    GuidingStats,
+    SettleFailed,
+    SettleParams,
+)
 from astrolol.core.sequencer.models import ExposureGroup, ImagingTask, Lane, TargetRef
 from plugins.sequencer.service import SequencerServiceImpl
 from plugins.sequencer.settings import SequencerSettings
@@ -129,11 +136,15 @@ class FakeMountManager:
             self.suspended -= 1
 
 
-class FakePhd2:
+class FakeGuider:
+    """Implements the core Guider protocol."""
+
+    name = "fake"
+
     def __init__(self, bus: EventBus) -> None:
         self._bus = bus
         self.connected = True
-        self.state = "Stopped"
+        self.guiding = False
         self.guides = 0
         self.dithers = 0
         self.stops = 0
@@ -141,28 +152,47 @@ class FakePhd2:
         self.unguided_s = 0.0
         self.losses = 0
 
-    def get_status(self) -> Any:
-        return SimpleNamespace(connected=self.connected, state=self.state)
+    def status(self) -> GuiderStatus:
+        return GuiderStatus(
+            guider=self.name,
+            connected=self.connected,
+            state="Guiding" if self.guiding else "Stopped",
+            guiding=self.guiding,
+            active=self.guiding,
+        )
 
-    async def guide(self, **kwargs: Any) -> None:
-        assert kwargs.get("wait_settle") is True
-        self.guides += 1
-        self.state = "Guiding"
-        if self.settle_error:
-            raise RuntimeError(f"PHD2 settle failed: {self.settle_error}")
+    def health(self) -> GuidingHealth:
+        return GuidingHealth(guiding=self.guiding)
 
     def mark(self) -> float:
         return time.monotonic()
 
-    def guiding_stats(self, since: float, until: float | None = None) -> Any:
-        return SimpleNamespace(rms_total=0.8, unguided_s=self.unguided_s, losses=self.losses)
+    def stats(self, since: float, until: float | None = None) -> GuidingStats:
+        return GuidingStats(
+            duration_s=1.0, steps=1, rms_total=0.8, unguided_s=self.unguided_s, losses=self.losses
+        )
 
-    async def stop_capture(self) -> None:
+    async def guide(
+        self, settle: SettleParams, *, recalibrate: bool = False, wait_settle: bool = True
+    ) -> None:
+        assert wait_settle is True
+        self.guides += 1
+        self.guiding = True
+        if self.settle_error:
+            raise SettleFailed(f"settle failed: {self.settle_error}")
+
+    async def stop(self) -> None:
         self.stops += 1
-        self.state = "Stopped"
+        self.guiding = False
 
-    async def dither(self, **kwargs: Any) -> None:
+    async def dither(self, pixels: float, ra_only: bool, settle: SettleParams) -> None:
         self.dithers += 1
+
+    async def pause(self) -> None:
+        pass
+
+    async def resume(self) -> None:
+        pass
 
 
 class FakeSolveManager:
@@ -208,7 +238,7 @@ class Rig:
         self.bus = EventBus()
         self.imager = FakeImager()
         self.mount = FakeMountManager(self.bus)
-        self.phd2 = FakePhd2(self.bus)
+        self.guider = FakeGuider(self.bus)
         self.solver = FakeSolveManager()
         self.fwm = FakeFilterWheelManager(["L", "R", "G", "B", "Ha"])
         self.dm = FakeDeviceManager(
@@ -220,7 +250,7 @@ class Rig:
                 imager_manager=self.imager,
                 mount_manager=self.mount,
                 filter_wheel_manager=self.fwm,
-                phd2_client=self.phd2,
+                guider=self.guider,
                 solve_manager=self.solver,
                 active_profile=None,
                 equipment_store=None,

@@ -1,8 +1,9 @@
 """Guiding health: is guiding healthy right now, and how good was it over a time window.
 
-Fed by the PHD2 client's event handler; kept separate (with an injectable clock) so it can
-be tested without PHD2. A consumer takes ``mark()`` before an exposure and asks
-``stats(mark)`` after it to learn the guiding RMS and how long the frame was unguided.
+A helper shared by guider implementations: they feed it guide steps and losses. The clock
+is injectable so it can be tested without a guider. A consumer takes ``mark()`` before an
+exposure and asks ``stats(mark)`` after it to learn the guiding RMS and how long the frame
+was unguided.
 """
 
 from __future__ import annotations
@@ -13,7 +14,7 @@ from collections import deque
 from collections.abc import Callable
 from dataclasses import dataclass
 
-from plugins.phd2.models import GuidingHealth, GuidingStats
+from astrolol.core.guiding.models import GuidingHealth, GuidingStats
 
 _MAX_STEPS = 20_000  # ~11 h at one step every 2 s
 _MAX_GAPS = 2_000
@@ -40,23 +41,36 @@ class GuidingHealthTracker:
 
     # ── Inputs ───────────────────────────────────────────────────────────
 
-    def on_step(self, ra_arcsec: float, dec_arcsec: float) -> None:
-        """A guide step was received: the star is being tracked."""
+    def on_step(self, ra_arcsec: float, dec_arcsec: float) -> bool:
+        """A guide step was received: the star is being tracked.
+
+        Returns True when this step starts (or restarts) active guiding.
+        """
         now = self._clock()
         self._steps.append((now, ra_arcsec, dec_arcsec))
-        if self._open is not None:
-            self._open.end = now
-            self._open = None
-            self._guiding_since = now
+        if self._open is None:
+            return False
+        self._open.end = now
+        self._open = None
+        self._guiding_since = now
+        return True
 
-    def on_lost(self, reason: str) -> None:
-        """Guiding stopped or the star was lost. Idempotent while already unguided."""
+    def on_lost(self, reason: str) -> bool:
+        """Guiding stopped or the star was lost. Idempotent while already unguided.
+
+        Returns True when this interrupts active guiding.
+        """
         if self._open is not None:
-            return
+            return False
         gap = _Gap(start=self._clock(), end=None, reason=reason, was_guiding=True)
         self._gaps.append(gap)
         self._open = gap
         self._guiding_since = None
+        return True
+
+    @property
+    def guiding(self) -> bool:
+        return self._open is None
 
     # ── Queries ──────────────────────────────────────────────────────────
 
