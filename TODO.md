@@ -111,7 +111,13 @@ multi-camera lanes (primary-driven fit rule, per-lane autofocus, estimates, mult
 - **Lanes — later** — a secondary-lane error currently stops every lane (in-flight frames
   discarded); a per-lane error policy could let the other cameras carry on. The efficiency
   estimate ignores download time (real runs usually do a little better than shown).
-- **Phase 5** — named sequences, one runner per mount, MCP tool surface.
+- **Named sequences** — save the queue's task definitions under a name and load them back
+  later as fresh tasks (new ids, no progress): reusable plans across nights. Spec'd in
+  `SEQUENCER_SPEC.md` (`/sequences` routes), not built.
+- **One runner per mount** — rigs with several mounts: one independent queue/runner per
+  mount (models and routes are keyed so `runner_id = mount_id` can be added later).
+- **MCP tool surface** — expose the `Sequencer` protocol methods as MCP tools
+  (`sequencer_add_task`, `sequencer_start`, `sequencer_status`, …).
 - **Decided** — a disconnected guider doesn't block the start (pre-flight warns); the run
   waits for guiding like any outage. The flip hour angle stays a sequencer setting.
 - **Test isolation** — integration tests build real apps on the default data dir: they log
