@@ -7,27 +7,45 @@ Source: https://github.com/arisada/astrolol
 
 ## What works today
 
-- **Device management** — connect cameras, mounts, and focusers via INDI. Standard adapters
-  are bundled; third-party adapters install as packages via the pluggy entry-point system.
-- **Equipment profiles** — named device configurations persisted to JSON. Activate a profile
-  to reconnect all devices automatically at startup.
+- **Device management** — connect cameras, mounts, focusers, and filter wheels via INDI.
+  Standard adapters are bundled; third-party adapters install as packages via the pluggy
+  entry-point system. `plugins/eqmod/` adds a native (non-INDI) serial driver for Sky-Watcher
+  motor controllers, with an INDI proxy so INDI-only clients can still guide through it.
+- **Equipment profiles** — named device configurations persisted to JSON, plus a separate
+  equipment tree (site/mount/OTA/camera/filter wheel/focuser/rotator/GPS) for describing your
+  physical setup. Activate a profile to reconnect all devices automatically at startup.
 - **Imager** — single exposures and continuous loops per camera. FITS files stored server-side,
   auto-stretched JPEG preview streamed to clients.
 - **Mount control** — slew, stop, park/unpark, sync, tracking on/off (sidereal/lunar/solar).
   Pier side, hour angle, meridian-flip, directional nudge. Coordinates displayed in ICRS (J2000)
-  or JNow. Target concept: set a target independently of slewing, used by plate-solve sync and
-  future sequencer.
-- **Focuser control** — absolute and relative moves, halt.
+  or JNow.
+- **Focuser control** — absolute and relative moves, halt. Autofocus plugin with parabola/
+  hyperbola curve fitting (field accuracy not yet verified — see `TODO.md`).
+- **Target search** — resolve object names (NGC/IC/Messier/Sharpless/Hipparcos catalogs, common
+  names, planets) to J2000 coordinates offline, with SIMBAD fallback; rise/set/transit and an
+  altitude graph; favourites; sets the mount's target.
 - **Plate solving** — ASTAP integration (async, cancellable). Sync-and-re-slew workflow:
   solve, sync mount, set target, slew.
-- **PHD2 guiding** — connect to a running PHD2 instance, start/stop guiding, dithering,
-  live RMS display.
+- **Guiding** — a guider-agnostic core contract (`astrolol/core/guiding/`) implemented by a
+  PHD2 client (connect to a running instance, start/stop guiding, dithering, live RMS display)
+  and a guide simulator for testing without hardware.
+- **Sequencer** — task-queue imaging automation: ordered exposure plans with slew/center/guide/
+  dither/meridian-flip steps, resumable runs, multi-camera lanes, a session journal, and
+  named/saved sequences with task-file import/export.
+- **Telescope-protocol servers** — LX200 and Stellarium "remote telescope" TCP servers so
+  planetarium apps (SkySafari, Cartes du Ciel, Stellarium, TheSkyX, Voyager, …) can track the
+  mount astrolol controls.
+- **System management** — WiFi connect/AP-mode switching, system info, and thermal/power
+  throttle monitoring for the host machine (e.g. a Raspberry Pi).
 - **Live event stream** — all state changes broadcast to connected clients over WebSocket,
   with a ring-buffer replay for late-joining clients.
 - **Plugin system** — self-contained feature plugins in `plugins/`. Each plugin registers its
   own API routes, UI page, and sidebar entry. Enable/disable from Options with a live restart.
 - **Web UI** — dark-theme React app: Equipment, Profiles, Imaging, Mount, Focuser, Logs,
   Options pages, plus one page per enabled plugin.
+
+Pre-1.0: functional core with a wide plugin surface, but persistence beyond JSON files, a
+red-mode/mobile UI, and packaging (systemd/reverse-proxy) are not built yet — see `TODO.md`.
 
 ## Requirements
 

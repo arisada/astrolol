@@ -10,14 +10,18 @@ connect via REST and WebSocket. The backend owns all state — clients are obser
 
 ## Architecture in one paragraph
 
-FastAPI serves the REST and WebSocket API. Devices (camera, mount, focuser) are abstracted
-behind `Protocol` interfaces in `astrolol/devices/base/`. Concrete adapters register themselves
-via the pluggy plugin system at startup. Standard adapters (INDI) are **bundled inside astrolol**
-in `astrolol/devices/indi/` — the pluggy interface exists for extensibility (ASCOM, direct
-serial, etc.), not to force a separate install for the common case. An internal `EventBus`
-(asyncio queues) lets any component publish typed events; connected WebSocket clients subscribe
-and receive a live JSON stream. A React + TypeScript web UI is served as static files from
-`ui/dist/` and proxied through Vite in development.
+FastAPI serves the REST and WebSocket API. Devices (camera, mount, focuser, filter wheel) are
+abstracted behind `Protocol` interfaces in `astrolol/devices/base/`. Concrete adapters register
+themselves via the pluggy plugin system at startup. Standard adapters (INDI) are **bundled
+inside astrolol** in `astrolol/devices/indi/` — the pluggy interface exists for extensibility,
+not to force a separate install for the common case; `plugins/eqmod/` is a real example of a
+non-INDI adapter (a native serial driver for Sky-Watcher motor controllers) that also exposes
+an INDI proxy so INDI-only clients (e.g. PHD2) can still guide through it. Similarly,
+`astrolol/core/guiding/` and `astrolol/core/sequencer/` define guider- and sequencer-agnostic
+`Protocol` contracts that `plugins/phd2/` / `plugins/guide_simulator/` and `plugins/sequencer/`
+implement. An internal `EventBus` (asyncio queues) lets any component publish typed events;
+connected WebSocket clients subscribe and receive a live JSON stream. A React + TypeScript web
+UI is served as static files from `ui/dist/` and proxied through Vite in development.
 
 ## Plugin architecture
 
@@ -268,7 +272,7 @@ Plugin scopes are collected at startup and exposed via `GET /admin/log_scopes`;
 - Structlog output is captured by pytest's log system, not `capsys`. Use
   `caplog.at_level(logging.WARNING, logger="<module>")` to assert on log output.
 
-Current count: **277 unit tests**, **37 integration tests**, **172 plugin tests** (all passing).
+Current count: **408 unit tests**, **37 integration tests**, **682 plugin tests** (all passing).
 
 ### TypeScript type checking
 
@@ -345,8 +349,10 @@ docker-compose run --rm backend python3 -m pytest tests/ plugins/ -v
 ```
 
 Backend API at `http://localhost:8000`, UI dev server at `http://localhost:80`.
-Vite proxies `/devices`, `/imager`, `/mount`, `/focuser`, `/ws`, `/plugins`, `/hello`,
-`/admin` to the backend container.
+Vite proxies `/api`, `/devices`, `/profiles`, `/imager`, `/mount`, `/focuser`, `/filter_wheel`,
+`/indi`, `/inventory`, `/settings`, `/events`, `/health`, `/plugins`, `/admin`, and `/ws` to the
+backend container. All plugin routes are mounted under `/plugins/<id>/...`, so no per-plugin
+proxy entries are needed.
 
 ## Project structure
 
@@ -362,13 +368,21 @@ astrolol/
 ├── core/
 │   ├── errors.py       # domain exception hierarchy
 │   ├── plugin_api.py   # Plugin protocol, PluginManifest, PluginContext
-│   └── events/         # EventBus (asyncio pub/sub, ring buffer) + typed event models
+│   ├── events/         # EventBus (asyncio pub/sub, ring buffer) + typed event models
+│   ├── guiding/         # Guider Protocol + GuiderStatus/GuidingHealth/SettleParams models,
+│   │                   # GuidingHealthTracker — shared contract for phd2 + guide_simulator
+│   └── sequencer/       # Sequencer Protocol + task/session/lane event & model set —
+│                        # the plugin-agnostic contract the sequencer plugin implements
 ├── devices/
 │   ├── base/           # ICamera, IMount, IFocuser Protocols + Pydantic models
 │   ├── config.py       # DeviceConfig — friendly ID generation + validation
 │   ├── manager.py      # DeviceManager — connect/disconnect lifecycle + events
 │   ├── registry.py     # DeviceRegistry — adapter_key → class mapping
 │   └── indi/           # INDI adapters (camera, mount, focuser + IndiClient)
+├── equipment/          # EquipmentStore — physical equipment tree (site/mount/OTA/camera/
+│                       # filter wheel/focuser/rotator/GPS) as profile-node graph, OpticalPath
+├── filter_wheel/
+│   └── manager.py      # FilterWheelManager — move/status lifecycle
 ├── focuser/
 │   └── manager.py      # FocuserManager — move tasks, halt, events
 ├── imaging/
@@ -377,6 +391,7 @@ astrolol/
 │   └── preview.py      # FITS → JPEG (percentile auto-stretch, astropy + Pillow)
 ├── mount/
 │   └── manager.py      # MountManager — slew/park/flip tasks, sync, tracking, events
+├── persistence/        # empty stub — planned SQLAlchemy/aiosqlite/Alembic layer, not started
 ├── config/
 │   ├── logging_setup.py  # structlog config + EventBusForwarder (log → EventBus bridge)
 │   ├── settings.py       # pydantic-settings (images_dir, jpeg_quality, ASTROLOL_ prefix)
@@ -390,26 +405,32 @@ astrolol/
 
 plugins/
 ├── hello/              # Minimal full-stack plugin (PoC / reference implementation)
-│   ├── plugin.py       # HelloPlugin — setup() registers router, initialises app.state
-│   ├── api.py          # GET/POST /hello/property, structlog instrumented
-│   ├── ui/
-│   │   └── HelloPage.tsx
-│   └── tests/
-│       └── test_hello_api.py   # 8 tests
-└── autofocus/          # Full-stack plugin — canonical example for complex plugins
-    ├── plugin.py
-    ├── api.py          # /start /abort /run /run/preview/{step} /settings
-    ├── engine.py       # async autofocus run orchestration
-    ├── star_detector.py
-    ├── algorithms.py   # parabola + hyperbola curve fitting
-    ├── models.py       # AutofocusRun, FocusDataPoint, CurveFit, events
-    ├── ui/
-    │   ├── index.ts        # registers event handlers + exports StatusChip
-    │   ├── AutofocusPage.tsx
-    │   ├── AutofocusChip.tsx  # status-bar chip, reads pluginStates['autofocus']
-    │   └── api.ts          # plugin-local fetch helpers
-    └── tests/
-        └── test_autofocus_api.py
+├── autofocus/          # Full-stack plugin — canonical example for complex plugins
+├── eqmod/              # Native (non-INDI) Sky-Watcher motor-controller driver: GoTo/sync/
+│                       # tracking/park over EQMOD cable or USB; ships an INDI mount-proxy so
+│                       # PHD2/other INDI clients can guide through it
+├── guide_simulator/    # Simulated guider (registers against core/guiding) for testing
+│                       # without PHD2/hardware — noisy steps, settling, injectable faults
+├── lx200/              # Virtual LX200 telescope TCP server (SkySafari, Cartes du Ciel, etc.)
+├── object_resolver/    # Offline-first name → J2000 coords resolver (NGC/IC/Messier/
+│                       # Sharpless/Hipparcos + common names), SIMBAD fallback, solar system
+├── phd2/               # PHD2 autoguider client — implements core.guiding.Guider, guide
+│                       # graph, auto-dither, health check
+├── platesolve/         # ASTAP-backed astrometric solving + solve-sync-reslew loop
+├── sequencer/          # Task-queue imaging sequencer — ordered exposure plans with slew/
+│                       # center/guide/dither/meridian-flip, resumable, multi-camera lanes,
+│                       # session journal, named/saved sequences. Largest plugin.
+├── stellarium/         # Stellarium "remote telescope" TCP protocol server (same pattern
+│                       # as lx200)
+├── system/             # Host-machine management — WiFi/AP mode, system info, thermal/
+│                       # power throttle monitoring
+└── target/             # Object search UI (uses object_resolver), rise/set/transit +
+                         # altitude graph, sets mount target, favourites
+
+# Each plugin follows the same layout: plugin.py, api.py, optional engine/protocol modules,
+# ui/ (index.ts + page + optional chip + api.ts), tests/. See plugins/hello/ for the minimal
+# shape and plugins/sequencer/ for the largest (runner.py, lanes.py, journal.py, sequences.py,
+# stalls.py, targets.py, focusing.py, guiding.py, devices.py; 8 test files, 12 UI files).
 
 ui/
 ├── src/
@@ -426,8 +447,8 @@ ui/
 
 tests/
 ├── conftest.py         # FakeCamera (real FITS), FakeMount, FakeFocuser + fixtures
-├── unit/               # 191 tests — no hardware required
-└── integration/        # 34 tests — require indiserver (skipped if not installed)
+├── unit/               # 408 tests — no hardware required
+└── integration/        # 37 tests — require indiserver (skipped if not installed)
 ```
 
 ## Deferred work
