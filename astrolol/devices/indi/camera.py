@@ -275,11 +275,12 @@ class IndiCamera:
             )
 
     async def push_telescope_coord(self, ra_jnow: float, dec_jnow: float) -> None:
-        """Push current mount pointing to the camera's TELESCOPE_EOD_COORD property.
-
-        Called before each exposure so the camera's internal FITS writer records the
-        correct pointing coordinates.  Best-effort: silently skipped if the driver
-        does not expose this property.
+        """Push current mount pointing to the camera's TELESCOPE_EOD_COORD property,
+        for drivers that expose a directly-writable coordinate property instead of (or
+        in addition to) ACTIVE_DEVICES snooping. Best-effort: silently skipped if the
+        driver does not expose this property -- confirmed a no-op on indi_simulator_ccd,
+        which relies on set_active_telescope's snoop mechanism instead, but some real
+        camera drivers may implement this property, so both are pushed.
         """
         try:
             await self._client.set_number(
@@ -296,6 +297,30 @@ class IndiCamera:
         except Exception as exc:
             logger.debug(
                 "indi.camera_telescope_coord_skipped",
+                device=self._device_name,
+                error=str(exc),
+            )
+
+    async def set_active_telescope(self, telescope_device_name: str) -> None:
+        """Point the camera driver's own ACTIVE_DEVICES.ACTIVE_TELESCOPE snoop at the
+        given INDI device name, so the driver's native snoop mechanism picks up live
+        mount coordinates for FITS header pointing and (for simulators) star-field
+        rendering. Best-effort: silently skipped if the driver has no such property.
+        """
+        try:
+            await self._client.set_text(
+                self._device_name,
+                "ACTIVE_DEVICES",
+                {"ACTIVE_TELESCOPE": telescope_device_name},
+            )
+            logger.debug(
+                "indi.camera_active_telescope_set",
+                device=self._device_name,
+                telescope_device_name=telescope_device_name,
+            )
+        except Exception as exc:
+            logger.debug(
+                "indi.camera_active_telescope_skipped",
                 device=self._device_name,
                 error=str(exc),
             )

@@ -49,6 +49,9 @@ class EqmodPlugin:
             Path(getattr(ctx.device_registry, "indi_run_dir", "/tmp/astrolol")),
         )
         app.state.eqmod_indi_proxy = self._proxy
+        imager_manager = getattr(app.state, "imager_manager", None)
+        if imager_manager is not None:
+            imager_manager.set_eqmod_proxy_status_fn(self._proxy.status)
         app.include_router(router)
         logger.info("eqmod.plugin_setup")
 

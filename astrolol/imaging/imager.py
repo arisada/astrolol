@@ -194,11 +194,19 @@ class ImagerManager:
         # Optional star-analysis hook set by the autofocus plugin on startup.
         # Signature: async (fits_path: str) -> tuple[float, int]  (fwhm, star_count)
         self._star_analyzer_fn: Callable[[str], Awaitable[tuple[float, int]]] | None = None
+        # Signature: () -> dict | None  (plugins/eqmod's IndiProxyRegistration.status())
+        self._eqmod_proxy_status_fn: Callable[[], dict | None] | None = None
 
     def set_dither_hook(self, fn: Callable[[DitherConfig], Awaitable[None]] | None) -> None:
         """Set (or clear) the function looping exposures call to dither — set by the
         active guider (see astrolol.core.guiding.register_guider)."""
         self._dither_fn = fn
+
+    def set_eqmod_proxy_status_fn(self, fn: Callable[[], dict | None] | None) -> None:
+        """Set (or clear) the function that reports the eqmod INDI mount proxy's live
+        status — set by plugins/eqmod on setup, since core code can't import it.
+        Used to resolve ACTIVE_TELESCOPE for cameras behind a native eqmod mount."""
+        self._eqmod_proxy_status_fn = fn
 
     def set_context(self, profile: "Profile | None") -> None:
         """Called when a profile is activated or cleared."""
@@ -362,8 +370,8 @@ class ImagerManager:
             try:
                 paths = resolve_optical_paths(profile, self._equipment_store, self._device_manager)
                 my_path = find_optical_path_for_camera_device(paths, device_id)
-            except Exception:
-                pass
+            except Exception as exc:
+                log.warning("imager.optical_path_resolve_failed", error=str(exc), exc_info=True)
 
         # Snapshot mount pointing before the shutter opens (best represents pointing)
         coord = None
@@ -372,19 +380,23 @@ class ImagerManager:
                 mount = self._device_manager.get_mount(my_path.mount_device_id)
                 status = await mount.get_status()
                 coord = status.skycoord
-            except Exception:
-                pass  # mount not connected or query failed — skip RA/DEC
+            except Exception as exc:
+                log.warning("imager.mount_coord_snapshot_failed", error=str(exc), exc_info=True)
 
-        # Push live mount coordinates to the camera's TELESCOPE_EOD_COORD property
-        # so the camera's internal FITS writer records correct pointing.
+        # Push live mount coordinates to each camera: a direct property write for
+        # drivers that support it, plus pointing ACTIVE_DEVICES.ACTIVE_TELESCOPE at the
+        # mount's INDI device for drivers (including the simulator) that only pick up
+        # pointing via their own native snoop.
         if profile is not None and profile.roots and self._equipment_store is not None:
             try:
                 from astrolol.api.profiles import _push_live_context
+                eqmod_proxy_status = self._eqmod_proxy_status_fn() if self._eqmod_proxy_status_fn else None
                 await _push_live_context(
-                    profile.roots, self._equipment_store, self._device_manager
+                    profile.roots, self._equipment_store, self._device_manager,
+                    eqmod_proxy_status=eqmod_proxy_status,
                 )
-            except Exception:
-                pass  # best-effort — never block an exposure
+            except Exception as exc:
+                log.warning("imager.push_live_context_failed", error=str(exc), exc_info=True)
 
         # Snapshot metadata for filename tokens and FITS OBJECT header.
         object_name = request.object_name or ""

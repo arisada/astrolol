@@ -256,22 +256,51 @@ async def _apply_tree_context(
                     )
 
 
+def _resolve_active_telescope_name(
+    mount_entry, device_manager, eqmod_proxy_status: dict | None,
+) -> str | None:
+    """The INDI device name a camera should snoop for this resolved mount, or None if
+    no INDI device currently carries this mount's live coordinates.
+
+    A real INDI mount is used directly. The native (non-INDI) eqmod adapters only have
+    live coordinates reachable over INDI via plugins/eqmod's mount proxy -- and only
+    when that proxy is actually running *and* currently relaying this exact mount (the
+    proxy always relays whichever connected mount device it finds first, so a proxy
+    that's merely enabled doesn't guarantee it's relaying *this* one).
+    """
+    if mount_entry is None:
+        return None
+    adapter_key = mount_entry.config.adapter_key
+    if adapter_key == "indi_mount":
+        return mount_entry.config.params.get("device_name")
+    if adapter_key in ("eqmod_sim", "eqmod"):
+        if not eqmod_proxy_status or not eqmod_proxy_status.get("enabled") or not eqmod_proxy_status.get("loaded"):
+            return None
+        connected_mounts = [d for d in device_manager.list_connected() if d["kind"] == "mount" and d["state"] == "connected"]
+        if connected_mounts and connected_mounts[0]["device_id"] == mount_entry.config.device_id:
+            return eqmod_proxy_status.get("device_name")
+    return None
+
+
 async def _push_live_context(
     nodes: list[ProfileNode],
     equipment_store: EquipmentStore,
     device_manager,
     *,
     mount_adapter=None,
+    mount_indi_name: str | None = None,
+    eqmod_proxy_status: dict | None = None,
 ) -> None:
-    """Walk the equipment tree and push live mount coordinates to cameras.
+    """Walk the equipment tree and push each camera's mount pointing two ways: a direct
+    TELESCOPE_EOD_COORD write (for drivers that expose it) and pointing the driver's own
+    ACTIVE_DEVICES.ACTIVE_TELESCOPE at the mount's INDI device (for drivers, including
+    the simulator, that only pick up pointing via their native snoop).
 
-    Called before each exposure so the camera's TELESCOPE_EOD_COORD INDI
-    property matches the mount's actual pointing when the shutter opens.
-    Also returns the first mount adapter found (for the caller to use as
-    a coord snapshot for FITS header patching).
+    Called before each exposure so the camera reflects the mount's actual pointing when
+    the shutter opens.
 
-    Propagates downward: a mount node sets the current mount adapter in
-    context; any camera in its subtree receives the coordinate push.
+    Propagates downward: a mount node sets the current mount adapter/INDI name in
+    context; any camera in its subtree gets both pushed to it.
     """
     for node in nodes:
         try:
@@ -279,34 +308,50 @@ async def _push_live_context(
         except KeyError:
             await _push_live_context(
                 node.children, equipment_store, device_manager,
-                mount_adapter=mount_adapter,
+                mount_adapter=mount_adapter, mount_indi_name=mount_indi_name,
+                eqmod_proxy_status=eqmod_proxy_status,
             )
             continue
 
         current_mount = mount_adapter
+        current_mount_indi_name = mount_indi_name
 
         if item.type == "mount":
-            adapter = _find_device_for_item(device_manager, "mount", item)
-            if adapter is not None:
-                current_mount = adapter
+            entry = _find_entry_for_item(device_manager, "mount", item)
+            if entry is not None:
+                current_mount = entry.instance
+                current_mount_indi_name = _resolve_active_telescope_name(
+                    entry, device_manager, eqmod_proxy_status
+                )
 
         elif item.type == "camera" and current_mount is not None:
             camera = _find_device_for_item(device_manager, "camera", item)
             if camera is not None and hasattr(camera, "push_telescope_coord"):
                 try:
                     status = await current_mount.get_status()
-                    await camera.push_telescope_coord(
-                        status.ra_jnow, status.dec_jnow
-                    )
+                    await camera.push_telescope_coord(status.ra_jnow, status.dec_jnow)
                 except Exception as exc:
                     logger.warning(
                         "profile.push_telescope_coord_failed",
                         item_id=item.id, error=str(exc),  # type: ignore[union-attr]
                     )
+            if (
+                camera is not None
+                and current_mount_indi_name is not None
+                and hasattr(camera, "set_active_telescope")
+            ):
+                try:
+                    await camera.set_active_telescope(current_mount_indi_name)
+                except Exception as exc:
+                    logger.warning(
+                        "profile.set_active_telescope_failed",
+                        item_id=item.id, error=str(exc),  # type: ignore[union-attr]
+                    )
 
         await _push_live_context(
             node.children, equipment_store, device_manager,
-            mount_adapter=current_mount,
+            mount_adapter=current_mount, mount_indi_name=current_mount_indi_name,
+            eqmod_proxy_status=eqmod_proxy_status,
         )
 
 
