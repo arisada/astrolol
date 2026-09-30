@@ -110,6 +110,35 @@ async def get_stats(device_id: str, request: Request) -> ImageStats:
     return stats
 
 
+@router.get("/{device_id}/preview.jpg")
+async def render_preview(
+    device_id: str, request: Request,
+    mode: str = "auto", black_pct: float = 50.0, white_pct: float = 99.0, quality: int = 85,
+) -> FileResponse:
+    """On-demand re-stretch of the *last* exposure for this camera — lets the Imaging
+    page reflect a JPEG-quality/black-point/white-point change immediately, without
+    waiting for (or forcing) a new exposure. Independent of the auto-generated
+    preview_path/preview_path_linear files a completed exposure already carries;
+    those keep using the camera's persisted settings for the *next* exposure."""
+    import asyncio
+    import tempfile
+
+    from astrolol.imaging.preview import fits_to_jpeg, fits_to_jpeg_linear
+
+    fits_path = _imager(request).get_last_fits_path(device_id)
+    if fits_path is None or not Path(fits_path).exists():
+        raise HTTPException(status_code=404, detail="No exposure available yet.")
+
+    tmp_dir = Path(tempfile.gettempdir()) / "astrolol"
+    tmp_dir.mkdir(parents=True, exist_ok=True)
+    out_path = tmp_dir / f"live_preview_{device_id}.jpg"
+    if mode == "linear":
+        await asyncio.to_thread(fits_to_jpeg_linear, Path(fits_path), out_path, quality)
+    else:
+        await asyncio.to_thread(fits_to_jpeg, Path(fits_path), out_path, quality, black_pct, white_pct)
+    return FileResponse(out_path, media_type="image/jpeg")
+
+
 @router.get("/{device_id}/settings", response_model=ImagerDeviceSettings)
 async def get_device_settings(device_id: str, request: Request) -> ImagerDeviceSettings:
     """Return persisted imager settings for a specific camera (defaults if not yet saved)."""

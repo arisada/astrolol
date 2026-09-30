@@ -116,6 +116,9 @@ export interface ImagerDeviceSettings {
   dither_minutes: string
   histo_auto: boolean
   target_temp: string
+  jpeg_quality: number
+  stretch_black_pct: number
+  stretch_white_pct: number
 }
 
 export interface FocuserDeviceSettings {
@@ -548,10 +551,10 @@ export interface FilterWheelStatus {
 
 export interface ImageStats {
   histogram: number[]     // 128 ADU-bin counts
-  hist_min: number        // ADU sample minimum
-  hist_max: number        // ADU sample maximum
-  stretch_low: number     // auto-stretch black point (median, ADU)
-  stretch_high: number    // auto-stretch white point (99th pct, ADU)
+  hist_min: number        // sensor full-scale minimum (0)
+  hist_max: number        // sensor full-scale maximum (e.g. 65535 for a 16-bit sensor)
+  stretch_low: number     // auto-stretch black point (ADU)
+  stretch_high: number    // auto-stretch white point (ADU)
   mean: number
   median: number
   fwhm: number | null     // median FWHM in pixels (null if autofocus plugin not loaded)
@@ -894,6 +897,21 @@ export interface AutofocusCompletedEvent extends BaseEvent {
 export interface AutofocusAbortedEvent extends BaseEvent { type: 'autofocus.aborted'; run_id: string }
 export interface AutofocusFailedEvent extends BaseEvent { type: 'autofocus.failed'; run_id: string; reason: string }
 
+// Coalesced — emitted at most once per second during a burst of index writes (a
+// multi-file rescan, or several captures in quick succession).
+export interface ViewerIndexChangedEvent extends BaseEvent { type: 'viewer.index_changed' }
+export interface ViewerRescanStartedEvent extends BaseEvent { type: 'viewer.rescan_started'; library_dir: string }
+export interface ViewerRescanProgressEvent extends BaseEvent { type: 'viewer.rescan_progress'; scanned: number }
+export interface ViewerRescanCompletedEvent extends BaseEvent {
+  type: 'viewer.rescan_completed'
+  added: number
+  updated: number
+  removed: number
+  duration_s: number
+  cancelled: boolean
+  error: string | null
+}
+
 export interface PlatesolveStartedEvent extends BaseEvent {
   type: 'platesolve.started'
   solve_id: string
@@ -1083,4 +1101,5 @@ export type AstrolollEvent =
   | GuidingStateChangedEvent | GuidingSettledEvent
   | SequencerStatusEvent | SequencerQueueChangedEvent | SequencerFrameSavedEvent
   | SequencerTaskFinishedEvent | SequencerStepFailedEvent
+  | ViewerIndexChangedEvent | ViewerRescanStartedEvent | ViewerRescanProgressEvent | ViewerRescanCompletedEvent
   | LogEvent

@@ -4,8 +4,16 @@ import { useLocalStorage } from '@/hooks/useLocalStorage'
 
 const BREAKPOINT = 768
 
-export function CollapsibleSidebar({ children }: { children: React.ReactNode }) {
-  const [open, setOpen] = useLocalStorage('ui.sidebar.open', window.innerWidth >= BREAKPOINT)
+export function CollapsibleSidebar({
+  children, storageKey = 'ui.sidebar.open',
+}: {
+  children: React.ReactNode
+  /** Distinct per-instance persistence key — e.g. a modal's own sidebar shouldn't
+   *  collapse/expand in lockstep with the main app sidebar just because both use
+   *  this component. Defaults to the original shared key for existing call sites. */
+  storageKey?: string
+}) {
+  const [open, setOpen] = useLocalStorage(storageKey, window.innerWidth >= BREAKPOINT)
   const prevWide = useRef(window.innerWidth >= BREAKPOINT)
 
   useEffect(() => {

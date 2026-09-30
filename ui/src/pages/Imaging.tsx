@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { forwardRef, useCallback, useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import {
   Camera, ChevronDown, ChevronUp, Crosshair, Play, Settings, Square, StopCircle, Thermometer,
@@ -6,7 +6,7 @@ import {
 import { api } from '@/api/client'
 import { useStore } from '@/store'
 import type {
-  CameraStatus, DitherConfig, FilterWheelStatus, FrameType, ImageStats, ImagerDeviceSettings, OpticalPath,
+  CameraStatus, DitherConfig, FilterWheelStatus, FrameType, ImagerDeviceSettings, OpticalPath,
 } from '@/api/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -16,6 +16,9 @@ import { EventLog } from '@/components/ui/event-log'
 import { PillGroup } from '@/components/ui/pill-group'
 import { DevicePropertiesPanel } from '@/components/DevicePropertiesPanel'
 import { CollapsibleSidebar } from '@/components/ui/collapsible-sidebar'
+import { LabeledSlider } from '@/components/ui/labeled-slider'
+import { HistogramOverlay } from '@/components/ui/histogram'
+import { ZoomableImage, type ZoomableImageHandle } from '@/components/ui/zoomable-image'
 
 const DEFAULT_IMAGER_SETTINGS: ImagerDeviceSettings = {
   duration: 5,
@@ -26,6 +29,9 @@ const DEFAULT_IMAGER_SETTINGS: ImagerDeviceSettings = {
   dither_minutes: '',
   histo_auto: true,
   target_temp: '',
+  jpeg_quality: 85,
+  stretch_black_pct: 50,
+  stretch_white_pct: 99,
 }
 
 // ── Exposure duration helpers ─────────────────────────────────────────────────
@@ -61,6 +67,23 @@ function Panel({
   )
 }
 
+function Foldable({ label, children }: { label: string; children: React.ReactNode }) {
+  const [open, setOpen] = useState(false)
+  return (
+    <div className="border-t border-surface-border pt-2">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="flex items-center justify-between w-full text-xs text-slate-400 hover:text-slate-300"
+      >
+        <span>{label}</span>
+        {open ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+      </button>
+      {open && <div className="flex flex-col gap-2 mt-2">{children}</div>}
+    </div>
+  )
+}
+
 function TogglePill({ label, value, onChange }: { label: string; value: boolean; onChange: (v: boolean) => void }) {
   return (
     <button
@@ -78,61 +101,57 @@ function TogglePill({ label, value, onChange }: { label: string; value: boolean;
   )
 }
 
-// ── Histogram overlay ─────────────────────────────────────────────────────────
-
-function HistogramOverlay({ stats }: { stats: ImageStats }) {
-  const { histogram, hist_min, hist_max, stretch_low, stretch_high } = stats
-  const W = 160
-  const H = 48
-  const maxCount = Math.max(...histogram, 1)
-  const range = hist_max - hist_min || 1
-  const lowX = Math.max(0, Math.min(W, ((stretch_low - hist_min) / range) * W))
-  const highX = Math.max(0, Math.min(W, ((stretch_high - hist_min) / range) * W))
-  const bins = histogram.length
-
-  return (
-    <svg width={W} height={H} className="block">
-      {histogram.map((count, i) => {
-        const barH = (count / maxCount) * H
-        const x = (i / bins) * W
-        const bw = W / bins + 0.5
-        return (
-          <rect
-            key={i}
-            x={x} y={H - barH} width={bw} height={barH}
-            fill="rgba(200,200,200,0.6)"
-          />
-        )
-      })}
-      {/* Stretch clip markers */}
-      <line x1={lowX} y1={0} x2={lowX} y2={H} stroke="rgba(96,165,250,0.8)" strokeWidth={1} />
-      <line x1={highX} y1={0} x2={highX} y2={H} stroke="rgba(251,191,36,0.8)" strokeWidth={1} />
-    </svg>
-  )
-}
-
 // ── Image Viewer ──────────────────────────────────────────────────────────────
 
-function ImageViewer({ deviceId, histoAuto }: { deviceId: string | undefined; histoAuto: boolean }) {
+export type ImageViewerHandle = ZoomableImageHandle
+
+export interface PreviewParams {
+  jpeg_quality: number
+  stretch_black_pct: number
+  stretch_white_pct: number
+}
+
+const ImageViewer = forwardRef<ImageViewerHandle, { deviceId: string | undefined; histoAuto: boolean; previewParams: PreviewParams }>(
+function ImageViewer({ deviceId, histoAuto, previewParams }, ref) {
   const image = useStore((s) => deviceId ? (s.latestImages[deviceId] ?? null) : null)
   const stats = useStore((s) => deviceId ? (s.imageStats[deviceId] ?? null) : null)
-  const previewUrl = image
-    ? (histoAuto || !image.previewUrlLinear ? image.previewUrl : image.previewUrlLinear)
+  // Re-rendered on demand from the current stretch/quality settings (not the static
+  // preview_path/preview_path_linear a completed exposure carries) so a slider change
+  // is reflected immediately without waiting for — or forcing — a new exposure.
+  // `v` is only a cache-buster: it ties the URL to this specific exposure (via its
+  // already-unique preview_path) so a new capture always fetches fresh pixels even
+  // when the stretch settings themselves haven't changed.
+  const previewUrl = deviceId && image
+    ? `/imager/${deviceId}/preview.jpg?mode=${histoAuto ? 'auto' : 'linear'}`
+      + `&black_pct=${previewParams.stretch_black_pct}&white_pct=${previewParams.stretch_white_pct}`
+      + `&quality=${previewParams.jpeg_quality}&v=${encodeURIComponent(image.previewUrl)}`
     : null
 
   return (
-    <div className="flex-1 bg-black flex items-center justify-center relative min-h-0">
-      {previewUrl ? (
+    <ZoomableImage
+      ref={ref}
+      className="flex-1"
+      src={previewUrl}
+      alt="Latest exposure"
+      resetKey={deviceId}
+      empty={
+        <div className="text-slate-600 text-sm flex flex-col items-center gap-2">
+          <Camera size={32} />
+          <span>No image yet</span>
+        </div>
+      }
+    >
+      {/* JSX children are evaluated eagerly by the caller, regardless of whether
+          ZoomableImage's own `src ? … : empty` branch ends up rendering them — so
+          this whole block must be gated on `image` itself, not just on `src` being
+          non-null downstream, or `image!.width` throws (and takes the whole page
+          down with it) whenever no exposure has been taken yet. */}
+      {image && (
         <>
-          <img
-            src={previewUrl}
-            alt="Latest exposure"
-            className="max-w-full max-h-full object-contain"
-          />
           {/* Bottom-left: image info + FWHM */}
           <div className="absolute bottom-2 left-2 flex flex-col gap-0.5">
             <div className="text-xs text-slate-400 bg-black/60 px-2 py-1 rounded">
-              {image!.width}×{image!.height} · {image!.duration}s
+              {image.width}×{image.height} · {image.duration}s
               {stats && stats.star_count > 0 && stats.fwhm != null && (
                 <span className="ml-2 text-emerald-400">
                   FWHM {stats.fwhm.toFixed(1)}px · {stats.star_count}★
@@ -147,15 +166,10 @@ function ImageViewer({ deviceId, histoAuto }: { deviceId: string | undefined; hi
             </div>
           )}
         </>
-      ) : (
-        <div className="text-slate-600 text-sm flex flex-col items-center gap-2">
-          <Camera size={32} />
-          <span>No image yet</span>
-        </div>
       )}
-    </div>
+    </ZoomableImage>
   )
-}
+})
 
 // ── Camera Panel ──────────────────────────────────────────────────────────────
 
@@ -163,12 +177,15 @@ const FRAME_TYPES: FrameType[] = ['light', 'dark', 'flat', 'bias']
 const BINNINGS = [1, 2, 3, 4]
 
 function CameraPanel({
-  deviceId, name, onSettings, onHistoAutoChange,
+  deviceId, name, onSettings, onHistoAutoChange, onPreviewParamsChange, onZoomFit, onZoomNative,
 }: {
   deviceId: string
   name: string
   onSettings: (id: string) => void
   onHistoAutoChange: (v: boolean) => void
+  onPreviewParamsChange: (p: PreviewParams) => void
+  onZoomFit: () => void
+  onZoomNative: () => void
 }) {
   const imagerBusy = useStore((s) => s.imagerBusy)
   const busy = imagerBusy[deviceId] ?? false
@@ -178,11 +195,30 @@ function CameraPanel({
   const settingsRef = useRef(settings)
   settingsRef.current = settings
 
+  const notifyPreviewParams = useCallback((s: ImagerDeviceSettings) => {
+    onPreviewParamsChange({
+      jpeg_quality: s.jpeg_quality,
+      stretch_black_pct: s.stretch_black_pct,
+      stretch_white_pct: s.stretch_white_pct,
+    })
+  }, [onPreviewParamsChange])
+
   const patchSettings = useCallback((patch: Partial<ImagerDeviceSettings>) => {
     const next = { ...settingsRef.current, ...patch }
     setSettingsState(next)
     api.imager.putSettings(deviceId, next).catch(() => {})
-  }, [deviceId])
+    notifyPreviewParams(next)
+  }, [deviceId, notifyPreviewParams])
+
+  // Sliders update local state on every drag tick (for a responsive handle) but only
+  // PUT to the server once the drag ends — same one-write-per-change intent as the
+  // rest of the settings, just deferred past mouseup instead of onChange. The live
+  // preview, however, only needs to move on commit too (re-rendering full-resolution
+  // on every drag tick would hammer the backend for no benefit), so this doesn't
+  // notify the parent — patchSettings (called on commit) does.
+  const patchLocal = useCallback((patch: Partial<ImagerDeviceSettings>) => {
+    setSettingsState((prev) => ({ ...prev, ...patch }))
+  }, [])
 
   // Gain lives in the driver, not in persisted settings.
   const [gain, setGain] = useState(0)
@@ -205,6 +241,7 @@ function CameraPanel({
       .then((s) => {
         setSettingsState(s)
         onHistoAutoChange(s.histo_auto)
+        notifyPreviewParams(s)
       })
       .catch(() => {})
 
@@ -394,6 +431,40 @@ function CameraPanel({
             onChange={(v) => { patchSettings({ histo_auto: v }); onHistoAutoChange(v) }} />
         </div>
 
+        {/* Preview: JPEG quality + auto-stretch strength */}
+        <Foldable label="Preview settings">
+          <div className="flex gap-1.5">
+            <Button size="sm" variant="outline" className="flex-1" onClick={onZoomFit} title="Fit the image to the window">
+              Fit
+            </Button>
+            <Button size="sm" variant="outline" className="flex-1" onClick={onZoomNative} title="Zoom to the image's own resolution (1 image pixel = 1 screen pixel)">
+              1x
+            </Button>
+          </div>
+          <LabeledSlider
+            label="JPEG quality" value={settings.jpeg_quality} min={10} max={100} step={5}
+            format={(v) => String(v)}
+            onChange={(v) => patchLocal({ jpeg_quality: v })}
+            onCommit={(v) => patchSettings({ jpeg_quality: v })}
+          />
+          {settings.histo_auto && (
+            <>
+              <LabeledSlider
+                label="Stretch black point" value={settings.stretch_black_pct} min={50} max={90} step={1}
+                format={(v) => `${v}th pct`}
+                onChange={(v) => patchLocal({ stretch_black_pct: v })}
+                onCommit={(v) => patchSettings({ stretch_black_pct: v })}
+              />
+              <LabeledSlider
+                label="Stretch white point" value={settings.stretch_white_pct} min={90} max={100} step={0.1}
+                format={(v) => `${v.toFixed(1)}th pct`}
+                onChange={(v) => patchLocal({ stretch_white_pct: v })}
+                onCommit={(v) => patchSettings({ stretch_white_pct: v })}
+              />
+            </>
+          )}
+        </Foldable>
+
         {/* Guiding / dither */}
         <div className="border-t border-surface-border pt-2 flex flex-col gap-2">
           <div className="flex items-center gap-1.5">
@@ -578,6 +649,18 @@ export function Imaging() {
   // CameraPanel sets it via onHistoAutoChange when it loads or toggles.
   const [histoAuto, setHistoAuto] = useState(true)
 
+  // Same lift for the stretch/quality settings — ImageViewer needs the live values
+  // (not just what's persisted) to build the on-demand preview.jpg URL, and
+  // CameraPanel reports them via onPreviewParamsChange on load and on every commit.
+  const [previewParams, setPreviewParams] = useState<PreviewParams>({
+    jpeg_quality: DEFAULT_IMAGER_SETTINGS.jpeg_quality,
+    stretch_black_pct: DEFAULT_IMAGER_SETTINGS.stretch_black_pct,
+    stretch_white_pct: DEFAULT_IMAGER_SETTINGS.stretch_white_pct,
+  })
+
+  // Zoom/pan lives inside ImageViewer; the sidebar's Fit/1x buttons reach it imperatively.
+  const viewerRef = useRef<ImageViewerHandle>(null)
+
   // INDI properties panel state
   const [propertiesDeviceId, setPropertiesDeviceId] = useState<string | null>(null)
   const openProperties = useCallback((id: string) => {
@@ -626,7 +709,7 @@ export function Imaging() {
     <div className="flex h-full">
       {/* Image viewer */}
       <div className="flex-1 flex flex-col min-w-0">
-        <ImageViewer deviceId={deviceId} histoAuto={histoAuto} />
+        <ImageViewer ref={viewerRef} deviceId={deviceId} histoAuto={histoAuto} previewParams={previewParams} />
         <EventLog filter={['imager', 'indi', 'phd2']} />
       </div>
 
@@ -642,6 +725,9 @@ export function Imaging() {
               name={camera.driver_name ?? camera.device_id}
               onSettings={openProperties}
               onHistoAutoChange={setHistoAuto}
+              onPreviewParamsChange={setPreviewParams}
+              onZoomFit={() => viewerRef.current?.fit()}
+              onZoomNative={() => viewerRef.current?.oneToOne()}
             />
             {focuser && (
               <FocuserPanel key={focuser.device_id} deviceId={focuser.device_id} onSettings={openProperties} />

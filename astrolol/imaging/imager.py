@@ -28,7 +28,14 @@ from astrolol.equipment.optical_path import (
     find_profile_site,
     resolve_optical_paths,
 )
-from astrolol.imaging.models import DitherConfig, ExposureRequest, ExposureResult, ImagerState, ImagerStatus
+from astrolol.imaging.models import (
+    DitherConfig,
+    ExposureRequest,
+    ExposureResult,
+    ImagerDeviceSettings,
+    ImagerState,
+    ImagerStatus,
+)
 from astrolol.imaging.preview import fits_to_jpeg, fits_to_jpeg_linear
 
 if TYPE_CHECKING:
@@ -180,6 +187,7 @@ class ImagerManager:
         self._mount_manager = mount_manager
         self._save_counters: dict[str, int] = {}
         self._last_stats: dict[str, ImageStats] = {}
+        self._last_fits_path: dict[str, str] = {}
         # Optional dither hook set by the PHD2 plugin on startup.
         # Signature: async (config: DitherConfig) -> None
         self._dither_fn: Callable[[DitherConfig], Awaitable[None]] | None = None
@@ -307,12 +315,22 @@ class ImagerManager:
     def get_last_stats(self, device_id: str) -> ImageStats | None:
         return self._last_stats.get(device_id)
 
+    def get_last_fits_path(self, device_id: str) -> str | None:
+        return self._last_fits_path.get(device_id)
+
     # --- Internal ---
 
     def _get_or_create(self, device_id: str) -> CameraImager:
         if device_id not in self._imagers:
             self._imagers[device_id] = CameraImager(device_id=device_id)
         return self._imagers[device_id]
+
+    def _get_device_settings(self, device_id: str) -> ImagerDeviceSettings:
+        """Persisted per-camera preview settings (JPEG quality, stretch percentiles)."""
+        if self._profile_store is None:
+            return ImagerDeviceSettings()
+        raw = self._profile_store.get_user_settings().imager_settings.get(device_id, {})
+        return ImagerDeviceSettings(**raw)
 
     def _require_idle(self, imager: CameraImager) -> None:
         if imager.state != ImagerState.IDLE:
@@ -478,6 +496,8 @@ class ImagerManager:
             except Exception:
                 logger.warning("imager.temp_move_failed", src=str(fits_path), dst=str(tmp_fits))
 
+        self._last_fits_path[device_id] = str(fits_path)
+
         # Generate two previews (auto-stretch + linear) — both live in images_dir.
         # Each call is individually wrapped in mem_guard so that when low-memory
         # mode is active the global Semaphore(1) serialises them (and any other
@@ -485,14 +505,26 @@ class ImagerManager:
         preview_path = self._preview_path(fits_path.stem, self._images_dir, suffix="auto")
         preview_path_linear = self._preview_path(fits_path.stem, self._images_dir, suffix="linear")
 
-        async def _preview(fn, dst: Path):
-            async with mem_guard():
-                return await asyncio.to_thread(fn, fits_path, dst, settings.jpeg_quality)
+        device_settings = self._get_device_settings(device_id)
 
-        preview_stats_raw, _ = await asyncio.gather(
-            _preview(fits_to_jpeg, preview_path),
-            _preview(fits_to_jpeg_linear, preview_path_linear),
-        )
+        async def _preview_auto():
+            async with mem_guard():
+                return await asyncio.to_thread(
+                    fits_to_jpeg,
+                    fits_path,
+                    preview_path,
+                    device_settings.jpeg_quality,
+                    device_settings.stretch_black_pct,
+                    device_settings.stretch_white_pct,
+                )
+
+        async def _preview_linear():
+            async with mem_guard():
+                return await asyncio.to_thread(
+                    fits_to_jpeg_linear, fits_path, preview_path_linear, device_settings.jpeg_quality
+                )
+
+        preview_stats_raw, _ = await asyncio.gather(_preview_auto(), _preview_linear())
 
         # Build ImageStats from histogram data.
         # NOTE: per-frame star analysis (FWHM/star count) is disabled — too expensive

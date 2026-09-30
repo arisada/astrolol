@@ -71,3 +71,12 @@ class ImagerDeviceSettings(BaseModel):
     dither_minutes: str = ""
     histo_auto: bool = True
     target_temp: str = ""
+    jpeg_quality: int = Field(default=85, ge=1, le=100)
+    stretch_black_pct: float = Field(
+        default=50.0, ge=0.0, le=100.0,
+        description="Auto-stretch black point, as a percentile of the sampled pixels",
+    )
+    stretch_white_pct: float = Field(
+        default=99.0, ge=0.0, le=100.0,
+        description="Auto-stretch white point, as a percentile of the sampled pixels",
+    )
