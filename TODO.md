@@ -187,5 +187,11 @@ named sequences (server library) and task file download/upload.
   focuser move-in/out buttons, and the CollapsibleSidebar toggle strip (h-8). Audit and
   increase tap area before declaring mobile support.
 - **Caddy / systemd packaging** — deployment guide for Raspberry Pi with HTTPS and autostart.
-- **Auth / security** — API keys or JWT tokens. Required before any internet exposure.
+- **Auth token** — bearer token, generated once, entered manually into the Android app;
+  must work for both `GET`/`POST` (Authorization header) and the `/ws/events` WebSocket
+  (query param or subprotocol, since browsers can't set arbitrary headers on a WS handshake);
+  must survive a reverse proxy injecting the header. Required before any internet exposure.
   See the Security section in README.md.
+- **mDNS discovery** — advertise the astrolol server (e.g. `_astrolol._tcp`) via `zeroconf`
+  so the Android app can find it on the local network without typing an IP. New dependency,
+  no existing code to build on.
