@@ -2,6 +2,7 @@ import asyncio
 import os
 import traceback
 from contextlib import asynccontextmanager
+from importlib.metadata import PackageNotFoundError, version as _pkg_version
 from pathlib import Path
 
 import uvicorn
@@ -45,8 +46,14 @@ from astrolol.filter_wheel import FilterWheelManager
 from astrolol.focuser import FocuserManager
 from astrolol.imaging import ImagerManager
 from astrolol.mount import MountManager
+from astrolol.version import PROTOCOL_VERSION
 
 logger = structlog.get_logger()
+
+try:
+    SERVER_VERSION = _pkg_version("astrolol")
+except PackageNotFoundError:
+    SERVER_VERSION = "0.0.0-dev"
 
 # Core module log scopes (always present regardless of enabled plugins)
 _CORE_SCOPES: list[LogScope] = [
@@ -88,7 +95,7 @@ def create_app() -> FastAPI:
                 except Exception as exc:
                     logger.error("plugin.shutdown_failed", plugin_id=plugin_id, error=str(exc), exc_info=True)
 
-    app = FastAPI(title="astrolol", version="0.1.0", lifespan=lifespan)
+    app = FastAPI(title="astrolol", version=SERVER_VERSION, lifespan=lifespan)
 
     from astrolol.config.settings import settings as _settings
 
@@ -196,9 +203,20 @@ def create_app() -> FastAPI:
         )
         return JSONResponse(status_code=500, content={"detail": "Internal server error"})
 
+    class HealthResponse(BaseModel):
+        status: str
+        protocol_version: int
+        server_version: str
+        enabled_plugins: list[str]
+
     @app.get("/health")
-    async def health() -> dict[str, str]:
-        return {"status": "ok"}
+    async def health(request: Request) -> HealthResponse:
+        return HealthResponse(
+            status="ok",
+            protocol_version=PROTOCOL_VERSION,
+            server_version=SERVER_VERSION,
+            enabled_plugins=sorted(request.app.state.enabled_plugin_ids),
+        )
 
     @app.post("/admin/restart", status_code=202)
     async def admin_restart() -> dict[str, str]:
