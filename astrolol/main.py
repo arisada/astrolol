@@ -2,7 +2,6 @@ import asyncio
 import os
 import traceback
 from contextlib import asynccontextmanager
-from importlib.metadata import PackageNotFoundError, version as _pkg_version
 from pathlib import Path
 
 import uvicorn
@@ -46,14 +45,9 @@ from astrolol.filter_wheel import FilterWheelManager
 from astrolol.focuser import FocuserManager
 from astrolol.imaging import ImagerManager
 from astrolol.mount import MountManager
-from astrolol.version import PROTOCOL_VERSION
+from astrolol.version import PROTOCOL_VERSION, SERVER_VERSION
 
 logger = structlog.get_logger()
-
-try:
-    SERVER_VERSION = _pkg_version("astrolol")
-except PackageNotFoundError:
-    SERVER_VERSION = "0.0.0-dev"
 
 # Core module log scopes (always present regardless of enabled plugins)
 _CORE_SCOPES: list[LogScope] = [

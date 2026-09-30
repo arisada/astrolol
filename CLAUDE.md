@@ -412,6 +412,10 @@ plugins/
 ├── guide_simulator/    # Simulated guider (registers against core/guiding) for testing
 │                       # without PHD2/hardware — noisy steps, settling, injectable faults
 ├── lx200/              # Virtual LX200 telescope TCP server (SkySafari, Cartes du Ciel, etc.)
+├── mdns/               # Advertises this server via mDNS (_astrolol._tcp.local.) so clients
+│                       # can find it without a typed-in IP; advertised host/port/scheme are
+│                       # explicit settings since astrolol can't know what a reverse proxy
+│                       # in front of it exposes
 ├── object_resolver/    # Offline-first name → J2000 coords resolver (NGC/IC/Messier/
 │                       # Sharpless/Hipparcos + common names), SIMBAD fallback, solar system
 ├── phd2/               # PHD2 autoguider client — implements core.guiding.Guider, guide
