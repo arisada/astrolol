@@ -148,6 +148,13 @@ named sequences (server library) and task file download/upload.
 - **Runtime enable/disable without restart** — currently requires `POST /admin/restart`.
   The main blocker is that FastAPI does not support hot-swapping routers; a sub-application
   mount pattern or a proxy middleware could work around this.
+- **Sidebar clutter from set-and-forget plugins** — every plugin with a UI currently gets its
+  own top-level sidebar entry (`plugin-registry.ts` + `manifest.nav_order`), which doesn't
+  scale once small, configure-once plugins (e.g. `mdns`) pile up alongside the plugins people
+  actually navigate to daily (sequencer, mount, imaging). Needs some notion of a lesser-tier
+  plugin whose settings live in a subpage (e.g. folded into an "Options" or "Plugins" list)
+  instead of claiming a permanent sidebar slot. Not designed yet — affects `PluginManifest`
+  (a tier/category field?) and `plugin-registry.ts` (how the sidebar renders each tier).
 
 ## Imaging — deferred
 
