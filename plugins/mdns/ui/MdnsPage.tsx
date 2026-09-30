@@ -12,11 +12,20 @@ const EMPTY: MdnsSettings = {
   instance_name: null,
 }
 
+function currentPageAddress(): { host: string; port: number; scheme: 'http' | 'https' } {
+  const scheme = window.location.protocol === 'https:' ? 'https' : 'http'
+  const port = window.location.port
+    ? Number(window.location.port)
+    : scheme === 'https' ? 443 : 80
+  return { host: window.location.hostname, port, scheme }
+}
+
 export function MdnsPage() {
   const [settings, setSettings] = useState<MdnsSettings | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [saved, setSaved] = useState(false)
+  const [restarting, setRestarting] = useState(false)
 
   useEffect(() => {
     api.getSettings().then(setSettings).catch(() => setError('Cannot reach backend'))
@@ -25,6 +34,11 @@ export function MdnsPage() {
   const update = (patch: Partial<MdnsSettings>) => {
     setSettings((s) => (s ? { ...s, ...patch } : s))
     setSaved(false)
+  }
+
+  const handleAutofill = () => {
+    const { host, port, scheme } = currentPageAddress()
+    update({ advertised_host: host, advertised_port: port, scheme })
   }
 
   const handleSave = async () => {
@@ -40,6 +54,23 @@ export function MdnsPage() {
     } finally {
       setSaving(false)
     }
+  }
+
+  const handleRestart = async () => {
+    setRestarting(true)
+    try {
+      await fetch('/admin/restart', { method: 'POST' })
+    } catch {
+      // expected — process may die before responding
+    }
+    const poll = async () => {
+      try {
+        const r = await fetch('/health')
+        if (r.ok) { window.location.reload(); return }
+      } catch { /* still down */ }
+      setTimeout(poll, 800)
+    }
+    setTimeout(poll, 1200)
   }
 
   const s = settings ?? EMPTY
@@ -60,12 +91,32 @@ export function MdnsPage() {
         </div>
       )}
       {saved && !error && (
-        <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-300">
-          Saved — restart astrolol for this to take effect.
+        <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-300 flex items-center justify-between gap-3">
+          <span>{restarting ? 'Restarting…' : 'Saved — astrolol needs to be restarted for this to take effect.'}</span>
+          {!restarting && (
+            <button
+              onClick={handleRestart}
+              className="px-2.5 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium transition-colors flex-none"
+            >
+              Restart astrolol
+            </button>
+          )}
         </div>
       )}
 
       <Card title="Advertisement" className="p-4 space-y-4">
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-xs text-slate-500">
+            Fill the host/port/scheme below from the address used to load this page.
+          </p>
+          <button
+            onClick={handleAutofill}
+            className="px-2.5 py-1 rounded bg-surface-overlay hover:bg-surface-border text-slate-300 text-xs font-medium transition-colors flex-none"
+          >
+            Use this page's address
+          </button>
+        </div>
+
         <div>
           <label className="text-xs text-slate-400 block mb-1">Instance name</label>
           <Input
@@ -84,7 +135,9 @@ export function MdnsPage() {
           />
           <p className="text-xs text-slate-600 mt-1">
             An IP or hostname. Set this when the deployment fronts astrolol with a reverse
-            proxy on a different host, or when auto-detection picks the wrong interface.
+            proxy on a different host, or when auto-detection picks the wrong interface. Note
+            that autofill reflects the browser's address bar, so it's wrong if you're viewing
+            this through the Vite dev server rather than the deployment's real address.
           </p>
         </div>
 
