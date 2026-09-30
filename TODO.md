@@ -7,6 +7,21 @@ Items designed for but not yet built. Ordered roughly by priority.
 - **INDI items connected from the tree are untested on real indiserver** — the mapping
   (`indi_<kind>` + `{device_name, executable}`) matches what the wizard sends and the INDI
   adapters load the driver themselves, but only non-INDI items were verified end to end.
+- **Hot-enabling a plugin is unreachable once `ui/dist` exists (production mode)** — the
+  SPA catch-all route (`astrolol/api/static.py::spa_fallback`, registered once at startup
+  in `mount_ui()`) sits earlier in Starlette's route list than a router added later via
+  `POST /settings`'s hot-enable path (`astrolol/app.py`, the `PluginManifest.hot_reloadable`
+  mechanism from commit 000396f). Starlette matches routes in registration order, not
+  specificity, so every request under that plugin's `/plugins/<id>/...` prefix hits the
+  catch-all first and gets a 404, even though the route legitimately exists (shows up in
+  `/openapi.json`). Confirmed live: hot-enabling `viewer` on a running production-mode
+  instance 404'd every one of its endpoints; a full restart (which sets it up before
+  `mount_ui()` runs, in the normal `setup_plugins()` order) fixed it immediately. Affects
+  *any* hot-reloadable plugin enabled after boot while serving the built UI — dev mode
+  (Vite dev server, no `mount_ui()` call) is unaffected. Fix is presumably to either
+  register hot-enabled routers ahead of the catch-all (e.g. `app.router.routes.insert()`
+  before the `spa_fallback` route) or move the API-prefix 404 check earlier so it doesn't
+  depend on route order at all.
 
 ## EQMOD native driver — assumptions & deferred items
 
