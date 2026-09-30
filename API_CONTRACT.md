@@ -63,6 +63,20 @@ should fetch this, then subscribe to `/ws/events`, and de-duplicate on `id` (see
 overlap between what history returns and what the socket then delivers is expected, not
 a bug.
 
+### mDNS discovery (`plugins/mdns/`, optional)
+
+When enabled and configured, the server advertises itself via mDNS as
+`<instance_name>._astrolol._tcp.local.`, with a TXT record carrying `protocol_version`,
+`server_version`, and `scheme` (`http`/`https`). This is opt-in and requires explicit
+settings (`advertised_host`/`advertised_port`/`scheme` under
+`GET/PUT /plugins/mdns/settings`) — astrolol cannot infer the network-visible address or
+port on its own, since a reverse proxy commonly sits between the network and whatever
+port astrolol actually binds. No advertisement is made until `advertised_port` is set.
+A client should still treat mDNS purely as a convenience for finding a candidate
+address — it must confirm compatibility with `GET /health` (§2) before relying on it,
+since the TXT record's `protocol_version` is a hint, not a substitute for asking the
+server directly.
+
 ### Same-origin assumption
 
 The web UI is served from `/` by the same process (`astrolol/api/static.py`); in
@@ -140,8 +154,6 @@ Nothing below exists yet. Don't write client code against it.
   `/ws/events` (query param or subprotocol, since a browser WebSocket handshake can't
   set arbitrary headers); must survive a reverse proxy injecting it. Required before any
   internet exposure. Tracked in `TODO.md`.
-- **mDNS discovery** — advertising the server on the local network via `zeroconf` so the
-  Android app doesn't need a typed-in IP. Tracked in `TODO.md`.
 - **Absence-based notifications** — "autofocus should have run by now and didn't." Needs
   something watching a clock, not reacting to events; ties into the mount watchdog item
   in `TODO.md`. Not designed.

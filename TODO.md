@@ -199,6 +199,3 @@ named sequences (server library) and task file download/upload.
   (query param or subprotocol, since browsers can't set arbitrary headers on a WS handshake);
   must survive a reverse proxy injecting the header. Required before any internet exposure.
   See the Security section in README.md.
-- **mDNS discovery** — advertise the astrolol server (e.g. `_astrolol._tcp`) via `zeroconf`
-  so the Android app can find it on the local network without typing an IP. New dependency,
-  no existing code to build on.
