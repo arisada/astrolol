@@ -50,6 +50,23 @@ async def test_run_completes_and_records_progress(rig: Rig) -> None:
     assert rig.svc.status().run_state == RunState.IDLE
 
 
+async def test_completed_run_notifies_info(rig: Rig) -> None:
+    await rig.svc.add(make_task(groups=[ExposureGroup(duration=1, count=1)]))
+    assert await _run_to_end(rig) == RunOutcome.COMPLETED
+    finished = rig.of("sequencer.session_finished")
+    assert finished[-1].notify == "info"
+
+
+async def test_stopped_run_does_not_notify(rig: Rig) -> None:
+    await rig.svc.add(make_task(groups=[ExposureGroup(duration=1, count=2)]))
+    await rig.svc.start()
+    await wait_until(lambda: rig.imager.exposing)
+    await rig.svc.stop("frame")
+    assert await rig.svc.wait_idle() == RunOutcome.STOPPED
+    finished = rig.of("sequencer.session_finished")
+    assert finished[-1].notify is None
+
+
 async def test_frames_are_named_after_the_target(rig: Rig) -> None:
     await rig.svc.add(make_task(name="Orion Nebula", groups=[ExposureGroup(duration=1, count=1)]))
     await _run_to_end(rig)
@@ -364,6 +381,26 @@ async def test_on_error_pause_setup_failure_reruns_setup(rig: Rig) -> None:
     assert len(rig.mount.slews) == 1  # the retry slewed successfully
 
 
+async def test_on_error_pause_notifies(rig: Rig) -> None:
+    await rig.svc.add(make_task(on_error="pause"))
+    rig.mount.fail_slew = ["below horizon"]
+    await rig.svc.start()
+    await wait_until(lambda: rig.svc.status().run_state == RunState.PAUSED)
+    failed = rig.of("sequencer.step_failed")
+    assert failed and failed[0].notify == "warning"
+    await rig.svc.resume()
+    await rig.svc.wait_idle()
+
+
+async def test_on_error_skip_does_not_notify(rig: Rig) -> None:
+    await rig.svc.add(make_task("A", on_error="skip"))
+    await rig.svc.add(make_task("B"))
+    rig.imager.fail_next = [RuntimeError("boom")]
+    assert await _run_to_end(rig) == RunOutcome.COMPLETED
+    failed = rig.of("sequencer.step_failed")
+    assert failed and failed[0].notify is None
+
+
 async def test_paused_on_error_then_stop(rig: Rig) -> None:
     entry = await rig.svc.add(make_task(on_error="pause"))
     rig.imager.fail_next = [RuntimeError("boom")]
@@ -407,6 +444,8 @@ async def test_on_error_defer(tmp_path: Path) -> None:
     assert rt_a.interruptions[-1].stall_kind == "centering"
     assert rt_a.stall is None
     assert (await rig.svc.get(b.task.id)).runtime.status == TaskStatus.COMPLETED
+    interruption = rig.of("sequencer.interruption")
+    assert interruption[-1].notify == "warning"
 
 
 async def test_on_error_abort(rig: Rig) -> None:
@@ -415,6 +454,8 @@ async def test_on_error_abort(rig: Rig) -> None:
     rig.imager.fail_next = [RuntimeError("boom")]
     assert await _run_to_end(rig) == RunOutcome.FAILED
     assert (await rig.svc.get(a.task.id)).runtime.status == TaskStatus.FAILED
+    finished = rig.of("sequencer.session_finished")
+    assert finished[-1].notify == "warning"
     assert (await rig.svc.get(b.task.id)).runtime.status == TaskStatus.PENDING
     assert "boom" in (rig.svc.status().last_error or "")
 

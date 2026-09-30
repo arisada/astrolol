@@ -222,7 +222,11 @@ class Phd2Client:
     async def _lost(self, reason: str) -> None:
         if self._health.on_lost(reason):
             await self._event_bus.publish(
-                GuidingStateChanged(guider="phd2", guiding=False, reason=reason)
+                GuidingStateChanged(
+                    guider="phd2", guiding=False, reason=reason,
+                    notify="warning", notify_title="Guiding stopped",
+                    notify_body=f"PHD2 guiding stopped: {reason}",
+                )
             )
 
     def guiding_health(self) -> GuidingHealth:
@@ -303,7 +307,11 @@ class Phd2Client:
         if self._health.on_lost("disconnected"):
             asyncio.get_event_loop().create_task(
                 self._event_bus.publish(
-                    GuidingStateChanged(guider="phd2", guiding=False, reason="disconnected")
+                    GuidingStateChanged(
+                        guider="phd2", guiding=False, reason="disconnected",
+                        notify="warning", notify_title="Guiding stopped",
+                        notify_body="PHD2 disconnected",
+                    )
                 )
             )
 

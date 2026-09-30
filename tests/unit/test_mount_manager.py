@@ -197,6 +197,50 @@ async def test_park_publishes_parked_event(
 
 
 @pytest.mark.asyncio
+async def test_park_from_api_does_not_notify(
+    mount_manager: MountManager, manager: DeviceManager, event_bus
+) -> None:
+    await connected_mount(manager)
+    q = event_bus.subscribe()
+    while not q.empty():
+        await q.get()
+
+    await mount_manager.park("mount1")
+    ctrl = mount_manager._controllers["mount1"]
+    if ctrl._active_task:
+        await asyncio.wait_for(ctrl._active_task, timeout=2.0)
+
+    events = []
+    while not q.empty():
+        events.append(q.get_nowait())
+    parked = next(e for e in events if isinstance(e, MountParked))
+    assert parked.notify is None
+
+
+@pytest.mark.asyncio
+async def test_park_from_automation_notifies(
+    mount_manager: MountManager, manager: DeviceManager, event_bus
+) -> None:
+    await connected_mount(manager)
+    q = event_bus.subscribe()
+    while not q.empty():
+        await q.get()
+
+    await mount_manager.park("mount1", source="automation")
+    ctrl = mount_manager._controllers["mount1"]
+    if ctrl._active_task:
+        await asyncio.wait_for(ctrl._active_task, timeout=2.0)
+
+    events = []
+    while not q.empty():
+        events.append(q.get_nowait())
+    parked = next(e for e in events if isinstance(e, MountParked))
+    assert parked.notify == "info"
+    assert parked.notify_title
+    assert parked.notify_body
+
+
+@pytest.mark.asyncio
 async def test_park_sets_parked_state(
     mount_manager: MountManager, manager: DeviceManager
 ) -> None:
@@ -709,6 +753,27 @@ async def test_sinking_below_the_horizon_stops_tracking_once(manager: DeviceMana
     fake.alt = 9.0
     await mm._check_automation("m1")
     assert not fake._tracking
+
+
+@pytest.mark.asyncio
+async def test_horizon_stops_tracking_notifies(manager: DeviceManager, event_bus) -> None:
+    mm, fake = await _limits_setup(manager, event_bus, horizon_min_alt_deg=10.0)
+    fake._tracking = True
+    fake.alt = 9.5
+
+    q = event_bus.subscribe()
+    while not q.empty():
+        await q.get()
+
+    await mm._check_automation("m1")
+
+    events = []
+    while not q.empty():
+        events.append(q.get_nowait())
+    changed = next(e for e in events if isinstance(e, MountTrackingChanged))
+    assert changed.notify == "warning"
+    assert changed.notify_title
+    assert changed.notify_body
 
 
 @pytest.mark.asyncio

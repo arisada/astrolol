@@ -49,6 +49,9 @@ async def test_guider_not_connected_waits_until_it_is(tmp_path: Path) -> None:
     unstalled = rig.of("sequencer.task_unstalled")
     assert [e.kind for e in stalled] == ["guiding"] and len(unstalled) == 1
     assert unstalled[0].attempts >= 2
+    assert stalled[0].notify == "warning"
+    assert unstalled[0].notify == "info"
+    assert rig.of("sequencer.stall_attempt")[0].notify is None  # retries don't spam
 
 
 async def test_star_lost_holds_frames_and_recovers_without_a_restart(tmp_path: Path) -> None:

@@ -384,12 +384,25 @@ class Runner:
             self._last_error = error
             self._state = RunState.IDLE
             self._idle_event.set()
+            # COMPLETED/FAILED end the run with nobody watching a response — CANCELLED/
+            # STOPPED were requested by a user who already knows.
+            notify_kwargs: dict = {}
+            if outcome == RunOutcome.COMPLETED:
+                notify_kwargs = dict(
+                    notify="info", notify_title="Sequence finished",
+                    notify_body=f"{run.frames_saved} frame(s) saved",
+                )
+            elif outcome == RunOutcome.FAILED:
+                notify_kwargs = dict(
+                    notify="warning", notify_title="Sequence failed", notify_body=error or "Unknown error",
+                )
             await self.bus.publish(
                 SequencerSessionFinished(
                     session_id=run.session_id,
                     outcome=outcome,
                     error=error,
                     frames_saved=run.frames_saved,
+                    **notify_kwargs,
                 )
             )
             await self.emit_status()
@@ -551,6 +564,14 @@ class Runner:
                 step=err.step,
                 error=str(err),
                 handling=policy,
+                # "pause" leaves the run blocked waiting on a human right now — the other
+                # policies self-heal (skip/continue/retry) or already end in a notified
+                # session/interruption event (abort, defer), so notifying here too would
+                # double up.
+                **(dict(
+                    notify="warning", notify_title="Sequencer paused",
+                    notify_body=f"Task {task.id} failed at {err.step}: {err}",
+                ) if policy == "pause" else {}),
             )
         )
         logger.warning(
@@ -575,6 +596,9 @@ class Runner:
                     actor="system",
                     reason=str(err),
                     stall_kind=err.stall_kind,
+                    notify="warning",
+                    notify_title="Task deferred",
+                    notify_body=f"Task {task.id} deferred: {err}",
                 )
             )
             await self._finish_task(entry, TaskStatus.INTERRUPTED, interruption)

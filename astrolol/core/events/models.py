@@ -28,9 +28,21 @@ class ImageStats(BaseModel):
     star_count: int = 0
 
 
+NotifySeverity = Literal["info", "warning", "critical"]
+
+
 class BaseEvent(BaseModel):
     id: str = Field(default_factory=_uid)
     timestamp: datetime = Field(default_factory=_now)
+
+    # Set only by unattended code paths (automation loops, the sequencer runner,
+    # watchdogs) that publish an event with nobody already looking at a response —
+    # never by request-handler code, since the same event class can also fire
+    # synchronously in reaction to a user action (which belongs in the error log
+    # only). None means "not notify-worthy"; clients ignore it either way.
+    notify: NotifySeverity | None = None
+    notify_title: str | None = None
+    notify_body: str | None = None
 
 
 # --- Device events ---

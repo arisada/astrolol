@@ -3,7 +3,7 @@ import contextlib
 from collections.abc import Iterator
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Callable
+from typing import Callable, Literal
 
 import structlog
 
@@ -69,6 +69,12 @@ def meridian_flip_due(pier_side: str | None, hour_angle: float | None) -> bool |
 
 _AUTOMATION_INTERVAL = 30  # seconds between automation checks
 _HORIZON_REARM_DEG = 1.0   # the horizon action re-arms once the mount is this far above the limit
+
+# park()/meridian_flip()/set_tracking() are shared by API routes and the automation loop.
+# "automation" marks a call the user isn't watching a response for, so its outcome events
+# can carry a `notify` — the API-triggered case never does, since the user already sees the
+# result in the response.
+MountActionSource = Literal["api", "automation"]
 
 
 class MountManager:
@@ -195,13 +201,13 @@ class MountManager:
         await self._event_bus.publish(MountSlewAborted(device_id=device_id))
         logger.info("mount.stopped", device_id=device_id)
 
-    async def park(self, device_id: str) -> None:
+    async def park(self, device_id: str, source: MountActionSource = "api") -> None:
         """Start parking the mount. Returns immediately; events announce completion."""
         ctrl = self._get_or_create(device_id)
         self._require_idle(ctrl)
 
         ctrl._active_task = asyncio.create_task(
-            self._park_worker(ctrl),
+            self._park_worker(ctrl, source),
             name=f"mount_park_{device_id}",
         )
         logger.info("mount.parking", device_id=device_id)
@@ -222,11 +228,24 @@ class MountManager:
         )
         logger.info("mount.synced", device_id=device_id, ra=icrs.ra.deg, dec=icrs.dec.deg)
 
-    async def set_tracking(self, device_id: str, enabled: bool, mode: TrackingMode | None = None) -> None:
+    async def set_tracking(
+        self,
+        device_id: str,
+        enabled: bool,
+        mode: TrackingMode | None = None,
+        source: MountActionSource = "api",
+    ) -> None:
         mount = self._device_manager.get_mount(device_id)
         await mount.set_tracking(enabled, mode)
+        notify_kwargs = {}
+        if source == "automation" and not enabled:
+            notify_kwargs = dict(
+                notify="warning",
+                notify_title="Tracking stopped",
+                notify_body=f"{device_id}: tracking stopped automatically (horizon limit)",
+            )
         await self._event_bus.publish(
-            MountTrackingChanged(device_id=device_id, tracking=enabled, mode=mode)
+            MountTrackingChanged(device_id=device_id, tracking=enabled, mode=mode, **notify_kwargs)
         )
         logger.info("mount.tracking_changed", device_id=device_id, tracking=enabled, mode=mode)
 
@@ -261,7 +280,7 @@ class MountManager:
         await mount.pulse_guide(direction, duration_ms)
         logger.debug("mount.pulse_guided", device_id=device_id, direction=direction, duration_ms=duration_ms)
 
-    async def meridian_flip(self, device_id: str) -> None:
+    async def meridian_flip(self, device_id: str, source: MountActionSource = "api") -> None:
         """
         Perform a meridian flip: slew to the current position on the opposite pier side.
         Returns immediately; subscribe to events for completion / failure.
@@ -276,7 +295,7 @@ class MountManager:
             )
 
         ctrl._active_task = asyncio.create_task(
-            self._flip_worker(ctrl),
+            self._flip_worker(ctrl, source),
             name=f"mount_flip_{device_id}",
         )
         await self._event_bus.publish(MountMeridianFlipStarted(device_id=device_id))
@@ -368,9 +387,9 @@ class MountManager:
             limit=cfg.horizon_min_alt_deg, action=cfg.horizon_action,
         )
         if cfg.horizon_action == "park":
-            await self.park(device_id)
+            await self.park(device_id, source="automation")
         else:
-            await self.set_tracking(device_id, False)
+            await self.set_tracking(device_id, False, source="automation")
 
     # --- Automation ---
 
@@ -456,7 +475,7 @@ class MountManager:
                         ctrl = self._get_or_create(device_id)
                         if not ctrl.is_busy:
                             logger.info("mount.auto_park_triggered", device_id=device_id, time=cfg.auto_park_time)
-                            await self.park(device_id)
+                            await self.park(device_id, source="automation")
 
         try:
             status = await self.get_status(device_id)
@@ -489,7 +508,7 @@ class MountManager:
                         ha=round(ha, 3),
                         threshold=cfg.auto_flip_ha_hours,
                     )
-                    await self.meridian_flip(device_id)
+                    await self.meridian_flip(device_id, source="automation")
 
     # --- Internal ---
 
@@ -532,50 +551,68 @@ class MountManager:
         finally:
             ctrl._active_task = None
 
-    async def _flip_worker(self, ctrl: MountController) -> None:
+    async def _flip_worker(self, ctrl: MountController, source: MountActionSource = "api") -> None:
         device_id = ctrl.device_id
         mount = self._device_manager.get_mount(device_id)
+        notify = source == "automation"
         try:
             await asyncio.wait_for(mount.meridian_flip(), timeout=SLEW_TIMEOUT)
-            await self._event_bus.publish(MountMeridianFlipCompleted(device_id=device_id))
+            await self._event_bus.publish(MountMeridianFlipCompleted(
+                device_id=device_id,
+                **(dict(notify="info", notify_title="Meridian flip completed",
+                        notify_body=f"{device_id} flipped automatically") if notify else {}),
+            ))
             logger.info("mount.meridian_flip_completed", device_id=device_id)
         except asyncio.CancelledError:
             logger.info("mount.meridian_flip_cancelled", device_id=device_id)
             raise
         except asyncio.TimeoutError:
             await self._event_bus.publish(MountSlewAborted(device_id=device_id))
-            await self._event_bus.publish(
-                MountOperationFailed(device_id=device_id, operation="meridian_flip", reason="Flip timed out")
-            )
+            await self._event_bus.publish(MountOperationFailed(
+                device_id=device_id, operation="meridian_flip", reason="Flip timed out",
+                **(dict(notify="warning", notify_title="Meridian flip failed",
+                        notify_body=f"{device_id}: flip timed out") if notify else {}),
+            ))
             logger.error("mount.meridian_flip_timeout", device_id=device_id)
         except Exception as exc:
             await self._event_bus.publish(MountSlewAborted(device_id=device_id))
-            await self._event_bus.publish(
-                MountOperationFailed(device_id=device_id, operation="meridian_flip", reason=str(exc))
-            )
+            await self._event_bus.publish(MountOperationFailed(
+                device_id=device_id, operation="meridian_flip", reason=str(exc),
+                **(dict(notify="warning", notify_title="Meridian flip failed",
+                        notify_body=f"{device_id}: {exc}") if notify else {}),
+            ))
             logger.error("mount.meridian_flip_error", device_id=device_id, error=str(exc), exc_info=True)
         finally:
             ctrl._active_task = None
 
-    async def _park_worker(self, ctrl: MountController) -> None:
+    async def _park_worker(self, ctrl: MountController, source: MountActionSource = "api") -> None:
         device_id = ctrl.device_id
         mount = self._device_manager.get_mount(device_id)
+        notify = source == "automation"
         try:
             await asyncio.wait_for(mount.park(), timeout=PARK_TIMEOUT)
-            await self._event_bus.publish(MountParked(device_id=device_id))
+            await self._event_bus.publish(MountParked(
+                device_id=device_id,
+                **(dict(notify="info", notify_title="Mount parked",
+                        notify_body=f"{device_id} parked automatically") if notify else {}),
+            ))
             logger.info("mount.parked", device_id=device_id)
         except asyncio.CancelledError:
             logger.info("mount.park_cancelled", device_id=device_id)
             raise
         except asyncio.TimeoutError:
-            await self._event_bus.publish(
-                MountOperationFailed(device_id=device_id, operation="park", reason="Park timed out")
-            )
+            await self._event_bus.publish(MountOperationFailed(
+                device_id=device_id, operation="park", reason="Park timed out",
+                **(dict(notify="warning", notify_title="Park failed",
+                        notify_body=f"{device_id}: park timed out") if notify else {}),
+            ))
             logger.error("mount.park_timeout", device_id=device_id)
         except Exception as exc:
-            await self._event_bus.publish(
-                MountOperationFailed(device_id=device_id, operation="park", reason=str(exc))
-            )
+            await self._event_bus.publish(MountOperationFailed(
+                device_id=device_id, operation="park", reason=str(exc),
+                **(dict(notify="warning", notify_title="Park failed",
+                        notify_body=f"{device_id}: {exc}") if notify else {}),
+            ))
             logger.error("mount.park_error", device_id=device_id, error=str(exc), exc_info=True)
         finally:
             ctrl._active_task = None

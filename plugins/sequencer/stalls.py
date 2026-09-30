@@ -58,6 +58,9 @@ class StallTracker:
                 task_id=self._entry.task.id,
                 kind=self.kind,
                 error=error,
+                notify="warning",
+                notify_title="Task stalled",
+                notify_body=f"{self._entry.task.id}: {self.kind.value} keeps failing — {error}",
             )
         )
         logger.warning(
@@ -126,6 +129,9 @@ class StallTracker:
                 kind=self.kind,
                 duration_s=round(duration, 1),
                 attempts=attempts,
+                notify="info",
+                notify_title="Task recovered",
+                notify_body=f"{self._entry.task.id}: {self.kind.value} recovered after {duration / 60:.0f} min",
             )
         )
         logger.info(

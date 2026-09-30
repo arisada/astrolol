@@ -48,6 +48,26 @@ async def test_disconnect_counts_as_loss() -> None:
     assert c.guiding_health().reason == "disconnected"
 
 
+async def test_star_lost_notifies() -> None:
+    from astrolol.core.guiding.events import GuidingStateChanged
+
+    c = _client()
+    q = c._event_bus.subscribe()
+    await c._handle_event({"Event": "GuideStep", "RADistanceRaw": 0.0, "DECDistanceRaw": 0.0})
+    while not q.empty():
+        q.get_nowait()
+
+    await c._handle_event({"Event": "StarLost"})
+
+    events = []
+    while not q.empty():
+        events.append(q.get_nowait())
+    lost = next(e for e in events if isinstance(e, GuidingStateChanged))
+    assert lost.notify == "warning"
+    assert lost.notify_title
+    assert lost.notify_body
+
+
 async def _settling_client(error: str | None) -> tuple[Phd2Client, list[Any]]:
     c = _client()
     calls: list[Any] = []

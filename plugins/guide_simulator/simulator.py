@@ -210,7 +210,11 @@ class GuideSimulator:
     async def _lost_event(self, reason: str) -> None:
         if self._health.on_lost(reason):
             await self._bus.publish(
-                GuidingStateChanged(guider=self.name, guiding=False, reason=reason)
+                GuidingStateChanged(
+                    guider=self.name, guiding=False, reason=reason,
+                    notify="warning", notify_title="Guiding stopped",
+                    notify_body=f"{self.name} guiding stopped: {reason}",
+                )
             )
 
     async def _step_loop(self) -> None:
