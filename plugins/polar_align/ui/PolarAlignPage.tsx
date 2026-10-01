@@ -204,6 +204,17 @@ export function PolarAlignPage() {
 
       {/* ── Part 1: reticle ── */}
       <Card title="Polar Scope Reticle" className="p-4 space-y-3">
+        <p className="text-xs text-slate-500">
+          The dot shows where Polaris should sit on your polar scope's dial right now.
+          Your reticle is bolted to the RA axis, so it physically rotates with it — the
+          app has no way to know how yours happens to be clocked in, which is what
+          calibration is for. <strong className="text-slate-400">To calibrate:</strong>{' '}
+          with tracking off, rotate the RA axis by hand until the reticle's own 0°/12
+          o'clock mark is plumb vertical, then press Calibrate. That's only valid as long
+          as the RA axis stays at that exact rotation afterwards — slewing or hand-turning
+          it again invalidates it, which is what the axis-at-home warning below watches
+          for (only possible with a mount connected).
+        </p>
         {mounts.length === 0 && (
           <p className="text-xs text-slate-600">
             No mount connected -- the reticle still shows raw sky positions, but
