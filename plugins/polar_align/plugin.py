@@ -1,8 +1,8 @@
 """Polar-alignment plugin for astrolol.
 
 Part 2 (the plate-solve wizard) and Part 1 (the polar scope reticle view) are both wired
-up here. Part 1 needs no engine of its own -- it's stateless request/response math plus
-calibration persisted in UserSettings.plugin_settings, see reticle.py and api.py.
+up here. Part 1 needs no engine of its own -- it's stateless request/response math, see
+reticle.py and api.py.
 """
 from __future__ import annotations
 

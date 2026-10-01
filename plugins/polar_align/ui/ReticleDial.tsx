@@ -1,8 +1,8 @@
 import type { ReticleState } from '@/api/types'
 
-// Clock-position mapping: angle_deg=0 is straight up (the reticle's calibrated
-// 0deg/12-o'clock mark). angle_deg is Hour Angle-based (SPEC.md section 2) and HA
-// increases as a circumpolar star moves west over time -- which, looking north at the
+// Clock-position mapping: angle_deg=0 is straight up (the reticle's 0deg/12-o'clock
+// mark). angle_deg is Hour Angle-based (SPEC.md section 2) and HA increases as a
+// circumpolar star moves west over time -- which, looking north at the
 // northern-hemisphere sky (the view this reticle models), is COUNTER-clockwise: the
 // classic "star trails circle Polaris counter-clockwise" fact. Found by comparing
 // against a real polar-scope app (PolarisView) at a known site/time: this code
@@ -43,30 +43,15 @@ export function ReticleDial({ state }: { state: ReticleState | null }) {
         <line x1={C} y1={C - 5} x2={C} y2={C + 5} stroke="#64748b" strokeWidth={0.8} />
 
         {dot && (
-          <circle
-            cx={dot.x} cy={dot.y} r={5}
-            fill={state?.axis_at_home === false ? '#f87171' : '#fbbf24'}
-            stroke="#0f1623" strokeWidth={1.5}
-          />
+          <circle cx={dot.x} cy={dot.y} r={5} fill="#fbbf24" stroke="#0f1623" strokeWidth={1.5} />
         )}
       </svg>
 
       {state ? (
         <div className="text-center text-xs text-slate-400 space-y-0.5">
           <div>
-            Radius: <span className="text-slate-200 font-mono">{state.radius_arcmin.toFixed(1)}&prime;</span>
-            {' · '}
             Angle: <span className="text-slate-200 font-mono">{state.angle_deg.toFixed(1)}&deg;</span>
           </div>
-          {!state.calibrated && (
-            <p className="text-amber-400">Uncalibrated -- match by rotating the RA axis, not the alt/az knobs</p>
-          )}
-          {state.axis_at_home === false && (
-            <p className="text-red-400">RA axis has moved since calibration -- this reading is unreliable</p>
-          )}
-          {state.axis_at_home === null && state.calibrated && (
-            <p className="text-slate-600">Axis-at-home unverified (no mount connected)</p>
-          )}
         </div>
       ) : (
         <p className="text-xs text-slate-600">No reading yet</p>

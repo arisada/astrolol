@@ -265,17 +265,8 @@ export interface WizardRun {
 
 // Part 1 — polar scope reticle (reticle.py)
 
-export interface ReticleCalibration {
-  offset_deg: number
-  home_ha_hours: number | null
-  calibrated_at: string
-}
-
 export interface ReticleState {
   angle_deg: number
-  radius_arcmin: number
-  calibrated: boolean
-  axis_at_home: boolean | null
   when: string
 }
 

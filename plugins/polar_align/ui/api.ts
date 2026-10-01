@@ -1,4 +1,4 @@
-import type { ReticleCalibration, ReticleState, WizardRequest, WizardRun } from '@/api/types'
+import type { ReticleState, WizardRequest, WizardRun } from '@/api/types'
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(path, {
@@ -28,21 +28,4 @@ export const cancelWizard = () =>
 
 // ── Part 1: polar scope reticle ─────────────────────────────────────────────────
 
-export const getReticle = (mountNodeId?: string, mountId?: string) => {
-  const params = new URLSearchParams()
-  if (mountNodeId) params.set('mount_node_id', mountNodeId)
-  if (mountId) params.set('mount_id', mountId)
-  const qs = params.toString()
-  return request<ReticleState>(`/plugins/polar_align/reticle${qs ? `?${qs}` : ''}`)
-}
-
-export const calibrateReticle = (mountNodeId: string, mountId?: string) =>
-  request<ReticleCalibration>('/plugins/polar_align/reticle/calibrate', {
-    method: 'POST',
-    body: JSON.stringify({ mount_node_id: mountNodeId, mount_id: mountId ?? null }),
-  })
-
-export const deleteReticleCalibration = (mountNodeId: string) =>
-  request<void>(`/plugins/polar_align/reticle/calibration/${encodeURIComponent(mountNodeId)}`, {
-    method: 'DELETE',
-  })
+export const getReticle = () => request<ReticleState>('/plugins/polar_align/reticle')
