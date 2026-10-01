@@ -212,6 +212,73 @@ export interface AutofocusRun {
   image_height: number | null
 }
 
+// ── Polar alignment (mirrors plugins/polar_align) ──────────────────────────────
+
+// Part 2 — plate-solve wizard (wizard.py)
+
+export interface PoleOffset {
+  axis_ra_hours: number
+  axis_dec_deg: number
+  alt_error_arcmin: number
+  az_error_arcmin: number
+}
+
+export interface ConvergenceUpdate {
+  alt_error_arcmin: number
+  az_error_arcmin: number
+}
+
+export interface WizardRequest {
+  mount_id: string
+  camera_id: string
+  exposure_s?: number
+  binning?: number
+  gain?: number | null
+  step_deg?: number
+  n_points?: 3
+  converge_exposure_s?: number | null
+  converge_binning?: number | null
+  converge_search_radius_deg?: number
+}
+
+export interface WizardPoint {
+  index: number
+  mount_ra_hours: number
+  solved_ra_hours: number
+  solved_dec_deg: number
+  when: string
+}
+
+export type WizardStatus = 'running' | 'converging' | 'completed' | 'failed' | 'cancelled'
+
+export interface WizardRun {
+  id: string
+  status: WizardStatus
+  request: WizardRequest
+  points: WizardPoint[]
+  result: PoleOffset | null
+  convergence_reference_index: number | null
+  live_offset: ConvergenceUpdate | null
+  error: string | null
+  started_at: string
+}
+
+// Part 1 — polar scope reticle (reticle.py)
+
+export interface ReticleCalibration {
+  offset_deg: number
+  home_ha_hours: number | null
+  calibrated_at: string
+}
+
+export interface ReticleState {
+  angle_deg: number
+  radius_arcmin: number
+  calibrated: boolean
+  axis_at_home: boolean | null
+  when: string
+}
+
 // --- Guiding (mirrors astrolol/core/guiding/models.py) ---
 
 export interface GuiderStatus {
@@ -897,6 +964,26 @@ export interface AutofocusCompletedEvent extends BaseEvent {
 export interface AutofocusAbortedEvent extends BaseEvent { type: 'autofocus.aborted'; run_id: string }
 export interface AutofocusFailedEvent extends BaseEvent { type: 'autofocus.failed'; run_id: string; reason: string }
 
+export interface PolarAlignWizardStartedEvent extends BaseEvent { type: 'polar_align.wizard_started'; run_id: string }
+export interface PolarAlignPointStartedEvent extends BaseEvent {
+  type: 'polar_align.point_started'; run_id: string; index: number
+}
+export interface PolarAlignPointSolvedEvent extends BaseEvent {
+  type: 'polar_align.point_solved'; run_id: string; index: number
+  solved_ra_hours: number; solved_dec_deg: number
+}
+export interface PolarAlignFitCompletedEvent extends BaseEvent {
+  type: 'polar_align.fit_completed'; run_id: string; alt_error_arcmin: number; az_error_arcmin: number
+}
+export interface PolarAlignErrorUpdatedEvent extends BaseEvent {
+  type: 'polar_align.error_updated'; run_id: string; alt_error_arcmin: number; az_error_arcmin: number
+}
+export interface PolarAlignWizardCompletedEvent extends BaseEvent { type: 'polar_align.wizard_completed'; run_id: string }
+export interface PolarAlignWizardFailedEvent extends BaseEvent {
+  type: 'polar_align.wizard_failed'; run_id: string; reason: string
+}
+export interface PolarAlignWizardCancelledEvent extends BaseEvent { type: 'polar_align.wizard_cancelled'; run_id: string }
+
 // Coalesced — emitted at most once per second during a burst of index writes (a
 // multi-file rescan, or several captures in quick succession).
 export interface ViewerIndexChangedEvent extends BaseEvent { type: 'viewer.index_changed' }
@@ -1098,6 +1185,9 @@ export type AstrolollEvent =
   | PlatesolveStartedEvent | PlatesolveCompletedEvent | PlatesolveFailedEvent | PlatesolveCancelledEvent
   | AutofocusStartedEvent | AutofocusDataPointEvent | AutofocusCompletedEvent
   | AutofocusAbortedEvent | AutofocusFailedEvent
+  | PolarAlignWizardStartedEvent | PolarAlignPointStartedEvent | PolarAlignPointSolvedEvent
+  | PolarAlignFitCompletedEvent | PolarAlignErrorUpdatedEvent
+  | PolarAlignWizardCompletedEvent | PolarAlignWizardFailedEvent | PolarAlignWizardCancelledEvent
   | GuidingStateChangedEvent | GuidingSettledEvent
   | SequencerStatusEvent | SequencerQueueChangedEvent | SequencerFrameSavedEvent
   | SequencerTaskFinishedEvent | SequencerStepFailedEvent

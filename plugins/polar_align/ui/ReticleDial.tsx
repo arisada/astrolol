@@ -1,0 +1,71 @@
+import type { ReticleState } from '@/api/types'
+
+// Clock-position mapping: angle_deg=0 is straight up (the reticle's calibrated
+// 0deg/12-o'clock mark), increasing clockwise -- matching how a physical polar-scope
+// reticle is read, and SPEC.md section 2's "12 o'clock mark" language.
+function clockToXY(angleDeg: number, radius: number, cx: number, cy: number) {
+  const theta = (angleDeg * Math.PI) / 180
+  return { x: cx + radius * Math.sin(theta), y: cy - radius * Math.cos(theta) }
+}
+
+export function ReticleDial({ state }: { state: ReticleState | null }) {
+  const SIZE = 220
+  const C = SIZE / 2
+  const R = 86 // the engraved circle Polaris's dot should sit on
+
+  const dot = state ? clockToXY(state.angle_deg, R, C, C) : null
+
+  return (
+    <div className="flex flex-col items-center gap-2">
+      <svg viewBox={`0 0 ${SIZE} ${SIZE}`} width={SIZE} height={SIZE} className="block">
+        {/* Bezel */}
+        <circle cx={C} cy={C} r={C - 2} fill="#0f1623" stroke="#1e293b" strokeWidth={1} />
+        {/* Engraved circle Polaris should trace */}
+        <circle cx={C} cy={C} r={R} fill="none" stroke="#334155" strokeWidth={1} strokeDasharray="2,3" />
+        {/* Clock ticks every 30deg, larger every 90deg */}
+        {Array.from({ length: 12 }, (_, i) => {
+          const deg = i * 30
+          const major = deg % 90 === 0
+          const inner = clockToXY(deg, R - (major ? 10 : 6), C, C)
+          const outer = clockToXY(deg, R + (major ? 4 : 2), C, C)
+          return (
+            <line key={i} x1={inner.x} y1={inner.y} x2={outer.x} y2={outer.y}
+              stroke={major ? '#475569' : '#334155'} strokeWidth={major ? 1.2 : 0.8} />
+          )
+        })}
+        {/* True pole: dead centre */}
+        <line x1={C - 5} y1={C} x2={C + 5} y2={C} stroke="#64748b" strokeWidth={0.8} />
+        <line x1={C} y1={C - 5} x2={C} y2={C + 5} stroke="#64748b" strokeWidth={0.8} />
+
+        {dot && (
+          <circle
+            cx={dot.x} cy={dot.y} r={5}
+            fill={state?.axis_at_home === false ? '#f87171' : '#fbbf24'}
+            stroke="#0f1623" strokeWidth={1.5}
+          />
+        )}
+      </svg>
+
+      {state ? (
+        <div className="text-center text-xs text-slate-400 space-y-0.5">
+          <div>
+            Radius: <span className="text-slate-200 font-mono">{state.radius_arcmin.toFixed(1)}&prime;</span>
+            {' · '}
+            Angle: <span className="text-slate-200 font-mono">{state.angle_deg.toFixed(1)}&deg;</span>
+          </div>
+          {!state.calibrated && (
+            <p className="text-amber-400">Uncalibrated -- showing the raw sky angle, not a reticle clock position</p>
+          )}
+          {state.axis_at_home === false && (
+            <p className="text-red-400">RA axis has moved since calibration -- this reading is unreliable</p>
+          )}
+          {state.axis_at_home === null && state.calibrated && (
+            <p className="text-slate-600">Axis-at-home unverified (no mount connected)</p>
+          )}
+        </div>
+      ) : (
+        <p className="text-xs text-slate-600">No reading yet</p>
+      )}
+    </div>
+  )
+}
