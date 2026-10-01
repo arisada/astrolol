@@ -65,7 +65,7 @@ from typing import Any, Callable
 
 import astropy.units as u
 import structlog
-from astropy.coordinates import FK5, AltAz, EarthLocation, SkyCoord
+from astropy.coordinates import TETE, AltAz, EarthLocation, SkyCoord
 from astropy.time import Time
 
 from astrolol.devices.base.models import DeviceState, MountStatus, TrackingMode
@@ -536,7 +536,7 @@ class EqmodSimMount:
 
         now = Time.now()
         icrs = SkyCoord(ra=ra_deg * u.deg, dec=dec * u.deg, frame="icrs")
-        jnow = icrs.transform_to(FK5(equinox=now))
+        jnow = icrs.transform_to(TETE(obstime=now))
         out["ra"] = icrs.ra.hour
         out["dec"] = icrs.dec.deg
         out["ra_jnow"] = jnow.ra.hour

@@ -1,5 +1,8 @@
 """Sky maths that must work offline in the field: no IERS tables (LST uses UTC, Alt/Az has
-no refraction). ICRS<->JNow uses astropy FK5, which is precession only and needs no IERS.
+no refraction). ICRS<->JNow uses astropy TETE (True Equator True Equinox), which applies
+precession + nutation + annual aberration and needs no IERS -- unlike bare FK5(equinox=...),
+which is precession only and was found to disagree with true apparent position by 10-20"
+(nutation is ~9-17", aberration up to ~20.5", both omitted by precession alone).
 """
 from __future__ import annotations
 
@@ -7,7 +10,7 @@ import math
 from datetime import datetime
 
 import astropy.units as u
-from astropy.coordinates import FK5, SkyCoord
+from astropy.coordinates import TETE, SkyCoord
 from astropy.time import Time
 
 
@@ -27,13 +30,13 @@ def alt_az(ha_h: float, dec_deg: float, latitude_deg: float) -> tuple[float, flo
 
 
 def icrs_to_jnow(coord: SkyCoord, when: datetime) -> tuple[float, float]:
-    """Return (RA hours, Dec deg) in the equinox-of-date frame."""
-    jnow = coord.icrs.transform_to(FK5(equinox=Time(when)))
+    """Return (RA hours, Dec deg) in the true-equator/true-equinox-of-date apparent frame."""
+    jnow = coord.icrs.transform_to(TETE(obstime=Time(when)))
     return float(jnow.ra.hour), float(jnow.dec.deg)
 
 
 def jnow_to_icrs(ra_h: float, dec_deg: float, when: datetime) -> SkyCoord:
-    return SkyCoord(ra=ra_h * u.hourangle, dec=dec_deg * u.deg, frame=FK5(equinox=Time(when))).icrs
+    return SkyCoord(ra=ra_h * u.hourangle, dec=dec_deg * u.deg, frame=TETE(obstime=Time(when))).icrs
 
 
 def altitude_of(coord: SkyCoord, when: datetime, latitude_deg: float, longitude_deg: float) -> float:

@@ -2,7 +2,7 @@ from typing import Literal
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 import astropy.units as u
-from astropy.coordinates import FK5, SkyCoord
+from astropy.coordinates import TETE, SkyCoord
 from astropy.time import Time
 
 from astrolol.config.user_settings import MountDeviceSettings
@@ -51,7 +51,7 @@ def _target_request_to_skycoord(body: TargetRequest) -> SkyCoord:
         return SkyCoord(
             ra=body.ra * u.deg,
             dec=body.dec * u.deg,
-            frame=FK5(equinox=Time.now()),
+            frame=TETE(obstime=Time.now()),
         ).icrs
     return _icrs_deg_to_skycoord(body.ra, body.dec)
 

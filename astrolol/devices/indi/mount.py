@@ -18,7 +18,7 @@ import time
 from typing import Callable
 
 import structlog
-from astropy.coordinates import FK5, SkyCoord
+from astropy.coordinates import TETE, SkyCoord
 from astropy.time import Time
 import astropy.units as u
 
@@ -33,8 +33,9 @@ logger = structlog.get_logger()
 
 
 def _to_jnow(coord: SkyCoord) -> SkyCoord:
-    """Convert any SkyCoord to FK5 JNow (the frame INDI EQUATORIAL_EOD_COORD uses)."""
-    return coord.transform_to(FK5(equinox=Time.now()))
+    """Convert any SkyCoord to true-equator/true-equinox-of-date apparent coordinates
+    (precession + nutation + annual aberration), the frame INDI EQUATORIAL_EOD_COORD uses."""
+    return coord.transform_to(TETE(obstime=Time.now()))
 
 
 def _jnow_to_icrs(ra_hours: float, dec_deg: float) -> SkyCoord | None:
@@ -48,7 +49,7 @@ def _jnow_to_icrs(ra_hours: float, dec_deg: float) -> SkyCoord | None:
     return SkyCoord(
         ra=ra_hours * u.hourangle,
         dec=dec_deg * u.deg,
-        frame=FK5(equinox=Time.now()),
+        frame=TETE(obstime=Time.now()),
     ).icrs
 
 
