@@ -1,11 +1,16 @@
 import type { ReticleState } from '@/api/types'
 
 // Clock-position mapping: angle_deg=0 is straight up (the reticle's calibrated
-// 0deg/12-o'clock mark), increasing clockwise -- matching how a physical polar-scope
-// reticle is read, and SPEC.md section 2's "12 o'clock mark" language.
+// 0deg/12-o'clock mark). angle_deg is Hour Angle-based (SPEC.md section 2) and HA
+// increases as a circumpolar star moves west over time -- which, looking north at the
+// northern-hemisphere sky (the view this reticle models), is COUNTER-clockwise: the
+// classic "star trails circle Polaris counter-clockwise" fact. Found by comparing
+// against a real polar-scope app (PolarisView) at a known site/time: this code
+// originally mapped increasing angle_deg to clockwise rotation, placing the dot at the
+// mirror-image clock position (e.g. 6:50 shown where 5:10 was correct).
 function clockToXY(angleDeg: number, radius: number, cx: number, cy: number) {
   const theta = (angleDeg * Math.PI) / 180
-  return { x: cx + radius * Math.sin(theta), y: cy - radius * Math.cos(theta) }
+  return { x: cx - radius * Math.sin(theta), y: cy - radius * Math.cos(theta) }
 }
 
 export function ReticleDial({ state }: { state: ReticleState | null }) {
