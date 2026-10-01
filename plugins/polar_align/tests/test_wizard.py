@@ -413,7 +413,8 @@ async def test_recheck_updates_live_offset(tmp_path) -> None:
     assert imager.expose_count == expose_count_before + 1
     last_solve_call = solve_manager.solve_calls[-1]
     assert last_solve_call["radius"] == run.request.converge_search_radius_deg
-    assert last_solve_call["ra_hint"] == pytest.approx(run.points[-1].solved_ra_hours * 15.0)
+    reference = run.points[run.convergence_reference_index]
+    assert last_solve_call["ra_hint"] == pytest.approx(reference.solved_ra_hours * 15.0)
 
 
 @pytest.mark.asyncio
@@ -430,6 +431,46 @@ async def test_recheck_rejects_when_not_converging(tmp_path) -> None:
     # Never run -- still "running", not "converging".
     with pytest.raises(ValueError, match="converging"):
         await wizard.recheck(run)
+
+
+@pytest.mark.asyncio
+async def test_convergence_reference_picks_best_conditioned_point(tmp_path) -> None:
+    """A regression test for the "last point happens to be degenerate" bug: at this
+    latitude/declination the fitted axis's bearing puts point 0 clearly ahead of points 1
+    and 2 on solver.reference_conditioning_margin_deg (verified independently below), so
+    the wizard must not just default to picking the last point solved."""
+    from astrolol.equipment.models import SiteItem
+    from astrolol.equipment.store import EquipmentStore
+    from astrolol.profiles.models import Profile, ProfileNode
+    from plugins.polar_align.solver import reference_conditioning_margin_deg
+
+    lat, lon = 45.0, 5.0
+    store = EquipmentStore(tmp_path / "inventory.json")
+    site = store.create(SiteItem(name="s", latitude=lat, longitude=lon, altitude=0.0))
+    profile = Profile(name="p", roots=[ProfileNode(item_id=site.id)])
+
+    bus = EventBus()
+    mount = FakeMount(bus, start_ra_h=START_RA_H, start_dec_deg=40.0)
+    imager = FakeImager()
+    solve_manager = FakeSolveManager(mount)
+    app = _app(mount, imager, solve_manager, profile=profile, equipment_store=store)
+
+    wizard = PolarAlignWizard(app, bus)
+    run = WizardRun(id="r1", request=_req(), started_at=datetime.now(timezone.utc))
+    await wizard.run(run)
+    assert run.status == "converging", run.error
+
+    when = datetime.now(timezone.utc)
+    margins = [
+        reference_conditioning_margin_deg(
+            run.result.axis_ra_hours, run.result.axis_dec_deg,
+            p.solved_ra_hours, p.solved_dec_deg, lat, lon, when,
+        )
+        for p in run.points
+    ]
+    best_index = max(range(len(margins)), key=lambda i: margins[i])
+    assert run.convergence_reference_index == best_index
+    assert best_index != len(run.points) - 1  # the whole point of this test: it isn't just "last"
 
 
 @pytest.mark.asyncio

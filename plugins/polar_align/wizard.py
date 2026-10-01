@@ -53,6 +53,7 @@ from plugins.polar_align.solver import (
     Observation,
     PoleOffset,
     fit_pole_offset,
+    reference_conditioning_margin_deg,
     update_pole_offset,
 )
 
@@ -107,6 +108,12 @@ class WizardRun(BaseModel):
     request: WizardRequest
     points: list[WizardPoint] = Field(default_factory=list)
     result: PoleOffset | None = None
+    convergence_reference_index: int | None = Field(
+        default=None,
+        description="Index into points used as the CONVERGING-phase reference -- the "
+        "best-conditioned of the fit's own points for update_pole_offset, not necessarily "
+        "the last one solved (see PolarAlignWizard.run's point-selection, SPEC.md section 3)",
+    )
     live_offset: ConvergenceUpdate | None = Field(
         default=None, description="Latest CONVERGING-phase reading, updated by each recheck"
     )
@@ -223,6 +230,24 @@ class PolarAlignWizard:
                     site.latitude,
                     site.longitude,
                     _now(),
+                )
+                # Pick whichever of the fit's own points is best-conditioned as the
+                # CONVERGING reference, rather than always the last one solved -- the
+                # fitted axis's bearing can by chance put the last point in
+                # update_pole_offset's symmetric-tie guard zone even though the fit itself
+                # was fine (see SPEC.md section 3's "still open" callout -- this closes it).
+                converge_when = _now()
+                run.convergence_reference_index = max(
+                    range(len(run.points)),
+                    key=lambda i: reference_conditioning_margin_deg(
+                        run.result.axis_ra_hours,
+                        run.result.axis_dec_deg,
+                        run.points[i].solved_ra_hours,
+                        run.points[i].solved_dec_deg,
+                        site.latitude,
+                        site.longitude,
+                        converge_when,
+                    ),
                 )
                 # Not "completed": the wizard's own job (producing a fit) is done, but the
                 # run as a whole isn't over until the user is satisfied with the live
@@ -369,7 +394,8 @@ class PolarAlignWizard:
             raise ValueError("No site location configured for the active profile")
 
         req = run.request
-        reference = run.points[-1]
+        ref_index = run.convergence_reference_index
+        reference = run.points[ref_index if ref_index is not None else -1]
         exposure_s = req.converge_exposure_s or req.exposure_s
         binning = req.converge_binning or req.binning
 

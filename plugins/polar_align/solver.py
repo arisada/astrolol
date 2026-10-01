@@ -281,6 +281,57 @@ _MIN_SEP_FROM_SYMMETRIC_PLANE_DEG = 15.0  # the two-solution ambiguity is a near
 _MAX_PLAUSIBLE_KNOB_ADJUSTMENT_DEG = 10.0
 
 
+def _to_altaz_vector(ra_hours: float, dec_deg: float, latitude_deg: float, lst: float) -> np.ndarray:
+    ha = lst - ra_hours
+    alt, az = alt_az(ha, dec_deg, latitude_deg)
+    alt_r, az_r = np.radians(alt), np.radians(az)
+    return np.array([np.cos(alt_r) * np.sin(az_r), np.cos(alt_r) * np.cos(az_r), np.sin(alt_r)])
+
+
+def _knob_axes(axis_ra_hours: float, axis_dec_deg: float, latitude_deg: float, lst: float) -> tuple[
+    np.ndarray, np.ndarray, np.ndarray, np.ndarray
+]:
+    """axis_v, zenith, alt_axis (horizontal, perpendicular to the mount's current azimuth
+    bearing), and normal (== the bearing direction) -- the two mechanically fixed
+    knob-rotation axes plus the plane-normal used by update_pole_offset's symmetric-tie
+    guard. See that function's docstring for the physical meaning."""
+    axis_v = _to_altaz_vector(axis_ra_hours, axis_dec_deg, latitude_deg, lst)
+    zenith = np.array([0.0, 0.0, 1.0])
+    az0 = np.arctan2(axis_v[0], axis_v[1])
+    alt_axis = np.array([np.cos(az0), -np.sin(az0), 0.0])
+    normal = np.cross(zenith, alt_axis)
+    return axis_v, zenith, alt_axis, normal
+
+
+def reference_conditioning_margin_deg(
+    axis_ra_hours: float,
+    axis_dec_deg: float,
+    reference_ra_hours: float,
+    reference_dec_deg: float,
+    latitude_deg: float,
+    longitude_deg: float,
+    when: datetime,
+) -> float:
+    """How far a candidate CONVERGING reference point is from tripping any of
+    update_pole_offset's three conditioning guards, in degrees -- the minimum of the three
+    margins, so a negative value means that guard would reject it. Lets a caller with
+    several already-solved points (e.g. the wizard's 3-point fit) pick the best-conditioned
+    one as the CONVERGING reference instead of hardcoding "the last point", which can land
+    in the symmetric-tie zone purely by chance -- see SPEC.md section 3."""
+    lst = local_sidereal_time_h(when, longitude_deg)
+    _axis_v, zenith, alt_axis, normal = _knob_axes(axis_ra_hours, axis_dec_deg, latitude_deg, lst)
+    p_ref = _to_altaz_vector(reference_ra_hours, reference_dec_deg, latitude_deg, lst)
+
+    sep_from_zenith = np.degrees(np.arccos(np.clip(abs(np.dot(p_ref, zenith)), -1.0, 1.0)))
+    sep_from_alt_axis = np.degrees(np.arccos(np.clip(abs(np.dot(p_ref, alt_axis)), -1.0, 1.0)))
+    sep_from_symmetric_plane = np.degrees(np.arcsin(np.clip(abs(np.dot(p_ref, normal)), -1.0, 1.0)))
+    return min(
+        sep_from_zenith - _MIN_SEP_FROM_ZENITH_DEG,
+        sep_from_alt_axis - _MIN_SEP_FROM_ALT_AXIS_DEG,
+        sep_from_symmetric_plane - _MIN_SEP_FROM_SYMMETRIC_PLANE_DEG,
+    )
+
+
 def update_pole_offset(
     axis_ra_hours: float,
     axis_dec_deg: float,
@@ -322,20 +373,9 @@ def update_pole_offset(
     """
     lst = local_sidereal_time_h(when, longitude_deg)
 
-    def to_altaz_vector(ra_hours: float, dec_deg: float) -> np.ndarray:
-        ha = lst - ra_hours
-        alt, az = alt_az(ha, dec_deg, latitude_deg)
-        alt_r, az_r = np.radians(alt), np.radians(az)
-        return np.array([np.cos(alt_r) * np.sin(az_r), np.cos(alt_r) * np.cos(az_r), np.sin(alt_r)])
-
-    p_ref = to_altaz_vector(reference_ra_hours, reference_dec_deg)
-    p_new = to_altaz_vector(new_ra_hours, new_dec_deg)
-    axis_v = to_altaz_vector(axis_ra_hours, axis_dec_deg)
-
-    zenith = np.array([0.0, 0.0, 1.0])
-    az0 = np.arctan2(axis_v[0], axis_v[1])  # axis's own current azimuth bearing
-    alt_axis = np.array([np.cos(az0), -np.sin(az0), 0.0])  # horizontal, perpendicular to that bearing
-    normal = np.cross(zenith, alt_axis)  # == the bearing direction; |normal| == 1 since zenith ⟂ alt_axis
+    p_ref = _to_altaz_vector(reference_ra_hours, reference_dec_deg, latitude_deg, lst)
+    p_new = _to_altaz_vector(new_ra_hours, new_dec_deg, latitude_deg, lst)
+    axis_v, zenith, alt_axis, normal = _knob_axes(axis_ra_hours, axis_dec_deg, latitude_deg, lst)
 
     sep_from_zenith = np.degrees(np.arccos(np.clip(abs(np.dot(p_ref, zenith)), -1.0, 1.0)))
     if sep_from_zenith < _MIN_SEP_FROM_ZENITH_DEG:
