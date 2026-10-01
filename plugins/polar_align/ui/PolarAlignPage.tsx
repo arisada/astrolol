@@ -4,6 +4,8 @@ import { api } from '@/api/client'
 import * as polarAlignApi from './api'
 import { ReticleDial } from './ReticleDial'
 import { useStore } from '@/store'
+import { useLocalStorage } from '@/hooks/useLocalStorage'
+import { ToggleSwitch } from '@/components/ui/toggle-switch'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -59,6 +61,18 @@ export function PolarAlignPage() {
   const [reticle, setReticle] = useState<ReticleState | null>(null)
   const [reticleError, setReticleError] = useState<string | null>(null)
   const [calibrating, setCalibrating] = useState(false)
+
+  // Purely a per-viewer display convenience (SPEC.md section 2): most polar scopes have
+  // no erecting prism, so a simple lens inverts the image -- both axes at once, i.e. a
+  // 180deg rotation, not a mirror -- which is what lets you skip calibration entirely for
+  // a quick one-off alignment: just rotate the RA axis by hand until the real star (seen
+  // through that inverted view) matches the dot. Only meaningful while uncalibrated --
+  // once calibrated, the stored offset was measured through your actual eyepiece and
+  // already accounts for whatever it does, so adding this on top would double-correct.
+  const [assumeInvertingScope, setAssumeInvertingScope] = useLocalStorage('polar_align.assume_inverting_scope', true)
+  const displayReticle: ReticleState | null = reticle && !reticle.calibrated && assumeInvertingScope
+    ? { ...reticle, angle_deg: (reticle.angle_deg + 180) % 360 }
+    : reticle
 
   const fetchReticle = useCallback(() => {
     polarAlignApi.getReticle(mountNodeId, mountId || undefined)
@@ -206,15 +220,29 @@ export function PolarAlignPage() {
       <Card title="Polar Scope Reticle" className="p-4 space-y-3">
         <p className="text-xs text-slate-500">
           The dot shows where Polaris should sit on your polar scope's dial right now.
-          Your reticle is bolted to the RA axis, so it physically rotates with it — the
-          app has no way to know how yours happens to be clocked in, which is what
-          calibration is for. <strong className="text-slate-400">To calibrate:</strong>{' '}
-          with tracking off, rotate the RA axis by hand until the reticle's own 0°/12
-          o'clock mark is plumb vertical, then press Calibrate. That's only valid as long
-          as the RA axis stays at that exact rotation afterwards — slewing or hand-turning
-          it again invalidates it, which is what the axis-at-home warning below watches
-          for (only possible with a mount connected).
+          <strong className="text-slate-400"> Simplest use:</strong> with tracking off,
+          rotate the RA axis by hand until the real star (seen through your eyepiece)
+          matches the dot's position below — no Calibrate step needed.
         </p>
+
+        {!reticle?.calibrated && (
+          <div className="flex items-start justify-between gap-3 rounded border border-surface-border bg-surface-overlay/50 px-3 py-2">
+            <label className="text-xs text-slate-400 leading-tight">
+              Assume a typical inverting scope
+              <span className="block text-[10px] text-slate-600">
+                Most polar scopes have no erecting prism, so a simple lens flips the image
+                both left-right and top-bottom at once — equivalent to a 180° rotation, not
+                a mirror. Leave this on unless you know yours shows the sky upright.
+              </span>
+            </label>
+            <ToggleSwitch
+              label="Assume a typical 180deg-inverting scope"
+              checked={assumeInvertingScope}
+              onChange={() => setAssumeInvertingScope(!assumeInvertingScope)}
+            />
+          </div>
+        )}
+
         {mounts.length === 0 && (
           <p className="text-xs text-slate-600">
             No mount connected -- the reticle still shows raw sky positions, but
@@ -230,20 +258,34 @@ export function PolarAlignPage() {
         {reticleError && <p className="text-xs text-red-400">{reticleError}</p>}
 
         <div className="flex flex-col items-center">
-          <ReticleDial state={reticle} />
+          <ReticleDial state={displayReticle} />
         </div>
 
-        <div className="flex items-center justify-center gap-2 pt-1">
-          <Button size="sm" variant="outline" onClick={handleCalibrate} disabled={!mountNodeId || calibrating}>
-            <Crosshair size={13} className="mr-1.5" />
-            {calibrating ? 'Calibrating…' : "Calibrate (0° mark is vertical now)"}
-          </Button>
-          {reticle?.calibrated && (
-            <Button size="sm" variant="ghost" onClick={handleClearCalibration} disabled={!mountNodeId}>
-              Clear
+        <details className="text-xs text-slate-500">
+          <summary className="cursor-pointer text-slate-400 hover:text-slate-300">
+            Advanced: precise, persisted calibration
+          </summary>
+          <p className="mt-2 space-y-1">
+            For repeat sessions, or if your scope's install clocking differs from the
+            generic 180° assumption above: with tracking off, rotate the RA axis until the
+            reticle's own 0°/12 o'clock mark is plumb vertical, then press Calibrate. This
+            measures your exact scope's offset once and remembers it (overriding the
+            toggle above), and stays valid only as long as the RA axis doesn't rotate again
+            afterwards — slewing or hand-turning it invalidates it, which the axis-at-home
+            warning watches for (needs a connected mount).
+          </p>
+          <div className="flex items-center gap-2 pt-2">
+            <Button size="sm" variant="outline" onClick={handleCalibrate} disabled={!mountNodeId || calibrating}>
+              <Crosshair size={13} className="mr-1.5" />
+              {calibrating ? 'Calibrating…' : "Calibrate (0° mark is vertical now)"}
             </Button>
-          )}
-        </div>
+            {reticle?.calibrated && (
+              <Button size="sm" variant="ghost" onClick={handleClearCalibration} disabled={!mountNodeId}>
+                Clear
+              </Button>
+            )}
+          </div>
+        </details>
       </Card>
 
       {/* ── Part 2: wizard ── */}

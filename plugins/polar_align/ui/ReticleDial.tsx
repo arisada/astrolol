@@ -59,7 +59,7 @@ export function ReticleDial({ state }: { state: ReticleState | null }) {
             Angle: <span className="text-slate-200 font-mono">{state.angle_deg.toFixed(1)}&deg;</span>
           </div>
           {!state.calibrated && (
-            <p className="text-amber-400">Uncalibrated -- showing the raw sky angle, not a reticle clock position</p>
+            <p className="text-amber-400">Uncalibrated -- match by rotating the RA axis, not the alt/az knobs</p>
           )}
           {state.axis_at_home === false && (
             <p className="text-red-400">RA axis has moved since calibration -- this reading is unreliable</p>
