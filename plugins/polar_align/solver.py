@@ -70,6 +70,15 @@ class PoleOffset(BaseModel):
     az_error_arcmin: float = Field(description="Axis azimuth minus true pole azimuth, wrapped to +-180deg")
 
 
+class ConvergenceUpdate(BaseModel):
+    """Live reading during the knob-adjustment phase: the current total offset, measured
+    fresh each time against the same fixed reference and starting axis -- see
+    update_pole_offset."""
+
+    alt_error_arcmin: float
+    az_error_arcmin: float
+
+
 def fit_pole_offset(
     observations: list[Observation],
     latitude_deg: float,
@@ -260,3 +269,161 @@ def _refine_axis(
             break
 
     return axis_from_xy(x, y)
+
+
+_MIN_SEP_FROM_ZENITH_DEG = 10.0  # az-knob rotation barely moves a point this close to zenith/nadir
+_MIN_SEP_FROM_ALT_AXIS_DEG = 10.0  # alt-knob rotation barely moves a point this close to its own axis
+_MIN_SEP_FROM_SYMMETRIC_PLANE_DEG = 15.0  # the two-solution ambiguity is a near-exact mirror tie this close
+# The 2-solution ambiguity (see update_pole_offset) only becomes practically dangerous --
+# picking the wrong root -- once the rotation is large; a real knob nudge between two
+# consecutive rechecks should never approach this, so treat it as a sign something else
+# is wrong (wrong reference, a slew instead of a knob turn) rather than trust the root.
+_MAX_PLAUSIBLE_KNOB_ADJUSTMENT_DEG = 10.0
+
+
+def update_pole_offset(
+    axis_ra_hours: float,
+    axis_dec_deg: float,
+    reference_ra_hours: float,
+    reference_dec_deg: float,
+    new_ra_hours: float,
+    new_dec_deg: float,
+    latitude_deg: float,
+    longitude_deg: float,
+    when: datetime,
+) -> ConvergenceUpdate:
+    """Measure how far physically turning the mount's altitude/azimuth adjustment knobs
+    has moved the polar axis, by re-solving the *same* nominal pointing (no slew) and
+    comparing it to a fixed reference solved earlier -- typically the last point from the
+    initial fit_pole_offset run, reused rather than taken fresh, since repeated solving is
+    expensive and this needs no new information beyond what the fit already produced.
+
+    This is a different problem from fit_pole_offset's, not a repeat of it: turning a knob
+    does not rotate the mount about its own (possibly still-misaligned) RA axis -- it
+    physically tips the *whole* mount body, axis and OTA together, about one of two
+    mechanically fixed axes: the local vertical (azimuth knob) and the local horizontal
+    axis perpendicular to the mount's current azimuth bearing (altitude knob). A single
+    newly-solved point gives exactly two constraints, matching the two unknown knob
+    angles -- but unlike a system of two linear equations, this one is *not* always
+    uniquely solvable: like a 2-link robot arm reaching one target (elbow-up vs.
+    elbow-down), two genuinely different knob-rotation pairs can produce the same
+    observed point. Resolved by picking the smaller one (a real knob adjustment between
+    rechecks is small), with conditioning guards for reference geometries where that
+    choice stops being reliable -- see the raised ValueErrors for exactly which. Always
+    measured against the *original*, fixed reference and starting axis, not the previous
+    reading, so readings don't accumulate error over repeated calls.
+
+    Always compares reference and new positions at the same `when` (not each one's own
+    solve time): alt/az of a fixed sky point changes with time regardless of any knob
+    turn, so using each solve's own timestamp would conflate ordinary sky rotation with
+    the knob adjustment being measured. Both axes are recomputed from axis_ra_hours/
+    axis_dec_deg and the site every call, not cached, since the knob-axis directions
+    depend on the mount's current azimuth bearing.
+    """
+    lst = local_sidereal_time_h(when, longitude_deg)
+
+    def to_altaz_vector(ra_hours: float, dec_deg: float) -> np.ndarray:
+        ha = lst - ra_hours
+        alt, az = alt_az(ha, dec_deg, latitude_deg)
+        alt_r, az_r = np.radians(alt), np.radians(az)
+        return np.array([np.cos(alt_r) * np.sin(az_r), np.cos(alt_r) * np.cos(az_r), np.sin(alt_r)])
+
+    p_ref = to_altaz_vector(reference_ra_hours, reference_dec_deg)
+    p_new = to_altaz_vector(new_ra_hours, new_dec_deg)
+    axis_v = to_altaz_vector(axis_ra_hours, axis_dec_deg)
+
+    zenith = np.array([0.0, 0.0, 1.0])
+    az0 = np.arctan2(axis_v[0], axis_v[1])  # axis's own current azimuth bearing
+    alt_axis = np.array([np.cos(az0), -np.sin(az0), 0.0])  # horizontal, perpendicular to that bearing
+    normal = np.cross(zenith, alt_axis)  # == the bearing direction; |normal| == 1 since zenith ⟂ alt_axis
+
+    sep_from_zenith = np.degrees(np.arccos(np.clip(abs(np.dot(p_ref, zenith)), -1.0, 1.0)))
+    if sep_from_zenith < _MIN_SEP_FROM_ZENITH_DEG:
+        raise ValueError(
+            f"Reference point is within {_MIN_SEP_FROM_ZENITH_DEG:g}deg of the zenith/nadir -- "
+            "an azimuth-knob adjustment barely moves a point there, so this reading would be "
+            "unreliable. Re-run the initial fit at a lower-altitude target."
+        )
+    sep_from_alt_axis = np.degrees(np.arccos(np.clip(abs(np.dot(p_ref, alt_axis)), -1.0, 1.0)))
+    if sep_from_alt_axis < _MIN_SEP_FROM_ALT_AXIS_DEG:
+        raise ValueError(
+            f"Reference point is within {_MIN_SEP_FROM_ALT_AXIS_DEG:g}deg of the altitude-knob's "
+            "own rotation axis -- an altitude-knob adjustment barely moves a point there, so this "
+            "reading would be unreliable. Re-run the initial fit at a different target."
+        )
+    # A separate degeneracy from both checks above, found by testing: when the reference's
+    # *azimuth* lines up with alt_axis's azimuth (az0 +/- 90deg) -- regardless of altitude,
+    # this is an exact symmetry, not a magnitude effect -- the point sits in the vertical
+    # plane spanned by zenith and alt_axis, which makes the two-solution ambiguity below a
+    # near-exact mirror tie that minimum-norm selection can't reliably break. That plane's
+    # normal is exactly `normal` (the bearing direction), so this is one dot product.
+    sep_from_symmetric_plane = np.degrees(np.arcsin(np.clip(abs(np.dot(p_ref, normal)), -1.0, 1.0)))
+    if sep_from_symmetric_plane < _MIN_SEP_FROM_SYMMETRIC_PLANE_DEG:
+        raise ValueError(
+            f"Reference point's azimuth is within {_MIN_SEP_FROM_SYMMETRIC_PLANE_DEG:g}deg of the "
+            "altitude-knob axis's own azimuth (bearing +/- 90deg) -- this makes the two possible "
+            "knob-adjustment readings nearly indistinguishable regardless of altitude. Re-run the "
+            "initial fit at a different azimuth."
+        )
+
+    # Closed form, not iterative: decompose p_ref -> p_new as p_ref -> q -> p_new, where
+    # q = R_az(d_az) @ p_ref is the point after the azimuth-knob rotation alone. Since
+    # rotating about zenith preserves angular distance from zenith, and rotating about
+    # alt_axis preserves angular distance from alt_axis, q is exactly pinned down by two
+    # known angular-distance constraints: angle(q, zenith) = angle(p_ref, zenith) and
+    # angle(q, alt_axis) = angle(p_new, alt_axis). zenith and alt_axis are *always*
+    # perpendicular by construction (alt_axis is defined to lie in the horizontal plane),
+    # which is exactly what keeps this closed form simple -- no oblique cross-terms.
+    # Two solutions for q exist in general (a real geometric ambiguity, like a 2-link
+    # robot arm's elbow-up/elbow-down for the same target -- confirmed by experiment: an
+    # iterative solver found two genuinely distinct exact solutions for the same inputs),
+    # picked by minimum total knob rotation -- physically, an adjustment between rechecks
+    # is small, not tens of degrees. This closed form also avoids the iterative version's
+    # real problem found during testing: small floating-point-level input noise got
+    # amplified into a meaningfully different (daz, dalt) depending on the solver's
+    # starting seed, because the residual landscape near the true solution is fairly
+    # flat for some geometries.
+    c1 = np.arccos(np.clip(np.dot(p_ref, zenith), -1.0, 1.0))
+    c2 = np.arccos(np.clip(np.dot(p_new, alt_axis), -1.0, 1.0))
+    alpha, beta = np.cos(c1), np.cos(c2)
+    gamma_sq = 1.0 - alpha**2 - beta**2
+    if gamma_sq < -1e-3:
+        raise ValueError(
+            "No knob-adjustment rotation maps the reference onto the new solve -- the solved "
+            "position is inconsistent with a pure altitude/azimuth tip from the reference"
+        )
+    gamma = np.sqrt(max(gamma_sq, 0.0))  # a tight-but-valid case can land fractionally below 0 from fp noise
+
+    def signed_angle_about(u: np.ndarray, v: np.ndarray, axis: np.ndarray) -> float:
+        u_perp = u - np.dot(u, axis) * axis
+        v_perp = v - np.dot(v, axis) * axis
+        return float(np.arctan2(np.dot(axis, np.cross(u_perp, v_perp)), np.dot(u_perp, v_perp)))
+
+    best: tuple[float, float] | None = None
+    for sign in (1.0, -1.0):
+        q = alpha * zenith + beta * alt_axis + sign * gamma * normal
+        d_az = signed_angle_about(p_ref, q, zenith)
+        d_alt = signed_angle_about(q, p_new, alt_axis)
+        if best is None or d_az**2 + d_alt**2 < best[0] ** 2 + best[1] ** 2:
+            best = (d_az, d_alt)
+    assert best is not None
+    d_az, d_alt = best
+    if max(abs(d_az), abs(d_alt)) > np.radians(_MAX_PLAUSIBLE_KNOB_ADJUSTMENT_DEG):
+        raise ValueError(
+            f"Implied knob adjustment exceeds {_MAX_PLAUSIBLE_KNOB_ADJUSTMENT_DEG:g}deg, which isn't "
+            "plausible between two rechecks -- the two-solution ambiguity this closed form has "
+            "becomes unreliable at this scale. Check the mount wasn't slewed/synced instead of "
+            "adjusted by the alt/az knobs, or re-run the initial fit."
+        )
+
+    new_axis_v = _rodrigues(alt_axis, d_alt, _rodrigues(zenith, d_az, axis_v))
+    new_alt = np.degrees(np.arcsin(np.clip(new_axis_v[2], -1.0, 1.0)))
+    new_az = np.degrees(np.arctan2(new_axis_v[0], new_axis_v[1])) % 360.0
+
+    true_pole_dec = 90.0 if latitude_deg >= 0 else -90.0
+    true_alt, true_az = alt_az(0.0, true_pole_dec, latitude_deg)
+
+    return ConvergenceUpdate(
+        alt_error_arcmin=(new_alt - true_alt) * 60.0,
+        az_error_arcmin=np.degrees(_wrap_pm_pi(np.radians(new_az - true_az))) * 60.0,
+    )

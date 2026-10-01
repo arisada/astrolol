@@ -26,7 +26,7 @@ from astropy.time import Time
 import astropy.units as u
 
 from astrolol.mount.sky import local_sidereal_time_h
-from plugins.polar_align.solver import Observation, _refine_axis, fit_pole_offset
+from plugins.polar_align.solver import Observation, _refine_axis, fit_pole_offset, update_pole_offset
 
 LATITUDE = 45.0
 LONGITUDE = 5.0
@@ -370,3 +370,205 @@ def test_random_sweep_recovers_injected_error() -> None:
 
         assert result.alt_error_arcmin == pytest.approx(alt_err, abs=1.5)
         assert result.az_error_arcmin == pytest.approx(az_err, abs=1.5)
+
+
+# ===========================================================================
+# update_pole_offset -- the CONVERGING-phase knob-adjustment measurement.
+#
+# Independent oracle here is built differently from the main fit's: the "knob rotation"
+# is constructed with a freshly-written Rodrigues implementation (not imported from
+# solver.py) operating directly in alt/az terms (where an azimuth-knob rotation is
+# exactly "shift az, keep alt" and an altitude-knob rotation is a rotation about a known
+# horizontal axis), and astropy's AltAz<->FK5 transform (not solver.py's sky.alt_az) is
+# the oracle for converting alt/az to JNow RA/Dec.
+# ===========================================================================
+
+
+def _own_rodrigues(axis: np.ndarray, theta: float, v: np.ndarray) -> np.ndarray:
+    axis = axis / np.linalg.norm(axis)
+    return v * np.cos(theta) + np.cross(axis, v) * np.sin(theta) + axis * np.dot(axis, v) * (1 - np.cos(theta))
+
+
+def _altaz_to_vector(alt_deg: float, az_deg: float) -> np.ndarray:
+    alt_r, az_r = np.radians(alt_deg), np.radians(az_deg)
+    return np.array([np.cos(alt_r) * np.sin(az_r), np.cos(alt_r) * np.cos(az_r), np.sin(alt_r)])
+
+
+def _vector_to_altaz(v: np.ndarray) -> tuple[float, float]:
+    v = v / np.linalg.norm(v)
+    alt = np.degrees(np.arcsin(np.clip(v[2], -1.0, 1.0)))
+    az = np.degrees(np.arctan2(v[0], v[1])) % 360.0
+    return float(alt), float(az)
+
+
+def _apply_knob_rotation(
+    alt_deg: float, az_deg: float, bearing_deg: float, d_az_deg: float, d_alt_deg: float
+) -> tuple[float, float]:
+    """Independent reimplementation of the same physical model update_pole_offset
+    assumes: a rigid-body tip about the local vertical (azimuth knob) composed with a
+    rotation about the horizontal axis perpendicular to `bearing_deg` (altitude knob)."""
+    v = _altaz_to_vector(alt_deg, az_deg)
+    zenith = np.array([0.0, 0.0, 1.0])
+    bearing_r = np.radians(bearing_deg)
+    alt_axis = np.array([np.cos(bearing_r), -np.sin(bearing_r), 0.0])
+    v = _own_rodrigues(zenith, np.radians(d_az_deg), v)
+    v = _own_rodrigues(alt_axis, np.radians(d_alt_deg), v)
+    return _vector_to_altaz(v)
+
+
+def _altaz_to_jnow(alt_deg: float, az_deg: float, latitude_deg: float) -> tuple[float, float]:
+    site = EarthLocation(lat=latitude_deg * u.deg, lon=LONGITUDE * u.deg, height=200 * u.m)
+    coord = SkyCoord(alt=alt_deg * u.deg, az=az_deg * u.deg, frame=AltAz(obstime=TIME, location=site)).transform_to(
+        FK5(equinox=TIME)
+    )
+    return float(coord.ra.hour), float(coord.dec.deg)
+
+
+def _convergence_case(
+    alt_err0_arcmin: float,
+    az_err0_arcmin: float,
+    d_az_deg: float,
+    d_alt_deg: float,
+    ref_alt_deg: float = 45.0,
+    # Not 90: that's alt_axis's own azimuth (bearing +/- 90), the exact mirror-symmetric
+    # degeneracy update_pole_offset now rejects (see _MIN_SEP_FROM_SYMMETRIC_PLANE_DEG).
+    ref_az_offset_deg: float = 45.0,
+    latitude_deg: float = LATITUDE,
+):
+    pole_sign = 1.0 if latitude_deg >= 0 else -1.0
+    axis_alt0 = pole_sign * latitude_deg + alt_err0_arcmin / 60.0
+    axis_az0 = (0.0 if latitude_deg >= 0 else 180.0) + az_err0_arcmin / 60.0
+    ref_alt0, ref_az0 = ref_alt_deg, (axis_az0 + ref_az_offset_deg) % 360.0
+
+    axis_ra_h, axis_dec = _altaz_to_jnow(axis_alt0, axis_az0, latitude_deg)
+    ref_ra_h, ref_dec = _altaz_to_jnow(ref_alt0, ref_az0, latitude_deg)
+
+    new_axis_alt, new_axis_az = _apply_knob_rotation(axis_alt0, axis_az0, axis_az0, d_az_deg, d_alt_deg)
+    new_ref_alt, new_ref_az = _apply_knob_rotation(ref_alt0, ref_az0, axis_az0, d_az_deg, d_alt_deg)
+    new_ra_h, new_dec = _altaz_to_jnow(new_ref_alt, new_ref_az, latitude_deg)
+
+    true_pole_dec = 90.0 if latitude_deg >= 0 else -90.0
+    from astrolol.mount.sky import alt_az as _alt_az
+
+    true_alt, true_az = _alt_az(0.0, true_pole_dec, latitude_deg)
+    expected_alt_error = (new_axis_alt - true_alt) * 60.0
+    expected_az_error = ((new_axis_az - true_az + 180.0) % 360.0 - 180.0) * 60.0
+
+    return axis_ra_h, axis_dec, ref_ra_h, ref_dec, new_ra_h, new_dec, expected_alt_error, expected_az_error
+
+
+@pytest.mark.parametrize(
+    "alt_err0,az_err0,d_az,d_alt",
+    [
+        (20.0, 15.0, 0.0, 0.0),
+        (20.0, 15.0, 9.0, 0.0),
+        (20.0, 15.0, 0.0, -8.0),
+        (20.0, 15.0, -8.0, 6.0),
+        (-30.0, 40.0, 5.0, -5.0),
+        (60.0, -20.0, 8.0, 8.0),
+    ],
+)
+def test_update_pole_offset_matches_independent_oracle(
+    alt_err0: float, az_err0: float, d_az: float, d_alt: float
+) -> None:
+    axis_ra_h, axis_dec, ref_ra_h, ref_dec, new_ra_h, new_dec, exp_alt, exp_az = _convergence_case(
+        alt_err0, az_err0, d_az, d_alt
+    )
+    result = update_pole_offset(axis_ra_h, axis_dec, ref_ra_h, ref_dec, new_ra_h, new_dec, LATITUDE, LONGITUDE, WHEN)
+
+    assert result.alt_error_arcmin == pytest.approx(exp_alt, abs=1.5)
+    assert result.az_error_arcmin == pytest.approx(exp_az, abs=1.5)
+
+
+def test_update_pole_offset_zero_knob_rotation_is_a_noop() -> None:
+    axis_ra_h, axis_dec, ref_ra_h, ref_dec, new_ra_h, new_dec, exp_alt, exp_az = _convergence_case(
+        25.0, -10.0, 0.0, 0.0
+    )
+    result = update_pole_offset(axis_ra_h, axis_dec, ref_ra_h, ref_dec, new_ra_h, new_dec, LATITUDE, LONGITUDE, WHEN)
+
+    assert result.alt_error_arcmin == pytest.approx(25.0, abs=1.5)
+    assert result.az_error_arcmin == pytest.approx(-10.0, abs=1.5)
+
+
+def test_update_pole_offset_southern_hemisphere() -> None:
+    axis_ra_h, axis_dec, ref_ra_h, ref_dec, new_ra_h, new_dec, exp_alt, exp_az = _convergence_case(
+        15.0, -25.0, -8.0, 6.0, latitude_deg=-LATITUDE
+    )
+    result = update_pole_offset(
+        axis_ra_h, axis_dec, ref_ra_h, ref_dec, new_ra_h, new_dec, -LATITUDE, LONGITUDE, WHEN
+    )
+
+    assert result.alt_error_arcmin == pytest.approx(exp_alt, abs=1.5)
+    assert result.az_error_arcmin == pytest.approx(exp_az, abs=1.5)
+
+
+def test_update_pole_offset_rejects_reference_near_zenith() -> None:
+    axis_ra_h, axis_dec, ref_ra_h, ref_dec, new_ra_h, new_dec, _, _ = _convergence_case(
+        10.0, 10.0, 5.0, 5.0, ref_alt_deg=89.0
+    )
+    with pytest.raises(ValueError, match="zenith"):
+        update_pole_offset(axis_ra_h, axis_dec, ref_ra_h, ref_dec, new_ra_h, new_dec, LATITUDE, LONGITUDE, WHEN)
+
+
+def test_update_pole_offset_rejects_reference_near_alt_axis() -> None:
+    # alt_axis (horizontal, perpendicular to the bearing) points at azimuth bearing+90,
+    # altitude 0 -- a reference near THAT azimuth and near the horizon is what's nearly
+    # aligned with it, not a reference at the bearing's own azimuth (that's actually the
+    # best-conditioned direction, since it's as far from alt_axis as azimuth allows).
+    axis_ra_h, axis_dec, ref_ra_h, ref_dec, new_ra_h, new_dec, _, _ = _convergence_case(
+        10.0, 10.0, 5.0, 5.0, ref_alt_deg=2.0, ref_az_offset_deg=90.0
+    )
+    with pytest.raises(ValueError, match="altitude-knob"):
+        update_pole_offset(axis_ra_h, axis_dec, ref_ra_h, ref_dec, new_ra_h, new_dec, LATITUDE, LONGITUDE, WHEN)
+
+
+def test_update_pole_offset_rejects_implausibly_large_adjustment() -> None:
+    # The 2-solution ambiguity picks the wrong root for some geometries once the
+    # rotation gets this large (confirmed directly: both candidates are exact solutions,
+    # minimum-norm selection isn't reliably the physical one any more) -- large enough
+    # that it isn't a realistic single knob nudge between rechecks either way.
+    axis_ra_h, axis_dec, ref_ra_h, ref_dec, new_ra_h, new_dec, _, _ = _convergence_case(
+        60.0, -20.0, 20.0, 20.0
+    )
+    with pytest.raises(ValueError, match="knob adjustment"):
+        update_pole_offset(axis_ra_h, axis_dec, ref_ra_h, ref_dec, new_ra_h, new_dec, LATITUDE, LONGITUDE, WHEN)
+
+
+def test_update_pole_offset_random_sweep() -> None:
+    """With the injected axis kept close to the pole (realistic: fine-tuning an already
+    roughly-aligned mount), azimuth itself is somewhat numerically sensitive -- the same
+    effect fit_pole_offset's own near-pole tests have to account for -- so a conditioning
+    guard legitimately rejecting a handful of random draws is expected, not a failure;
+    what matters is that it doesn't reject *most* of them, and that every accepted draw
+    is correct."""
+    rng = np.random.default_rng(20261001)
+    rejected = 0
+    checked = 0
+    for _ in range(50):
+        alt_err0 = rng.uniform(-80.0, 80.0)
+        az_err0 = rng.uniform(-170.0, 170.0)
+        # Within the realistic knob-adjustment range update_pole_offset actually targets
+        # (see _MAX_PLAUSIBLE_KNOB_ADJUSTMENT_DEG) -- a dedicated test covers the guard
+        # that rejects larger, ambiguity-prone implied adjustments.
+        d_az = rng.uniform(-7.0, 7.0)
+        d_alt = rng.uniform(-7.0, 7.0)
+        ref_alt = rng.uniform(20.0, 70.0)
+        ref_az_offset = rng.choice([45.0, 60.0, 120.0, 135.0, 225.0, 240.0, 300.0, 315.0])
+        latitude = rng.choice([LATITUDE, -LATITUDE])
+
+        axis_ra_h, axis_dec, ref_ra_h, ref_dec, new_ra_h, new_dec, exp_alt, exp_az = _convergence_case(
+            alt_err0, az_err0, d_az, d_alt, ref_alt_deg=ref_alt, ref_az_offset_deg=ref_az_offset,
+            latitude_deg=latitude,
+        )
+        try:
+            result = update_pole_offset(
+                axis_ra_h, axis_dec, ref_ra_h, ref_dec, new_ra_h, new_dec, latitude, LONGITUDE, WHEN
+            )
+        except ValueError:
+            rejected += 1
+            continue
+        checked += 1
+        assert result.alt_error_arcmin == pytest.approx(exp_alt, abs=1.5)
+        assert result.az_error_arcmin == pytest.approx(exp_az, abs=1.5)
+
+    assert checked >= 35, f"too many of 50 draws were rejected by a conditioning guard ({rejected})"

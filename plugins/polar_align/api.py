@@ -34,9 +34,26 @@ async def get_wizard(request: Request) -> WizardRun:
     return run
 
 
+@router.post("/wizard/recheck", response_model=WizardRun)
+async def recheck_wizard(request: Request) -> WizardRun:
+    """One CONVERGING-phase reading: re-solve once and report how far the alt/az knobs
+    have moved the axis since the fixed reference. 404 if no run has been started; 422 if
+    the run isn't in the converging phase or the reading itself was bad (a solve failure,
+    or an ambiguous/ill-conditioned geometry -- see solver.update_pole_offset) -- neither
+    is fatal to the run, the caller can just try again."""
+    try:
+        return await _engine(request).recheck()
+    except ValueError as exc:
+        raise HTTPException(status_code=404 if "No polar" in str(exc) else 422, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
 @router.delete("/wizard", status_code=204)
 async def cancel_wizard(request: Request) -> None:
-    """Cancel the running wizard. No-op if already idle. Does not move the mount back --
-    see wizard.py's module docstring on why re-slewing on cancel would be actively harmful
-    once the user has started physically adjusting the mount."""
+    """Stop the wizard. During CONVERGING this marks the run completed (the user is
+    satisfied, nothing failed); otherwise it aborts the in-progress run. No-op if already
+    idle. Does not move the mount back -- see wizard.py's module docstring on why
+    re-slewing on cancel would be actively harmful once the user has started physically
+    adjusting the mount."""
     await _engine(request).cancel()

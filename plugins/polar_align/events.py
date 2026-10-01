@@ -32,6 +32,14 @@ class PolarAlignFitCompleted(BaseEvent):
     az_error_arcmin: float
 
 
+class PolarAlignErrorUpdated(BaseEvent):
+    """Emitted on each CONVERGING-phase recheck, as the user turns the alt/az knobs."""
+    type: Literal["polar_align.error_updated"] = "polar_align.error_updated"
+    run_id: str
+    alt_error_arcmin: float
+    az_error_arcmin: float
+
+
 class PolarAlignWizardCompleted(BaseEvent):
     type: Literal["polar_align.wizard_completed"] = "polar_align.wizard_completed"
     run_id: str

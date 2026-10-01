@@ -9,11 +9,15 @@ That's also why solve_manager.solve() takes **kwargs rather than a SolveRequest
 instance: building one here would require importing plugins.platesolve.models.
 
 CONVERGING (the live, re-solve-without-re-slewing phase that lets the user watch the
-error shrink while turning alt/az knobs) is deliberately NOT implemented here. It needs
-its own new pure function -- the fitted axis from this module's observations is not
-valid once the user starts turning knobs, so "re-solve and report" is a different math
-problem, not a repeat of fit_pole_offset -- see SPEC.md section 3. This module currently
-stops at DONE once the initial fit is in.
+error shrink while turning alt/az knobs) uses solver.update_pole_offset, a genuinely
+different pure function from fit_pole_offset -- the fitted axis from the initial 3-point
+run is not something CONVERGING re-derives, it's an input: each recheck re-solves once
+and measures how far that implies the knobs have physically moved the axis since. The
+reference point and binning/exposure settings used for a recheck solve are deliberately
+reused/tightened versions of the main fit's, not fresh ones at the main fit's full
+precision: repeated plate-solving is the expensive part of this whole feature, and a
+recheck only needs to track whether the error is shrinking, not re-establish it from
+scratch -- see WizardRequest's converge_* fields.
 """
 from __future__ import annotations
 
@@ -35,6 +39,7 @@ from astrolol.equipment.optical_path import find_profile_site
 from astrolol.imaging.models import ExposureRequest
 from astrolol.mount.sky import altitude_of, icrs_to_jnow
 from plugins.polar_align.events import (
+    PolarAlignErrorUpdated,
     PolarAlignFitCompleted,
     PolarAlignPointSolved,
     PolarAlignPointStarted,
@@ -43,7 +48,13 @@ from plugins.polar_align.events import (
     PolarAlignWizardFailed,
     PolarAlignWizardStarted,
 )
-from plugins.polar_align.solver import Observation, PoleOffset, fit_pole_offset
+from plugins.polar_align.solver import (
+    ConvergenceUpdate,
+    Observation,
+    PoleOffset,
+    fit_pole_offset,
+    update_pole_offset,
+)
 
 logger = structlog.get_logger()
 
@@ -66,6 +77,20 @@ class WizardRequest(BaseModel):
     # SPEC.md section 6.3: 3 points only for v1 -- a 2-point fit is only reliable away
     # from the equator and solver.py's own guard will reject it near the equator anyway.
     n_points: Literal[3] = 3
+    # CONVERGING-phase recheck settings -- deliberately separate from the main fit's own
+    # exposure_s/binning above, and defaulting to faster/smaller rather than inheriting
+    # them: a recheck only needs to track whether the error is shrinking, not re-establish
+    # it at the main fit's precision, and repeated plate-solving is the expensive part of
+    # this whole feature (see module docstring).
+    converge_exposure_s: float | None = Field(default=None, gt=0)
+    converge_binning: int | None = Field(default=None, ge=1)
+    converge_search_radius_deg: float = Field(
+        default=3.0, gt=0,
+        description="ASTAP search radius for a recheck solve. Small and tight on purpose: "
+        "the mount hasn't been slewed, only the knobs turned a little, so the true position "
+        "is known to within a couple of degrees of the reference -- a small radius is what "
+        "actually makes a recheck solve fast.",
+    )
 
 
 class WizardPoint(BaseModel):
@@ -78,10 +103,13 @@ class WizardPoint(BaseModel):
 
 class WizardRun(BaseModel):
     id: str
-    status: Literal["running", "completed", "failed", "cancelled"] = "running"
+    status: Literal["running", "converging", "completed", "failed", "cancelled"] = "running"
     request: WizardRequest
     points: list[WizardPoint] = Field(default_factory=list)
     result: PoleOffset | None = None
+    live_offset: ConvergenceUpdate | None = Field(
+        default=None, description="Latest CONVERGING-phase reading, updated by each recheck"
+    )
     error: str | None = None
     started_at: datetime
 
@@ -196,7 +224,11 @@ class PolarAlignWizard:
                     site.longitude,
                     _now(),
                 )
-                run.status = "completed"
+                # Not "completed": the wizard's own job (producing a fit) is done, but the
+                # run as a whole isn't over until the user is satisfied with the live
+                # knob-adjustment readings and says so (WizardEngine.cancel() during this
+                # phase marks it completed then -- see that method's docstring).
+                run.status = "converging"
                 logger.info(
                     "polar_align.fit_completed", run_id=run_id,
                     alt_error_arcmin=run.result.alt_error_arcmin,
@@ -209,7 +241,6 @@ class PolarAlignWizard:
                         az_error_arcmin=run.result.az_error_arcmin,
                     )
                 )
-                await self._publish(PolarAlignWizardCompleted(run_id=run_id))
         except asyncio.CancelledError:
             run.status = "cancelled"
             await self._publish(PolarAlignWizardCancelled(run_id=run_id))
@@ -315,6 +346,78 @@ class PolarAlignWizard:
             f"Plate solve failed for point {index} after {MAX_SOLVE_ATTEMPTS} attempts: {last_error}"
         )
 
+    async def recheck(self, run: WizardRun) -> None:
+        """One CONVERGING-phase reading: expose, solve once (tight hint + small radius --
+        see WizardRequest.converge_*, and the module docstring on why), and measure how far
+        that implies the knobs have moved the axis since the fixed reference. Raises on a
+        bad reading (solve failure, or an update_pole_offset conditioning/ambiguity guard)
+        without touching run.status -- a single bad recheck isn't fatal to the run, the
+        caller just doesn't get an updated live_offset this time and can try again."""
+        if run.status != "converging":
+            raise ValueError("Polar alignment is not in the converging phase")
+        if run.result is None or not run.points:
+            raise RuntimeError("No fit result to converge against")
+        app = self._app
+        im = getattr(app.state, "imager_manager", None)
+        solve_manager = getattr(app.state, "solve_manager", None)
+        if im is None or solve_manager is None or not hasattr(solve_manager, "solve"):
+            raise RuntimeError(
+                "Polar alignment needs the imager and platesolve plugin enabled (solve_manager.solve)"
+            )
+        site = self._site(app)
+        if site is None:
+            raise ValueError("No site location configured for the active profile")
+
+        req = run.request
+        reference = run.points[-1]
+        exposure_s = req.converge_exposure_s or req.exposure_s
+        binning = req.converge_binning or req.binning
+
+        t0 = _now()
+        exposure = await im.expose(
+            req.camera_id,
+            ExposureRequest(duration=exposure_s, binning=binning, gain=req.gain, save=False),
+        )
+        when = t0 + timedelta(seconds=exposure_s / 2.0)
+        result = await solve_manager.solve(
+            fits_path=str(exposure.fits_path),
+            ra_hint=reference.solved_ra_hours * 15.0,
+            dec_hint=reference.solved_dec_deg,
+            radius=req.converge_search_radius_deg,
+        )
+        icrs_coord = SkyCoord(ra=result.ra * u.deg, dec=result.dec * u.deg, frame="icrs")
+        new_ra_h, new_dec = icrs_to_jnow(icrs_coord, when)
+
+        run.live_offset = update_pole_offset(
+            run.result.axis_ra_hours,
+            run.result.axis_dec_deg,
+            reference.solved_ra_hours,
+            reference.solved_dec_deg,
+            new_ra_h,
+            new_dec,
+            site.latitude,
+            site.longitude,
+            when,
+        )
+        logger.info(
+            "polar_align.error_updated", run_id=run.id,
+            alt_error_arcmin=run.live_offset.alt_error_arcmin,
+            az_error_arcmin=run.live_offset.az_error_arcmin,
+        )
+        await self._publish(
+            PolarAlignErrorUpdated(
+                run_id=run.id,
+                alt_error_arcmin=run.live_offset.alt_error_arcmin,
+                az_error_arcmin=run.live_offset.az_error_arcmin,
+            )
+        )
+
+    async def finish_converging(self, run: WizardRun) -> None:
+        """The user is satisfied and stops CONVERGING -- a completion, not a cancellation
+        (nothing failed; see WizardEngine.cancel())."""
+        run.status = "completed"
+        await self._publish(PolarAlignWizardCompleted(run_id=run.id))
+
     async def _publish(self, event: BaseEvent) -> None:
         """Best-effort: a missing/misbehaving event bus must never break the wizard run
         itself, only its live progress reporting."""
@@ -340,12 +443,29 @@ class WizardEngine:
     async def start(self, req: WizardRequest) -> WizardRun:
         if self._task is not None and not self._task.done():
             raise ValueError("Polar alignment is already running. Cancel it first.")
+        # The background task itself finishes normally on entering "converging" (see
+        # PolarAlignWizard.run) -- rechecks from then on are one-shot calls, not a task --
+        # so the task-done check above doesn't catch "still in the converging phase",
+        # and a run sitting there is still very much in progress from the user's side.
+        if self._current_run is not None and self._current_run.status == "converging":
+            raise ValueError("Polar alignment is still converging. Finish or cancel it first.")
         run = WizardRun(id=uuid.uuid4().hex[:12], request=req, started_at=_now())
         self._current_run = run
         self._task = asyncio.create_task(self._wizard.run(run), name=f"polar_align_{run.id}")
         return run
 
+    async def recheck(self) -> WizardRun:
+        if self._current_run is None:
+            raise ValueError("No polar alignment run has been started")
+        await self._wizard.recheck(self._current_run)
+        return self._current_run
+
     async def cancel(self) -> None:
+        """Stop the current run. During CONVERGING this is a completion, not an abort --
+        see PolarAlignWizard.finish_converging."""
+        if self._current_run is not None and self._current_run.status == "converging":
+            await self._wizard.finish_converging(self._current_run)
+            return
         if self._task is not None and not self._task.done():
             self._task.cancel()
             try:
