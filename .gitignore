@@ -22,4 +22,5 @@ astrolol.log
 ui/node_modules/
 ui/dist/
 BUGS.md
+SPEC.md
 /inventory.json

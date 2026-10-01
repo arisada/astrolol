@@ -191,6 +191,21 @@ class SolveManager:
     # Public API
     # ------------------------------------------------------------------
 
+    async def solve(self, **kwargs: Any) -> SolveResult:
+        """Solve a single FITS file and await the result directly (no polling).
+
+        Takes the same keyword arguments as SolveRequest (fits_path, ra_hint, dec_hint,
+        radius, tolerance, fov) and builds one internally -- like center() does for
+        CenterRequest -- so a caller reaching this via app.state (another plugin; see
+        plugin_api.py's "plugins must not import each other directly") never needs to
+        import SolveRequest itself.
+
+        For callers that need a solve inline in their own control flow rather than as a
+        background job -- unlike submit()/expose_and_solve(), which only ever return a
+        pollable SolveJob.
+        """
+        return await self._solve(SolveRequest(**kwargs), job_id=str(uuid4()))
+
     async def submit(self, request: SolveRequest) -> SolveJob:
         """Create and start a new solve job. Returns immediately."""
         job = _Job(
