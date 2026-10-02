@@ -637,6 +637,12 @@ class Runner:
             or moved
             or paused_s > self.settings.recenter_after_pause_min * 60
         )
+        # A pause (however short) can leave the filter wheel anywhere — e.g. a manual
+        # autofocus run moves it to a focus filter and doesn't put it back. Don't trust
+        # the cached "last filter we set" across any pause; force a re-select before the
+        # next frame regardless of whether a full setup re-run is also needed.
+        for ls in ts.lanes.values():
+            ls.current_filter = None
         self._pause_reason = None
         await self.bus.publish(
             SequencerResumed(

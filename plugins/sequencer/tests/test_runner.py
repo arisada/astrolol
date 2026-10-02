@@ -246,6 +246,32 @@ async def test_pause_now_discards_the_frame(rig: Rig) -> None:
     assert (await rig.svc.get(entry.task.id)).runtime.frames_done() == 2
 
 
+async def test_resume_reselects_filter_moved_during_pause(rig: Rig) -> None:
+    """A pause can let something else (e.g. a manual autofocus run) move the filter
+    wheel. On resume the sequencer must not trust its cached "last filter we set" and
+    skip re-selecting — it has to re-assert the task's filter before the next frame."""
+    import asyncio
+
+    rig.imager.gate = asyncio.Event()
+    rig.fwm.slot = 5  # Ha
+    groups = [ExposureGroup(filter_name="R", duration=1, count=2)]
+    await rig.svc.add(make_task(groups=groups, dither_every=None))
+    await rig.svc.start()
+    await wait_until(lambda: rig.imager.exposing)
+    await rig.svc.pause("frame", actor="user")
+    rig.imager.gate.set()
+    await wait_until(lambda: rig.svc.status().run_state == RunState.PAUSED)
+    assert rig.fwm.selected == [2]  # R selected before the first frame
+
+    # Something external (manual autofocus, INDI panel, ...) moves the wheel away.
+    rig.fwm.slot = 1
+
+    await rig.svc.resume(actor="user")
+    assert await rig.svc.wait_idle() == RunOutcome.COMPLETED
+    # The second frame must re-select R rather than trusting the stale cache.
+    assert rig.fwm.selected == [2, 2]
+
+
 async def test_resume_before_pause_takes_effect_cancels_it(rig: Rig) -> None:
     import asyncio
 
