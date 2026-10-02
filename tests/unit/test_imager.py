@@ -233,6 +233,28 @@ def test_patch_fits_headers_no_object_when_empty(tmp_path: Path):
         assert "OBJECT" not in hdul[0].header
 
 
+def test_patch_fits_headers_writes_filter(tmp_path: Path):
+    from astropy.io import fits as astrofits
+    from tests.conftest import make_fake_fits
+    fits_file = make_fake_fits(tmp_path / "test.fits")
+
+    _patch_fits_headers(fits_file, None, None, None, filter_name="Ha")
+
+    with astrofits.open(str(fits_file)) as hdul:
+        assert hdul[0].header["FILTER"] == "Ha"
+
+
+def test_patch_fits_headers_no_filter_when_empty(tmp_path: Path):
+    from astropy.io import fits as astrofits
+    from tests.conftest import make_fake_fits
+    fits_file = make_fake_fits(tmp_path / "test.fits")
+
+    _patch_fits_headers(fits_file, None, None, None, filter_name="")
+
+    with astrofits.open(str(fits_file)) as hdul:
+        assert "FILTER" not in hdul[0].header
+
+
 # --- _do_expose on a tree-only profile (regression: object_name/filter_name/FITS
 # telescope+site metadata used to only ever be looked up via the (now-removed) flat
 # profile.devices list and profile.telescope field, which were always empty for a

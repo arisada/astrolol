@@ -131,6 +131,7 @@ def _patch_fits_headers(
     site: "SiteItem | None",
     coord: "SkyCoord | None",
     object_name: str = "",
+    filter_name: str = "",
 ) -> None:
     """Inject observatory and telescope metadata into an existing FITS file.
 
@@ -144,6 +145,8 @@ def _patch_fits_headers(
             hdr = hdul[0].header
             if object_name:
                 hdr["OBJECT"] = (object_name, "Target object name")
+            if filter_name:
+                hdr["FILTER"] = (filter_name, "Filter name")
             if telescope is not None:
                 hdr["TELESCOP"] = (telescope.name, "Telescope name")
                 hdr["FOCALLEN"] = (telescope.focal_length, "[mm] Focal length")
@@ -472,7 +475,7 @@ class ImagerManager:
         await asyncio.to_thread(_write_imagetyp, fits_path, request.frame_type)
         if profile is not None:
             await asyncio.to_thread(
-                _patch_fits_headers, fits_path, telescope, site, coord, object_name
+                _patch_fits_headers, fits_path, telescope, site, coord, object_name, filter_name
             )
 
         # Optionally move to save directory, or park unsaved frames in a fixed temp path
