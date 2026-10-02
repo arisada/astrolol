@@ -167,7 +167,7 @@ class IndiClient(IPyClient):
 
         if isinstance(event, indi_events.Message) and event.message:
             if event.devicename:
-                logger.info("indi.message", device=event.devicename, message=event.message)
+                logger.debug("indi.message", device=event.devicename, message=event.message)
                 # In LOCAL upload mode indiserver does not forward setBLOBVector to clients;
                 # instead it sends a Message "... Image saved to /path".  Parse it here so
                 # wait_for_local_image() can return the path without polling.
@@ -176,7 +176,7 @@ class IndiClient(IPyClient):
                     if path_str:
                         self._local_image_paths[event.devicename] = Path(path_str)
             else:
-                logger.info("indi.message", message=event.message)
+                logger.debug("indi.message", message=event.message)
 
         if self._cond is not None:
             async with self._cond:
