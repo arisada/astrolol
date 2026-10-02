@@ -163,6 +163,15 @@ class EventBusForwarder:
         self._bus = bus
 
     def __call__(self, logger_inst: Any, method: str, event_dict: dict) -> dict:
+        # structlog runs this processor chain before handing off to the wrapped
+        # stdlib logger, so level filtering hasn't happened yet at this point —
+        # without this check every debug() call would reach the UI live log even
+        # when that logger's effective level is INFO (i.e. it's dropped before
+        # ever reaching the file/stderr handlers). Check the same way stdlib would.
+        logger_name = str(event_dict.get("logger", ""))
+        level_no = logging.getLevelName(method.upper())
+        if not isinstance(level_no, int) or not logging.getLogger(logger_name).isEnabledFor(level_no):
+            return event_dict
         if (
             self._bus is not None
             and method in ("info", "warning", "error", "critical", "debug")

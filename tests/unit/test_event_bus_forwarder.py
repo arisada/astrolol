@@ -1,5 +1,6 @@
 """Tests for EventBusForwarder — the structlog→EventBus bridge."""
 import asyncio
+import logging
 import pytest
 from unittest.mock import AsyncMock, MagicMock, patch
 
@@ -9,6 +10,18 @@ from astrolol.core.events.models import LogEvent
 
 def _make_event_dict(level="info", logger="astrolol.mount.manager", message="hello"):
     return {"level": level, "logger": logger, "event": message}
+
+
+@pytest.fixture(autouse=True)
+def _root_at_info():
+    # setup_logging() always sets the root logger to INFO in the real app; match
+    # that here so info/warning/error forwarding tests reflect production level
+    # filtering rather than pytest's own (unrelated) root logger configuration.
+    root = logging.getLogger()
+    previous = root.level
+    root.setLevel(logging.INFO)
+    yield
+    root.setLevel(previous)
 
 
 # ── Passthrough behaviour ─────────────────────────────────────────────────────
@@ -79,27 +92,62 @@ async def test_forwards_warning_and_error():
 
 
 @pytest.mark.asyncio
-async def test_forwards_debug():
+async def test_forwards_debug_once_the_scope_is_enabled():
     # Debug messages are forwarded so they appear in the live UI log panel
-    # when a scope has been set to debug verbosity.
-    fwd = EventBusForwarder()
-    published: list = []
+    # when a scope has been set to debug verbosity — but not before, since the
+    # same call would never reach the file/stderr handlers either.
+    logger_name = "plugins.some_scope"
+    logging.getLogger(logger_name).setLevel(logging.DEBUG)
+    try:
+        fwd = EventBusForwarder()
+        published: list = []
 
-    async def fake_publish(evt):
-        published.append(evt)
+        async def fake_publish(evt):
+            published.append(evt)
 
-    bus = MagicMock()
-    bus.publish = fake_publish
-    fwd.set_bus(bus)
+        bus = MagicMock()
+        bus.publish = fake_publish
+        fwd.set_bus(bus)
 
-    async def _run():
-        fwd(None, "debug", _make_event_dict(level="debug", message="verbose debug"))
-        await asyncio.sleep(0)
+        async def _run():
+            fwd(None, "debug", _make_event_dict(logger=logger_name, level="debug", message="verbose debug"))
+            await asyncio.sleep(0)
 
-    await _run()
-    assert len(published) == 1
-    assert published[0].level == "debug"
-    assert published[0].message == "verbose debug"
+        await _run()
+        assert len(published) == 1
+        assert published[0].level == "debug"
+        assert published[0].message == "verbose debug"
+    finally:
+        logging.getLogger(logger_name).setLevel(logging.NOTSET)
+
+
+@pytest.mark.asyncio
+async def test_does_not_forward_debug_below_the_logger_s_level():
+    # Without this, every debug() call anywhere would reach the live UI log
+    # panel regardless of the logger's configured level — the file/stderr
+    # handlers filter these out via stdlib's level check, which only happens
+    # *after* this processor runs, so it must apply the same check itself.
+    logger_name = "plugins.some_other_scope"
+    logging.getLogger(logger_name).setLevel(logging.INFO)
+    try:
+        fwd = EventBusForwarder()
+        published: list = []
+
+        async def fake_publish(evt):
+            published.append(evt)
+
+        bus = MagicMock()
+        bus.publish = fake_publish
+        fwd.set_bus(bus)
+
+        async def _run():
+            fwd(None, "debug", _make_event_dict(logger=logger_name, level="debug", message="should not appear"))
+            await asyncio.sleep(0)
+
+        await _run()
+        assert published == []
+    finally:
+        logging.getLogger(logger_name).setLevel(logging.NOTSET)
 
 
 @pytest.mark.asyncio
