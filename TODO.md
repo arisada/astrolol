@@ -85,6 +85,73 @@ baked into the current code/design or a feature left out; revisit when it bites.
   (0.1–1.0x sidereal, default 0.5). Verified against a stub/real astrolol, not yet against a
   real indiserver + PHD2.
 
+## From the 2026-10-01 night session
+
+Observations from a real imaging session (IC 1795, Ha/L/R/G/B) logged in `oct_1/`.
+Trivial items from that session (mobile sidebar scroll, EFW filter-name comma input,
+`indi.message` log spam, stale filter cache on sequencer resume, missing FITS `FILTER`
+header, `EventBusForwarder` forwarding debug logs to the UI regardless of the logger's
+actual level, favorites silently failing to save because `crypto.randomUUID()` throws
+over plain HTTP by hostname) were fixed in the same session — see git log. The rest needs
+more design/testing than a single sitting allows:
+
+- **Polar-align wizard's first point can land near the pole** — the 3-point fit picks its
+  own RA/Dec test points and on 2026-10-01 the first one landed close to DEC=90°, which
+  the mount struggled with (confirmed in `astrolol.log`: `mount.target_set` with
+  `dec≈89.85`). It went fine after the user manually picked a lower Dec. Either let the
+  user pick/override the starting Dec, or bias the wizard's point selection away from the
+  pole by default.
+- **Polar-align "Refresh" can get stuck repeating a stale fit** — after a 3-point fit, the
+  user hit Refresh and kept getting the same "5.6′ too high / 8.1′ east" result
+  (`polar_align.fit_completed` not re-running the solve, or re-solving against a cached
+  frame — needs to be reproduced and root-caused). Wanted: a start/stop auto-refresh with
+  a configurable interval instead of a manual one-shot button.
+- **Autofocus star detector picks up hot pixels, especially on defocused frames** — no
+  single run worked reliably with the L filter that night (`autofocus.failed`: "Focus
+  curve did not fit a valid V shape" × 6 in `astrolol.log`). `plugins/autofocus/star_detector.py`
+  needs a hot-pixel rejection pass (e.g. a bad-pixel map, or rejecting single-pixel-wide
+  sources) before HFD/FWHM measurement.
+- **FWHM metric performs much worse than HFD** for autofocus on this rig — consider
+  defaulting new autofocus configs to HFD, or investigating why FWHM's star fit is so much
+  more hot-pixel-sensitive than HFD's.
+- **Parallel-lane "too long" warning fires on two identical-duration lanes** — in
+  `plugins/sequencer/lanes.py::estimate_lanes`, when a secondary lane's exposure duration
+  equals (or is close to) the primary's and `dither_every` is tight, `room = interval -
+  duration - margin_s` goes negative even though the two lanes are nominally the same
+  length, so `per_interval` floors to 0 and `wall_s` blows up to `inf` / triggers
+  `secondary_outlasts_primary` — observed with two 300×10 lanes. The "fits between
+  dithers" model may need a special case (or a clearer message) for lanes whose group
+  durations match the primary's.
+- **OOM browsing images in the viewer** — expensive per-image operations (thumbnailing,
+  full-res preview, star detection for quality scoring) should be serialized behind the
+  memory-pressure-aware mutex mentioned in the architecture notes (not built yet) so
+  browsing a large image set on a Pi can't exhaust memory.
+- **Resuming a sequencer task after a crash skips re-plate-solving** — a crash mid-task
+  should be treated like a long pause on the next startup (force `setup_needed=True` so
+  `_setup()`'s slew/center/plate-solve runs again), not resume straight into exposing at
+  the last known pointing.
+- **Too many PHD2 "star lost" notifications** — `phd2.settle_failed` logged 113 times in
+  one night. Needs de-duplication/throttling (e.g. collapse repeats within a time window
+  into one notification, or only notify on a state *transition* into "lost") before this
+  reaches the UI as a toast/push notification.
+- **mDNS didn't advertise on the production Pi** — worked fine on the dev machine; to
+  investigate on real hardware. First boot that night also logged `mdns.not_advertising`
+  (`reason: advertised_port is not set`) before the port setting took effect — check
+  whether the plugin should fall back to the app's own listening port instead of requiring
+  an explicit `advertised_port`.
+- **Sequencer camera temperature/ramp settings are unused** — the task editor doesn't let
+  you set a target sensor temperature or cooling ramp rate; add to `ExposureGroup`/`Lane`
+  and apply it at task setup.
+- **PHD2 log analyzer** — parse PHD2's own guide log inside astrolol (star mass, RMS,
+  dither/settle events) instead of requiring a separate tool. New plugin or part of
+  `plugins/phd2/`.
+- **`eqmod.stop_move` can 500 instead of degrading gracefully** — `/mount/<id>/move`
+  (stop) raised `TimeoutError`/`EqmodMountError: Mount error 2: Motor not stopped` as an
+  unhandled 500 four times that night (`plugins/eqmod/mount.py::_stop_axis`,
+  `protocol.py::set_motion_mode`). The driver should retry or report a clean device-error
+  state instead of leaking a raw exception through the API; `astrolol/api/mount.py`'s
+  `stop_move` has no handling for an EQMOD-specific failure mode.
+
 ## Near-term
 
 - **Target persistence across restart** — store the last-set target in `profiles.json` so
