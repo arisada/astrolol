@@ -922,6 +922,11 @@ function ItemForm({
   )
   const [connectParamsError, setConnectParamsError] = useState<string | null>(null)
 
+  const initialFilterNames = (initial as { filter_names?: string[] }).filter_names
+  const [filterNamesText, setFilterNamesText] = useState(
+    (initialFilterNames ?? []).join(', '),
+  )
+
   useEffect(() => { nameRef.current?.focus() }, [])
 
   // Pre-fill system timezone for new site items
@@ -1111,10 +1116,11 @@ function ItemForm({
       {type === 'filter_wheel' && (
         <FieldRow label="Filter names (comma-separated)">
           <input
-            value={(form as { filter_names: string[] }).filter_names.join(', ')}
-            onChange={(e) =>
+            value={filterNamesText}
+            onChange={(e) => {
+              setFilterNamesText(e.target.value)
               set('filter_names', e.target.value.split(',').map((s) => s.trim()).filter(Boolean))
-            }
+            }}
             placeholder="L, R, G, B, Ha, OIII, SII"
             className="bg-surface border border-surface-border rounded px-3 py-1.5 text-sm text-slate-200
               focus:outline-none focus:ring-1 focus:ring-accent w-full"
