@@ -7,6 +7,20 @@ import { SearchBox, type ObjectMatch } from './SearchBox'
 import { ObjectCard } from './ObjectCard'
 import { FavoritesList } from './FavoritesList'
 
+// crypto.randomUUID() only exists in secure contexts (HTTPS or localhost) — it's
+// undefined when astrolol is reached over plain HTTP by hostname/IP (e.g.
+// http://astrolol.lan:8000 via mDNS), which throws here and silently aborts
+// before the favourite is ever saved. crypto.getRandomValues() has no such
+// restriction, so build a UUID v4 from it when randomUUID isn't available.
+function makeFavoriteId(): string {
+  if (typeof crypto.randomUUID === 'function') return crypto.randomUUID()
+  const bytes = crypto.getRandomValues(new Uint8Array(16))
+  bytes[6] = (bytes[6] & 0x0f) | 0x40
+  bytes[8] = (bytes[8] & 0x3f) | 0x80
+  const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('')
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`
+}
+
 export function TargetPage() {
   const connectedDevices = useStore((s) => s.connectedDevices)
   const mountIds = connectedDevices.filter((d) => d.kind === 'mount').map((d) => d.device_id)
@@ -102,7 +116,7 @@ export function TargetPage() {
       return
     }
     const newFav: FavoriteTarget = {
-      id: crypto.randomUUID(),
+      id: makeFavoriteId(),
       name: selected.name,
       ra: selected.ra,
       dec: selected.dec,
@@ -138,7 +152,7 @@ export function TargetPage() {
       return
     }
     const newFav: FavoriteTarget = {
-      id: crypto.randomUUID(),
+      id: makeFavoriteId(),
       name: mountSaveName.trim(),
       ra: raDeg,
       dec: dec!,
