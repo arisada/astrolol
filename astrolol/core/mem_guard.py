@@ -29,11 +29,28 @@ from contextlib import asynccontextmanager
 from typing import Callable
 
 # Single global semaphore — limit of 1 means at most one guarded block runs at
-# a time when low-memory mode is active.
-_sem = asyncio.Semaphore(1)
+# a time when low-memory mode is active. Created lazily, bound to whichever
+# event loop first acquires it (asyncio.Semaphore binds to the running loop on
+# first use, same as asyncio.Lock/Event/Condition — see docs/indi-testing-notes.md
+# #8). The app has exactly one loop for its whole process lifetime, so this never
+# matters in production; it matters for tests, which may run different test
+# modules on different loops (this repo's pytest config scopes the event loop per
+# module) — recreate the semaphore if the running loop has changed since it was
+# last bound, instead of leaking a stale binding across test modules.
+_sem: asyncio.Semaphore | None = None
+_sem_loop: asyncio.AbstractEventLoop | None = None
 
 # Replaced by configure(); returns False (guard disabled) until wired up.
 _check_fn: Callable[[], bool] = lambda: False
+
+
+def _current_sem() -> asyncio.Semaphore:
+    global _sem, _sem_loop
+    loop = asyncio.get_running_loop()
+    if _sem is None or _sem_loop is not loop:
+        _sem = asyncio.Semaphore(1)
+        _sem_loop = loop
+    return _sem
 
 
 def configure(check_fn: Callable[[], bool]) -> None:
@@ -55,7 +72,7 @@ async def mem_guard():
     When disabled, yields immediately without touching the semaphore.
     """
     if _check_fn():
-        async with _sem:
+        async with _current_sem():
             yield
     else:
         yield
