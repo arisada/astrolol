@@ -107,10 +107,6 @@ more design/testing than a single sitting allows:
 - **FWHM metric performs much worse than HFD** for autofocus on this rig — consider
   defaulting new autofocus configs to HFD, or investigating why FWHM's star fit is so much
   more hot-pixel-sensitive than HFD's.
-- **OOM browsing images in the viewer** — expensive per-image operations (thumbnailing,
-  full-res preview, star detection for quality scoring) should be serialized behind the
-  memory-pressure-aware mutex mentioned in the architecture notes (not built yet) so
-  browsing a large image set on a Pi can't exhaust memory.
 - **Resuming a sequencer task after a crash skips re-plate-solving** — a crash mid-task
   should be treated like a long pause on the next startup (force `setup_needed=True` so
   `_setup()`'s slew/center/plate-solve runs again), not resume straight into exposing at

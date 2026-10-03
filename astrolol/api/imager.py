@@ -123,6 +123,7 @@ async def render_preview(
     import asyncio
     import tempfile
 
+    from astrolol.core.mem_guard import mem_guard
     from astrolol.imaging.preview import fits_to_jpeg, fits_to_jpeg_linear
 
     fits_path = _imager(request).get_last_fits_path(device_id)
@@ -132,10 +133,11 @@ async def render_preview(
     tmp_dir = Path(tempfile.gettempdir()) / "astrolol"
     tmp_dir.mkdir(parents=True, exist_ok=True)
     out_path = tmp_dir / f"live_preview_{device_id}.jpg"
-    if mode == "linear":
-        await asyncio.to_thread(fits_to_jpeg_linear, Path(fits_path), out_path, quality)
-    else:
-        await asyncio.to_thread(fits_to_jpeg, Path(fits_path), out_path, quality, black_pct, white_pct)
+    async with mem_guard():
+        if mode == "linear":
+            await asyncio.to_thread(fits_to_jpeg_linear, Path(fits_path), out_path, quality)
+        else:
+            await asyncio.to_thread(fits_to_jpeg, Path(fits_path), out_path, quality, black_pct, white_pct)
     return FileResponse(out_path, media_type="image/jpeg")
 
 

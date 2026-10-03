@@ -189,6 +189,71 @@ def test_thumbnail_and_preview_and_stats(client: TestClient, tmp_path: Path) -> 
     assert "histogram" in stats.json()
 
 
+async def test_preview_generation_serialises_under_low_memory_mode(
+    app: FastAPI, tmp_path: Path
+) -> None:
+    """/preview.jpg decodes the full FITS frame into memory (see preview.py) — under
+    low_memory_mode it must go through mem_guard so two requests for different images
+    never do that at the same time (see astrolol/core/mem_guard.py).
+
+    Stays fully async throughout (no sync TestClient calls) — ViewerIndex's internal
+    asyncio.Lock binds to whichever event loop first awaits it, and mixing TestClient's
+    own loop with this async test's loop raises "bound to a different event loop"."""
+    import asyncio
+
+    from astrolol.core import mem_guard as mem_guard_mod
+    from httpx import ASGITransport, AsyncClient
+
+    lib = tmp_path / "lib"
+    write_fits(lib / "a.fits", **_std_header())
+    write_fits(lib / "b.fits", **_std_header(OBJECT="M31"))
+
+    await app.state.viewer_index.start()
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as ac:
+            resp = await ac.put("/plugins/viewer/settings", json={"library_dir": str(lib)})
+            assert resp.status_code == 200
+            await ac.post("/plugins/viewer/rescan")
+            for _ in range(100):
+                if not (await ac.get("/plugins/viewer/status")).json()["rescanning"]:
+                    break
+                await asyncio.sleep(0.02)
+
+            items = (await ac.get("/plugins/viewer/images")).json()["items"]
+            assert len(items) == 2
+            id_a, id_b = items[0]["id"], items[1]["id"]
+
+            order: list[str] = []
+
+            def _fake_fits_to_jpeg(fits_path, jpeg_path, quality, black_pct, white_pct):
+                order.append("enter")
+                import time
+                time.sleep(0.05)
+                Path(jpeg_path).write_bytes(b"\xff\xd8\xff\xd9")  # minimal JPEG
+                order.append("exit")
+                return {"histogram": [], "hist_min": 0.0, "hist_max": 1.0, "stretch_low": 0.0,
+                        "stretch_high": 1.0, "mean": 0.0, "median": 0.0}
+
+            import plugins.viewer.api as viewer_api
+            original = viewer_api.fits_to_jpeg
+            viewer_api.fits_to_jpeg = _fake_fits_to_jpeg
+            original_check = mem_guard_mod._check_fn
+            mem_guard_mod.configure(lambda: True)
+            try:
+                await asyncio.gather(
+                    ac.get(f"/plugins/viewer/images/{id_a}/preview.jpg"),
+                    ac.get(f"/plugins/viewer/images/{id_b}/preview.jpg"),
+                )
+            finally:
+                viewer_api.fits_to_jpeg = original
+                mem_guard_mod._check_fn = original_check
+    finally:
+        await app.state.viewer_index.close()
+
+    # Semaphore(1): the first call must fully exit before the second enters.
+    assert order == ["enter", "exit", "enter", "exit"]
+
+
 def test_fits_download(client: TestClient, tmp_path: Path) -> None:
     lib = tmp_path / "lib"
     write_fits(lib / "a.fits", **_std_header())

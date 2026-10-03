@@ -13,6 +13,7 @@ import structlog
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import FileResponse
 
+from astrolol.core.mem_guard import mem_guard
 from astrolol.imaging.preview import fits_to_jpeg, fits_to_jpeg_linear
 from astrolol.profiles.store import ProfileStore
 from plugins.viewer.index import ImageFilters, RescanInProgress, ViewerIndex
@@ -294,7 +295,8 @@ async def get_stats(image_id: str, request: Request) -> dict:
         return json.loads(stats_path.read_text())
 
     tmp_jpeg = cache_dir / f"{record.id}_{int(record.mtime)}.stats.jpg"
-    stats = await asyncio.to_thread(fits_to_jpeg, Path(record.path), tmp_jpeg, 85, 50.0, 99.0)
+    async with mem_guard():
+        stats = await asyncio.to_thread(fits_to_jpeg, Path(record.path), tmp_jpeg, 85, 50.0, 99.0)
     import json
     stats_path.write_text(json.dumps(stats))
     tmp_jpeg.unlink(missing_ok=True)
@@ -315,12 +317,13 @@ async def get_preview(
         f"{render.white_pct}_{render.quality}.jpg"
     )
     if not out.exists():
-        if render.mode == "linear":
-            await asyncio.to_thread(fits_to_jpeg_linear, Path(record.path), out, render.quality)
-        else:
-            await asyncio.to_thread(
-                fits_to_jpeg, Path(record.path), out, render.quality, render.black_pct, render.white_pct,
-            )
+        async with mem_guard():
+            if render.mode == "linear":
+                await asyncio.to_thread(fits_to_jpeg_linear, Path(record.path), out, render.quality)
+            else:
+                await asyncio.to_thread(
+                    fits_to_jpeg, Path(record.path), out, render.quality, render.black_pct, render.white_pct,
+                )
     return FileResponse(out, media_type="image/jpeg")
 
 

@@ -19,6 +19,8 @@ from pathlib import Path
 
 from PIL import Image
 
+from astrolol.core.mem_guard import mem_guard
+
 THUMB_MAX_DIM = 256
 THUMB_QUALITY = 70
 
@@ -36,10 +38,13 @@ async def ensure_thumbnail(
     if out.exists():
         return out
     if source_preview_jpeg is not None and source_preview_jpeg.exists():
+        # Downscaling an existing small JPEG, not decoding a full FITS frame — cheap,
+        # no need to serialise it with the heavy path below.
         await asyncio.to_thread(_downscale_jpeg, source_preview_jpeg, out)
     else:
         from astrolol.imaging.preview import fits_to_thumbnail
-        await asyncio.to_thread(fits_to_thumbnail, fits_path, out, THUMB_MAX_DIM, THUMB_QUALITY)
+        async with mem_guard():
+            await asyncio.to_thread(fits_to_thumbnail, fits_path, out, THUMB_MAX_DIM, THUMB_QUALITY)
     return out
 
 
