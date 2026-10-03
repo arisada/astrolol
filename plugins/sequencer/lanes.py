@@ -159,12 +159,23 @@ def _weighted_primary_duration(task: ImagingTask) -> float:
 def estimate_lanes(task: ImagingTask, margin_s: float) -> list[LaneEstimate]:
     """Per-lane exposure, efficiency and duration, from the fit rule.
 
-    Between two dithers the primary exposes ``dither_every`` frames. A secondary lane's
-    first frame of the interval runs in lockstep with the primary and needs no margin of
-    its own (same as the primary's own frame) — it only has to fit within the interval at
-    all. Each *additional* frame squeezed into the same interval has to end ``margin``
-    before the dither, so it fits ``floor((interval - duration - margin) / duration)``
-    more on top of that first one.
+    Between two dithers the primary exposes ``dither_every`` frames. A secondary frame
+    starts only if it ends ``margin`` before the dither, so (download time aside) it fits
+    ``floor((interval - duration - margin) / duration) + 1`` frames per interval.
+
+    This genuinely requires ``duration + margin <= interval`` even for a single frame —
+    there's no "first frame is free" exemption, because the runtime scheduling gate this
+    estimate has to match (``RigSchedule.fits()`` in this module) doesn't grant one
+    either: it always requires ``clock() + duration + margin <= next_mount_op()``, with
+    no notion of "this is the first secondary frame since the last dither." A secondary
+    lane whose exposure is close to or equal to the primary's own, with ``dither_every``
+    tight, is a real scheduling conflict, not just an overly strict estimate — the
+    secondary will actually stall forever in WAITING_FOR_PRIMARY at runtime, not just get
+    a pessimistic preflight number. (An earlier version of this function added that
+    exemption to fix a confusing preflight warning on two equal-duration lanes, without
+    changing the runtime gate to match — which made the preflight lie instead. See the
+    TODO entry on parallel lanes for what a real fix — teaching the runtime gate the same
+    "first frame since the last dither is free" rule — would need.)
     """
     primary = task.lanes[0]
     primary_total = sum(g.count * g.duration for g in primary.groups)
@@ -200,17 +211,13 @@ def estimate_lanes(task: ImagingTask, margin_s: float) -> list[LaneEstimate]:
             continue
         exposing = 0.0
         for g in lane.groups:
-            if g.duration > interval:
-                per_interval = 0
-            else:
-                remaining = interval - g.duration
-                extra = math.floor((remaining - margin_s) / g.duration) if remaining >= margin_s else 0
-                per_interval = 1 + extra
+            room = interval - g.duration - margin_s
+            per_interval = math.floor(room / g.duration) + 1 if room >= 0 else 0
             eff = per_interval * g.duration / interval
             exposing += g.count * g.duration * eff
         efficiency = exposing / total if total else 1.0
         can_start = shortest_interval is not None and all(
-            g.duration <= shortest_interval for g in lane.groups
+            g.duration + margin_s <= shortest_interval for g in lane.groups
         )
         wall = total / efficiency if efficiency > 0 else math.inf
         out.append(
@@ -465,9 +472,12 @@ async def _prepare_frame(
     if group.filter_name is not None and ls.current_filter != group.filter_name:
         if index:
             await runner.set_lane_activity(entry, index, Activity.CHANGING_FILTER)
-        await runner._steps.change_filter(entry.task.id, devices, group.filter_name)
+        moved = await runner._steps.change_filter(entry.task.id, devices, group.filter_name)
         ls.current_filter = group.filter_name
-        if lane.autofocus_on_filter_change:
+        # Only moved==True means the wheel actually turned. ls.current_filter gets
+        # invalidated on every sequencer resume (a pause could have let something else
+        # touch the wheel) even when it didn't — don't autofocus for those no-ops.
+        if moved and lane.autofocus_on_filter_change:
             ls.af_due = f"filter {group.filter_name}"
     if index:
         schedule.set_busy(lane.id, True)

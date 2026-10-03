@@ -272,6 +272,33 @@ async def test_resume_reselects_filter_moved_during_pause(rig: Rig) -> None:
     assert rig.fwm.selected == [2, 2]
 
 
+async def test_resume_does_not_autofocus_when_the_filter_never_moved(rig: Rig) -> None:
+    """Invalidating the cached filter on resume (above) must not also fire an unwanted
+    autofocus: _prepare_frame's change_filter call is now a no-op (the wheel was already
+    on the right slot — nothing disturbed it during the pause), and only an actual move
+    should arm autofocus_on_filter_change."""
+    import asyncio
+
+    rig.imager.gate = asyncio.Event()
+    rig.fwm.slot = 1  # not yet on R (slot 2) -- the first frame's change triggers autofocus
+    groups = [ExposureGroup(filter_name="R", duration=1, count=2)]
+    task = make_task(groups=groups, dither_every=None)
+    task.lanes = [Lane(groups=groups, autofocus_on_filter_change=True)]
+    await rig.svc.add(task)
+    await rig.svc.start()
+    await wait_until(lambda: rig.imager.exposing)
+    await rig.svc.pause("frame", actor="user")
+    rig.imager.gate.set()
+    await wait_until(lambda: rig.svc.status().run_state == RunState.PAUSED)
+    assert rig.autofocus.calls == [("cam1", "foc1")]  # only the first frame's filter change
+
+    # Nothing touched the wheel during the pause.
+    await rig.svc.resume(actor="user")
+    assert await rig.svc.wait_idle() == RunOutcome.COMPLETED
+    # No second autofocus run from the cache invalidation alone.
+    assert rig.autofocus.calls == [("cam1", "foc1")]
+
+
 async def test_resume_before_pause_takes_effect_cancels_it(rig: Rig) -> None:
     import asyncio
 

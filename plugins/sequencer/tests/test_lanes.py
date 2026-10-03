@@ -120,25 +120,28 @@ def test_estimate_secondary_longer_than_the_dither_interval() -> None:
     assert est[1].can_start is False
 
 
-def test_estimate_equal_duration_lanes_fit_with_the_default_dither() -> None:
-    """Regression: two lanes with the same per-frame duration (300x10 and 300x10) under
-    the default dither_every=1 used to be flagged as never fitting / outlasting the
-    primary, purely because the margin was charged against the only frame in the
-    interval — the one running in lockstep with the primary's own frame, which needs no
-    margin of its own."""
+def test_estimate_equal_duration_lanes_need_the_margin_too() -> None:
+    """Two lanes with the same per-frame duration (300x10 and 300x10) under the default
+    dither_every=1 genuinely can't both run at full efficiency when margin_s > 0 — this
+    is not just a pessimistic estimate, it matches RigSchedule.fits()'s actual runtime
+    gate (see test_schedule_follows_the_primary_exposure), which requires
+    ``clock() + duration + margin <= next_mount_op()`` with no exemption for a lane's
+    first frame since the last dither. (An earlier version of estimate_lanes added that
+    exemption to silence this case without changing the runtime gate to match, which
+    made the preflight estimate promise something the scheduler would never actually
+    deliver — the secondary lane would stall forever in WAITING_FOR_PRIMARY.)"""
     est = estimate_lanes(_two_lanes(300, 300, 1), margin_s=10)
-    assert est[1].can_start is True
-    assert est[1].efficiency == pytest.approx(1.0)
-    assert est[1].wall_s == pytest.approx(est[0].wall_s)
+    assert est[1].can_start is False
+    assert est[1].efficiency == pytest.approx(0.0)
 
 
-def test_estimate_secondary_a_touch_under_the_interval_still_fits() -> None:
-    """A secondary frame that leaves less slack than the margin — but still fits inside
-    the interval — must not be rejected: the margin only governs squeezing in *extra*
-    frames beyond the first one."""
+def test_estimate_secondary_a_touch_under_the_interval_still_needs_the_margin() -> None:
+    """Same as above but with only a 5s shortfall (duration 295 vs interval 300, margin
+    10) — still a real conflict, not just a rounding nitpick: RigSchedule.fits() would
+    compute clock()+295+10=305 > next_mount_op()=300 and never let this lane start."""
     est = estimate_lanes(_two_lanes(300, 295, 1), margin_s=10)
-    assert est[1].can_start is True
-    assert est[1].efficiency == pytest.approx(295 / 300, abs=0.001)
+    assert est[1].can_start is False
+    assert est[1].efficiency == pytest.approx(0.0)
 
 
 # ── Runs ──────────────────────────────────────────────────────────────────────

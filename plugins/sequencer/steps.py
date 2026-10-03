@@ -512,7 +512,15 @@ class Steps:
         )
         return resolved
 
-    async def change_filter(self, task_id: str, devices: LaneDevices, filter_name: str) -> None:
+    async def change_filter(self, task_id: str, devices: LaneDevices, filter_name: str) -> bool:
+        """Returns True if the wheel actually moved, False if it was already there.
+
+        Callers that trigger autofocus on a filter change (``autofocus_on_filter_change``)
+        must only do so when this returns True — the cache that decides *whether* to call
+        this (``_LaneState.current_filter``) gets invalidated on every sequencer resume,
+        since a pause could have let something else touch the wheel, but most resumes
+        never actually did.
+        """
         fwm = self._state("filter_wheel_manager")
         if devices.filter_wheel_id is None or fwm is None:
             raise StepError("change_filter", f"No filter wheel for camera '{devices.camera_id}'")
@@ -528,7 +536,7 @@ class Steps:
             )
         slot = names.index(filter_name) + 1
         if status.current_slot == slot:
-            return
+            return False
         t0 = await self._started(
             task_id, "change_filter", Activity.CHANGING_FILTER, f"Filter → {filter_name}"
         )
@@ -539,6 +547,7 @@ class Steps:
                 "change_filter", f"Changing to filter '{filter_name}' failed: {exc}"
             ) from exc
         await self._finished(task_id, "change_filter", t0, {"filter": filter_name, "slot": slot})
+        return True
 
     async def expose(self, task: ImagingTask, devices: LaneDevices, group: ExposureGroup) -> str:
         """Take one saved frame; returns the FITS path. Cancellation aborts the exposure."""
