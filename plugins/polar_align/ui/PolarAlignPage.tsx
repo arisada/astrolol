@@ -76,9 +76,18 @@ export function PolarAlignPage() {
 
   const [run, setRun] = useState<WizardRun | null>(null)
   const [busy, setBusy] = useState(false)
-  const [wizardError, setWizardError] = useState<string | null>(null)
+  const [wizardError, setWizardErrorText] = useState<string | null>(null)
+  const [wizardErrorAt, setWizardErrorAt] = useState<Date | null>(null)
+  const setWizardError = useCallback((msg: string | null) => {
+    setWizardErrorText(msg)
+    setWizardErrorAt(msg ? new Date() : null)
+  }, [])
   const [exposureS, setExposureS] = useState(5)
   const [binning, setBinning] = useState(2)
+  // '' = let the wizard pick the Dec (it never inherits the mount's current Dec).
+  const [decInput, setDecInput] = useState('')
+  const decOverride = decInput.trim() === '' ? null : Number(decInput)
+  const decInvalid = decOverride !== null && (!Number.isFinite(decOverride) || Math.abs(decOverride) > 80)
 
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
@@ -106,12 +115,13 @@ export function PolarAlignPage() {
 
   const handleStart = useCallback(async () => {
     if (!mountId || !cameraId) { setWizardError('A mount and camera must be connected.'); return }
+    if (decInvalid) { setWizardError('Dec must be a number between -80 and 80, or blank for automatic.'); return }
     setWizardError(null)
     setBusy(true)
     setRun(null)
     try {
       const r = await polarAlignApi.startWizard({
-        mount_id: mountId, camera_id: cameraId, exposure_s: exposureS, binning,
+        mount_id: mountId, camera_id: cameraId, exposure_s: exposureS, binning, dec_deg: decOverride,
       })
       setRun(r)
       pollRef.current = setInterval(fetchRun, 1500)
@@ -119,20 +129,22 @@ export function PolarAlignPage() {
       setBusy(false)
       setWizardError(e instanceof Error ? e.message : 'Failed to start')
     }
-  }, [mountId, cameraId, exposureS, binning, fetchRun])
+  }, [mountId, cameraId, exposureS, binning, decOverride, decInvalid, fetchRun, setWizardError])
 
   const [rechecking, setRechecking] = useState(false)
   const handleRecheck = useCallback(async () => {
     setRechecking(true)
-    setWizardError(null)
     try {
       setRun(await polarAlignApi.recheckWizard())
+      setWizardError(null)
     } catch (e) {
-      setWizardError(e instanceof Error ? e.message : 'Recheck failed')
+      // Shown in the converging panel below, timestamped -- a failed recheck must not look
+      // like "nothing changed" (the previous reading, if any, stays up next to it).
+      setWizardError(`Recheck failed: ${e instanceof Error ? e.message : 'unknown error'}`)
     } finally {
       setRechecking(false)
     }
-  }, [])
+  }, [setWizardError])
 
   const handleStop = useCallback(async () => {
     try {
@@ -147,7 +159,7 @@ export function PolarAlignPage() {
   const handleStartNew = useCallback(() => {
     setRun(null)
     setWizardError(null)
-  }, [])
+  }, [setWizardError])
 
   const isTerminal = run && (run.status === 'completed' || run.status === 'failed' || run.status === 'cancelled')
 
@@ -230,6 +242,15 @@ export function PolarAlignPage() {
             <PillGroup options={[1, 2, 3, 4]} value={binning} onChange={setBinning}
               label="Binning" formatLabel={(b) => `${b}×${b}`} />
 
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-slate-400">Dec (°)</label>
+              <Input inputSize="sm" type="number" min={-80} max={80} step={5} placeholder="Auto"
+                value={decInput} onChange={(e) => setDecInput(e.target.value)} />
+              <span className="text-[10px] text-slate-600">
+                Leave blank to let the wizard choose a well-conditioned Dec (not the mount's current one).
+              </span>
+            </div>
+
             {wizardError && <p className="text-xs text-red-400">{wizardError}</p>}
 
             <Button onClick={handleStart} disabled={busy || mounts.length === 0 || cameras.length === 0} className="w-full">
@@ -237,8 +258,9 @@ export function PolarAlignPage() {
               {busy ? 'Starting…' : 'Start 3-Point Fit'}
             </Button>
             <p className="text-xs text-slate-600">
-              Slews to 3 points near the meridian, tracking off. Keep the mount on one
-              side of the pier throughout -- a meridian flip mid-run invalidates the fit.
+              Slews to 3 points at one Dec, all on the side of the meridian the mount is
+              currently pointing at, so no meridian flip happens mid-run (a flip would
+              invalidate the fit). The mount stays on the last point for the rechecks.
             </p>
           </>
         )}
@@ -260,7 +282,21 @@ export function PolarAlignPage() {
               </div>
             )}
 
+            {run.plan && (
+              <p className="text-xs text-slate-500">
+                Dec {run.plan.dec_jnow_deg.toFixed(0)}° · {run.plan.side} of the meridian
+                {run.request.dec_deg == null ? ' (auto)' : ''}
+              </p>
+            )}
+
             {run.error && <p className="text-xs text-red-400 break-words">{run.error}</p>}
+
+            {wizardError && (
+              <p className="text-xs text-red-400 break-words">
+                {wizardErrorAt && <span className="text-red-300/70 mr-1">[{wizardErrorAt.toLocaleTimeString()}]</span>}
+                {wizardError}
+              </p>
+            )}
 
             {run.result && (
               <div className="rounded border border-surface-border bg-surface-overlay/50 p-2.5 space-y-1">

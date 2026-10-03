@@ -217,8 +217,9 @@ export interface AutofocusRun {
 // Part 2 — plate-solve wizard (wizard.py)
 
 export interface PoleOffset {
-  axis_ra_hours: number
+  axis_ha_hours: number
   axis_dec_deg: number
+  axis_ra_hours: number
   alt_error_arcmin: number
   az_error_arcmin: number
 }
@@ -235,6 +236,8 @@ export interface WizardRequest {
   binning?: number
   gain?: number | null
   step_deg?: number
+  dec_deg?: number | null
+  settle_s?: number
   n_points?: 3
   converge_exposure_s?: number | null
   converge_binning?: number | null
@@ -249,6 +252,13 @@ export interface WizardPoint {
   when: string
 }
 
+export interface TargetPlan {
+  dec_jnow_deg: number
+  hour_angles_h: number[]
+  side: 'east' | 'west'
+  reference_margin_deg: number
+}
+
 export type WizardStatus = 'running' | 'converging' | 'completed' | 'failed' | 'cancelled'
 
 export interface WizardRun {
@@ -257,6 +267,7 @@ export interface WizardRun {
   request: WizardRequest
   points: WizardPoint[]
   result: PoleOffset | null
+  plan: TargetPlan | null
   convergence_reference_index: number | null
   live_offset: ConvergenceUpdate | null
   error: string | null

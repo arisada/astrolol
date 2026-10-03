@@ -37,7 +37,7 @@ from astrolol.core.events.models import BaseEvent
 from astrolol.equipment.models import SiteItem
 from astrolol.equipment.optical_path import find_profile_site
 from astrolol.imaging.models import ExposureRequest
-from astrolol.mount.sky import altitude_of, icrs_to_jnow
+from astrolol.mount.sky import alt_az, icrs_to_jnow, jnow_to_icrs, local_sidereal_time_h
 from plugins.polar_align.events import (
     PolarAlignErrorUpdated,
     PolarAlignFitCompleted,
@@ -52,6 +52,7 @@ from plugins.polar_align.solver import (
     ConvergenceUpdate,
     Observation,
     PoleOffset,
+    _wrap_hours,
     fit_pole_offset,
     reference_conditioning_margin_deg,
     update_pole_offset,
@@ -63,6 +64,23 @@ SLEW_TIMEOUT_S = 300.0
 MAX_SOLVE_ATTEMPTS = 3
 MAX_DEC_DRIFT_ARCMIN = 1.0
 
+# Target planning (see plan_targets). Auto-picked Dec candidates, as |Dec| (signed by the
+# site's hemisphere): well clear of the pole (where precession puts the JNow pole ~9' from
+# the ICRS one, and mounts behave awkwardly) and of the equator. The planner scores every
+# candidate; the order here doesn't matter. Above roughly the site latitude, points never
+# cross the east-west vertical plane where update_pole_offset's symmetric-plane guard
+# fires, which is why the band leans high.
+AUTO_DEC_CANDIDATES_DEG = (30.0, 35.0, 40.0, 45.0, 50.0, 55.0, 60.0, 65.0, 70.0)
+MAX_ABS_DEC_DEG = 80.0
+MIN_MERIDIAN_CLEARANCE_H = 0.5  # every point at least this far from the meridian -> no pier flip
+MAX_ABS_HA_H = 6.0  # beyond 6h from the meridian a German mount goes counterweight-up
+# How long after planning a point must stay usable: the run itself plus a typical
+# CONVERGING session at the last point (which keeps tracking -- its Hour Angle grows).
+PLAN_VALIDITY_H = 0.5
+# Conditioning margins beyond this are all "comfortably fine"; above it the planner prefers
+# higher-altitude plans instead of chasing extra margin.
+COMFORTABLE_MARGIN_DEG = 15.0
+
 
 class WizardRequest(BaseModel):
     mount_id: str
@@ -71,10 +89,18 @@ class WizardRequest(BaseModel):
     binning: int = Field(default=2, ge=1)
     gain: int | None = None
     step_deg: float = Field(
-        default=45.0, ge=-80.0, le=80.0,
-        description="Signed RA step between points; sign picks the slew direction. "
-        "Bounded well clear of the 180deg degenerate case solver.py rejects.",
+        default=30.0, ge=10.0, le=40.0,
+        description="RA step between points (magnitude only -- the direction is chosen from the "
+        "mount's current side of the meridian so every point stays on that side). At most 40deg "
+        "so 3 points fit between the meridian clearance and the 6h counterweight-down limit.",
     )
+    dec_deg: float | None = Field(
+        default=None, ge=-MAX_ABS_DEC_DEG, le=MAX_ABS_DEC_DEG,
+        description="JNow (mechanical) Dec for all points. None (default) lets the wizard pick "
+        "the best-conditioned Dec from AUTO_DEC_CANDIDATES_DEG; it never inherits whatever Dec "
+        "the mount happens to be pointing at (which may be the pole, after a park).",
+    )
+    settle_s: float = Field(default=2.0, ge=0.0, le=60.0, description="Wait after each slew before exposing")
     # SPEC.md section 6.3: 3 points only for v1 -- a 2-point fit is only reliable away
     # from the equator and solver.py's own guard will reject it near the equator anyway.
     n_points: Literal[3] = 3
@@ -94,6 +120,97 @@ class WizardRequest(BaseModel):
     )
 
 
+class TargetPlan(BaseModel):
+    """The points the wizard will visit, fixed before the mount moves (see plan_targets)."""
+
+    dec_jnow_deg: float = Field(description="JNow (mechanical) Dec held constant across all points")
+    hour_angles_h: list[float] = Field(description="Hour Angle of each point, in visiting order")
+    side: Literal["east", "west"] = Field(description="Side of the meridian all points are on")
+    reference_margin_deg: float = Field(
+        description="Predicted conditioning margin of the last point as the CONVERGING reference "
+        "(solver.reference_conditioning_margin_deg, with the true pole standing in for the fit)"
+    )
+
+
+def plan_targets(
+    latitude_deg: float,
+    current_ha_h: float,
+    step_deg: float,
+    n_points: int,
+    horizon_min_alt_deg: float,
+    dec_deg: float | None = None,
+) -> TargetPlan:
+    """Choose a constant JNow Dec and a monotonic sequence of Hour Angles for the fit.
+
+    Constraints (any violation rules a candidate out):
+    - all points on the mount's *current* side of the meridian, at least
+      MIN_MERIDIAN_CLEARANCE_H from it and at most MAX_ABS_HA_H -- so no GoTo in the run
+      causes a pier flip, whatever Dec/RA the mount started at;
+    - every point above the horizon limit now and PLAN_VALIDITY_H later;
+    - the *last* point (where the mount stays, so the CONVERGING reference) clears
+      update_pole_offset's conditioning guards over that same window.
+    Among feasible candidates (Dec x start offset x stepping away from / toward the
+    meridian), the one with the best reference margin wins, capped at
+    COMFORTABLE_MARGIN_DEG, then the highest minimum altitude. Raises ValueError, before
+    anything moves, if no candidate is feasible.
+    """
+    side = 1.0 if _wrap_hours(current_ha_h) >= 0 else -1.0
+    step_h = abs(step_deg) / 15.0
+    pole_dec = 90.0 if latitude_deg >= 0 else -90.0
+    hemisphere = 1.0 if latitude_deg >= 0 else -1.0
+    decs = [dec_deg] if dec_deg is not None else [hemisphere * d for d in AUTO_DEC_CANDIDATES_DEG]
+    offsets = [MIN_MERIDIAN_CLEARANCE_H + 0.25 * k for k in range(int((MAX_ABS_HA_H - MIN_MERIDIAN_CLEARANCE_H) / 0.25) + 1)]
+
+    best: tuple[tuple[float, float], TargetPlan] | None = None
+    rejected_for = {"horizon": 0, "conditioning": 0}
+    for dec in decs:
+        for h0 in offsets:
+            away = [side * (h0 + i * step_h) for i in range(n_points)]
+            if any(abs(h) > MAX_ABS_HA_H for h in away):
+                continue
+            # away and away[::-1] are the same set of HA values -- min_alt doesn't
+            # depend on visiting order, so compute it once instead of per direction.
+            min_alt = min(
+                alt_az(h + dt, dec, latitude_deg)[0] for h in away for dt in (0.0, PLAN_VALIDITY_H)
+            )
+            if min_alt < horizon_min_alt_deg:
+                rejected_for["horizon"] += 2
+                continue
+            for has in (away, away[::-1]):
+                margin = min(
+                    reference_conditioning_margin_deg(0.0, pole_dec, has[-1] + dt, dec, latitude_deg)
+                    for dt in (0.0, PLAN_VALIDITY_H)
+                )
+                if margin <= 0.0:
+                    rejected_for["conditioning"] += 1
+                    continue
+                score = (min(margin, COMFORTABLE_MARGIN_DEG), min_alt)
+                if best is None or score > best[0]:
+                    best = (
+                        score,
+                        TargetPlan(
+                            dec_jnow_deg=dec,
+                            hour_angles_h=has,
+                            side="west" if side > 0 else "east",
+                            reference_margin_deg=margin,
+                        ),
+                    )
+    if best is None:
+        which = f"Dec {dec_deg:g}deg" if dec_deg is not None else "any Dec in the automatic range"
+        side_name = "west" if side > 0 else "east"
+        reason = (
+            "below the horizon limit"
+            if rejected_for["horizon"] >= rejected_for["conditioning"]
+            else "too poorly conditioned for the live-adjustment rechecks"
+        )
+        raise ValueError(
+            f"No usable set of {n_points} points at {which} on the {side_name} side of the "
+            f"meridian (where the mount currently points) -- candidates were {reason}. "
+            "Try a different Dec, or point the mount at the other side of the meridian first."
+        )
+    return best[1]
+
+
 class WizardPoint(BaseModel):
     index: int
     mount_ra_hours: float
@@ -108,11 +225,12 @@ class WizardRun(BaseModel):
     request: WizardRequest
     points: list[WizardPoint] = Field(default_factory=list)
     result: PoleOffset | None = None
+    plan: TargetPlan | None = Field(default=None, description="The points chosen before slewing")
     convergence_reference_index: int | None = Field(
         default=None,
-        description="Index into points used as the CONVERGING-phase reference -- the "
-        "best-conditioned of the fit's own points for update_pole_offset, not necessarily "
-        "the last one solved (see PolarAlignWizard.run's point-selection, SPEC.md section 3)",
+        description="Index into points used as the CONVERGING-phase reference -- always the "
+        "last point, where the mount is still pointing (plan_targets makes that one the "
+        "well-conditioned one)",
     )
     live_offset: ConvergenceUpdate | None = Field(
         default=None, description="Latest CONVERGING-phase reading, updated by each recheck"
@@ -166,29 +284,37 @@ class PolarAlignWizard:
             if status0.is_slewing:
                 raise ValueError(f"Mount '{req.mount_id}' is already slewing")
             start_pier = status0.pier_side
-            # ICRS dec, not dec_jnow: the wizard commands a fixed ICRS dec across all
-            # points (see _plan_targets), but JNow dec legitimately varies by RA for a
-            # perfectly constant ICRS dec -- full precession+nutation+aberration is a 3D
-            # rotation, not a per-coordinate offset -- so comparing dec_jnow across points
-            # at different RA would false-positive on a perfectly healthy mount.
-            start_dec_icrs = status0.dec or 0.0
 
+            # Plan everything before moving: constant *JNow* Dec (the mount's mechanical Dec
+            # axis -- constant ICRS Dec would move it by up to ~9' between points, which
+            # biases the fit), on the mount's current side of the meridian, above the
+            # horizon, with a well-conditioned last point. Independent of the mount's
+            # current Dec, which may well be the pole after a park.
             mount_settings = self._mount_settings(app, req.mount_id)
-            targets = self._plan_targets(status0.ra, status0.dec, req)
-            for i, coord in enumerate(targets):
-                alt = altitude_of(coord, _now(), site.latitude, site.longitude)
-                if alt < mount_settings.horizon_min_alt_deg:
-                    raise ValueError(
-                        f"Point {i} ({coord.ra.to_string(unit='hour')} "
-                        f"{coord.dec.to_string(unit='deg')}) would be below the horizon limit "
-                        f"({alt:.1f}deg < {mount_settings.horizon_min_alt_deg:g}deg) -- aborting "
-                        "before moving the mount"
-                    )
+            current_ha = local_sidereal_time_h(_now(), site.longitude) - (status0.ra_jnow or 0.0)
+            # plan_targets() is a pure-CPU grid search (hundreds of candidates, each a
+            # handful of trig calls) -- off the event loop so it doesn't stall concurrent
+            # requests/WebSocket delivery for the run's duration.
+            plan = await asyncio.to_thread(
+                plan_targets,
+                site.latitude, current_ha, req.step_deg, req.n_points,
+                mount_settings.horizon_min_alt_deg, req.dec_deg,
+            )
+            run.plan = plan
+            logger.info(
+                "polar_align.plan_selected", run_id=run_id, dec_jnow_deg=plan.dec_jnow_deg,
+                hour_angles_h=plan.hour_angles_h, side=plan.side,
+                reference_margin_deg=plan.reference_margin_deg,
+            )
+            first_dec_jnow: float | None = None
 
             with self._suspend_auto_flip(app, req.mount_id):
-                for i, coord in enumerate(targets):
+                for i, ha in enumerate(plan.hour_angles_h):
                     await self._publish(PolarAlignPointStarted(run_id=run_id, index=i))
+                    coord = self._target_at(ha, plan.dec_jnow_deg, site.longitude)
                     await self._slew(mm, req.mount_id, coord, name=f"polar_align_{i}")
+                    if req.settle_s > 0:
+                        await asyncio.sleep(req.settle_s)
 
                     status = await mm.get_status(req.mount_id)
                     if status.pier_side != start_pier:
@@ -197,7 +323,33 @@ class PolarAlignWizard:
                             "a meridian flip invalidates the fit; keep all points on one side "
                             "of the meridian"
                         )
-                    if abs((status.dec or 0.0) - start_dec_icrs) * 60.0 > MAX_DEC_DRIFT_ARCMIN:
+                    # dec_jnow, the mount's own mechanical Dec: that's what fit_pole_offset
+                    # needs held constant. Compared to the first point as actually reached,
+                    # not the plan, so a constant GoTo offset doesn't trip it.
+                    dec_jnow = status.dec_jnow or 0.0
+                    if first_dec_jnow is None:
+                        first_dec_jnow = dec_jnow
+                        # plan_targets() validated the horizon limit against the PLANNED
+                        # dec_jnow/HA, before anything moved. A real mount can reach a
+                        # meaningfully different position than planned -- e.g. a GoTo
+                        # pointing error, plausible on exactly the badly-misaligned mount
+                        # this wizard exists to fix -- so that validation only holds if the
+                        # mount actually landed close to where it was told to. Re-check
+                        # against where it actually is now, not just trust the plan.
+                        actual_ha = local_sidereal_time_h(_now(), site.longitude) - (
+                            status.ra_jnow or 0.0
+                        )
+                        actual_alt = alt_az(actual_ha, dec_jnow, site.latitude)[0]
+                        if actual_alt < mount_settings.horizon_min_alt_deg:
+                            raise RuntimeError(
+                                f"First point landed at {actual_alt:.1f}deg altitude, below "
+                                f"the {mount_settings.horizon_min_alt_deg:g}deg horizon limit, "
+                                "even though the plan was above it -- the mount's GoTo is "
+                                "landing somewhere other than commanded (check for a pointing "
+                                "model / sync offset), so the plan's safety margins can't be "
+                                "trusted"
+                            )
+                    elif abs(dec_jnow - first_dec_jnow) * 60.0 > MAX_DEC_DRIFT_ARCMIN:
                         raise RuntimeError(
                             f"Dec drifted by more than {MAX_DEC_DRIFT_ARCMIN:g}' mid-run -- "
                             "check for an active mount alignment/pointing model and clear it "
@@ -231,24 +383,12 @@ class PolarAlignWizard:
                     site.longitude,
                     _now(),
                 )
-                # Pick whichever of the fit's own points is best-conditioned as the
-                # CONVERGING reference, rather than always the last one solved -- the
-                # fitted axis's bearing can by chance put the last point in
-                # update_pole_offset's symmetric-tie guard zone even though the fit itself
-                # was fine (see SPEC.md section 3's "still open" callout -- this closes it).
-                converge_when = _now()
-                run.convergence_reference_index = max(
-                    range(len(run.points)),
-                    key=lambda i: reference_conditioning_margin_deg(
-                        run.result.axis_ra_hours,
-                        run.result.axis_dec_deg,
-                        run.points[i].solved_ra_hours,
-                        run.points[i].solved_dec_deg,
-                        site.latitude,
-                        site.longitude,
-                        converge_when,
-                    ),
-                )
+                # The CONVERGING reference is the last point: it's where the mount still
+                # points, so a recheck re-solves the same pointing. (Picking another, "better
+                # conditioned" fit point instead -- as an earlier version did -- compared two
+                # pointings 30-90deg apart and failed every recheck; plan_targets now makes
+                # the last point the well-conditioned one instead.)
+                run.convergence_reference_index = len(run.points) - 1
                 # Not "completed": the wizard's own job (producing a fit) is done, but the
                 # run as a whole isn't over until the user is satisfied with the live
                 # knob-adjustment readings and says so (WizardEngine.cancel() during this
@@ -280,14 +420,13 @@ class PolarAlignWizard:
 
     # ------------------------------------------------------------------
 
-    def _plan_targets(self, start_ra_h: float, start_dec_deg: float, req: WizardRequest) -> list[SkyCoord]:
-        """ICRS targets for each point: fixed Dec, RA stepped by step_deg from wherever
-        the mount currently points (SPEC.md section 3's "target selection" decision)."""
-        targets = []
-        for i in range(req.n_points):
-            ra_h = (start_ra_h + i * req.step_deg / 15.0) % 24.0
-            targets.append(SkyCoord(ra=ra_h * u.hourangle, dec=start_dec_deg * u.deg, frame="icrs"))
-        return targets
+    def _target_at(self, ha_h: float, dec_jnow_deg: float, longitude_deg: float) -> SkyCoord:
+        """ICRS coordinate (what MountManager.set_target takes) for a planned Hour Angle and
+        JNow Dec, evaluated right now -- so the point lands at its planned HA even though
+        earlier points took a while."""
+        now = _now()
+        ra_jnow = (local_sidereal_time_h(now, longitude_deg) - ha_h) % 24.0
+        return jnow_to_icrs(ra_jnow, dec_jnow_deg, now)
 
     def _site(self, app: Any) -> SiteItem | None:
         profile = getattr(app.state, "active_profile", None)
@@ -393,12 +532,18 @@ class PolarAlignWizard:
         if site is None:
             raise ValueError("No site location configured for the active profile")
 
+        mm = getattr(app.state, "mount_manager", None)
+        if mm is None:
+            raise RuntimeError("Polar alignment needs the mount manager")
+
         req = run.request
-        ref_index = run.convergence_reference_index
-        reference = run.points[ref_index if ref_index is not None else -1]
+        reference = run.points[-1]  # where the mount still points -- see run()
         exposure_s = req.converge_exposure_s or req.exposure_s
         binning = req.converge_binning or req.binning
 
+        # The mount's own reported RA now: update_pole_offset carries the reference forward
+        # by the motor rotation since it was taken (tracking, in the normal case).
+        status = await mm.get_status(req.mount_id)
         t0 = _now()
         exposure = await im.expose(
             req.camera_id,
@@ -415,15 +560,22 @@ class PolarAlignWizard:
         new_ra_h, new_dec = icrs_to_jnow(icrs_coord, when)
 
         run.live_offset = update_pole_offset(
-            run.result.axis_ra_hours,
+            run.result.axis_ha_hours,
             run.result.axis_dec_deg,
-            reference.solved_ra_hours,
-            reference.solved_dec_deg,
-            new_ra_h,
-            new_dec,
+            Observation(
+                solved_ra_hours=reference.solved_ra_hours,
+                solved_dec_deg=reference.solved_dec_deg,
+                mount_ra_hours=reference.mount_ra_hours,
+                when=reference.when,
+            ),
+            Observation(
+                solved_ra_hours=new_ra_h,
+                solved_dec_deg=new_dec,
+                mount_ra_hours=status.ra_jnow,
+                when=when,
+            ),
             site.latitude,
             site.longitude,
-            when,
         )
         logger.info(
             "polar_align.error_updated", run_id=run.id,
@@ -483,7 +635,18 @@ class WizardEngine:
     async def recheck(self) -> WizardRun:
         if self._current_run is None:
             raise ValueError("No polar alignment run has been started")
-        await self._wizard.recheck(self._current_run)
+        try:
+            await self._wizard.recheck(self._current_run)
+        except Exception as exc:
+            # Not fatal to the run (the caller just gets no new reading), but must not be
+            # silent either: a recheck that keeps failing looks exactly like "the reading
+            # never changes" otherwise.
+            logger.warning(
+                "polar_align.recheck_failed", run_id=self._current_run.id, error=str(exc),
+                # A guard/solve rejection is an expected outcome; only a real bug needs a traceback.
+                exc_info=not isinstance(exc, (ValueError, RuntimeError)),
+            )
+            raise
         return self._current_run
 
     async def cancel(self) -> None:

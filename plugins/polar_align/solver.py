@@ -26,6 +26,18 @@ mount's reported RA -- the mount's self-reported *Hour Angle*. That
 correctly nets out to the true motor rotation whether the elapsed interval
 was spent tracking, slewing, or both.
 
+That rotation happens about an axis fixed to the *Earth* (the mount is bolted
+to the ground), not to the sky. So the fit is done in an Earth-fixed frame
+too: each plate-solved position is converted into it using its *own*
+observation's sidereal time (``_earth_vector``: RA minus LST, i.e. minus the
+Hour Angle) before fitting. Fitting raw sky RA/Dec vectors against an
+Earth-frame rotation angle -- what this module originally did -- is only
+correct when no time passes between observations; with the 30-90 s a real
+slew+settle+expose+solve takes per point, it biased the fit by tens of
+arcminutes. The fitted axis is reported as an Hour Angle/Dec pair
+(``PoleOffset.axis_ha_hours``), which stays valid for as long as nobody
+touches the mount -- unlike a sky RA, which drifts with sidereal time.
+
 Pure math only: no device I/O, no plugin state. ``wizard.py`` is the only
 caller and is responsible for collecting ``Observation``s from the mount and
 plate solver, and separately for verifying the mount-side preconditions this
@@ -64,8 +76,14 @@ class Observation(BaseModel):
 class PoleOffset(BaseModel):
     """Where the mount's actual mechanical pole is, and how far that is from true."""
 
-    axis_ra_hours: float
+    axis_ha_hours: float = Field(
+        description="Hour Angle of the mount's mechanical axis -- Earth-fixed, so constant over time"
+    )
     axis_dec_deg: float
+    axis_ra_hours: float = Field(
+        description="RA (JNow) of the mechanical axis at the fit's reporting time only -- informational: "
+        "an Earth-fixed axis's RA drifts with sidereal time, so use axis_ha_hours for anything later"
+    )
     alt_error_arcmin: float = Field(description="Axis altitude minus true pole altitude")
     az_error_arcmin: float = Field(description="Axis azimuth minus true pole azimuth, wrapped to +-180deg")
 
@@ -87,13 +105,17 @@ def fit_pole_offset(
 ) -> PoleOffset:
     """Recover the mount's actual polar-axis offset from >=2 observations.
 
-    Observations should share a fixed Dec target and differ mainly in RA
-    (the wizard's own job: keep Dec unchanged and verify it stayed that way),
-    but this function only relies on each observation's mount-reported Hour
-    Angle (mount_ra_hours combined with its own timestamp), not on any
-    particular Dec pattern. ``when`` (for the final alt/az conversion) need
-    not match any observation's own timestamp -- it is "now", for reporting
-    the error as it stands at call time.
+    The model is that every observation after the first is the first one
+    rotated about the mount's RA axis *only*: the mount's Dec axis must not
+    move between observations -- constant *mechanical* Dec, i.e. JNow Dec as
+    the mount itself reports it, not constant ICRS Dec (those differ by up to
+    ~9' depending on RA, from precession since J2000). The wizard plans for
+    that and verifies it via ``dec_jnow``; a Dec-axis move between points is
+    not modelled and biases the fit by roughly the amount moved. Rotation
+    angles come from each observation's mount-reported Hour Angle
+    (mount_ra_hours combined with its own timestamp). ``when`` only sets the
+    informational ``axis_ra_hours``: the alt/az error itself does not depend
+    on it, since the axis is Earth-fixed.
     """
     if len(observations) < 2:
         raise ValueError("need at least 2 observations to fit a pole offset")
@@ -115,7 +137,8 @@ def fit_pole_offset(
     # a *stationary* axis's apparent RA increases with elapsed time, so actively cancelling that
     # to hold RA constant means the motor contributes the negative of it).
     mount_pseudo_ra = [o.mount_ra_hours - local_sidereal_time_h(o.when, longitude_deg) for o in observations]
-    vectors = [_radec_to_vector(o.solved_ra_hours, o.solved_dec_deg) for o in observations]
+    # Earth-fixed frame, each solve converted with its *own* timestamp -- see module docstring.
+    vectors = [_earth_vector(o.solved_ra_hours, o.solved_dec_deg, o.when, longitude_deg) for o in observations]
     thetas = [np.radians((p_i - mount_pseudo_ra[0]) * 15.0) for p_i in mount_pseudo_ra[1:]]
     for theta in thetas:
         wrapped = abs(_wrap_pm_pi(theta))
@@ -136,16 +159,17 @@ def fit_pole_offset(
     if len(vectors) > 2:
         axis = _refine_axis(axis, vectors, thetas)
 
-    # axis is in the sky RA/Dec frame (same frame as the vectors above); convert to HA at
-    # the reporting time `when` only for the final alt/az step.
-    axis_ra_hours, axis_dec_deg = _vector_to_radec(axis)
-    axis_ha = local_sidereal_time_h(when, longitude_deg) - axis_ra_hours
+    # axis is in the Earth-fixed frame (same frame as the vectors above), where its "RA" is
+    # minus its Hour Angle -- so the alt/az step needs no reporting time at all.
+    axis_pseudo_ra, axis_dec_deg = _vector_to_radec(axis)
+    axis_ha = _wrap_hours(-axis_pseudo_ra)
     axis_alt, axis_az = alt_az(axis_ha, axis_dec_deg, latitude_deg)
     true_pole_dec = 90.0 if latitude_deg >= 0 else -90.0
     true_alt, true_az = alt_az(0.0, true_pole_dec, latitude_deg)
 
     return PoleOffset(
-        axis_ra_hours=axis_ra_hours,
+        axis_ha_hours=axis_ha,
+        axis_ra_hours=(local_sidereal_time_h(when, longitude_deg) - axis_ha) % 24.0,
         axis_dec_deg=axis_dec_deg,
         alt_error_arcmin=(axis_alt - true_alt) * 60.0,
         az_error_arcmin=np.degrees(_wrap_pm_pi(np.radians(axis_az - true_az))) * 60.0,
@@ -155,6 +179,25 @@ def fit_pole_offset(
 def _radec_to_vector(ra_hours: float, dec_deg: float) -> np.ndarray:
     ra, dec = np.radians(ra_hours * 15.0), np.radians(dec_deg)
     return np.array([np.cos(dec) * np.cos(ra), np.cos(dec) * np.sin(ra), np.sin(dec)])
+
+
+def _earth_vector(ra_hours: float, dec_deg: float, when: datetime, longitude_deg: float) -> np.ndarray:
+    """Unit vector in the Earth-fixed frame: the sky position rotated by -LST at its own
+    instant, so its "RA" coordinate in this frame is minus its Hour Angle. A mechanically
+    fixed mount axis is constant in this frame; in the RA/Dec sky frame it is not."""
+    return _radec_to_vector(ra_hours - local_sidereal_time_h(when, longitude_deg), dec_deg)
+
+
+def _earth_to_altaz(v: np.ndarray, latitude_deg: float) -> np.ndarray:
+    """Earth-frame vector (see _earth_vector) -> (east, north, up) alt/az vector: a fixed
+    rotation by the site latitude, matching astrolol.mount.sky.alt_az's conventions."""
+    lat = np.radians(latitude_deg)
+    x, y, z = v  # x: HA=0 on the equator, y: HA=-6h (due east), z: north celestial pole
+    return np.array([y, np.cos(lat) * z - np.sin(lat) * x, np.sin(lat) * z + np.cos(lat) * x])
+
+
+def _wrap_hours(h: float) -> float:
+    return float((h + 12.0) % 24.0 - 12.0)
 
 
 def _vector_to_radec(v: np.ndarray) -> tuple[float, float]:
@@ -273,7 +316,7 @@ def _refine_axis(
 
 _MIN_SEP_FROM_ZENITH_DEG = 10.0  # az-knob rotation barely moves a point this close to zenith/nadir
 _MIN_SEP_FROM_ALT_AXIS_DEG = 10.0  # alt-knob rotation barely moves a point this close to its own axis
-_MIN_SEP_FROM_SYMMETRIC_PLANE_DEG = 15.0  # the two-solution ambiguity is a near-exact mirror tie this close
+_MIN_SEP_FROM_SYMMETRIC_PLANE_DEG = 15.0  # both knobs move a point in this plane the same way (see below)
 # The 2-solution ambiguity (see update_pole_offset) only becomes practically dangerous --
 # picking the wrong root -- once the rotation is large; a real knob nudge between two
 # consecutive rechecks should never approach this, so treat it as a sign something else
@@ -281,21 +324,15 @@ _MIN_SEP_FROM_SYMMETRIC_PLANE_DEG = 15.0  # the two-solution ambiguity is a near
 _MAX_PLAUSIBLE_KNOB_ADJUSTMENT_DEG = 10.0
 
 
-def _to_altaz_vector(ra_hours: float, dec_deg: float, latitude_deg: float, lst: float) -> np.ndarray:
-    ha = lst - ra_hours
-    alt, az = alt_az(ha, dec_deg, latitude_deg)
-    alt_r, az_r = np.radians(alt), np.radians(az)
-    return np.array([np.cos(alt_r) * np.sin(az_r), np.cos(alt_r) * np.cos(az_r), np.sin(alt_r)])
-
-
-def _knob_axes(axis_ra_hours: float, axis_dec_deg: float, latitude_deg: float, lst: float) -> tuple[
+def _knob_axes(axis_ha_hours: float, axis_dec_deg: float, latitude_deg: float) -> tuple[
     np.ndarray, np.ndarray, np.ndarray, np.ndarray
 ]:
     """axis_v, zenith, alt_axis (horizontal, perpendicular to the mount's current azimuth
     bearing), and normal (== the bearing direction) -- the two mechanically fixed
-    knob-rotation axes plus the plane-normal used by update_pole_offset's symmetric-tie
-    guard. See that function's docstring for the physical meaning."""
-    axis_v = _to_altaz_vector(axis_ra_hours, axis_dec_deg, latitude_deg, lst)
+    knob-rotation axes plus the plane-normal used by update_pole_offset's symmetric-plane
+    guard, all as (east, north, up) alt/az vectors. See that function's docstring for the
+    physical meaning. Takes the axis's Hour Angle, not RA: the axis is Earth-fixed."""
+    axis_v = _earth_to_altaz(_radec_to_vector(-axis_ha_hours, axis_dec_deg), latitude_deg)
     zenith = np.array([0.0, 0.0, 1.0])
     az0 = np.arctan2(axis_v[0], axis_v[1])
     alt_axis = np.array([np.cos(az0), -np.sin(az0), 0.0])
@@ -303,102 +340,114 @@ def _knob_axes(axis_ra_hours: float, axis_dec_deg: float, latitude_deg: float, l
     return axis_v, zenith, alt_axis, normal
 
 
-def reference_conditioning_margin_deg(
-    axis_ra_hours: float,
-    axis_dec_deg: float,
-    reference_ra_hours: float,
-    reference_dec_deg: float,
-    latitude_deg: float,
-    longitude_deg: float,
-    when: datetime,
-) -> float:
-    """How far a candidate CONVERGING reference point is from tripping any of
-    update_pole_offset's three conditioning guards, in degrees -- the minimum of the three
-    margins, so a negative value means that guard would reject it. Lets a caller with
-    several already-solved points (e.g. the wizard's 3-point fit) pick the best-conditioned
-    one as the CONVERGING reference instead of hardcoding "the last point", which can land
-    in the symmetric-tie zone purely by chance -- see SPEC.md section 3."""
-    lst = local_sidereal_time_h(when, longitude_deg)
-    _axis_v, zenith, alt_axis, normal = _knob_axes(axis_ra_hours, axis_dec_deg, latitude_deg, lst)
-    p_ref = _to_altaz_vector(reference_ra_hours, reference_dec_deg, latitude_deg, lst)
-
+def _conditioning_margins_deg(
+    p_ref: np.ndarray, zenith: np.ndarray, alt_axis: np.ndarray, normal: np.ndarray
+) -> tuple[float, float, float]:
+    """Margins (degrees) by which an alt/az reference vector clears each of
+    update_pole_offset's three conditioning guards; negative means that guard fires."""
     sep_from_zenith = np.degrees(np.arccos(np.clip(abs(np.dot(p_ref, zenith)), -1.0, 1.0)))
     sep_from_alt_axis = np.degrees(np.arccos(np.clip(abs(np.dot(p_ref, alt_axis)), -1.0, 1.0)))
     sep_from_symmetric_plane = np.degrees(np.arcsin(np.clip(abs(np.dot(p_ref, normal)), -1.0, 1.0)))
-    return min(
-        sep_from_zenith - _MIN_SEP_FROM_ZENITH_DEG,
-        sep_from_alt_axis - _MIN_SEP_FROM_ALT_AXIS_DEG,
-        sep_from_symmetric_plane - _MIN_SEP_FROM_SYMMETRIC_PLANE_DEG,
+    return (
+        float(sep_from_zenith - _MIN_SEP_FROM_ZENITH_DEG),
+        float(sep_from_alt_axis - _MIN_SEP_FROM_ALT_AXIS_DEG),
+        float(sep_from_symmetric_plane - _MIN_SEP_FROM_SYMMETRIC_PLANE_DEG),
     )
 
 
-def update_pole_offset(
-    axis_ra_hours: float,
+def reference_conditioning_margin_deg(
+    axis_ha_hours: float,
     axis_dec_deg: float,
-    reference_ra_hours: float,
+    reference_ha_hours: float,
     reference_dec_deg: float,
-    new_ra_hours: float,
-    new_dec_deg: float,
+    latitude_deg: float,
+) -> float:
+    """How far a CONVERGING reference pointing (given by its Hour Angle/Dec, i.e. where
+    it is in the Earth frame at the moment of interest) is from tripping any of
+    update_pole_offset's three conditioning guards, in degrees -- the minimum of the three
+    margins, so a negative value means that guard would reject it. The wizard uses this
+    *before* slewing, with the true pole standing in for the not-yet-fitted axis, to plan
+    targets whose last point (the one the mount stays on, and so the CONVERGING
+    reference) is well-conditioned."""
+    _axis_v, zenith, alt_axis, normal = _knob_axes(axis_ha_hours, axis_dec_deg, latitude_deg)
+    p_ref = _earth_to_altaz(_radec_to_vector(-reference_ha_hours, reference_dec_deg), latitude_deg)
+    return min(_conditioning_margins_deg(p_ref, zenith, alt_axis, normal))
+
+
+def update_pole_offset(
+    axis_ha_hours: float,
+    axis_dec_deg: float,
+    reference: Observation,
+    new: Observation,
     latitude_deg: float,
     longitude_deg: float,
-    when: datetime,
 ) -> ConvergenceUpdate:
     """Measure how far physically turning the mount's altitude/azimuth adjustment knobs
-    has moved the polar axis, by re-solving the *same* nominal pointing (no slew) and
-    comparing it to a fixed reference solved earlier -- typically the last point from the
-    initial fit_pole_offset run, reused rather than taken fresh, since repeated solving is
-    expensive and this needs no new information beyond what the fit already produced.
+    has moved the polar axis, by re-solving the *same* pointing (no slew) and comparing it
+    to a fixed reference solved earlier -- the last point of the initial fit_pole_offset
+    run, which is where the mount is still pointing (comparing against any *other* point
+    would be comparing two different pointings 30+ degrees apart, not measuring a knob
+    turn). Both are full Observations because the mount keeps tracking in between: what
+    the reference pointing has become by the time of ``new`` is the reference rotated
+    about the (Earth-fixed) fitted axis by the mount's own motor rotation since then --
+    the same Hour-Angle-based angle fit_pole_offset uses -- not the reference's sky
+    RA/Dec held fixed (a tracking mount only holds sky position if it is perfectly
+    aligned, which is exactly what isn't the case here).
 
-    This is a different problem from fit_pole_offset's, not a repeat of it: turning a knob
-    does not rotate the mount about its own (possibly still-misaligned) RA axis -- it
-    physically tips the *whole* mount body, axis and OTA together, about one of two
-    mechanically fixed axes: the local vertical (azimuth knob) and the local horizontal
-    axis perpendicular to the mount's current azimuth bearing (altitude knob). A single
-    newly-solved point gives exactly two constraints, matching the two unknown knob
-    angles -- but unlike a system of two linear equations, this one is *not* always
-    uniquely solvable: like a 2-link robot arm reaching one target (elbow-up vs.
-    elbow-down), two genuinely different knob-rotation pairs can produce the same
-    observed point. Resolved by picking the smaller one (a real knob adjustment between
-    rechecks is small), with conditioning guards for reference geometries where that
-    choice stops being reliable -- see the raised ValueErrors for exactly which. Always
-    measured against the *original*, fixed reference and starting axis, not the previous
-    reading, so readings don't accumulate error over repeated calls.
-
-    Always compares reference and new positions at the same `when` (not each one's own
-    solve time): alt/az of a fixed sky point changes with time regardless of any knob
-    turn, so using each solve's own timestamp would conflate ordinary sky rotation with
-    the knob adjustment being measured. Both axes are recomputed from axis_ra_hours/
-    axis_dec_deg and the site every call, not cached, since the knob-axis directions
-    depend on the mount's current azimuth bearing.
+    The knob model: turning a knob does not rotate the mount about its own (possibly
+    still-misaligned) RA axis -- it physically tips the *whole* mount body, axis and OTA
+    together, about one of two mechanically fixed axes: the local vertical (azimuth knob)
+    and the local horizontal axis perpendicular to the mount's current azimuth bearing
+    (altitude knob). Because the tip K acts on the axis too, K R(axis, t) = R(K axis, t) K:
+    knob turns and tracking commute, so it doesn't matter when between the two solves the
+    knobs were turned. A single newly-solved point gives exactly two constraints, matching
+    the two unknown knob angles -- but unlike a system of two linear equations, this one
+    is *not* always uniquely solvable: like a 2-link robot arm reaching one target
+    (elbow-up vs. elbow-down), two genuinely different knob-rotation pairs can produce the
+    same observed point. Resolved by picking the smaller one (a real knob adjustment
+    between rechecks is small), with conditioning guards for reference geometries where
+    that choice stops being reliable -- see the raised ValueErrors for exactly which.
+    Always measured against the *original*, fixed reference and fitted axis, not the
+    previous reading, so readings don't accumulate error over repeated calls.
     """
-    lst = local_sidereal_time_h(when, longitude_deg)
+    # Everything in the Earth-fixed frame (see _earth_vector), then alt/az.
+    axis_e = _radec_to_vector(-axis_ha_hours, axis_dec_deg)
+    ref_e = _earth_vector(reference.solved_ra_hours, reference.solved_dec_deg, reference.when, longitude_deg)
+    new_e = _earth_vector(new.solved_ra_hours, new.solved_dec_deg, new.when, longitude_deg)
+    motor_theta = np.radians(
+        (
+            (new.mount_ra_hours - local_sidereal_time_h(new.when, longitude_deg))
+            - (reference.mount_ra_hours - local_sidereal_time_h(reference.when, longitude_deg))
+        )
+        * 15.0
+    )
+    ref_now_e = _rodrigues(axis_e, motor_theta, ref_e)
 
-    p_ref = _to_altaz_vector(reference_ra_hours, reference_dec_deg, latitude_deg, lst)
-    p_new = _to_altaz_vector(new_ra_hours, new_dec_deg, latitude_deg, lst)
-    axis_v, zenith, alt_axis, normal = _knob_axes(axis_ra_hours, axis_dec_deg, latitude_deg, lst)
+    p_ref = _earth_to_altaz(ref_now_e, latitude_deg)
+    p_new = _earth_to_altaz(new_e, latitude_deg)
+    axis_v, zenith, alt_axis, normal = _knob_axes(axis_ha_hours, axis_dec_deg, latitude_deg)
 
-    sep_from_zenith = np.degrees(np.arccos(np.clip(abs(np.dot(p_ref, zenith)), -1.0, 1.0)))
-    if sep_from_zenith < _MIN_SEP_FROM_ZENITH_DEG:
+    zenith_margin, alt_axis_margin, plane_margin = _conditioning_margins_deg(p_ref, zenith, alt_axis, normal)
+    if zenith_margin < 0:
         raise ValueError(
             f"Reference point is within {_MIN_SEP_FROM_ZENITH_DEG:g}deg of the zenith/nadir -- "
             "an azimuth-knob adjustment barely moves a point there, so this reading would be "
             "unreliable. Re-run the initial fit at a lower-altitude target."
         )
-    sep_from_alt_axis = np.degrees(np.arccos(np.clip(abs(np.dot(p_ref, alt_axis)), -1.0, 1.0)))
-    if sep_from_alt_axis < _MIN_SEP_FROM_ALT_AXIS_DEG:
+    if alt_axis_margin < 0:
         raise ValueError(
             f"Reference point is within {_MIN_SEP_FROM_ALT_AXIS_DEG:g}deg of the altitude-knob's "
             "own rotation axis -- an altitude-knob adjustment barely moves a point there, so this "
             "reading would be unreliable. Re-run the initial fit at a different target."
         )
-    # A separate degeneracy from both checks above, found by testing: when the reference's
-    # *azimuth* lines up with alt_axis's azimuth (az0 +/- 90deg) -- regardless of altitude,
-    # this is an exact symmetry, not a magnitude effect -- the point sits in the vertical
-    # plane spanned by zenith and alt_axis, which makes the two-solution ambiguity below a
-    # near-exact mirror tie that minimum-norm selection can't reliably break. That plane's
+    # A separate degeneracy from both checks above: a point in the vertical plane spanned
+    # by zenith and alt_axis (azimuth = bearing +/- 90deg, at *any* altitude) is moved in
+    # the same direction -- along `normal` -- by both knobs (zenith x p and alt_axis x p
+    # are both parallel to normal there), so the two knob angles can't be told apart: the
+    # Jacobian is singular. Equivalently, the two closed-form roots below coincide there,
+    # so neither "pick the smaller" nor anything else can separate them. That plane's
     # normal is exactly `normal` (the bearing direction), so this is one dot product.
-    sep_from_symmetric_plane = np.degrees(np.arcsin(np.clip(abs(np.dot(p_ref, normal)), -1.0, 1.0)))
-    if sep_from_symmetric_plane < _MIN_SEP_FROM_SYMMETRIC_PLANE_DEG:
+    if plane_margin < 0:
         raise ValueError(
             f"Reference point's azimuth is within {_MIN_SEP_FROM_SYMMETRIC_PLANE_DEG:g}deg of the "
             "altitude-knob axis's own azimuth (bearing +/- 90deg) -- this makes the two possible "
@@ -411,9 +460,10 @@ def update_pole_offset(
     # rotating about zenith preserves angular distance from zenith, and rotating about
     # alt_axis preserves angular distance from alt_axis, q is exactly pinned down by two
     # known angular-distance constraints: angle(q, zenith) = angle(p_ref, zenith) and
-    # angle(q, alt_axis) = angle(p_new, alt_axis). zenith and alt_axis are *always*
-    # perpendicular by construction (alt_axis is defined to lie in the horizontal plane),
-    # which is exactly what keeps this closed form simple -- no oblique cross-terms.
+    # angle(q, alt_axis) = angle(p_new, alt_axis) -- an exact intersection of two cones,
+    # which is why alpha comes from p_ref and beta from p_new. zenith and alt_axis are
+    # *always* perpendicular by construction (alt_axis is defined to lie in the horizontal
+    # plane), which is exactly what keeps this closed form simple -- no oblique cross-terms.
     # Two solutions for q exist in general (a real geometric ambiguity, like a 2-link
     # robot arm's elbow-up/elbow-down for the same target -- confirmed by experiment: an
     # iterative solver found two genuinely distinct exact solutions for the same inputs),
@@ -427,12 +477,17 @@ def update_pole_offset(
     c2 = np.arccos(np.clip(np.dot(p_new, alt_axis), -1.0, 1.0))
     alpha, beta = np.cos(c1), np.cos(c2)
     gamma_sq = 1.0 - alpha**2 - beta**2
+    # With the symmetric-plane guard above, a small genuine adjustment keeps gamma_sq near
+    # (p_ref . normal)^2 >= sin^2(15deg) ~= 0.067; plate-solve noise (arcseconds) moves it
+    # by ~1e-4 of that. Going negative therefore means p_new is degrees away from anywhere
+    # a knob turn could take p_ref (a slew, a different pointing), not noise.
     if gamma_sq < -1e-3:
         raise ValueError(
             "No knob-adjustment rotation maps the reference onto the new solve -- the solved "
-            "position is inconsistent with a pure altitude/azimuth tip from the reference"
+            "position is inconsistent with a pure altitude/azimuth tip from the reference "
+            "(was the mount slewed or synced since the fit?)"
         )
-    gamma = np.sqrt(max(gamma_sq, 0.0))  # a tight-but-valid case can land fractionally below 0 from fp noise
+    gamma = np.sqrt(max(gamma_sq, 0.0))
 
     def signed_angle_about(u: np.ndarray, v: np.ndarray, axis: np.ndarray) -> float:
         u_perp = u - np.dot(u, axis) * axis

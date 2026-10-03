@@ -8,12 +8,14 @@ its real axis is off by. astropy's AltAz transform (not solver.py's own code) pl
 axis on the sky.
 
 Each observation also gets an independently-chosen wall-clock timestamp, decoupled from the
-mount-frame RA used to build it: under tracking, the mount's self-reported RA stays the same
-regardless of elapsed time (that's what tracking means), so the same mount-frame RA can be
-stamped with any timestamp/gap at all and must still fit correctly -- this is what makes B1
-(solver.py must derive rotation from elapsed time *combined with* the mount's own reported RA,
-not from the solved position's Hour Angle, and not from the mount's reported RA delta alone)
-directly testable.
+mount-frame RA used to build it. The generator is a physical model: the misaligned axis is
+fixed to the *Earth*, the mount's shaft angle is its own reported Hour Angle, and a plate solve
+reports the resulting direction on the *sky* at that observation's own instant -- so a
+perfectly-aligned tracking mount's solved RA stays constant over time, as it does in reality.
+(An earlier version of this generator let the solved RA drift at the sidereal rate under
+tracking, sharing the solver's own sky-vs-Earth frame mix-up, which hid a tens-of-arcminutes
+bias whenever real time passed between observations.) ``test_perfect_mount_with_real_gaps``
+checks the same thing with no shared rotation code at all.
 """
 from __future__ import annotations
 
@@ -87,27 +89,35 @@ def _synthesize(
     axis were the true pole) -- this is the slew-command design variable, entirely independent
     of wall-clock time. ``timestamps`` (defaulting to the same instant for all, if omitted) is
     then stamped on independently: a mount holding one of these RA values under tracking reports
-    the *same* mount_ra_hours no matter how much time passes, while the true sky position (and
-    therefore what a plate solve run at that moment reports) is fixed by the rotation alone, not
-    by elapsed time either. The solver must still recover the correct rotation regardless of
-    what timestamps/gaps are stamped on the same mount-frame sequence.
+    the *same* mount_ra_hours no matter how much time passes, while the sky position it really
+    points at slowly drifts unless the axis is perfectly aligned (tracking about a tilted axis).
+    The solver must still recover the correct axis regardless of what timestamps/gaps are
+    stamped on the same mount-frame sequence.
     """
     if timestamps is None:
         timestamps = [WHEN] * len(mount_ra_sequence_deg)
     axis_coord = _injected_axis_coord(alt_err_arcmin, az_err_arcmin, latitude_deg)
-    rotation = _rotation_aligning_z_to(axis_coord.cartesian.xyz.value)
+    # The injected axis is a *physical* (Earth-fixed) direction: astropy places it on the sky
+    # at TIME, and its Hour Angle at that moment is what stays constant afterwards. Build it
+    # in a "minus Hour Angle" Earth frame (x: HA=0, y: HA=-6h, z: pole).
+    axis_ha_hours = local_sidereal_time_h(WHEN, LONGITUDE) - axis_coord.ra.hour
+    rotation = _rotation_aligning_z_to(_radec_to_vector(-axis_ha_hours, axis_coord.dec.deg))
 
     observations = []
     for mount_ra_deg, when in zip(mount_ra_sequence_deg, timestamps):
         mount_ra_hours = mount_ra_deg / 15.0
-        # The mount's true shaft angle (what the misalignment rotation actually acts on) is
-        # mount_ra - LST, not mount_ra directly: a mount tracking at a fixed reported RA keeps
-        # physically turning as time passes (LST advances), even though mount_ra_hours itself
-        # doesn't change -- see solver.py's module docstring for the full derivation.
-        shaft_angle_hours = mount_ra_hours - local_sidereal_time_h(when, LONGITUDE)
-        p_mount = _radec_to_vector(shaft_angle_hours, mount_dec_deg)
-        p_true = rotation @ p_mount
-        solved_ra_hours, solved_dec_deg = _vector_to_radec(p_true)
+        lst = local_sidereal_time_h(when, LONGITUDE)
+        # Physical model: the mount's shaft angle is its own reported Hour Angle (LST minus
+        # reported RA) -- a mount tracking at a fixed reported RA keeps physically turning as
+        # LST advances. Its OTA direction in the Earth frame is that shaft-angle pointing tipped
+        # by the (Earth-fixed) misalignment; a plate solve then reports where that direction is
+        # on the *sky* at that instant, i.e. Earth-frame "minus HA" plus LST. (The original
+        # generator skipped that last step and reported the Earth-frame coordinate as if it
+        # were a sky RA -- a tracked target's solved RA drifting at the sidereal rate -- which
+        # is exactly the frame mix-up the old solver had, so the two agreed with each other.)
+        p_mount = _radec_to_vector(mount_ra_hours - lst, mount_dec_deg)
+        earth_pseudo_ra, solved_dec_deg = _vector_to_radec(rotation @ p_mount)
+        solved_ra_hours = (earth_pseudo_ra + lst) % 24.0
         observations.append(
             Observation(
                 solved_ra_hours=solved_ra_hours,
@@ -280,8 +290,31 @@ def test_fit_matches_across_different_gap_patterns() -> None:
     assert result_loose.az_error_arcmin == pytest.approx(-20.0, abs=1.5)
 
 
+@pytest.mark.parametrize("dec", [20.0, 50.0, 80.0])
+@pytest.mark.parametrize("gap_s", [30.0, 60.0, 120.0])
+def test_perfect_mount_with_real_gaps(dec: float, gap_s: float) -> None:
+    """A perfectly-aligned, tracking mount, built from first principles with no rotation code
+    shared with the solver or the generator above: it points exactly where it reports, so each
+    plate solve returns the mount's own reported RA/Dec, whatever time it is. Real time passes
+    between points (slew + settle + expose + solve). The fit must report ~zero error -- the
+    old sky-frame fit reported tens of arcminutes here, growing with the gap (-51'/+81' for
+    the Dec 20, 60 s case)."""
+    observations = []
+    for i in range(3):
+        ra_h = (10.0 + i * 2.0) % 24.0
+        observations.append(
+            Observation(
+                solved_ra_hours=ra_h, solved_dec_deg=dec, mount_ra_hours=ra_h,
+                when=WHEN + timedelta(seconds=gap_s * i),
+            )
+        )
+    result = fit_pole_offset(observations, LATITUDE, LONGITUDE, observations[-1].when)
+    assert result.alt_error_arcmin == pytest.approx(0.0, abs=0.01)
+    assert result.az_error_arcmin == pytest.approx(0.0, abs=0.01)
+
+
 # ===========================================================================
-# B3 -- the 3-point refinement must not get stuck exactly at the pole, where
+# B3 --the 3-point refinement must not get stuck exactly at the pole, where
 # the old (ra, dec)-parameterized Gauss-Newton had a vanishing Jacobian.
 # ===========================================================================
 
@@ -416,12 +449,46 @@ def _apply_knob_rotation(
     return _vector_to_altaz(v)
 
 
-def _altaz_to_jnow(alt_deg: float, az_deg: float, latitude_deg: float) -> tuple[float, float]:
+def _altaz_to_jnow(
+    alt_deg: float, az_deg: float, latitude_deg: float, when: datetime = WHEN
+) -> tuple[float, float]:
     site = EarthLocation(lat=latitude_deg * u.deg, lon=LONGITUDE * u.deg, height=200 * u.m)
-    coord = SkyCoord(alt=alt_deg * u.deg, az=az_deg * u.deg, frame=AltAz(obstime=TIME, location=site)).transform_to(
-        FK5(equinox=TIME)
+    obstime = Time(when)
+    coord = SkyCoord(alt=alt_deg * u.deg, az=az_deg * u.deg, frame=AltAz(obstime=obstime, location=site)).transform_to(
+        FK5(equinox=obstime)
     )
     return float(coord.ra.hour), float(coord.dec.deg)
+
+
+_SIDEREAL_DEG_PER_MINUTE = 360.0 * 1.00273790935 / 1440.0
+_MOUNT_RA_HOURS = 3.0  # arbitrary; what the tracking mount reports throughout a convergence case
+
+
+def _track(alt_deg: float, az_deg: float, axis_alt_deg: float, axis_az_deg: float, minutes: float) -> tuple[float, float]:
+    """Where a tracking mount's OTA points (alt/az) after `minutes`, given its Earth-fixed
+    mechanical axis: a rotation about that axis by the sidereal angle, westward (the same
+    sense the sky turns about the true pole -- see test_tracking_model_matches_astropy)."""
+    v = _altaz_to_vector(alt_deg, az_deg)
+    axis = _altaz_to_vector(axis_alt_deg, axis_az_deg)
+    return _vector_to_altaz(_own_rodrigues(axis, -np.radians(minutes * _SIDEREAL_DEG_PER_MINUTE), v))
+
+
+def test_tracking_model_matches_astropy() -> None:
+    """Sanity check on _track's sign/rate, independent of solver.py: with the axis exactly at
+    the true pole, tracking must hold a star fixed on the sky, so the tracked alt/az must
+    match astropy's alt/az of that fixed star 30 minutes later."""
+    from astrolol.mount.sky import alt_az as _alt_az
+
+    pole_alt, pole_az = _alt_az(0.0, 90.0, LATITUDE)
+    ra_h, dec = _altaz_to_jnow(40.0, 120.0, LATITUDE)
+    later = WHEN + timedelta(minutes=30)
+    site = EarthLocation(lat=LATITUDE * u.deg, lon=LONGITUDE * u.deg, height=200 * u.m)
+    star = SkyCoord(ra=ra_h * u.hourangle, dec=dec * u.deg, frame=FK5(equinox=TIME)).transform_to(
+        AltAz(obstime=Time(later), location=site)
+    )
+    alt, az = _track(40.0, 120.0, pole_alt, pole_az, 30.0)
+    assert alt == pytest.approx(star.alt.deg, abs=0.01)
+    assert az == pytest.approx(star.az.deg, abs=0.01)
 
 
 def _convergence_case(
@@ -434,18 +501,34 @@ def _convergence_case(
     # degeneracy update_pole_offset now rejects (see _MIN_SEP_FROM_SYMMETRIC_PLANE_DEG).
     ref_az_offset_deg: float = 45.0,
     latitude_deg: float = LATITUDE,
+    track_minutes: float = 0.0,
 ):
+    """Reference solved at WHEN; the mount then tracks for `track_minutes` (about its own,
+    misaligned, Earth-fixed axis) and the knobs are turned, and the new solve happens at
+    WHEN + track_minutes. Returns the fitted axis's Hour Angle/Dec, both Observations, and
+    the expected final alt/az error."""
     pole_sign = 1.0 if latitude_deg >= 0 else -1.0
     axis_alt0 = pole_sign * latitude_deg + alt_err0_arcmin / 60.0
     axis_az0 = (0.0 if latitude_deg >= 0 else 180.0) + az_err0_arcmin / 60.0
     ref_alt0, ref_az0 = ref_alt_deg, (axis_az0 + ref_az_offset_deg) % 360.0
+    new_when = WHEN + timedelta(minutes=track_minutes)
 
     axis_ra_h, axis_dec = _altaz_to_jnow(axis_alt0, axis_az0, latitude_deg)
+    axis_ha_h = local_sidereal_time_h(WHEN, LONGITUDE) - axis_ra_h
     ref_ra_h, ref_dec = _altaz_to_jnow(ref_alt0, ref_az0, latitude_deg)
 
+    # Knob turns commute with tracking (the tip acts on the axis too), so track first, then tip.
+    tracked_alt, tracked_az = _track(ref_alt0, ref_az0, axis_alt0, axis_az0, track_minutes)
     new_axis_alt, new_axis_az = _apply_knob_rotation(axis_alt0, axis_az0, axis_az0, d_az_deg, d_alt_deg)
-    new_ref_alt, new_ref_az = _apply_knob_rotation(ref_alt0, ref_az0, axis_az0, d_az_deg, d_alt_deg)
-    new_ra_h, new_dec = _altaz_to_jnow(new_ref_alt, new_ref_az, latitude_deg)
+    new_ref_alt, new_ref_az = _apply_knob_rotation(tracked_alt, tracked_az, axis_az0, d_az_deg, d_alt_deg)
+    new_ra_h, new_dec = _altaz_to_jnow(new_ref_alt, new_ref_az, latitude_deg, new_when)
+
+    reference = Observation(
+        solved_ra_hours=ref_ra_h, solved_dec_deg=ref_dec, mount_ra_hours=_MOUNT_RA_HOURS, when=WHEN
+    )
+    new = Observation(
+        solved_ra_hours=new_ra_h, solved_dec_deg=new_dec, mount_ra_hours=_MOUNT_RA_HOURS, when=new_when
+    )
 
     true_pole_dec = 90.0 if latitude_deg >= 0 else -90.0
     from astrolol.mount.sky import alt_az as _alt_az
@@ -454,7 +537,7 @@ def _convergence_case(
     expected_alt_error = (new_axis_alt - true_alt) * 60.0
     expected_az_error = ((new_axis_az - true_az + 180.0) % 360.0 - 180.0) * 60.0
 
-    return axis_ra_h, axis_dec, ref_ra_h, ref_dec, new_ra_h, new_dec, expected_alt_error, expected_az_error
+    return axis_ha_h, axis_dec, reference, new, expected_alt_error, expected_az_error
 
 
 @pytest.mark.parametrize(
@@ -471,43 +554,101 @@ def _convergence_case(
 def test_update_pole_offset_matches_independent_oracle(
     alt_err0: float, az_err0: float, d_az: float, d_alt: float
 ) -> None:
-    axis_ra_h, axis_dec, ref_ra_h, ref_dec, new_ra_h, new_dec, exp_alt, exp_az = _convergence_case(
-        alt_err0, az_err0, d_az, d_alt
-    )
-    result = update_pole_offset(axis_ra_h, axis_dec, ref_ra_h, ref_dec, new_ra_h, new_dec, LATITUDE, LONGITUDE, WHEN)
+    axis_ha, axis_dec, reference, new, exp_alt, exp_az = _convergence_case(alt_err0, az_err0, d_az, d_alt)
+    result = update_pole_offset(axis_ha, axis_dec, reference, new, LATITUDE, LONGITUDE)
 
     assert result.alt_error_arcmin == pytest.approx(exp_alt, abs=1.5)
     assert result.az_error_arcmin == pytest.approx(exp_az, abs=1.5)
 
 
 def test_update_pole_offset_zero_knob_rotation_is_a_noop() -> None:
-    axis_ra_h, axis_dec, ref_ra_h, ref_dec, new_ra_h, new_dec, exp_alt, exp_az = _convergence_case(
-        25.0, -10.0, 0.0, 0.0
-    )
-    result = update_pole_offset(axis_ra_h, axis_dec, ref_ra_h, ref_dec, new_ra_h, new_dec, LATITUDE, LONGITUDE, WHEN)
+    axis_ha, axis_dec, reference, new, _, _ = _convergence_case(25.0, -10.0, 0.0, 0.0)
+    result = update_pole_offset(axis_ha, axis_dec, reference, new, LATITUDE, LONGITUDE)
 
     assert result.alt_error_arcmin == pytest.approx(25.0, abs=1.5)
     assert result.az_error_arcmin == pytest.approx(-10.0, abs=1.5)
 
 
-def test_update_pole_offset_southern_hemisphere() -> None:
-    axis_ra_h, axis_dec, ref_ra_h, ref_dec, new_ra_h, new_dec, exp_alt, exp_az = _convergence_case(
-        15.0, -25.0, -8.0, 6.0, latitude_deg=-LATITUDE
+@pytest.mark.parametrize("alt_err0,az_err0", [(60.0, 0.0), (0.0, 60.0), (120.0, -90.0)])
+def test_update_pole_offset_no_knob_turn_after_30_minutes_tracking(alt_err0: float, az_err0: float) -> None:
+    """No knob touched, but the mount has been tracking (about its misaligned axis) for 30
+    minutes between the reference solve and the recheck. The reading must not move: before
+    the Earth-frame fix, the fitted axis was re-derived from its *sky* RA at the recheck's
+    sidereal time (rotating it about the true pole) and the reference was treated as
+    sky-fixed, together drifting the live reading by 5-25' over 30 minutes for a 60' error
+    with nobody touching anything.
+
+    Compared against the same case at 0 minutes as well as the injected value: the ~0.5'
+    constant offset both share is this oracle's astropy FK5/AltAz frame vs. sky.py's mean
+    sidereal time, not anything time-dependent."""
+    def reading(minutes: float):
+        axis_ha, axis_dec, reference, new, _, _ = _convergence_case(
+            alt_err0, az_err0, 0.0, 0.0, track_minutes=minutes
+        )
+        return update_pole_offset(axis_ha, axis_dec, reference, new, LATITUDE, LONGITUDE)
+
+    at_start, after_30 = reading(0.0), reading(30.0)
+    assert after_30.alt_error_arcmin == pytest.approx(at_start.alt_error_arcmin, abs=0.1)
+    assert after_30.az_error_arcmin == pytest.approx(at_start.az_error_arcmin, abs=0.1)
+    assert after_30.alt_error_arcmin == pytest.approx(alt_err0, abs=1.0)
+    assert after_30.az_error_arcmin == pytest.approx(az_err0, abs=1.0)
+
+
+def test_update_pole_offset_knob_turn_during_tracking() -> None:
+    axis_ha, axis_dec, reference, new, exp_alt, exp_az = _convergence_case(
+        40.0, -30.0, 3.0, -2.0, track_minutes=20.0
     )
+    result = update_pole_offset(axis_ha, axis_dec, reference, new, LATITUDE, LONGITUDE)
+
+    assert result.alt_error_arcmin == pytest.approx(exp_alt, abs=1.5)
+    assert result.az_error_arcmin == pytest.approx(exp_az, abs=1.5)
+
+
+@pytest.mark.parametrize("reference_index", [0, 1, 2])
+def test_fit_then_recheck_after_tracking_end_to_end(reference_index: int) -> None:
+    """fit_pole_offset -> update_pole_offset with the same physical generator: 3 points with
+    realistic 90 s gaps, then a recheck at the last point 30 minutes later with no knob turn
+    must read back the fit's own result. Holds for *any* of the fit's points as the
+    reference, since the reference is carried forward by the mount's own reported motor
+    rotation (slew included) -- the wizard still uses the last one, where the mount sits."""
+    t = [WHEN + timedelta(seconds=90 * i) for i in range(3)] + [WHEN + timedelta(seconds=180, minutes=30)]
+    observations, _ = _synthesize(45.0, -35.0, [0.0, 30.0, 60.0, 60.0], mount_dec_deg=65.0, timestamps=t)
+    fit = fit_pole_offset(observations[:3], LATITUDE, LONGITUDE, t[2])
+    assert fit.alt_error_arcmin == pytest.approx(45.0, abs=1.0)
+    assert fit.az_error_arcmin == pytest.approx(-35.0, abs=1.0)
+
     result = update_pole_offset(
-        axis_ra_h, axis_dec, ref_ra_h, ref_dec, new_ra_h, new_dec, -LATITUDE, LONGITUDE, WHEN
+        fit.axis_ha_hours, fit.axis_dec_deg, observations[reference_index], observations[3], LATITUDE, LONGITUDE
     )
+    assert result.alt_error_arcmin == pytest.approx(fit.alt_error_arcmin, abs=0.05)
+    assert result.az_error_arcmin == pytest.approx(fit.az_error_arcmin, abs=0.05)
+
+
+def test_update_pole_offset_rejects_a_slew_reported_as_no_motion() -> None:
+    """A new solve 30+ degrees from the reference while the mount reports no motor rotation
+    (e.g. a sync, or a solve from a different pointing paired with stale mount data) is not
+    a knob turn and must be rejected rather than reported as one."""
+    t = [WHEN, WHEN + timedelta(seconds=90)]
+    observations, _ = _synthesize(20.0, 10.0, [0.0, 45.0], mount_dec_deg=65.0, timestamps=t)
+    moved = observations[1].model_copy(update={"mount_ra_hours": observations[0].mount_ra_hours})
+    with pytest.raises(ValueError):
+        update_pole_offset(0.0, 89.7, observations[0], moved, LATITUDE, LONGITUDE)
+
+
+def test_update_pole_offset_southern_hemisphere() -> None:
+    axis_ha, axis_dec, reference, new, exp_alt, exp_az = _convergence_case(
+        15.0, -25.0, -8.0, 6.0, latitude_deg=-LATITUDE, track_minutes=15.0
+    )
+    result = update_pole_offset(axis_ha, axis_dec, reference, new, -LATITUDE, LONGITUDE)
 
     assert result.alt_error_arcmin == pytest.approx(exp_alt, abs=1.5)
     assert result.az_error_arcmin == pytest.approx(exp_az, abs=1.5)
 
 
 def test_update_pole_offset_rejects_reference_near_zenith() -> None:
-    axis_ra_h, axis_dec, ref_ra_h, ref_dec, new_ra_h, new_dec, _, _ = _convergence_case(
-        10.0, 10.0, 5.0, 5.0, ref_alt_deg=89.0
-    )
+    axis_ha, axis_dec, reference, new, _, _ = _convergence_case(10.0, 10.0, 5.0, 5.0, ref_alt_deg=89.0)
     with pytest.raises(ValueError, match="zenith"):
-        update_pole_offset(axis_ra_h, axis_dec, ref_ra_h, ref_dec, new_ra_h, new_dec, LATITUDE, LONGITUDE, WHEN)
+        update_pole_offset(axis_ha, axis_dec, reference, new, LATITUDE, LONGITUDE)
 
 
 def test_update_pole_offset_rejects_reference_near_alt_axis() -> None:
@@ -515,11 +656,11 @@ def test_update_pole_offset_rejects_reference_near_alt_axis() -> None:
     # altitude 0 -- a reference near THAT azimuth and near the horizon is what's nearly
     # aligned with it, not a reference at the bearing's own azimuth (that's actually the
     # best-conditioned direction, since it's as far from alt_axis as azimuth allows).
-    axis_ra_h, axis_dec, ref_ra_h, ref_dec, new_ra_h, new_dec, _, _ = _convergence_case(
+    axis_ha, axis_dec, reference, new, _, _ = _convergence_case(
         10.0, 10.0, 5.0, 5.0, ref_alt_deg=2.0, ref_az_offset_deg=90.0
     )
     with pytest.raises(ValueError, match="altitude-knob"):
-        update_pole_offset(axis_ra_h, axis_dec, ref_ra_h, ref_dec, new_ra_h, new_dec, LATITUDE, LONGITUDE, WHEN)
+        update_pole_offset(axis_ha, axis_dec, reference, new, LATITUDE, LONGITUDE)
 
 
 def test_update_pole_offset_rejects_implausibly_large_adjustment() -> None:
@@ -527,11 +668,28 @@ def test_update_pole_offset_rejects_implausibly_large_adjustment() -> None:
     # rotation gets this large (confirmed directly: both candidates are exact solutions,
     # minimum-norm selection isn't reliably the physical one any more) -- large enough
     # that it isn't a realistic single knob nudge between rechecks either way.
-    axis_ra_h, axis_dec, ref_ra_h, ref_dec, new_ra_h, new_dec, _, _ = _convergence_case(
-        60.0, -20.0, 20.0, 20.0
-    )
+    axis_ha, axis_dec, reference, new, _, _ = _convergence_case(60.0, -20.0, 20.0, 20.0)
     with pytest.raises(ValueError, match="knob adjustment"):
-        update_pole_offset(axis_ra_h, axis_dec, ref_ra_h, ref_dec, new_ra_h, new_dec, LATITUDE, LONGITUDE, WHEN)
+        update_pole_offset(axis_ha, axis_dec, reference, new, LATITUDE, LONGITUDE)
+
+
+def test_reference_conditioning_margin_matches_update_pole_offset_guards() -> None:
+    """reference_conditioning_margin_deg (what the wizard plans with) must agree with the
+    guards update_pole_offset actually applies: a positive margin passes, a negative fails."""
+    from plugins.polar_align.solver import reference_conditioning_margin_deg
+
+    for ha in (-5.0, -3.0, -1.0, 1.0, 3.0, 5.0):
+        for dec in (20.0, 40.0, 60.0, 70.0):
+            margin = reference_conditioning_margin_deg(0.0, 90.0, ha, dec, LATITUDE)
+            if abs(margin) < 0.5:
+                continue
+            ra = local_sidereal_time_h(WHEN, LONGITUDE) - ha
+            obs = Observation(solved_ra_hours=ra % 24.0, solved_dec_deg=dec, mount_ra_hours=ra % 24.0, when=WHEN)
+            if margin > 0:
+                update_pole_offset(0.0, 90.0, obs, obs, LATITUDE, LONGITUDE)
+            else:
+                with pytest.raises(ValueError):
+                    update_pole_offset(0.0, 90.0, obs, obs, LATITUDE, LONGITUDE)
 
 
 def test_update_pole_offset_random_sweep() -> None:
@@ -555,15 +713,14 @@ def test_update_pole_offset_random_sweep() -> None:
         ref_alt = rng.uniform(20.0, 70.0)
         ref_az_offset = rng.choice([45.0, 60.0, 120.0, 135.0, 225.0, 240.0, 300.0, 315.0])
         latitude = rng.choice([LATITUDE, -LATITUDE])
+        track_minutes = rng.uniform(0.0, 20.0)
 
-        axis_ra_h, axis_dec, ref_ra_h, ref_dec, new_ra_h, new_dec, exp_alt, exp_az = _convergence_case(
+        axis_ha, axis_dec, reference, new, exp_alt, exp_az = _convergence_case(
             alt_err0, az_err0, d_az, d_alt, ref_alt_deg=ref_alt, ref_az_offset_deg=ref_az_offset,
-            latitude_deg=latitude,
+            latitude_deg=latitude, track_minutes=track_minutes,
         )
         try:
-            result = update_pole_offset(
-                axis_ra_h, axis_dec, ref_ra_h, ref_dec, new_ra_h, new_dec, latitude, LONGITUDE, WHEN
-            )
+            result = update_pole_offset(axis_ha, axis_dec, reference, new, latitude, LONGITUDE)
         except ValueError:
             rejected += 1
             continue
