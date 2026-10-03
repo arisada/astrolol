@@ -1,4 +1,4 @@
-import type { ReticleState, WizardRequest, WizardRun } from '@/api/types'
+import type { AutoRefreshRequest, ReticleState, WizardRequest, WizardRun } from '@/api/types'
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(path, {
@@ -25,6 +25,14 @@ export const recheckWizard = () =>
 
 export const cancelWizard = () =>
   request<void>('/plugins/polar_align/wizard', { method: 'DELETE' })
+
+export const startAutoRefresh = (req: AutoRefreshRequest) =>
+  request<WizardRun>('/plugins/polar_align/wizard/auto_refresh', {
+    method: 'POST', body: JSON.stringify(req),
+  })
+
+export const stopAutoRefresh = () =>
+  request<void>('/plugins/polar_align/wizard/auto_refresh', { method: 'DELETE' })
 
 // ── Part 1: polar scope reticle ─────────────────────────────────────────────────
 

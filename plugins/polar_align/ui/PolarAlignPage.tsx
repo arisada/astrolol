@@ -29,6 +29,37 @@ function azHint(arcmin: number): string {
     : `${(-arcmin).toFixed(1)}′ west of true north — increase azimuth`
 }
 
+// Thresholds on the combined (quadrature-summed) alt/az error — rough amateur-imaging
+// guidance, not a hard physical cutoff: 1' is comfortable for long narrowband subs at
+// most focal lengths, 3' is fine for most imaging, beyond 7' field rotation over a
+// sub-length exposure starts being visible on longer focal lengths.
+type PaQuality = 'excellent' | 'good' | 'fair' | 'poor'
+
+function paQuality(altArcmin: number, azArcmin: number): PaQuality {
+  const total = Math.hypot(altArcmin, azArcmin)
+  if (total <= 1) return 'excellent'
+  if (total <= 3) return 'good'
+  if (total <= 7) return 'fair'
+  return 'poor'
+}
+
+const QUALITY_LABEL: Record<PaQuality, string> = {
+  excellent: 'Excellent', good: 'Good', fair: 'Fair', poor: 'Needs work',
+}
+const QUALITY_CLASS: Record<PaQuality, string> = {
+  excellent: 'text-emerald-400', good: 'text-sky-400', fair: 'text-amber-400', poor: 'text-red-400',
+}
+
+function QualityBadge({ altArcmin, azArcmin }: { altArcmin: number; azArcmin: number }) {
+  const q = paQuality(altArcmin, azArcmin)
+  const total = Math.hypot(altArcmin, azArcmin)
+  return (
+    <span className={`text-xs font-medium ${QUALITY_CLASS[q]}`}>
+      {QUALITY_LABEL[q]} ({total.toFixed(1)}′ total)
+    </span>
+  )
+}
+
 export function PolarAlignPage() {
   const connectedDevices = useStore((s) => s.connectedDevices)
   const mounts = connectedDevices.filter((d) => d.kind === 'mount')
@@ -88,6 +119,11 @@ export function PolarAlignPage() {
   const [decInput, setDecInput] = useState('')
   const decOverride = decInput.trim() === '' ? null : Number(decInput)
   const decInvalid = decOverride !== null && (!Number.isFinite(decOverride) || Math.abs(decOverride) > 80)
+  // Recheck (CONVERGING-phase) settings -- '' = reuse the main fit's own exposure_s,
+  // same default as the backend (WizardRequest.converge_exposure_s: None).
+  const [convergeExposureInput, setConvergeExposureInput] = useState('')
+  const convergeExposureS = convergeExposureInput.trim() === '' ? null : Number(convergeExposureInput)
+  const [convergeSearchRadiusDeg, setConvergeSearchRadiusDeg] = useState(3)
 
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
@@ -95,7 +131,7 @@ export function PolarAlignPage() {
     try {
       const r = await polarAlignApi.getWizard()
       setRun(r)
-      if (r.status !== 'running') {
+      if (r.status !== 'running' && r.status !== 'converging') {
         setBusy(false)
         if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null }
       }
@@ -105,8 +141,12 @@ export function PolarAlignPage() {
   useEffect(() => {
     polarAlignApi.getWizard().then((r) => {
       setRun(r)
-      if (r.status === 'running') {
-        setBusy(true)
+      if (r.status === 'running') setBusy(true)
+      // Keep polling through CONVERGING too: the backend can be driving its own
+      // auto-refresh rechecks (see handleToggleAutoRefresh) with no browser tab
+      // watching, so this tab needs to pick those up on its own, not just whatever
+      // a local button click last set.
+      if (r.status === 'running' || r.status === 'converging') {
         pollRef.current = setInterval(fetchRun, 1500)
       }
     }).catch(() => {})
@@ -122,6 +162,7 @@ export function PolarAlignPage() {
     try {
       const r = await polarAlignApi.startWizard({
         mount_id: mountId, camera_id: cameraId, exposure_s: exposureS, binning, dec_deg: decOverride,
+        converge_exposure_s: convergeExposureS, converge_search_radius_deg: convergeSearchRadiusDeg,
       })
       setRun(r)
       pollRef.current = setInterval(fetchRun, 1500)
@@ -129,22 +170,42 @@ export function PolarAlignPage() {
       setBusy(false)
       setWizardError(e instanceof Error ? e.message : 'Failed to start')
     }
-  }, [mountId, cameraId, exposureS, binning, decOverride, decInvalid, fetchRun, setWizardError])
+  }, [mountId, cameraId, exposureS, binning, decOverride, decInvalid, convergeExposureS,
+      convergeSearchRadiusDeg, fetchRun, setWizardError])
 
   const [rechecking, setRechecking] = useState(false)
   const handleRecheck = useCallback(async () => {
     setRechecking(true)
     try {
       setRun(await polarAlignApi.recheckWizard())
-      setWizardError(null)
-    } catch (e) {
-      // Shown in the converging panel below, timestamped -- a failed recheck must not look
-      // like "nothing changed" (the previous reading, if any, stays up next to it).
-      setWizardError(`Recheck failed: ${e instanceof Error ? e.message : 'unknown error'}`)
+    } catch {
+      // The run itself now carries last_recheck_error/last_recheck_at (set by the
+      // backend regardless of whether a manual click or auto-refresh triggered the
+      // failed reading) -- refetch it instead of keeping a separate local error string,
+      // so both paths render through the same place below.
+      await fetchRun()
     } finally {
       setRechecking(false)
     }
-  }, [setWizardError])
+  }, [fetchRun])
+
+  const [autoRefreshIntervalInput, setAutoRefreshIntervalInput] = useState(20)
+  const [autoRefreshBusy, setAutoRefreshBusy] = useState(false)
+  const handleToggleAutoRefresh = useCallback(async () => {
+    setAutoRefreshBusy(true)
+    try {
+      if (run?.auto_refresh_interval_s != null) {
+        await polarAlignApi.stopAutoRefresh()
+      } else {
+        await polarAlignApi.startAutoRefresh({ interval_s: autoRefreshIntervalInput })
+      }
+      await fetchRun()
+    } catch (e) {
+      setWizardError(e instanceof Error ? e.message : 'Failed to toggle auto-refresh')
+    } finally {
+      setAutoRefreshBusy(false)
+    }
+  }, [run?.auto_refresh_interval_s, autoRefreshIntervalInput, fetchRun, setWizardError])
 
   const handleStop = useCallback(async () => {
     try {
@@ -251,6 +312,28 @@ export function PolarAlignPage() {
               </span>
             </div>
 
+            <div className="rounded border border-surface-border bg-surface-overlay/30 p-2.5 space-y-2">
+              <p className="text-xs text-slate-400">Live-adjustment rechecks</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs text-slate-500">Exposure (s)</label>
+                  <Input inputSize="sm" type="number" min={0.1} step={0.5} placeholder={`${exposureS} (same)`}
+                    value={convergeExposureInput} onChange={(e) => setConvergeExposureInput(e.target.value)} />
+                </div>
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs text-slate-500">Search radius (°)</label>
+                  <Input inputSize="sm" type="number" min={0.5} step={0.5}
+                    value={convergeSearchRadiusDeg}
+                    onChange={(e) => setConvergeSearchRadiusDeg(Number(e.target.value) || 0.5)} />
+                </div>
+              </div>
+              <p className="text-[10px] text-slate-600">
+                Used for every reading while turning the knobs — a shorter exposure and a
+                tight search radius (the mount hasn't been slewed) make each recheck fast.
+                Leave exposure blank to reuse the fit's own.
+              </p>
+            </div>
+
             {wizardError && <p className="text-xs text-red-400">{wizardError}</p>}
 
             <Button onClick={handleStart} disabled={busy || mounts.length === 0 || cameras.length === 0} className="w-full">
@@ -300,7 +383,10 @@ export function PolarAlignPage() {
 
             {run.result && (
               <div className="rounded border border-surface-border bg-surface-overlay/50 p-2.5 space-y-1">
-                <p className="text-xs text-slate-400">Initial fit:</p>
+                <div className="flex items-center justify-between">
+                  <p className="text-xs text-slate-400">Initial fit:</p>
+                  <QualityBadge altArcmin={run.result.alt_error_arcmin} azArcmin={run.result.az_error_arcmin} />
+                </div>
                 <p className="text-xs text-slate-200">{altHint(run.result.alt_error_arcmin)}</p>
                 <p className="text-xs text-slate-200">{azHint(run.result.az_error_arcmin)}</p>
               </div>
@@ -310,7 +396,10 @@ export function PolarAlignPage() {
               <div className="space-y-2">
                 {run.live_offset ? (
                   <div className="rounded border border-amber-500/30 bg-amber-500/10 p-2.5 space-y-1">
-                    <p className="text-xs text-amber-300">Latest reading:</p>
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs text-amber-300">Latest reading:</p>
+                      <QualityBadge altArcmin={run.live_offset.alt_error_arcmin} azArcmin={run.live_offset.az_error_arcmin} />
+                    </div>
                     <p className="text-xs text-slate-200">{altHint(run.live_offset.alt_error_arcmin)}</p>
                     <p className="text-xs text-slate-200">{azHint(run.live_offset.az_error_arcmin)}</p>
                   </div>
@@ -321,14 +410,54 @@ export function PolarAlignPage() {
                     re-slew between readings.
                   </p>
                 )}
+
+                {run.last_recheck_error && (
+                  <p className="text-xs text-red-400 break-words">
+                    {run.last_recheck_at && (
+                      <span className="text-red-300/70 mr-1">
+                        [{new Date(run.last_recheck_at).toLocaleTimeString()}]
+                      </span>
+                    )}
+                    Recheck failed: {run.last_recheck_error}
+                  </p>
+                )}
+
                 <div className="flex gap-2">
                   <Button size="sm" onClick={handleRecheck} disabled={rechecking} className="flex-1">
                     <RefreshCw size={13} className="mr-1.5" />
-                    {rechecking ? 'Rechecking…' : 'Recheck'}
+                    {rechecking ? 'Rechecking…' : 'Recheck now'}
                   </Button>
                   <Button size="sm" variant="outline" onClick={handleStop}>
                     Done
                   </Button>
+                </div>
+
+                <div className="rounded border border-surface-border bg-surface-overlay/30 p-2.5 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs text-slate-400">Auto-refresh</p>
+                    {run.auto_refresh_interval_s != null && (
+                      <span className="text-[10px] text-emerald-400">
+                        Every {run.auto_refresh_interval_s}s
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Input inputSize="sm" type="number" min={5} max={600} step={5}
+                      value={autoRefreshIntervalInput}
+                      disabled={run.auto_refresh_interval_s != null}
+                      onChange={(e) => setAutoRefreshIntervalInput(Number(e.target.value) || 5)}
+                      className="w-20" />
+                    <span className="text-xs text-slate-500">seconds</span>
+                    <Button size="sm" variant={run.auto_refresh_interval_s != null ? 'outline' : 'default'}
+                      onClick={handleToggleAutoRefresh} disabled={autoRefreshBusy} className="flex-1">
+                      {run.auto_refresh_interval_s != null ? 'Stop auto-refresh' : 'Start auto-refresh'}
+                    </Button>
+                  </div>
+                  <p className="text-[10px] text-slate-600">
+                    Rechecks automatically on this interval while you turn the knobs,
+                    even if nobody clicks Recheck — keeps going from the server side, so
+                    it survives this tab reloading or closing.
+                  </p>
                 </div>
               </div>
             )}

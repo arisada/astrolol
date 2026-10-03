@@ -244,6 +244,10 @@ export interface WizardRequest {
   converge_search_radius_deg?: number
 }
 
+export interface AutoRefreshRequest {
+  interval_s: number
+}
+
 export interface WizardPoint {
   index: number
   mount_ra_hours: number
@@ -270,6 +274,9 @@ export interface WizardRun {
   plan: TargetPlan | null
   convergence_reference_index: number | null
   live_offset: ConvergenceUpdate | null
+  auto_refresh_interval_s: number | null
+  last_recheck_at: string | null
+  last_recheck_error: string | null
   error: string | null
   started_at: string
 }
