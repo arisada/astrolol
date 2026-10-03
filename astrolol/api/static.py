@@ -81,3 +81,24 @@ def mount_ui(app: FastAPI) -> None:
                 return FileResponse(candidate)
         # Anything else (including root /) gets index.html (client-side routing).
         return FileResponse(UI_DIST / "index.html")
+
+
+def reorder_spa_fallback_last(app: FastAPI) -> None:
+    """Keep the SPA catch-all last in ``app.router.routes``.
+
+    Starlette matches routes in list order and stops at the first full match
+    (see ``starlette.routing.Router.app``), so the catch-all registered by
+    ``mount_ui()`` only "loses" to API routes because it was added after all
+    of them at startup. Hot-enabling a plugin later (``sync_enabled_plugins``)
+    appends its router to the route list at *runtime* — after the catch-all —
+    so without this, every request under that plugin's new "/plugins/<id>/..."
+    prefix would be swallowed by the catch-all before ever reaching the
+    plugin's own routes. Call this right after any such runtime
+    ``include_router``/``plugin.setup()`` so the catch-all keeps behaving as
+    if it were always registered last. No-op if the UI isn't mounted.
+    """
+    routes = app.router.routes
+    for i, route in enumerate(routes):
+        if getattr(route, "name", None) == "spa_fallback":
+            routes.append(routes.pop(i))
+            return

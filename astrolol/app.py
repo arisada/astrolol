@@ -8,6 +8,7 @@ from typing import Optional
 import pluggy
 import structlog
 
+from astrolol.api.static import reorder_spa_fallback_last
 from astrolol.core.plugin_api import Plugin, PluginContext
 from astrolol.plugin import AstrololSpec, PROJECT_NAME
 from astrolol.devices.registry import DeviceRegistry
@@ -166,6 +167,11 @@ async def sync_enabled_plugins(
             continue
         try:
             plugin.setup(app, ctx)
+            # setup() just appended this plugin's router after the SPA catch-all
+            # (added by mount_ui() at startup) — push the catch-all back to the
+            # end so it doesn't swallow the plugin's new routes. No-op in dev
+            # mode (no ui/dist, so no catch-all was ever registered).
+            reorder_spa_fallback_last(app)
             await plugin.startup()
         except Exception as exc:
             logger.error("plugin.hot_enable_failed", plugin_id=plugin_id, error=str(exc), exc_info=True)
