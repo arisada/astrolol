@@ -63,6 +63,8 @@ logger = structlog.get_logger()
 SLEW_TIMEOUT_S = 300.0
 MAX_SOLVE_ATTEMPTS = 3
 MAX_DEC_DRIFT_ARCMIN = 1.0
+MIN_AUTO_REFRESH_INTERVAL_S = 5.0
+MAX_AUTO_REFRESH_INTERVAL_S = 600.0
 
 # Target planning (see plan_targets). Auto-picked Dec candidates, as |Dec| (signed by the
 # site's hemisphere): well clear of the pole (where precession puts the JNow pole ~9' from
@@ -234,6 +236,19 @@ class WizardRun(BaseModel):
     )
     live_offset: ConvergenceUpdate | None = Field(
         default=None, description="Latest CONVERGING-phase reading, updated by each recheck"
+    )
+    auto_refresh_interval_s: float | None = Field(
+        default=None, description="Seconds between automatic rechecks; None = auto-refresh is off"
+    )
+    last_recheck_at: datetime | None = Field(
+        default=None, description="When the last recheck (manual or automatic) was attempted"
+    )
+    last_recheck_error: str | None = Field(
+        default=None,
+        description="Set by the most recent recheck if it failed, cleared by the next "
+        "successful one. Persisted on the run (not just raised to the caller) so an "
+        "auto-refresh failure -- which has no caller watching -- is still visible to "
+        "anyone polling GET /wizard, not just whoever clicked Recheck.",
     )
     error: str | None = None
     started_at: datetime
@@ -541,42 +556,53 @@ class PolarAlignWizard:
         exposure_s = req.converge_exposure_s or req.exposure_s
         binning = req.converge_binning or req.binning
 
-        # The mount's own reported RA now: update_pole_offset carries the reference forward
-        # by the motor rotation since it was taken (tracking, in the normal case).
-        status = await mm.get_status(req.mount_id)
-        t0 = _now()
-        exposure = await im.expose(
-            req.camera_id,
-            ExposureRequest(duration=exposure_s, binning=binning, gain=req.gain, save=False),
-        )
-        when = t0 + timedelta(seconds=exposure_s / 2.0)
-        result = await solve_manager.solve(
-            fits_path=str(exposure.fits_path),
-            ra_hint=reference.solved_ra_hours * 15.0,
-            dec_hint=reference.solved_dec_deg,
-            radius=req.converge_search_radius_deg,
-        )
-        icrs_coord = SkyCoord(ra=result.ra * u.deg, dec=result.dec * u.deg, frame="icrs")
-        new_ra_h, new_dec = icrs_to_jnow(icrs_coord, when)
+        # Recorded on the run itself (not just raised to the caller) so a failure from
+        # the auto-refresh loop -- which has no caller watching -- is still visible to
+        # anyone polling GET /wizard, not just whoever clicked Recheck.
+        run.last_recheck_at = _now()
+        try:
+            # The mount's own reported RA now: update_pole_offset carries the reference
+            # forward by the motor rotation since it was taken (tracking, in the normal case).
+            status = await mm.get_status(req.mount_id)
+            t0 = _now()
+            exposure = await im.expose(
+                req.camera_id,
+                ExposureRequest(duration=exposure_s, binning=binning, gain=req.gain, save=False),
+            )
+            when = t0 + timedelta(seconds=exposure_s / 2.0)
+            result = await solve_manager.solve(
+                fits_path=str(exposure.fits_path),
+                ra_hint=reference.solved_ra_hours * 15.0,
+                dec_hint=reference.solved_dec_deg,
+                radius=req.converge_search_radius_deg,
+            )
+            icrs_coord = SkyCoord(ra=result.ra * u.deg, dec=result.dec * u.deg, frame="icrs")
+            new_ra_h, new_dec = icrs_to_jnow(icrs_coord, when)
 
-        run.live_offset = update_pole_offset(
-            run.result.axis_ha_hours,
-            run.result.axis_dec_deg,
-            Observation(
-                solved_ra_hours=reference.solved_ra_hours,
-                solved_dec_deg=reference.solved_dec_deg,
-                mount_ra_hours=reference.mount_ra_hours,
-                when=reference.when,
-            ),
-            Observation(
-                solved_ra_hours=new_ra_h,
-                solved_dec_deg=new_dec,
-                mount_ra_hours=status.ra_jnow,
-                when=when,
-            ),
-            site.latitude,
-            site.longitude,
-        )
+            run.live_offset = update_pole_offset(
+                run.result.axis_ha_hours,
+                run.result.axis_dec_deg,
+                Observation(
+                    solved_ra_hours=reference.solved_ra_hours,
+                    solved_dec_deg=reference.solved_dec_deg,
+                    mount_ra_hours=reference.mount_ra_hours,
+                    when=reference.when,
+                ),
+                Observation(
+                    solved_ra_hours=new_ra_h,
+                    solved_dec_deg=new_dec,
+                    mount_ra_hours=status.ra_jnow,
+                    when=when,
+                ),
+                site.latitude,
+                site.longitude,
+            )
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            run.last_recheck_error = str(exc)
+            raise
+        run.last_recheck_error = None
         logger.info(
             "polar_align.error_updated", run_id=run.id,
             alt_error_arcmin=run.live_offset.alt_error_arcmin,
@@ -613,6 +639,7 @@ class WizardEngine:
         self._wizard = PolarAlignWizard(app, event_bus)
         self._current_run: WizardRun | None = None
         self._task: asyncio.Task[None] | None = None
+        self._auto_refresh_task: asyncio.Task[None] | None = None
 
     @property
     def current_run(self) -> WizardRun | None:
@@ -627,6 +654,7 @@ class WizardEngine:
         # and a run sitting there is still very much in progress from the user's side.
         if self._current_run is not None and self._current_run.status == "converging":
             raise ValueError("Polar alignment is still converging. Finish or cancel it first.")
+        await self._stop_auto_refresh_task()
         run = WizardRun(id=uuid.uuid4().hex[:12], request=req, started_at=_now())
         self._current_run = run
         self._task = asyncio.create_task(self._wizard.run(run), name=f"polar_align_{run.id}")
@@ -649,9 +677,61 @@ class WizardEngine:
             raise
         return self._current_run
 
+    async def start_auto_refresh(self, interval_s: float) -> WizardRun:
+        """Start (or re-time) periodic automatic rechecks -- a background loop around the
+        same recheck() used by a manual click, so a failed reading gets the same
+        last_recheck_error/last_recheck_at bookkeeping either way."""
+        if self._current_run is None:
+            raise ValueError("No polar alignment run has been started")
+        if self._current_run.status != "converging":
+            raise ValueError("Polar alignment is not in the converging phase")
+        await self._stop_auto_refresh_task()
+        self._current_run.auto_refresh_interval_s = interval_s
+        run_id = self._current_run.id
+        self._auto_refresh_task = asyncio.create_task(
+            self._auto_refresh_loop(interval_s), name=f"polar_align_autorefresh_{run_id}"
+        )
+        logger.info("polar_align.auto_refresh_started", run_id=run_id, interval_s=interval_s)
+        return self._current_run
+
+    async def stop_auto_refresh(self) -> WizardRun:
+        if self._current_run is None:
+            raise ValueError("No polar alignment run has been started")
+        await self._stop_auto_refresh_task()
+        self._current_run.auto_refresh_interval_s = None
+        return self._current_run
+
+    async def _auto_refresh_loop(self, interval_s: float) -> None:
+        run = self._current_run
+        assert run is not None
+        try:
+            while True:
+                await asyncio.sleep(interval_s)
+                if self._current_run is not run or run.status != "converging":
+                    return
+                try:
+                    await self.recheck()
+                except Exception:
+                    # Already logged by recheck()/engine.recheck, and recorded on the run
+                    # itself (last_recheck_error) -- a bad reading just means try again
+                    # next tick, same as a manual recheck isn't fatal to the run.
+                    pass
+        except asyncio.CancelledError:
+            raise
+
+    async def _stop_auto_refresh_task(self) -> None:
+        if self._auto_refresh_task is not None and not self._auto_refresh_task.done():
+            self._auto_refresh_task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await self._auto_refresh_task
+        self._auto_refresh_task = None
+
     async def cancel(self) -> None:
         """Stop the current run. During CONVERGING this is a completion, not an abort --
         see PolarAlignWizard.finish_converging."""
+        await self._stop_auto_refresh_task()
+        if self._current_run is not None:
+            self._current_run.auto_refresh_interval_s = None
         if self._current_run is not None and self._current_run.status == "converging":
             await self._wizard.finish_converging(self._current_run)
             return

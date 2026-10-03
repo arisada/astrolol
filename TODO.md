@@ -80,12 +80,6 @@ actual level, favorites silently failing to save because `crypto.randomUUID()` t
 over plain HTTP by hostname) were fixed in the same session — see git log. The rest needs
 more design/testing than a single sitting allows:
 
-- **Polar-align auto-refresh** — the "stuck on the same fit" report itself is fixed
-  (root cause: rechecks compared a fit point the mount wasn't pointing at, and the UI
-  never showed the resulting error; the fit itself also mixed sky and Earth frames.
-  The near-pole first point is fixed too, by `wizard.plan_targets`). Still wanted:
-  a start/stop auto-refresh with a configurable interval instead of the manual one-shot
-  Recheck button.
 - **Polar-align planning assumes "same side of the meridian ⇒ same pier side"** — true
   for a German mount in its normal, counterweight-down position, which is the usual
   starting state. A mount that is *currently* tracking past the meridian

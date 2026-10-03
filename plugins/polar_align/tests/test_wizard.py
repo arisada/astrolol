@@ -164,6 +164,20 @@ def _req(**kw: Any) -> WizardRequest:
     return WizardRequest(mount_id="m1", camera_id="c1", exposure_s=1.0, binning=1, **kw)
 
 
+async def _wait_until(predicate: Any, timeout: float = 2.0) -> None:
+    """Poll in real time until predicate() is true -- a fixed `asyncio.sleep(0.2)` to
+    "let the background task reach converging" is a real-time race against the fakes'
+    own awaits (expose/solve/slew), not the frozen `clock` fixture (which only controls
+    timestamps computed via wizard._now, not actual wall-clock scheduling), so it's
+    flaky under any system load. Fails fast via the predicate instead of hoping 0.2s
+    was enough."""
+    deadline = asyncio.get_event_loop().time() + timeout
+    while not predicate():
+        if asyncio.get_event_loop().time() >= deadline:
+            raise AssertionError(f"Condition not met within {timeout}s")
+        await asyncio.sleep(0.01)
+
+
 def _ha_of(ra_jnow_h: float, when: datetime) -> float:
     return (local_sidereal_time_h(when, LONGITUDE) - ra_jnow_h + 12.0) % 24.0 - 12.0
 
@@ -706,7 +720,7 @@ async def test_engine_recheck_updates_current_run(tmp_path) -> None:
 
     engine = WizardEngine(app, bus)
     run = await engine.start(_req())
-    await asyncio.sleep(0.2)  # let the background task reach "converging"
+    await _wait_until(lambda: run.status != "running")
     assert engine.current_run is not None
     assert engine.current_run.status == "converging"
 
@@ -728,7 +742,7 @@ async def test_engine_recheck_failure_is_logged_and_reraised(tmp_path) -> None:
 
     engine = WizardEngine(app, bus)
     run = await engine.start(_req())
-    await asyncio.sleep(0.2)
+    await _wait_until(lambda: run.status != "running")
     assert run.status == "converging", run.error
 
     solve_manager.fail_count = 1
@@ -743,6 +757,144 @@ async def test_engine_recheck_failure_is_logged_and_reraised(tmp_path) -> None:
 
 
 @pytest.mark.asyncio
+async def test_recheck_records_timestamp_and_clears_a_prior_error(tmp_path) -> None:
+    """last_recheck_error/last_recheck_at live on the run itself, not just the raised
+    exception -- an auto-refresh failure has no caller watching, so it has to be visible
+    to anyone polling GET /wizard instead."""
+    profile, store = _site_fixtures(tmp_path)
+    bus = EventBus()
+    mount = FakeMount(bus)
+    imager = FakeImager()
+    solve_manager = FakeSolveManager(mount)
+    app = _app(mount, imager, solve_manager, profile=profile, equipment_store=store)
+
+    engine = WizardEngine(app, bus)
+    run = await engine.start(_req())
+    await _wait_until(lambda: run.status != "running")
+    assert run.status == "converging", run.error
+    assert run.last_recheck_at is None
+
+    solve_manager.fail_count = 1
+    with pytest.raises(RuntimeError):
+        await engine.recheck()
+    assert run.last_recheck_error == "simulated solve failure"
+    first_at = run.last_recheck_at
+    assert first_at is not None
+
+    await engine.recheck()
+    assert run.last_recheck_error is None  # a later success clears it
+    assert run.last_recheck_at is not None and run.last_recheck_at >= first_at
+
+
+@pytest.mark.asyncio
+async def test_auto_refresh_runs_periodically_and_survives_a_bad_reading(tmp_path) -> None:
+    profile, store = _site_fixtures(tmp_path)
+    bus = EventBus()
+    mount = FakeMount(bus)
+    imager = FakeImager()
+    solve_manager = FakeSolveManager(mount)
+    app = _app(mount, imager, solve_manager, profile=profile, equipment_store=store)
+
+    engine = WizardEngine(app, bus)
+    run = await engine.start(_req())
+    await _wait_until(lambda: run.status != "running")
+    assert run.status == "converging", run.error
+
+    calls_before = len(solve_manager.solve_calls)
+    solve_manager.fail_count = 1  # the first auto-refresh tick fails
+    await engine.start_auto_refresh(0.05)
+    assert run.auto_refresh_interval_s == 0.05
+
+    try:
+        # Several ticks: at least the one bad reading plus later good ones.
+        await asyncio.sleep(0.3)
+    finally:
+        await engine.stop_auto_refresh()
+
+    assert len(solve_manager.solve_calls) > calls_before + 1  # ran on its own, repeatedly
+    assert run.live_offset is not None  # recovered after the bad reading
+    assert run.last_recheck_error is None
+    assert run.auto_refresh_interval_s is None
+
+
+@pytest.mark.asyncio
+async def test_stop_auto_refresh_actually_stops_it(tmp_path) -> None:
+    profile, store = _site_fixtures(tmp_path)
+    bus = EventBus()
+    mount = FakeMount(bus)
+    imager = FakeImager()
+    solve_manager = FakeSolveManager(mount)
+    app = _app(mount, imager, solve_manager, profile=profile, equipment_store=store)
+
+    engine = WizardEngine(app, bus)
+    run = await engine.start(_req())
+    await _wait_until(lambda: run.status != "running")
+
+    await engine.start_auto_refresh(0.05)
+    await asyncio.sleep(0.15)
+    await engine.stop_auto_refresh()
+    assert run.auto_refresh_interval_s is None
+
+    calls_after_stop = len(solve_manager.solve_calls)
+    await asyncio.sleep(0.2)
+    assert len(solve_manager.solve_calls) == calls_after_stop  # no more ticks
+
+
+@pytest.mark.asyncio
+async def test_cancel_stops_auto_refresh_too(tmp_path) -> None:
+    profile, store = _site_fixtures(tmp_path)
+    bus = EventBus()
+    mount = FakeMount(bus)
+    imager = FakeImager()
+    solve_manager = FakeSolveManager(mount)
+    app = _app(mount, imager, solve_manager, profile=profile, equipment_store=store)
+
+    engine = WizardEngine(app, bus)
+    run = await engine.start(_req())
+    await _wait_until(lambda: run.status != "running")
+    await engine.start_auto_refresh(0.05)
+
+    await engine.cancel()
+    assert run.status == "completed"
+    assert run.auto_refresh_interval_s is None
+
+    calls_after_cancel = len(solve_manager.solve_calls)
+    await asyncio.sleep(0.2)
+    assert len(solve_manager.solve_calls) == calls_after_cancel  # loop actually stopped
+
+
+@pytest.mark.asyncio
+async def test_start_auto_refresh_rejects_before_converging(tmp_path) -> None:
+    profile, store = _site_fixtures(tmp_path)
+    bus = EventBus()
+    mount = FakeMount(bus)
+    imager = FakeImager()
+    solve_manager = FakeSolveManager(mount)
+    app = _app(mount, imager, solve_manager, profile=profile, equipment_store=store)
+
+    engine = WizardEngine(app, bus)
+    await engine.start(_req())
+    assert engine.current_run.status == "running"  # not converging yet
+
+    with pytest.raises(ValueError, match="converging"):
+        await engine.start_auto_refresh(5.0)
+
+
+@pytest.mark.asyncio
+async def test_start_auto_refresh_rejects_without_a_run(tmp_path) -> None:
+    profile, store = _site_fixtures(tmp_path)
+    bus = EventBus()
+    mount = FakeMount(bus)
+    imager = FakeImager()
+    solve_manager = FakeSolveManager(mount)
+    app = _app(mount, imager, solve_manager, profile=profile, equipment_store=store)
+
+    engine = WizardEngine(app, bus)
+    with pytest.raises(ValueError, match="No polar"):
+        await engine.start_auto_refresh(5.0)
+
+
+@pytest.mark.asyncio
 async def test_engine_cancel_during_converging_completes_not_cancels(tmp_path) -> None:
     profile, store = _site_fixtures(tmp_path)
     bus = EventBus()
@@ -753,7 +905,7 @@ async def test_engine_cancel_during_converging_completes_not_cancels(tmp_path) -
 
     engine = WizardEngine(app, bus)
     run = await engine.start(_req())
-    await asyncio.sleep(0.2)
+    await _wait_until(lambda: run.status != "running")
     assert run.status == "converging"
 
     await engine.cancel()
@@ -771,7 +923,7 @@ async def test_engine_start_rejects_while_converging(tmp_path) -> None:
 
     engine = WizardEngine(app, bus)
     await engine.start(_req())
-    await asyncio.sleep(0.2)
+    await _wait_until(lambda: engine.current_run.status != "running")
     assert engine.current_run.status == "converging"
 
     with pytest.raises(ValueError, match="converging"):

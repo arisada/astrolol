@@ -7,10 +7,17 @@ from datetime import datetime, timezone
 
 import structlog
 from fastapi import APIRouter, HTTPException, Request
+from pydantic import BaseModel, Field
 
 from astrolol.equipment.optical_path import find_profile_site
 from plugins.polar_align.reticle import ReticleState, compute_reticle_state
-from plugins.polar_align.wizard import WizardEngine, WizardRequest, WizardRun
+from plugins.polar_align.wizard import (
+    MAX_AUTO_REFRESH_INTERVAL_S,
+    MIN_AUTO_REFRESH_INTERVAL_S,
+    WizardEngine,
+    WizardRequest,
+    WizardRun,
+)
 
 logger = structlog.get_logger()
 
@@ -79,6 +86,29 @@ async def recheck_wizard(request: Request) -> WizardRun:
         raise HTTPException(status_code=404 if "No polar" in str(exc) else 422, detail=str(exc)) from exc
     except RuntimeError as exc:
         raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+
+class AutoRefreshRequest(BaseModel):
+    interval_s: float = Field(ge=MIN_AUTO_REFRESH_INTERVAL_S, le=MAX_AUTO_REFRESH_INTERVAL_S)
+
+
+@router.post("/wizard/auto_refresh", response_model=WizardRun)
+async def start_auto_refresh(body: AutoRefreshRequest, request: Request) -> WizardRun:
+    """Start (or re-time) periodic automatic rechecks during CONVERGING. 404 if no run
+    has been started; 422 if it isn't in the converging phase yet."""
+    try:
+        return await _engine(request).start_auto_refresh(body.interval_s)
+    except ValueError as exc:
+        raise HTTPException(status_code=404 if "No polar" in str(exc) else 422, detail=str(exc)) from exc
+
+
+@router.delete("/wizard/auto_refresh", status_code=204)
+async def stop_auto_refresh(request: Request) -> None:
+    """Stop periodic automatic rechecks. No-op if it wasn't running."""
+    try:
+        await _engine(request).stop_auto_refresh()
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
 
 @router.delete("/wizard", status_code=204)
