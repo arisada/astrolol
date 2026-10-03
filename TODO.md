@@ -114,14 +114,6 @@ more design/testing than a single sitting allows:
 - **FWHM metric performs much worse than HFD** for autofocus on this rig — consider
   defaulting new autofocus configs to HFD, or investigating why FWHM's star fit is so much
   more hot-pixel-sensitive than HFD's.
-- **Parallel-lane "too long" warning fires on two identical-duration lanes** — in
-  `plugins/sequencer/lanes.py::estimate_lanes`, when a secondary lane's exposure duration
-  equals (or is close to) the primary's and `dither_every` is tight, `room = interval -
-  duration - margin_s` goes negative even though the two lanes are nominally the same
-  length, so `per_interval` floors to 0 and `wall_s` blows up to `inf` / triggers
-  `secondary_outlasts_primary` — observed with two 300×10 lanes. The "fits between
-  dithers" model may need a special case (or a clearer message) for lanes whose group
-  durations match the primary's.
 - **OOM browsing images in the viewer** — expensive per-image operations (thumbnailing,
   full-res preview, star detection for quality scoring) should be serialized behind the
   memory-pressure-aware mutex mentioned in the architecture notes (not built yet) so

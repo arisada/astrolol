@@ -159,9 +159,12 @@ def _weighted_primary_duration(task: ImagingTask) -> float:
 def estimate_lanes(task: ImagingTask, margin_s: float) -> list[LaneEstimate]:
     """Per-lane exposure, efficiency and duration, from the fit rule.
 
-    Between two dithers the primary exposes ``dither_every`` frames. A secondary frame
-    starts only if it ends ``margin`` before the dither, so (download time aside) it fits
-    ``floor((interval - duration - margin) / duration) + 1`` frames per interval.
+    Between two dithers the primary exposes ``dither_every`` frames. A secondary lane's
+    first frame of the interval runs in lockstep with the primary and needs no margin of
+    its own (same as the primary's own frame) — it only has to fit within the interval at
+    all. Each *additional* frame squeezed into the same interval has to end ``margin``
+    before the dither, so it fits ``floor((interval - duration - margin) / duration)``
+    more on top of that first one.
     """
     primary = task.lanes[0]
     primary_total = sum(g.count * g.duration for g in primary.groups)
@@ -197,13 +200,17 @@ def estimate_lanes(task: ImagingTask, margin_s: float) -> list[LaneEstimate]:
             continue
         exposing = 0.0
         for g in lane.groups:
-            room = interval - g.duration - margin_s
-            per_interval = math.floor(room / g.duration) + 1 if room >= 0 else 0
+            if g.duration > interval:
+                per_interval = 0
+            else:
+                remaining = interval - g.duration
+                extra = math.floor((remaining - margin_s) / g.duration) if remaining >= margin_s else 0
+                per_interval = 1 + extra
             eff = per_interval * g.duration / interval
             exposing += g.count * g.duration * eff
         efficiency = exposing / total if total else 1.0
         can_start = shortest_interval is not None and all(
-            g.duration + margin_s <= shortest_interval for g in lane.groups
+            g.duration <= shortest_interval for g in lane.groups
         )
         wall = total / efficiency if efficiency > 0 else math.inf
         out.append(
