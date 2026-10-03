@@ -80,17 +80,25 @@ actual level, favorites silently failing to save because `crypto.randomUUID()` t
 over plain HTTP by hostname) were fixed in the same session — see git log. The rest needs
 more design/testing than a single sitting allows:
 
-- **Polar-align wizard's first point can land near the pole** — the 3-point fit picks its
-  own RA/Dec test points and on 2026-10-01 the first one landed close to DEC=90°, which
-  the mount struggled with (confirmed in `astrolol.log`: `mount.target_set` with
-  `dec≈89.85`). It went fine after the user manually picked a lower Dec. Either let the
-  user pick/override the starting Dec, or bias the wizard's point selection away from the
-  pole by default.
-- **Polar-align "Refresh" can get stuck repeating a stale fit** — after a 3-point fit, the
-  user hit Refresh and kept getting the same "5.6′ too high / 8.1′ east" result
-  (`polar_align.fit_completed` not re-running the solve, or re-solving against a cached
-  frame — needs to be reproduced and root-caused). Wanted: a start/stop auto-refresh with
-  a configurable interval instead of a manual one-shot button.
+- **Polar-align auto-refresh** — the "stuck on the same fit" report itself is fixed
+  (root cause: rechecks compared a fit point the mount wasn't pointing at, and the UI
+  never showed the resulting error; the fit itself also mixed sky and Earth frames.
+  The near-pole first point is fixed too, by `wizard.plan_targets`). Still wanted:
+  a start/stop auto-refresh with a configurable interval instead of the manual one-shot
+  Recheck button.
+- **Polar-align planning assumes "same side of the meridian ⇒ same pier side"** — true
+  for a German mount in its normal, counterweight-down position, which is the usual
+  starting state. A mount that is *currently* tracking past the meridian
+  (counterweight-up) gets planned on its Hour-Angle side, so the first GoTo flips it and
+  the existing post-slew pier-side check aborts the run (safe, but unhelpful). Fix: plan
+  from `MountStatus.pier_side` when it's known instead of the HA sign alone.
+- **Polar-align preflight conditions on the true pole, not the real axis** —
+  `plan_targets` predicts the CONVERGING reference's conditioning margin with the true
+  pole standing in for the not-yet-fitted axis, accepting any margin > 0. A mount several
+  degrees off could land a marginal reference just inside a guard zone; the recheck then
+  fails visibly (now logged and shown in the UI) rather than silently. A fix would require
+  a minimum margin scaled to the expected rough-alignment error, or a re-plan of the
+  reference point after the fit.
 - **Autofocus star detector picks up hot pixels, especially on defocused frames** — no
   single run worked reliably with the L filter that night (`autofocus.failed`: "Focus
   curve did not fit a valid V shape" × 6 in `astrolol.log`). `plugins/autofocus/star_detector.py`
@@ -162,6 +170,33 @@ named sequences (server library) and task file download/upload.
 - **Lanes — later** — a secondary-lane error currently stops every lane (in-flight frames
   discarded); a per-lane error policy could let the other cameras carry on. The efficiency
   estimate ignores download time (real runs usually do a little better than shown).
+- **A secondary lane whose duration is close to the primary's genuinely can't reach full
+  efficiency, and the preflight is right to say so** — `estimate_lanes()` in
+  `plugins/sequencer/lanes.py` requires `duration + margin_s <= interval` for a secondary
+  frame to fit, with no exemption for "the first frame since the last dither" — and that's
+  correct, because `RigSchedule.fits()` (the actual runtime gate the primary/secondary
+  lanes use to decide when a secondary frame may start) enforces the exact same inequality
+  with no such exemption either (`clock() + duration + margin <= next_mount_op()`). Two
+  lanes of equal duration with `margin_s > 0` (the default `download_margin_s` is 10s) will
+  really stall forever in `WAITING_FOR_PRIMARY` at runtime, not just get a pessimistic
+  preflight number — confirmed by tracing `fits()` directly. A real fix for "I want two
+  cameras of the same exposure length to run together" would teach *both* layers a new
+  rule — the first secondary frame attempted since the primary's last dither doesn't need
+  `margin` of its own (it finishes in lockstep with the primary, which isn't charged a
+  margin against itself either), only the 2nd+ frame squeezed into the same interval does.
+  That requires `RigSchedule` to track, per secondary lane, which dither-cycle it last
+  placed a frame in (a monotonic dither counter, bumped wherever the primary's own dither
+  actually fires) — a real scheduler change, not a one-line math fix, and one that needs
+  care given it directly gates mount/camera timing. (A previous attempt fixed only the
+  preflight math without touching `RigSchedule`, which made the estimate lie instead —
+  caught by `/code-review` before it shipped.)
+- **`estimate_lanes()` fits each group in a multi-group lane independently, overcounting
+  shared interval slots** — a lane with alternating groups (e.g. round-robin R/G) gets
+  each group's `per_interval` computed as if it alone had the whole interval to itself,
+  so the estimate can promise more total frames than the interval can actually hold
+  across all of a lane's groups combined (pre-existing, not introduced by the item
+  above — confirmed present with or without that fix). Needs the per-group loop to share
+  one interval budget across the whole lane instead of computing each group in isolation.
 - **One runner per mount** — rigs with several mounts: one independent queue/runner per
   mount (models and routes are keyed so `runner_id = mount_id` can be added later).
 - **MCP tool surface** — expose the `Sequencer` protocol methods as MCP tools
