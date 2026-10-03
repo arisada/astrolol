@@ -163,6 +163,10 @@ class EventBusForwarder:
         self._bus = bus
 
     def __call__(self, logger_inst: Any, method: str, event_dict: dict) -> dict:
+        # This runs on every structlog call app-wide, so check the cheap "is anything
+        # even attached" case before the logger-hierarchy walk below.
+        if self._bus is None:
+            return event_dict
         # structlog runs this processor chain before handing off to the wrapped
         # stdlib logger, so level filtering hasn't happened yet at this point —
         # without this check every debug() call would reach the UI live log even
@@ -173,8 +177,7 @@ class EventBusForwarder:
         if not isinstance(level_no, int) or not logging.getLogger(logger_name).isEnabledFor(level_no):
             return event_dict
         if (
-            self._bus is not None
-            and method in ("info", "warning", "error", "critical", "debug")
+            method in ("info", "warning", "error", "critical", "debug")
             and event_dict.get("logger") not in _SKIP_LOGGERS
         ):
             try:

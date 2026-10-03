@@ -96,6 +96,11 @@ def reorder_spa_fallback_last(app: FastAPI) -> None:
     plugin's own routes. Call this right after any such runtime
     ``include_router``/``plugin.setup()`` so the catch-all keeps behaving as
     if it were always registered last. No-op if the UI isn't mounted.
+
+    ``sync_enabled_plugins`` (``astrolol/app.py``) is the only runtime route
+    registration path today — if another one is ever added (e.g. a future
+    admin endpoint calling ``app.include_router``/``app.mount`` directly), it
+    needs this same call too, or it silently reintroduces this bug.
     """
     routes = app.router.routes
     for i, route in enumerate(routes):
