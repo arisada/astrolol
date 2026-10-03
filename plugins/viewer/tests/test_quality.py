@@ -1,9 +1,13 @@
+import asyncio
+import time
 from pathlib import Path
 
 import numpy as np
 import pytest
 from astropy.io import fits
 
+import plugins.viewer.quality as quality_mod
+from astrolol.core import mem_guard as mem_guard_mod
 from plugins.viewer.quality import compute_quality
 
 
@@ -54,3 +58,33 @@ async def test_missing_data_does_not_raise(tmp_path: Path) -> None:
     bg_median, star_count, hfr = await compute_quality(path)
 
     assert (bg_median, star_count, hfr) == (None, None, None)
+
+
+@pytest.mark.asyncio
+async def test_compute_quality_serialises_under_low_memory_mode(tmp_path: Path) -> None:
+    """The quality worker's own camera-busy check only covers one kind of overlap —
+    it must also respect mem_guard so it never runs alongside another guarded
+    operation (autofocus star detection, a plate-solve) during low-memory mode."""
+    order: list[str] = []
+
+    def _fake_compute_sync(fits_path: Path):
+        order.append("enter")
+        time.sleep(0.05)
+        order.append("exit")
+        return 500.0, 0, None
+
+    original = quality_mod._compute_sync
+    original_check = mem_guard_mod._check_fn
+    quality_mod._compute_sync = _fake_compute_sync
+    mem_guard_mod.configure(lambda: True)
+    try:
+        await asyncio.gather(
+            compute_quality(tmp_path / "a.fits"),
+            compute_quality(tmp_path / "b.fits"),
+        )
+    finally:
+        quality_mod._compute_sync = original
+        mem_guard_mod._check_fn = original_check
+
+    # Semaphore(1): the first call must fully exit before the second enters.
+    assert order == ["enter", "exit", "enter", "exit"]

@@ -9,7 +9,11 @@ more, that goes through the event bus, not a direct import.
 
 Runs on a background, low-priority queue (see ``QualityWorker`` in ``plugin.py``),
 decoupled from indexing and thumbnail generation — it never competes with an active
-capture session for CPU.
+capture session for CPU. That check (``_camera_busy()``) only yields while a camera is
+actively exposing, which still leaves gaps (download, dither wait, filter change) where
+every camera is briefly idle but another memory-intensive operation (autofocus star
+detection, a plate-solve) could be mid-flight — so this also goes through mem_guard,
+same as those, rather than relying on the camera-busy check alone.
 """
 from __future__ import annotations
 
@@ -17,6 +21,8 @@ import asyncio
 from pathlib import Path
 
 import structlog
+
+from astrolol.core.mem_guard import mem_guard
 
 logger = structlog.get_logger()
 
@@ -26,7 +32,8 @@ _MAX_ANALYSIS_DIM = 800  # downsample larger frames before detection — speed, 
 async def compute_quality(fits_path: Path) -> tuple[float | None, int | None, float | None]:
     """Returns (background_median, star_count, hfr). All None/0 on failure or a frame
     with no image data — never raises."""
-    return await asyncio.to_thread(_compute_sync, fits_path)
+    async with mem_guard():
+        return await asyncio.to_thread(_compute_sync, fits_path)
 
 
 def _compute_sync(fits_path: Path) -> tuple[float | None, int | None, float | None]:
