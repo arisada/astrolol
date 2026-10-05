@@ -706,6 +706,7 @@ export interface CameraEquipmentItem extends BaseEquipmentItem {
   adapter_key: string | null
   connect_params: Record<string, unknown>
   pixel_size_um: number | null
+  default_gain: number | null
 }
 export interface FilterWheelEquipmentItem extends BaseEquipmentItem {
   type: 'filter_wheel'

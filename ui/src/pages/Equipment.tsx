@@ -885,7 +885,7 @@ function emptyForm(type: EquipmentItemType): Omit<EquipmentItem, 'id'> {
   const r: Record<string, any> = { type, name: '' }
   if (type === 'site') Object.assign(r, { latitude: 0, longitude: 0, altitude: 0, timezone: 'UTC' })
   else if (type === 'ota') Object.assign(r, { focal_length: 500, aperture: 80 })
-  else if (type === 'camera') Object.assign(r, { indi_driver: null, indi_device_name: null, adapter_key: null, connect_params: {}, pixel_size_um: null })
+  else if (type === 'camera') Object.assign(r, { indi_driver: null, indi_device_name: null, adapter_key: null, connect_params: {}, pixel_size_um: null, default_gain: null })
   else if (type === 'filter_wheel') Object.assign(r, { indi_driver: null, indi_device_name: null, adapter_key: null, connect_params: {}, filter_names: [] })
   else Object.assign(r, { indi_driver: null, indi_device_name: null, adapter_key: null, connect_params: {} })
   return r as Omit<EquipmentItem, 'id'>
@@ -1098,18 +1098,30 @@ function ItemForm({
         </div>
       )}
 
-      {/* Camera extra field */}
+      {/* Camera extra fields */}
       {type === 'camera' && (
-        <FieldRow label="Pixel size (µm)">
-          <input
-            type="number" step="0.01" min="0"
-            value={(form as { pixel_size_um: number | null }).pixel_size_um ?? ''}
-            onChange={(e) => set('pixel_size_um', e.target.value ? parseFloat(e.target.value) : null)}
-            placeholder="e.g. 3.76"
-            className="bg-surface border border-surface-border rounded px-3 py-1.5 text-sm text-slate-200
-              focus:outline-none focus:ring-1 focus:ring-accent w-40"
-          />
-        </FieldRow>
+        <div className="flex gap-3">
+          <FieldRow label="Pixel size (µm)">
+            <input
+              type="number" step="0.01" min="0"
+              value={(form as { pixel_size_um: number | null }).pixel_size_um ?? ''}
+              onChange={(e) => set('pixel_size_um', e.target.value ? parseFloat(e.target.value) : null)}
+              placeholder="e.g. 3.76"
+              className="bg-surface border border-surface-border rounded px-3 py-1.5 text-sm text-slate-200
+                focus:outline-none focus:ring-1 focus:ring-accent w-40"
+            />
+          </FieldRow>
+          <FieldRow label="Default gain">
+            <input
+              type="number" step="1" min="0"
+              value={(form as { default_gain: number | null }).default_gain ?? ''}
+              onChange={(e) => set('default_gain', e.target.value ? parseInt(e.target.value, 10) : null)}
+              placeholder="driver default is risky — set this"
+              className="bg-surface border border-surface-border rounded px-3 py-1.5 text-sm text-slate-200
+                focus:outline-none focus:ring-1 focus:ring-accent w-56"
+            />
+          </FieldRow>
+        </div>
       )}
 
       {/* Filter wheel extra field */}
@@ -1524,6 +1536,7 @@ export function Equipment() {
 
       if (invType === 'camera') {
         item.pixel_size_um = null
+        item.default_gain = null
         // Opportunistically read CCD_INFO to pre-fill pixel size
         try {
           const props = await api.devices.properties(device.device_id)

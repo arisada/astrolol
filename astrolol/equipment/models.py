@@ -61,6 +61,12 @@ class CameraItem(BaseModel):
     adapter_key: str | None = None
     connect_params: dict = {}
     pixel_size_um: float | None = None
+    default_gain: int | None = Field(
+        default=None,
+        description="Gain to pre-fill for new exposures on this camera. Camera driver "
+        "defaults are often not what you want (e.g. a high-gain preset meant for "
+        "framing) and using them unnoticed can ruin a night's worth of frames.",
+    )
 
 
 class FilterWheelItem(BaseModel):
