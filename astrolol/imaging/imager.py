@@ -36,7 +36,7 @@ from astrolol.imaging.models import (
     ImagerState,
     ImagerStatus,
 )
-from astrolol.imaging.preview import fits_to_jpeg, fits_to_jpeg_linear
+from astrolol.imaging.preview import PreviewBaseCache, render_auto, render_linear
 
 if TYPE_CHECKING:
     from astrolol.equipment.models import OTAItem, SiteItem
@@ -191,6 +191,9 @@ class ImagerManager:
         self._save_counters: dict[str, int] = {}
         self._last_stats: dict[str, ImageStats] = {}
         self._last_fits_path: dict[str, str] = {}
+        # Binned preview bases of the latest frames, so re-stretching the last
+        # exposure (render_preview endpoint) never re-reads its FITS file.
+        self._preview_cache = PreviewBaseCache(capacity=2)
         # Optional dither hook set by the PHD2 plugin on startup.
         # Signature: async (config: DitherConfig) -> None
         self._dither_fn: Callable[[DitherConfig], Awaitable[None]] | None = None
@@ -328,6 +331,10 @@ class ImagerManager:
 
     def get_last_fits_path(self, device_id: str) -> str | None:
         return self._last_fits_path.get(device_id)
+
+    @property
+    def preview_cache(self) -> PreviewBaseCache:
+        return self._preview_cache
 
     # --- Internal ---
 
@@ -514,32 +521,31 @@ class ImagerManager:
         self._last_fits_path[device_id] = str(fits_path)
 
         # Generate two previews (auto-stretch + linear) — both live in images_dir.
-        # Each call is individually wrapped in mem_guard so that when low-memory
-        # mode is active the global Semaphore(1) serialises them (and any other
-        # guarded work such as astap_cli) across all cameras.
+        # Both render from one streamed read of the FITS file (the cached preview
+        # base, which the on-demand re-stretch endpoint then reuses). Wrapped in
+        # mem_guard so that when low-memory mode is active the global Semaphore(1)
+        # serialises it with any other guarded work such as astap_cli.
         preview_path = self._preview_path(fits_path.stem, self._images_dir, suffix="auto")
         preview_path_linear = self._preview_path(fits_path.stem, self._images_dir, suffix="linear")
 
         device_settings = self._get_device_settings(device_id)
 
-        async def _preview_auto():
-            async with mem_guard():
-                return await asyncio.to_thread(
-                    fits_to_jpeg,
-                    fits_path,
-                    preview_path,
-                    device_settings.jpeg_quality,
-                    device_settings.stretch_black_pct,
-                    device_settings.stretch_white_pct,
-                )
+        def _render_previews() -> dict:
+            base = self._preview_cache.load(fits_path)
+            stats = render_auto(
+                base,
+                preview_path,
+                device_settings.jpeg_quality,
+                device_settings.stretch_target_bg,
+                device_settings.stretch_shadows_sigma,
+                color=device_settings.preview_color,
+                linked=device_settings.stretch_linked,
+            )
+            render_linear(base, preview_path_linear, device_settings.jpeg_quality, color=device_settings.preview_color)
+            return stats
 
-        async def _preview_linear():
-            async with mem_guard():
-                return await asyncio.to_thread(
-                    fits_to_jpeg_linear, fits_path, preview_path_linear, device_settings.jpeg_quality
-                )
-
-        preview_stats_raw, _ = await asyncio.gather(_preview_auto(), _preview_linear())
+        async with mem_guard():
+            preview_stats_raw = await asyncio.to_thread(_render_previews)
 
         # Build ImageStats from histogram data.
         # NOTE: per-frame star analysis (FWHM/star count) is disabled — too expensive

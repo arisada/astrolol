@@ -410,7 +410,7 @@ async def test_cancelled_expose_aborts_and_frees_the_camera(
 async def test_expose_uses_persisted_per_camera_preview_settings(
     manager: DeviceManager, event_bus, tmp_path: Path
 ) -> None:
-    """JPEG quality and stretch percentiles saved via PUT /imager/{id}/settings must be
+    """JPEG quality and stretch parameters saved via PUT /imager/{id}/settings must be
     picked up when generating the preview for the next exposure."""
     from astrolol.imaging.models import ImagerDeviceSettings
     from astrolol.profiles.store import ProfileStore
@@ -422,7 +422,7 @@ async def test_expose_uses_persisted_per_camera_preview_settings(
         current.model_copy(update={
             "imager_settings": {
                 "cam1": ImagerDeviceSettings(
-                    jpeg_quality=40, stretch_black_pct=10.0, stretch_white_pct=90.0,
+                    jpeg_quality=40, stretch_target_bg=0.15, stretch_shadows_sigma=-1.0,
                 ).model_dump(),
             },
         })
@@ -434,5 +434,6 @@ async def test_expose_uses_persisted_per_camera_preview_settings(
 
     assert Path(result.preview_path).exists()
     assert stats is not None
-    # 10th/90th percentile stretch must differ from the 50th/99th default.
-    assert stats.stretch_low != stats.median
+    # Black point at −1σ (not the default −2.8σ) below the displayed background.
+    assert stats.display_sigma > 0
+    assert stats.stretch_low == pytest.approx(stats.display_median - 1.0 * stats.display_sigma, rel=1e-4)

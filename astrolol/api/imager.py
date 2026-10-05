@@ -1,6 +1,6 @@
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
@@ -113,10 +113,15 @@ async def get_stats(device_id: str, request: Request) -> ImageStats:
 @router.get("/{device_id}/preview.jpg")
 async def render_preview(
     device_id: str, request: Request,
-    mode: str = "auto", black_pct: float = 50.0, white_pct: float = 99.0, quality: int = 85,
+    mode: str = "auto",
+    target_bg: float = Query(0.25, gt=0.0, lt=1.0),
+    shadows: float = Query(-2.8, ge=-10.0, le=0.0),
+    quality: int = Query(85, ge=1, le=100),
+    color: bool = True,
+    linked: bool = False,
 ) -> FileResponse:
     """On-demand re-stretch of the *last* exposure for this camera — lets the Imaging
-    page reflect a JPEG-quality/black-point/white-point change immediately, without
+    page reflect a JPEG-quality/background/shadows change immediately, without
     waiting for (or forcing) a new exposure. Independent of the auto-generated
     preview_path/preview_path_linear files a completed exposure already carries;
     those keep using the camera's persisted settings for the *next* exposure."""
@@ -124,20 +129,27 @@ async def render_preview(
     import tempfile
 
     from astrolol.core.mem_guard import mem_guard
-    from astrolol.imaging.preview import fits_to_jpeg, fits_to_jpeg_linear
+    from astrolol.imaging.preview import render_auto, render_linear
 
-    fits_path = _imager(request).get_last_fits_path(device_id)
+    imager = _imager(request)
+    fits_path = imager.get_last_fits_path(device_id)
     if fits_path is None or not Path(fits_path).exists():
         raise HTTPException(status_code=404, detail="No exposure available yet.")
 
     tmp_dir = Path(tempfile.gettempdir()) / "astrolol"
     tmp_dir.mkdir(parents=True, exist_ok=True)
     out_path = tmp_dir / f"live_preview_{device_id}.jpg"
-    async with mem_guard():
+
+    def _render() -> None:
+        # Normally a cache hit — the exposure already built this frame's base.
+        base = imager.preview_cache.load(Path(fits_path))
         if mode == "linear":
-            await asyncio.to_thread(fits_to_jpeg_linear, Path(fits_path), out_path, quality)
+            render_linear(base, out_path, quality, color=color)
         else:
-            await asyncio.to_thread(fits_to_jpeg, Path(fits_path), out_path, quality, black_pct, white_pct)
+            render_auto(base, out_path, quality, target_bg, shadows, color=color, linked=linked)
+
+    async with mem_guard():
+        await asyncio.to_thread(_render)
     return FileResponse(out_path, media_type="image/jpeg")
 
 

@@ -103,8 +103,10 @@ class RescanResult(BaseModel):
 
 class RenderRequest(BaseModel):
     mode: str = Field(default="auto", pattern="^(auto|linear)$")
-    black_pct: float = Field(default=50.0, ge=0.0, le=100.0)
-    white_pct: float = Field(default=99.0, ge=0.0, le=100.0)
+    target_bg: float = Field(default=0.25, gt=0.0, lt=1.0)
+    shadows: float = Field(default=-2.8, ge=-10.0, le=0.0)
+    color: bool = True
+    linked: bool = False
     quality: int = Field(default=85, ge=1, le=100)
 
 

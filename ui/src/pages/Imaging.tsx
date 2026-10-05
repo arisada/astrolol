@@ -18,6 +18,7 @@ import { DevicePropertiesPanel } from '@/components/DevicePropertiesPanel'
 import { CollapsibleSidebar } from '@/components/ui/collapsible-sidebar'
 import { LabeledSlider } from '@/components/ui/labeled-slider'
 import { HistogramOverlay } from '@/components/ui/histogram'
+import { ColorControls, StretchControls } from '@/components/ui/stretch-controls'
 import { ZoomableImage, type ZoomableImageHandle } from '@/components/ui/zoomable-image'
 
 const DEFAULT_IMAGER_SETTINGS: ImagerDeviceSettings = {
@@ -30,8 +31,10 @@ const DEFAULT_IMAGER_SETTINGS: ImagerDeviceSettings = {
   histo_auto: true,
   target_temp: '',
   jpeg_quality: 85,
-  stretch_black_pct: 50,
-  stretch_white_pct: 99,
+  stretch_target_bg: 0.25,
+  stretch_shadows_sigma: -2.8,
+  preview_color: true,
+  stretch_linked: false,
 }
 
 // ── Exposure duration helpers ─────────────────────────────────────────────────
@@ -107,8 +110,10 @@ export type ImageViewerHandle = ZoomableImageHandle
 
 export interface PreviewParams {
   jpeg_quality: number
-  stretch_black_pct: number
-  stretch_white_pct: number
+  stretch_target_bg: number
+  stretch_shadows_sigma: number
+  preview_color: boolean
+  stretch_linked: boolean
 }
 
 const ImageViewer = forwardRef<ImageViewerHandle, { deviceId: string | undefined; histoAuto: boolean; previewParams: PreviewParams }>(
@@ -123,7 +128,8 @@ function ImageViewer({ deviceId, histoAuto, previewParams }, ref) {
   // when the stretch settings themselves haven't changed.
   const previewUrl = deviceId && image
     ? `/imager/${deviceId}/preview.jpg?mode=${histoAuto ? 'auto' : 'linear'}`
-      + `&black_pct=${previewParams.stretch_black_pct}&white_pct=${previewParams.stretch_white_pct}`
+      + `&target_bg=${previewParams.stretch_target_bg}&shadows=${previewParams.stretch_shadows_sigma}`
+      + `&color=${previewParams.preview_color}&linked=${previewParams.stretch_linked}`
       + `&quality=${previewParams.jpeg_quality}&v=${encodeURIComponent(image.previewUrl)}`
     : null
 
@@ -162,7 +168,16 @@ function ImageViewer({ deviceId, histoAuto, previewParams }, ref) {
           {/* Bottom-right: histogram */}
           {stats && (
             <div className="absolute bottom-2 right-2 bg-black/60 rounded p-1">
-              <HistogramOverlay stats={stats} />
+              <HistogramOverlay
+                stats={stats}
+                linear={!histoAuto}
+                color={previewParams.preview_color}
+                linked={previewParams.stretch_linked}
+                params={{
+                  target_bg: previewParams.stretch_target_bg,
+                  shadows_sigma: previewParams.stretch_shadows_sigma,
+                }}
+              />
             </div>
           )}
         </>
@@ -189,6 +204,8 @@ function CameraPanel({
 }) {
   const imagerBusy = useStore((s) => s.imagerBusy)
   const busy = imagerBusy[deviceId] ?? false
+  // Colour options only apply to one-shot-colour (Bayer) frames, which carry per-channel stats.
+  const isColorFrame = useStore((s) => !!s.imageStats[deviceId]?.channels?.length)
 
   // Server-persisted settings — loaded on mount, saved on each change
   const [settings, setSettingsState] = useState<ImagerDeviceSettings>(DEFAULT_IMAGER_SETTINGS)
@@ -198,8 +215,10 @@ function CameraPanel({
   const notifyPreviewParams = useCallback((s: ImagerDeviceSettings) => {
     onPreviewParamsChange({
       jpeg_quality: s.jpeg_quality,
-      stretch_black_pct: s.stretch_black_pct,
-      stretch_white_pct: s.stretch_white_pct,
+      stretch_target_bg: s.stretch_target_bg,
+      stretch_shadows_sigma: s.stretch_shadows_sigma,
+      preview_color: s.preview_color,
+      stretch_linked: s.stretch_linked,
     })
   }, [onPreviewParamsChange])
 
@@ -448,20 +467,18 @@ function CameraPanel({
             onCommit={(v) => patchSettings({ jpeg_quality: v })}
           />
           {settings.histo_auto && (
-            <>
-              <LabeledSlider
-                label="Stretch black point" value={settings.stretch_black_pct} min={50} max={90} step={1}
-                format={(v) => `${v}th pct`}
-                onChange={(v) => patchLocal({ stretch_black_pct: v })}
-                onCommit={(v) => patchSettings({ stretch_black_pct: v })}
-              />
-              <LabeledSlider
-                label="Stretch white point" value={settings.stretch_white_pct} min={90} max={100} step={0.1}
-                format={(v) => `${v.toFixed(1)}th pct`}
-                onChange={(v) => patchLocal({ stretch_white_pct: v })}
-                onCommit={(v) => patchSettings({ stretch_white_pct: v })}
-              />
-            </>
+            <StretchControls
+              value={{ target_bg: settings.stretch_target_bg, shadows_sigma: settings.stretch_shadows_sigma }}
+              onChange={(p) => patchLocal({ stretch_target_bg: p.target_bg, stretch_shadows_sigma: p.shadows_sigma })}
+              onCommit={(p) => patchSettings({ stretch_target_bg: p.target_bg, stretch_shadows_sigma: p.shadows_sigma })}
+            />
+          )}
+          {isColorFrame && (
+            <ColorControls
+              value={{ color: settings.preview_color, linked: settings.stretch_linked }}
+              onChange={(p) => patchSettings({ preview_color: p.color, stretch_linked: p.linked })}
+              showLinked={settings.histo_auto}
+            />
           )}
         </Foldable>
 
@@ -654,8 +671,10 @@ export function Imaging() {
   // CameraPanel reports them via onPreviewParamsChange on load and on every commit.
   const [previewParams, setPreviewParams] = useState<PreviewParams>({
     jpeg_quality: DEFAULT_IMAGER_SETTINGS.jpeg_quality,
-    stretch_black_pct: DEFAULT_IMAGER_SETTINGS.stretch_black_pct,
-    stretch_white_pct: DEFAULT_IMAGER_SETTINGS.stretch_white_pct,
+    stretch_target_bg: DEFAULT_IMAGER_SETTINGS.stretch_target_bg,
+    stretch_shadows_sigma: DEFAULT_IMAGER_SETTINGS.stretch_shadows_sigma,
+    preview_color: DEFAULT_IMAGER_SETTINGS.preview_color,
+    stretch_linked: DEFAULT_IMAGER_SETTINGS.stretch_linked,
   })
 
   // Zoom/pan lives inside ImageViewer; the sidebar's Fit/1x buttons reach it imperatively.

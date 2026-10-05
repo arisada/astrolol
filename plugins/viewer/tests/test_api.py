@@ -181,7 +181,7 @@ def test_thumbnail_and_preview_and_stats(client: TestClient, tmp_path: Path) -> 
     assert thumb.status_code == 200
     assert thumb.headers["content-type"] == "image/jpeg"
 
-    preview = client.get(f"/plugins/viewer/images/{image_id}/preview.jpg", params={"black_pct": 10, "white_pct": 90})
+    preview = client.get(f"/plugins/viewer/images/{image_id}/preview.jpg", params={"target_bg": 0.15, "shadows": -2.0})
     assert preview.status_code == 200
 
     stats = client.get(f"/plugins/viewer/images/{image_id}/stats")
@@ -225,18 +225,16 @@ async def test_preview_generation_serialises_under_low_memory_mode(
 
             order: list[str] = []
 
-            def _fake_fits_to_jpeg(fits_path, jpeg_path, quality, black_pct, white_pct):
+            def _fake_render_preview(cache, fits_path, out, render):
                 order.append("enter")
                 import time
                 time.sleep(0.05)
-                Path(jpeg_path).write_bytes(b"\xff\xd8\xff\xd9")  # minimal JPEG
+                Path(out).write_bytes(b"\xff\xd8\xff\xd9")  # minimal JPEG
                 order.append("exit")
-                return {"histogram": [], "hist_min": 0.0, "hist_max": 1.0, "stretch_low": 0.0,
-                        "stretch_high": 1.0, "mean": 0.0, "median": 0.0}
 
             import plugins.viewer.api as viewer_api
-            original = viewer_api.fits_to_jpeg
-            viewer_api.fits_to_jpeg = _fake_fits_to_jpeg
+            original = viewer_api._render_preview
+            viewer_api._render_preview = _fake_render_preview
             original_check = mem_guard_mod._check_fn
             mem_guard_mod.configure(lambda: True)
             try:
@@ -245,7 +243,7 @@ async def test_preview_generation_serialises_under_low_memory_mode(
                     ac.get(f"/plugins/viewer/images/{id_b}/preview.jpg"),
                 )
             finally:
-                viewer_api.fits_to_jpeg = original
+                viewer_api._render_preview = original
                 mem_guard_mod._check_fn = original_check
     finally:
         await app.state.viewer_index.close()

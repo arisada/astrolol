@@ -50,7 +50,6 @@ async def ensure_thumbnail(
 
 def _downscale_jpeg(src: Path, dst: Path) -> None:
     with Image.open(src) as img:
-        img = img.convert("L")
         img.thumbnail((THUMB_MAX_DIM, THUMB_MAX_DIM), Image.LANCZOS)
         img.save(dst, format="JPEG", quality=THUMB_QUALITY)
 

@@ -117,8 +117,10 @@ export interface ImagerDeviceSettings {
   histo_auto: boolean
   target_temp: string
   jpeg_quality: number
-  stretch_black_pct: number
-  stretch_white_pct: number
+  stretch_target_bg: number      // auto-stretch background brightness (0–1)
+  stretch_shadows_sigma: number  // auto-stretch black point, σ below the background
+  preview_color: boolean         // colour (Bayer) frames in colour; false → luminance
+  stretch_linked: boolean        // colour frames: one shared stretch for all channels
 }
 
 export interface FocuserDeviceSettings {
@@ -625,14 +627,32 @@ export interface FilterWheelStatus {
   is_moving: boolean
 }
 
+export interface ChannelStats {
+  name: 'R' | 'G' | 'B'
+  histogram: number[]
+  median: number
+  noise_sigma: number
+  display_median: number
+  display_sigma: number
+  stretch_low: number     // this channel's stretch (the shared one when linked)
+  stretch_high: number
+  stretch_midtone: number
+}
+
 export interface ImageStats {
   histogram: number[]     // 128 ADU-bin counts
   hist_min: number        // sensor full-scale minimum (0)
   hist_max: number        // sensor full-scale maximum (e.g. 65535 for a 16-bit sensor)
   stretch_low: number     // auto-stretch black point (ADU)
-  stretch_high: number    // auto-stretch white point (ADU)
+  stretch_high: number    // auto-stretch white point (ADU) — full scale, nothing clipped
+  stretch_midtone: number // auto-stretch midtones balance (0.5 = linear)
   mean: number
-  median: number
+  median: number          // full-resolution sky background (ADU)
+  noise_sigma: number     // full-resolution background noise (ADU)
+  saturated_pct: number | null  // % of pixels at full scale (null: no fixed full scale)
+  display_median: number  // stats of the binned preview the stretch is computed on
+  display_sigma: number
+  channels: ChannelStats[] | null  // colour frames only; the scalars above are luminance
   fwhm: number | null     // median FWHM in pixels (null if autofocus plugin not loaded)
   star_count: number
 }

@@ -72,11 +72,20 @@ class ImagerDeviceSettings(BaseModel):
     histo_auto: bool = True
     target_temp: str = ""
     jpeg_quality: int = Field(default=85, ge=1, le=100)
-    stretch_black_pct: float = Field(
-        default=50.0, ge=0.0, le=100.0,
-        description="Auto-stretch black point, as a percentile of the sampled pixels",
+    stretch_target_bg: float = Field(
+        default=0.25, gt=0.0, lt=1.0,
+        description="Auto-stretch: display brightness the sky background is lifted to (0–1)",
     )
-    stretch_white_pct: float = Field(
-        default=99.0, ge=0.0, le=100.0,
-        description="Auto-stretch white point, as a percentile of the sampled pixels",
+    stretch_shadows_sigma: float = Field(
+        default=-2.8, ge=-10.0, le=0.0,
+        description="Auto-stretch: black point, in noise σ relative to the sky background",
+    )
+    preview_color: bool = Field(
+        default=True,
+        description="Render colour (Bayer) frames in colour; False renders luminance",
+    )
+    stretch_linked: bool = Field(
+        default=False,
+        description="Colour frames: one shared stretch for all channels (true colour balance) "
+                    "instead of one per channel (neutralises a background colour cast)",
     )

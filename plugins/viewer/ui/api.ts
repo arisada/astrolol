@@ -2,6 +2,8 @@
 // REST-only response shapes are defined locally here (not in ui/src/api/types.ts) since
 // nothing here flows through the WebSocket/store — only the ViewerXxxEvent types do.
 
+import type { ChannelStats } from '@/api/types'
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(path, {
     headers: { 'Content-Type': 'application/json' },
@@ -116,8 +118,14 @@ export interface ImageStats {
   hist_max: number
   stretch_low: number
   stretch_high: number
+  stretch_midtone: number
   mean: number
   median: number
+  noise_sigma: number
+  saturated_pct: number | null
+  display_median: number
+  display_sigma: number
+  channels: ChannelStats[] | null
 }
 
 export interface ImageFilterParams {
@@ -197,7 +205,7 @@ export const getStats = (id: string) => request<ImageStats>(`/plugins/viewer/ima
 
 export const thumbnailUrl = (id: string) => `/plugins/viewer/images/${id}/thumbnail`
 
-export const previewUrl = (id: string, opts: { mode?: 'auto' | 'linear'; black_pct?: number; white_pct?: number; quality?: number }) =>
+export const previewUrl = (id: string, opts: { mode?: 'auto' | 'linear'; target_bg?: number; shadows?: number; quality?: number; color?: boolean; linked?: boolean }) =>
   `/plugins/viewer/images/${id}/preview.jpg${toQuery(opts as Record<string, unknown>)}`
 
 export const fitsDownloadUrl = (id: string) => `/plugins/viewer/images/${id}/fits`

@@ -15,15 +15,36 @@ def _uid() -> str:
     return str(uuid4())
 
 
+class ChannelStats(BaseModel):
+    """Per-colour-channel statistics of a debayered (one-shot-colour) frame."""
+    name: Literal["R", "G", "B"]
+    histogram: list[int]    # full-resolution counts, same bins as ImageStats.histogram
+    median: float           # full-resolution background (ADU)
+    noise_sigma: float
+    display_median: float   # binned preview the stretch is computed on
+    display_sigma: float
+    stretch_low: float      # this channel's auto-stretch (shared ones when linked)
+    stretch_high: float
+    stretch_midtone: float
+
+
 class ImageStats(BaseModel):
     """Statistics computed from the last exposure (histogram + optional star analysis)."""
-    histogram: list[int]    # 128-bin raw ADU distribution
-    hist_min: float         # sample minimum (ADU)
-    hist_max: float         # sample maximum (ADU)
-    stretch_low: float      # auto-stretch black point = median of sample (ADU)
-    stretch_high: float     # auto-stretch white point = 99th percentile (ADU)
+    histogram: list[int]    # 128-bin full-resolution ADU distribution over [hist_min, hist_max]
+    hist_min: float         # 0
+    hist_max: float         # sensor full-scale ADU (the frame's own max for float FITS)
+    stretch_low: float      # auto-stretch black point (ADU)
+    stretch_high: float     # auto-stretch white point (ADU) — full scale, no highlight clip
+    stretch_midtone: float = 0.5  # auto-stretch midtones balance (0.5 = linear)
     mean: float
-    median: float
+    median: float           # full-resolution sky background (ADU)
+    noise_sigma: float = 0.0              # full-resolution background noise, 1.4826·MAD (ADU)
+    saturated_pct: float | None = None    # % of pixels at full scale; None without a fixed full scale
+    # Statistics of the binned preview the stretch is computed on — lets a client
+    # redraw the stretch curve for other parameters without asking the server.
+    display_median: float = 0.0
+    display_sigma: float = 0.0
+    channels: list[ChannelStats] | None = None  # colour frames only; scalars above are luminance
     fwhm: float | None = None   # median FWHM in pixels; None when autofocus plugin is not loaded
     star_count: int = 0
 

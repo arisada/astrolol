@@ -5,18 +5,29 @@ import { useStore } from '@/store'
 import { Button } from '@/components/ui/button'
 import { LabeledSlider } from '@/components/ui/labeled-slider'
 import { HistogramOverlay } from '@/components/ui/histogram'
+import { ColorControls, StretchControls } from '@/components/ui/stretch-controls'
+import { DEFAULT_STRETCH_PARAMS } from '@/utils/stretch'
 import { ZoomableImage } from '@/components/ui/zoomable-image'
 import { CollapsibleSidebar } from '@/components/ui/collapsible-sidebar'
 import * as api from './api'
 
 interface Stretch {
   mode: 'auto' | 'linear'
-  black_pct: number
-  white_pct: number
+  target_bg: number
+  shadows: number
   quality: number
+  color: boolean
+  linked: boolean
 }
 
-const DEFAULT_STRETCH: Stretch = { mode: 'auto', black_pct: 50, white_pct: 99, quality: 85 }
+const DEFAULT_STRETCH: Stretch = {
+  mode: 'auto',
+  target_bg: DEFAULT_STRETCH_PARAMS.target_bg,
+  shadows: DEFAULT_STRETCH_PARAMS.shadows_sigma,
+  quality: 85,
+  color: true,
+  linked: false,
+}
 
 function fmt(v: number | null | undefined, digits = 1, suffix = ''): string {
   return v == null ? '—' : `${v.toFixed(digits)}${suffix}`
@@ -42,12 +53,14 @@ export function ImageDetail({
   const [mountId, setMountId] = useState<string>('')
   const connectedMounts = useStore((s) => s.connectedDevices.filter((d) => d.kind === 'mount'))
 
+  // Deliberately doesn't reset stretch/renderStretch here — browsing prev/next through a
+  // series re-fetches the record and stats for the new id, but the user's current
+  // stretch mode and slider positions should carry over rather than snapping back to
+  // defaults on every arrow press.
   useEffect(() => {
     setError(null)
     api.getImage(id).then(setRecord).catch((e) => setError((e as Error).message))
     api.getStats(id).then(setStats).catch(() => {})
-    setStretch(DEFAULT_STRETCH)
-    setRenderStretch(DEFAULT_STRETCH)
   }, [id])
 
   useEffect(() => {
@@ -127,7 +140,13 @@ export function ImageDetail({
         >
           {stats && (
             <div className="absolute bottom-2 right-2 bg-black/60 rounded p-1">
-              <HistogramOverlay stats={stats} />
+              <HistogramOverlay
+                stats={stats}
+                linear={renderStretch.mode === 'linear'}
+                color={renderStretch.color}
+                linked={renderStretch.linked}
+                params={{ target_bg: renderStretch.target_bg, shadows_sigma: renderStretch.shadows }}
+              />
             </div>
           )}
         </ZoomableImage>
@@ -207,20 +226,18 @@ export function ImageDetail({
             >Linear</button>
           </div>
           {stretch.mode === 'auto' && (
-            <>
-              <LabeledSlider
-                label="Black point" value={stretch.black_pct} min={50} max={90} step={1}
-                format={(v) => `${v}th pct`}
-                onChange={(v) => setStretch((s) => ({ ...s, black_pct: v }))}
-                onCommit={(v) => setRenderStretch((s) => ({ ...s, black_pct: v }))}
-              />
-              <LabeledSlider
-                label="White point" value={stretch.white_pct} min={90} max={100} step={0.1}
-                format={(v) => `${v.toFixed(1)}th pct`}
-                onChange={(v) => setStretch((s) => ({ ...s, white_pct: v }))}
-                onCommit={(v) => setRenderStretch((s) => ({ ...s, white_pct: v }))}
-              />
-            </>
+            <StretchControls
+              value={{ target_bg: stretch.target_bg, shadows_sigma: stretch.shadows }}
+              onChange={(p) => setStretch((s) => ({ ...s, target_bg: p.target_bg, shadows: p.shadows_sigma }))}
+              onCommit={(p) => setRenderStretch((s) => ({ ...s, target_bg: p.target_bg, shadows: p.shadows_sigma }))}
+            />
+          )}
+          {!!stats?.channels?.length && (
+            <ColorControls
+              value={{ color: stretch.color, linked: stretch.linked }}
+              onChange={(p) => { setStretch((s) => ({ ...s, ...p })); setRenderStretch((s) => ({ ...s, ...p })) }}
+              showLinked={stretch.mode === 'auto'}
+            />
           )}
           <LabeledSlider
             label="JPEG quality" value={stretch.quality} min={10} max={100} step={5}

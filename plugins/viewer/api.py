@@ -14,7 +14,7 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import FileResponse
 
 from astrolol.core.mem_guard import mem_guard
-from astrolol.imaging.preview import fits_to_jpeg, fits_to_jpeg_linear
+from astrolol.imaging.preview import PreviewBaseCache, auto_stretch_stats, render_auto, render_linear
 from astrolol.profiles.store import ProfileStore
 from plugins.viewer.index import ImageFilters, RescanInProgress, ViewerIndex
 from plugins.viewer.models import (
@@ -48,6 +48,27 @@ def _index(request: Request) -> ViewerIndex:
 
 def _cache_dir(request: Request) -> Path:
     return request.app.state.viewer_cache_dir
+
+
+def _preview_cache(request: Request) -> PreviewBaseCache:
+    """Binned base of the most recently viewed image, so dragging a stretch slider
+    re-renders from memory instead of re-reading the FITS file every time."""
+    cache = getattr(request.app.state, "viewer_preview_cache", None)
+    if cache is None:
+        cache = request.app.state.viewer_preview_cache = PreviewBaseCache(capacity=1)
+    return cache
+
+
+def _render_preview(cache: PreviewBaseCache, fits_path: Path, out: Path, render: RenderRequest) -> None:
+    """Blocking — call through asyncio.to_thread."""
+    base = cache.load(fits_path)
+    if render.mode == "linear":
+        render_linear(base, out, render.quality, color=render.color)
+    else:
+        render_auto(
+            base, out, render.quality, render.target_bg, render.shadows,
+            color=render.color, linked=render.linked,
+        )
 
 
 def _thumbs_dir(request: Request) -> Path:
@@ -289,41 +310,42 @@ async def get_stats(image_id: str, request: Request) -> dict:
     record = await _require_record(request, image_id)
     cache_dir = _cache_dir(request)
     cache_dir.mkdir(parents=True, exist_ok=True)
-    stats_path = cache_dir / f"{record.id}_{int(record.mtime)}.stats.json"
+    # v3: MTF-stretch stats with per-channel colour stats — older cache
+    # files are simply not picked up any more.
+    stats_path = cache_dir / f"{record.id}_{int(record.mtime)}.stats.v3.json"
     if stats_path.exists():
         import json
         return json.loads(stats_path.read_text())
 
-    tmp_jpeg = cache_dir / f"{record.id}_{int(record.mtime)}.stats.jpg"
+    cache = _preview_cache(request)
     async with mem_guard():
-        stats = await asyncio.to_thread(fits_to_jpeg, Path(record.path), tmp_jpeg, 85, 50.0, 99.0)
+        base = await asyncio.to_thread(cache.load, Path(record.path))
+    stats = auto_stretch_stats(base)
     import json
     stats_path.write_text(json.dumps(stats))
-    tmp_jpeg.unlink(missing_ok=True)
     return stats
 
 
 @router.get("/images/{image_id}/preview.jpg")
 async def get_preview(
     image_id: str, request: Request,
-    mode: str = "auto", black_pct: float = 50.0, white_pct: float = 99.0, quality: int = 85,
+    mode: str = "auto", target_bg: float = 0.25, shadows: float = -2.8, quality: int = 85,
+    color: bool = True, linked: bool = False,
 ) -> FileResponse:
     record = await _require_record(request, image_id)
     cache_dir = _cache_dir(request)
     cache_dir.mkdir(parents=True, exist_ok=True)
-    render = RenderRequest(mode=mode, black_pct=black_pct, white_pct=white_pct, quality=quality)
+    render = RenderRequest(
+        mode=mode, target_bg=target_bg, shadows=shadows, quality=quality, color=color, linked=linked,
+    )
     out = cache_dir / (
-        f"{record.id}_{int(record.mtime)}_{render.mode}_{render.black_pct}_"
-        f"{render.white_pct}_{render.quality}.jpg"
+        f"{record.id}_{int(record.mtime)}_{render.mode}_mtf{render.target_bg}_"
+        f"{render.shadows}_{render.quality}_{'rgb' if render.color else 'mono'}"
+        f"{'_linked' if render.linked else ''}.jpg"
     )
     if not out.exists():
         async with mem_guard():
-            if render.mode == "linear":
-                await asyncio.to_thread(fits_to_jpeg_linear, Path(record.path), out, render.quality)
-            else:
-                await asyncio.to_thread(
-                    fits_to_jpeg, Path(record.path), out, render.quality, render.black_pct, render.white_pct,
-                )
+            await asyncio.to_thread(_render_preview, _preview_cache(request), Path(record.path), out, render)
     return FileResponse(out, media_type="image/jpeg")
 
 

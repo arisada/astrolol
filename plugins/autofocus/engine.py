@@ -272,19 +272,16 @@ class AutofocusEngine:
                 auto_path = str(preview_dir / f"step_{run.current_step:02d}.jpg")
                 linear_path = str(preview_dir / f"step_{run.current_step:02d}_linear.jpg")
                 try:
-                    from astrolol.imaging.preview import fits_to_jpeg, fits_to_jpeg_linear
+                    from astrolol.imaging.preview import load_preview_base, render_auto, render_linear
+
+                    def _render_step_previews(fits_path: Path, quality: int) -> None:
+                        base = load_preview_base(fits_path)  # one read for both previews
+                        render_auto(base, Path(auto_path), quality)
+                        render_linear(base, Path(linear_path), quality)
+
                     async with mem_guard():
                         await asyncio.to_thread(
-                            fits_to_jpeg,
-                            Path(image.fits_path),
-                            Path(auto_path),
-                            settings.jpeg_quality,
-                        )
-                        await asyncio.to_thread(
-                            fits_to_jpeg_linear,
-                            Path(image.fits_path),
-                            Path(linear_path),
-                            settings.jpeg_quality,
+                            _render_step_previews, Path(image.fits_path), settings.jpeg_quality,
                         )
                     if raw_stars:
                         for p in (auto_path, linear_path):

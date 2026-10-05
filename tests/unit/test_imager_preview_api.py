@@ -38,14 +38,14 @@ async def test_preview_renders_after_exposure(
     await _connected_camera(manager)
     await imager_manager.expose("cam1", ExposureRequest(duration=1.0))
 
-    resp = client.get("/imager/cam1/preview.jpg", params={"black_pct": 10, "white_pct": 90, "quality": 50})
+    resp = client.get("/imager/cam1/preview.jpg", params={"target_bg": 0.15, "shadows": -2.0, "quality": 50})
 
     assert resp.status_code == 200
     assert resp.headers["content-type"] == "image/jpeg"
 
 
 @pytest.mark.asyncio
-async def test_preview_linear_mode_ignores_percentiles(
+async def test_preview_linear_mode_ignores_stretch_params(
     client: TestClient, imager_manager: ImagerManager, manager: DeviceManager
 ) -> None:
     await _connected_camera(manager)
@@ -88,3 +88,34 @@ async def test_preview_404_when_last_fits_no_longer_exists(
     resp = client.get("/imager/cam1/preview.jpg")
 
     assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_restretch_reuses_the_exposures_preview_base(
+    client: TestClient, imager_manager: ImagerManager, manager: DeviceManager, monkeypatch
+) -> None:
+    """Re-stretching the last exposure must not re-read its FITS file — the
+    exposure already built (and cached) its binned preview base."""
+    from astrolol.imaging import preview as preview_mod
+
+    await _connected_camera(manager)
+    await imager_manager.expose("cam1", ExposureRequest(duration=1.0))
+
+    loads: list = []
+    real_load = preview_mod.load_preview_base
+    monkeypatch.setattr(preview_mod, "load_preview_base", lambda p, m: loads.append(p) or real_load(p, m))
+
+    for params in ({"target_bg": 0.15}, {"shadows": -1.5}, {"mode": "linear"}):
+        assert client.get("/imager/cam1/preview.jpg", params=params).status_code == 200
+    assert loads == []
+
+
+@pytest.mark.asyncio
+async def test_preview_accepts_colour_options(
+    client: TestClient, imager_manager: ImagerManager, manager: DeviceManager
+) -> None:
+    """Mono frames ignore the colour options rather than rejecting them."""
+    await _connected_camera(manager)
+    await imager_manager.expose("cam1", ExposureRequest(duration=1.0))
+    for params in ({"color": "false"}, {"linked": "true"}, {"mode": "linear", "color": "false"}):
+        assert client.get("/imager/cam1/preview.jpg", params=params).status_code == 200
