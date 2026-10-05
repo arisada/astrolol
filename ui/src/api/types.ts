@@ -214,6 +214,62 @@ export interface AutofocusRun {
   image_height: number | null
 }
 
+// ── Flat Wizard ───────────────────────────────────────────────────────────────
+
+export interface FlatWizardFilterSpec {
+  filter_name: string | null
+  count: number
+}
+
+export interface FlatWizardConfig {
+  camera_id: string
+  filter_wheel_id?: string | null
+  filters: FlatWizardFilterSpec[]
+  target_pct?: number
+  tolerance_pct?: number
+  saturation_pct?: number
+  binning?: number
+  gain?: number | null
+  seed_duration?: number
+  min_duration?: number
+  max_duration?: number
+  max_attempts?: number
+}
+
+export interface FlatTrial {
+  attempt: number
+  duration: number
+  mean_adu: number
+  full_scale_adu: number
+  ratio_pct: number
+  saturated: boolean
+}
+
+export type FlatFilterStatus = 'solved' | 'failed'
+
+export interface FlatFilterResult {
+  filter_name: string | null
+  status: FlatFilterStatus
+  solved_duration: number | null
+  trials: FlatTrial[]
+  error: string | null
+}
+
+export type FlatWizardRunStatus = 'running' | 'completed' | 'failed' | 'aborted'
+
+export interface FlatWizardRun {
+  id: string
+  config: FlatWizardConfig
+  status: FlatWizardRunStatus
+  current_filter_index: number
+  total_filters: number
+  results: FlatFilterResult[]
+  task_id: string | null
+  error: string | null
+  started_at: string
+  completed_at: string | null
+}
+
 // ── Polar alignment (mirrors plugins/polar_align) ──────────────────────────────
 
 // Part 2 — plate-solve wizard (wizard.py)
@@ -994,6 +1050,33 @@ export interface AutofocusCompletedEvent extends BaseEvent {
 export interface AutofocusAbortedEvent extends BaseEvent { type: 'autofocus.aborted'; run_id: string }
 export interface AutofocusFailedEvent extends BaseEvent { type: 'autofocus.failed'; run_id: string; reason: string }
 
+export interface FlatWizardStartedEvent extends BaseEvent {
+  type: 'flat_wizard.started'; run_id: string; camera_id: string; total_filters: number
+}
+export interface FlatWizardTrialEvent extends BaseEvent {
+  type: 'flat_wizard.trial'
+  run_id: string
+  filter_index: number
+  filter_name: string | null
+  attempt: number
+  duration: number
+  mean_adu: number
+  full_scale_adu: number
+  ratio_pct: number
+  saturated: boolean
+}
+export interface FlatWizardFilterSolvedEvent extends BaseEvent {
+  type: 'flat_wizard.filter_solved'; run_id: string; filter_index: number; filter_name: string | null; duration: number
+}
+export interface FlatWizardFilterFailedEvent extends BaseEvent {
+  type: 'flat_wizard.filter_failed'; run_id: string; filter_index: number; filter_name: string | null; error: string
+}
+export interface FlatWizardCompletedEvent extends BaseEvent {
+  type: 'flat_wizard.completed'; run_id: string; task_id: string | null
+}
+export interface FlatWizardFailedEvent extends BaseEvent { type: 'flat_wizard.failed'; run_id: string; reason: string }
+export interface FlatWizardAbortedEvent extends BaseEvent { type: 'flat_wizard.aborted'; run_id: string }
+
 export interface PolarAlignWizardStartedEvent extends BaseEvent { type: 'polar_align.wizard_started'; run_id: string }
 export interface PolarAlignPointStartedEvent extends BaseEvent {
   type: 'polar_align.point_started'; run_id: string; index: number
@@ -1215,6 +1298,9 @@ export type AstrolollEvent =
   | PlatesolveStartedEvent | PlatesolveCompletedEvent | PlatesolveFailedEvent | PlatesolveCancelledEvent
   | AutofocusStartedEvent | AutofocusDataPointEvent | AutofocusCompletedEvent
   | AutofocusAbortedEvent | AutofocusFailedEvent
+  | FlatWizardStartedEvent | FlatWizardTrialEvent | FlatWizardFilterSolvedEvent
+  | FlatWizardFilterFailedEvent | FlatWizardCompletedEvent | FlatWizardFailedEvent
+  | FlatWizardAbortedEvent
   | PolarAlignWizardStartedEvent | PolarAlignPointStartedEvent | PolarAlignPointSolvedEvent
   | PolarAlignFitCompletedEvent | PolarAlignErrorUpdatedEvent
   | PolarAlignWizardCompletedEvent | PolarAlignWizardFailedEvent | PolarAlignWizardCancelledEvent
