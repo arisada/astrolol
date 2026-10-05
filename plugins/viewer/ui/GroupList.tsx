@@ -23,12 +23,34 @@ function groupLabel(g: api.GroupSummary): string {
 
 // A group is fully described by these field values — expanding it is just /images
 // filtered by them, never an opaque group_key/endpoint (see index.py's grouping doc).
+//
+// Which fields actually belong in that filter depends on frame_type, exactly mirroring
+// grouping.py's compute_group_key — flat/bias/dark each drop one or more fields from the
+// key (e.g. flats ignore exposure_s so a set shot at slightly different exposures still
+// collapses into one group). Filtering the expanded view by a dropped field used to pick
+// up GroupSummary's single (arbitrary, SQL GROUP BY-selected) value for it and silently
+// hide every frame in the group that didn't happen to share that one value — e.g. a
+// 40-frame flat set shot at two exposure times only showed the 20 matching whichever
+// exposure the summary query happened to return.
 function groupFilters(g: api.GroupSummary): api.ImageFilterParams {
+  const base: api.ImageFilterParams = {
+    frame_type: [g.frame_type], camera_name: g.camera_name || undefined,
+    binning: g.binning ?? undefined, gain: g.gain ?? undefined,
+  }
+  if (g.frame_type === 'flat') {
+    return { ...base, filter_name: g.filter_name || undefined, night: g.night }
+  }
+  if (g.frame_type === 'bias') {
+    return { ...base, night: g.night }
+  }
+  if (g.frame_type === 'dark') {
+    return { ...base, exposure_s: g.exposure_s ?? undefined }
+  }
+  // light, unknown: every field is part of the grouping key.
   return {
-    frame_type: [g.frame_type], object_name: g.object_name || undefined,
-    filter_name: g.filter_name || undefined, camera_name: g.camera_name || undefined,
-    exposure_s: g.exposure_s ?? undefined, binning: g.binning ?? undefined, gain: g.gain ?? undefined,
-    night: g.night,
+    ...base,
+    object_name: g.object_name || undefined, filter_name: g.filter_name || undefined,
+    exposure_s: g.exposure_s ?? undefined, night: g.night,
     sky_cell_ra: !g.object_name ? g.sky_cell_ra ?? undefined : undefined,
     sky_cell_dec: !g.object_name ? g.sky_cell_dec ?? undefined : undefined,
   }
