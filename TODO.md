@@ -247,6 +247,20 @@ named sequences (server library) and task file download/upload.
   instead of claiming a permanent sidebar slot. Not designed yet — affects `PluginManifest`
   (a tier/category field?) and `plugin-registry.ts` (how the sidebar renders each tier).
 
+## Bluetooth serial — deferred
+
+- **INDI mounts over Bluetooth** — `plugins/bluetooth_serial` + `astrolol/devices/bluetooth/`
+  currently only serve native (non-INDI) drivers, which open a raw RFCOMM socket directly
+  (see `BluetoothRfcommTransport`, used by `plugins/eqmod`). An INDI driver process needs an
+  actual `/dev/rfcommN` tty node, which BlueZ's D-Bus API can't create — that still needs the
+  `rfcomm connect` subprocess approach discussed when this was designed, exposed as a device
+  so it can sit in a profile and be waited on the same way a USB-serial port would.
+- **Single Bluetooth adapter assumed** — `BlueZBackend` hardcodes `/org/bluez/hci0`; a second
+  adapter (`hci1`) isn't selectable.
+- **Not tested**: re-pairing after a lost link key, pairing more than one device in the same
+  session, PIN/passkey flows other than the legacy fixed-PIN path (SSP "just works"/
+  confirmation path is implemented but unverified against real hardware).
+
 ## Imaging — deferred
 
 - **Debayer + full STF preview** — colour camera preview shows raw Bayer grid today.

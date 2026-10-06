@@ -30,6 +30,10 @@ class BluetoothTimeoutError(BluetoothTransportError):
     """No complete response before the timeout."""
 
 
+class BluetoothLinkClosedError(BluetoothTransportError):
+    """The RFCOMM socket was closed out from under us (BT link dropped)."""
+
+
 class BluetoothRfcommTransport:
     def __init__(
         self,
@@ -63,12 +67,44 @@ class BluetoothRfcommTransport:
             self._executor = None
 
     async def request(self, command: bytes) -> bytes:
+        """Send a command and return its terminated response.
+
+        A clearly-closed link (``BluetoothLinkClosedError`` -- the socket was
+        dropped, not just slow to answer) is treated as transient: the next
+        call transparently reopens the RFCOMM socket and retries once, so a
+        caller doing nothing more than periodic ``ping()``s self-heals after a
+        Bluetooth drop without ever seeing an error, the same way a USB-serial
+        adapter coming back on the same device node would. A plain timeout is
+        NOT treated this way -- the link may still be live with a command in
+        flight, and reconnecting underneath it risks the peripheral seeing the
+        same command twice.
+        """
         if self._sock is None or self._lock is None:
             raise BluetoothTransportError("Transport is not open")
         async with self._lock:
-            response = await self._run(lambda: self._exchange(command))
+            try:
+                response = await self._run(lambda: self._exchange(command))
+            except BluetoothLinkClosedError:
+                logger.warning("bluetooth.rfcomm_reconnecting", device_id=self._device_id)
+                await self._reopen()
+                response = await self._run(lambda: self._exchange(command))
+                logger.info("bluetooth.rfcomm_reconnected", device_id=self._device_id)
         logger.debug("bluetooth.rfcomm_exchange", command=command, response=response)
         return response
+
+    async def _reopen(self) -> None:
+        if self._sock is not None:
+            old_sock = self._sock
+            self._sock = None
+            await self._run(old_sock.close)
+        try:
+            sock = await self._manager.open(self._device_id)
+            sock.settimeout(self._timeout)
+        except Exception as exc:
+            raise BluetoothTransportError(
+                f"Could not reopen the Bluetooth link to '{self._device_id}': {exc}"
+            ) from exc
+        self._sock = sock
 
     def _exchange(self, command: bytes) -> bytes:
         assert self._sock is not None
@@ -78,14 +114,14 @@ class BluetoothRfcommTransport:
             while not buf.endswith(self._terminator):
                 chunk = self._sock.recv(256)
                 if not chunk:
-                    raise BluetoothTransportError(f"Bluetooth link to '{self._device_id}' closed")
+                    raise BluetoothLinkClosedError(f"Bluetooth link to '{self._device_id}' closed")
                 buf += chunk
         except socket.timeout as exc:
             raise BluetoothTimeoutError(
                 f"No response to {command!r} from device '{self._device_id}'"
             ) from exc
         except OSError as exc:
-            raise BluetoothTransportError(f"Bluetooth link to '{self._device_id}' closed: {exc}") from exc
+            raise BluetoothLinkClosedError(f"Bluetooth link to '{self._device_id}' closed: {exc}") from exc
         return buf
 
     async def _run(self, fn):
