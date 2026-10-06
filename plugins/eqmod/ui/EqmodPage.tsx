@@ -3,6 +3,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ToggleSwitch } from '@/components/ui/toggle-switch'
 import { BluetoothDevicePicker } from '@/components/ui/bluetooth-picker'
+import { api } from '@/api/client'
+import type { MountEquipmentItem } from '@/api/types'
 import {
   getDiagnostics, getIndiProxy, getSettings, putSettings,
   type AxisDiagnostics, type EqmodSettings, type IndiProxyStatus, type MountDiagnostics,
@@ -213,16 +215,48 @@ function SettingsCard() {
 }
 
 function BluetoothConnectHelper() {
+  const [mountItems, setMountItems] = useState<MountEquipmentItem[] | null>(null)
+  const [itemId, setItemId] = useState<string | null>(null)
   const [deviceId, setDeviceId] = useState<string | null>(null)
-  const [copied, setCopied] = useState(false)
-  const snippet = deviceId ? JSON.stringify({ bluetooth_device_id: deviceId }) : null
+  const [status, setStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const [error, setError] = useState<string | null>(null)
 
-  const copy = () => {
-    if (!snippet) return
-    navigator.clipboard.writeText(snippet).then(() => {
-      setCopied(true)
-      setTimeout(() => setCopied(false), 1500)
-    })
+  const load = () =>
+    api.inventory
+      .list()
+      .then((items) => {
+        const mounts = items.filter(
+          (i): i is MountEquipmentItem => i.type === 'mount' && i.adapter_key === 'eqmod',
+        )
+        setMountItems(mounts)
+        setItemId((current) => current ?? mounts[0]?.id ?? null)
+      })
+      .catch((e: Error) => setError(e.message))
+
+  useEffect(() => {
+    load()
+  }, [])
+
+  const item = mountItems?.find((i) => i.id === itemId) ?? null
+
+  const apply = async () => {
+    if (!item || !deviceId) return
+    setStatus('saving')
+    setError(null)
+    try {
+      // Bluetooth and serial are mutually exclusive transports: drop port/baudrate
+      // when switching a mount over to a paired Bluetooth device.
+      const { port: _port, baudrate: _baudrate, ...rest } = item.connect_params
+      await api.inventory.update({
+        ...item,
+        connect_params: { ...rest, bluetooth_device_id: deviceId },
+      })
+      setStatus('saved')
+      await load()
+    } catch (e) {
+      setError((e as Error).message)
+      setStatus('error')
+    }
   }
 
   return (
@@ -230,18 +264,52 @@ function BluetoothConnectHelper() {
       <p className="text-slate-300 font-medium">Connect over Bluetooth</p>
       <p className="text-xs text-slate-500">
         Pair the mount's Bluetooth serial adapter first on the{' '}
-        <span className="font-mono">Bluetooth Serial</span> plugin page, then pick it here to get the
-        connect params to paste into Equipment → Load driver (no MAC address or channel needed).
+        <span className="font-mono">Bluetooth Serial</span> plugin page, then apply it directly to the
+        mount's inventory entry below (no MAC address or channel to type in).
       </p>
-      <div className="flex items-center gap-2">
-        <div className="flex-1">
-          <BluetoothDevicePicker value={deviceId} onChange={setDeviceId} />
+      {error && <p className="text-xs text-status-error">{error}</p>}
+      {mountItems !== null && mountItems.length === 0 && (
+        <p className="text-xs text-slate-500">
+          No <span className="font-mono">eqmod</span> mount in your inventory yet — add one from Equipment first.
+        </p>
+      )}
+      {mountItems !== null && mountItems.length > 0 && (
+        <div className="flex flex-col gap-2">
+          {mountItems.length > 1 && (
+            <select
+              value={itemId ?? ''}
+              onChange={(e) => setItemId(e.target.value)}
+              className="w-full rounded bg-surface-overlay border border-surface-border px-3 py-1.5 text-sm text-slate-200"
+            >
+              {mountItems.map((i) => (
+                <option key={i.id} value={i.id}>{i.name}</option>
+              ))}
+            </select>
+          )}
+          <div className="flex items-center gap-2">
+            <div className="flex-1">
+              <BluetoothDevicePicker value={deviceId} onChange={setDeviceId} />
+            </div>
+            <Button size="sm" disabled={!deviceId || status === 'saving'} onClick={apply}>
+              {status === 'saving' ? 'Applying…' : 'Apply'}
+            </Button>
+          </div>
+          {item && (
+            <p className="text-xs text-slate-500">
+              Applies to <span className="font-mono">{item.name}</span>
+              {typeof item.connect_params.bluetooth_device_id === 'string' && (
+                <> — currently set to the paired device <span className="font-mono">{item.connect_params.bluetooth_device_id}</span></>
+              )}
+              .
+            </p>
+          )}
+          {status === 'saved' && (
+            <p className="text-xs text-emerald-400">
+              Saved. Reconnect the mount (or reload the profile) for it to take effect.
+            </p>
+          )}
         </div>
-        <Button size="sm" variant="outline" disabled={!snippet} onClick={copy}>
-          {copied ? 'Copied' : 'Copy params'}
-        </Button>
-      </div>
-      {snippet && <p className="text-xs text-slate-500 font-mono">{snippet}</p>}
+      )}
     </div>
   )
 }

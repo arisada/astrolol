@@ -14,6 +14,7 @@ class FakeBackend:
         self.paired_macs: set[str] = set()
         self.opened: list[tuple[str, int]] = []
         self.fake_socket = object()
+        self.fail_first_n_opens = 0
 
     async def scan(self, timeout: float):
         return [("AA:BB:CC:DD:EE:FF", "HC-06", -55)]
@@ -30,6 +31,8 @@ class FakeBackend:
 
     async def open_socket(self, mac: str, channel: int):
         self.opened.append((mac, channel))
+        if len(self.opened) <= self.fail_first_n_opens:
+            raise OSError("Host is down")
         return self.fake_socket
 
 
@@ -90,6 +93,34 @@ async def test_open_returns_backend_socket(manager: BluetoothManager, backend: F
     sock = await manager.open(device.id)
     assert sock is backend.fake_socket
     assert backend.opened == [("AA:BB:CC:DD:EE:FF", 3)]
+
+
+async def test_open_retries_transient_failure_then_succeeds(
+    manager: BluetoothManager, backend: FakeBackend, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The ACL link can take a moment to settle right after pairing; a single
+    ENETDOWN/EHOSTDOWN-style failure must not surface to the caller."""
+    from astrolol.devices.bluetooth import manager as manager_module
+
+    monkeypatch.setattr(manager_module, "OPEN_RETRY_DELAYS", (0.0, 0.0))
+    device = await manager.pair("AA:BB:CC:DD:EE:FF", pin="1234")
+    backend.fail_first_n_opens = 2
+    sock = await manager.open(device.id)
+    assert sock is backend.fake_socket
+    assert len(backend.opened) == 3
+
+
+async def test_open_raises_after_exhausting_retries(
+    manager: BluetoothManager, backend: FakeBackend, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from astrolol.devices.bluetooth import manager as manager_module
+
+    monkeypatch.setattr(manager_module, "OPEN_RETRY_DELAYS", (0.0, 0.0))
+    device = await manager.pair("AA:BB:CC:DD:EE:FF", pin="1234")
+    backend.fail_first_n_opens = 999
+    with pytest.raises(ConnectionError):
+        await manager.open(device.id)
+    assert len(backend.opened) == 3
 
 
 async def test_persistence_survives_new_manager_instance(tmp_path, backend: FakeBackend) -> None:

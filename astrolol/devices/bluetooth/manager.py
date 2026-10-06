@@ -9,6 +9,7 @@ connect params — that's the whole point of keeping pairing out of eqmod's
 """
 from __future__ import annotations
 
+import asyncio
 import socket
 
 import structlog
@@ -18,6 +19,13 @@ from astrolol.devices.bluetooth.models import DiscoveredDevice, PairedSerialDevi
 from astrolol.devices.bluetooth.store import BluetoothDeviceStore
 
 logger = structlog.get_logger()
+
+# The baseband (ACL) link can take a moment to settle right after pairing, or
+# after the peripheral drops and the kernel hasn't noticed yet — an RFCOMM
+# connect attempted too early fails with ENETDOWN/EHOSTDOWN even though the
+# device is right there. Retry with backoff instead of making every consumer
+# (and the person clicking "reconnect" twice) work around it themselves.
+OPEN_RETRY_DELAYS: tuple[float, ...] = (0.5, 1.0, 2.0)
 
 
 class BluetoothManager:
@@ -86,4 +94,18 @@ class BluetoothManager:
                 f"'{device.name}' ({device.mac}) is no longer paired at the OS level "
                 "(link key missing — re-pair it from the Bluetooth Serial plugin page)."
             )
-        return await self._backend.open_socket(device.mac, device.channel)
+        last_exc: OSError | None = None
+        for attempt, delay in enumerate((0.0, *OPEN_RETRY_DELAYS)):
+            if delay:
+                await asyncio.sleep(delay)
+            try:
+                return await self._backend.open_socket(device.mac, device.channel)
+            except OSError as exc:
+                last_exc = exc
+                logger.warning(
+                    "bluetooth.open_retry", device_id=device_id, attempt=attempt + 1, error=str(exc)
+                )
+        raise ConnectionError(
+            f"Could not open the RFCOMM link to '{device.name}' ({device.mac}) after "
+            f"{len(OPEN_RETRY_DELAYS) + 1} attempts: {last_exc}"
+        ) from last_exc
