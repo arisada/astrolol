@@ -174,6 +174,7 @@ Use components from `ui/src/components/ui/` rather than re-implementing them per
 | `EventLog` | `@/components/ui/event-log` | Scrollable log panel filtered by component name(s) |
 | `PillGroup` | `@/components/ui/pill-group` | Segmented button group for enum-like or numeric options |
 | `DurationStepper` | `@/components/ui/duration-stepper` | Number input with +/− stepper buttons |
+| `CountStepper` | `@/components/ui/count-stepper` | Frame-count stepper (0,1,2,3,5,10,… steps), editable inline |
 | `Input` | `@/components/ui/input` | Styled text/number input |
 | `ToggleSwitch` | `@/components/ui/toggle-switch` | Labelled boolean toggle |
 | `Card`, `SidebarSection` | `@/components/ui/card` | Container variants |

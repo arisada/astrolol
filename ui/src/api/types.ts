@@ -221,15 +221,19 @@ export interface FlatWizardFilterSpec {
   count: number
 }
 
-export interface FlatWizardConfig {
+export interface FlatWizardCameraSpec {
   camera_id: string
   filter_wheel_id?: string | null
   filters: FlatWizardFilterSpec[]
+  gain?: number | null
+}
+
+export interface FlatWizardConfig {
+  cameras: FlatWizardCameraSpec[]   // solved concurrently, queued as parallel sequencer lanes
   target_pct?: number
   tolerance_pct?: number
   saturation_pct?: number
   binning?: number
-  gain?: number | null
   seed_duration?: number
   min_duration?: number
   max_duration?: number
@@ -248,6 +252,7 @@ export interface FlatTrial {
 export type FlatFilterStatus = 'solved' | 'failed'
 
 export interface FlatFilterResult {
+  camera_id: string
   filter_name: string | null
   status: FlatFilterStatus
   solved_duration: number | null
@@ -261,9 +266,8 @@ export interface FlatWizardRun {
   id: string
   config: FlatWizardConfig
   status: FlatWizardRunStatus
-  current_filter_index: number
-  total_filters: number
-  results: FlatFilterResult[]
+  total_filters: number        // camera/filter combinations
+  results: FlatFilterResult[]  // completion order (cameras run concurrently)
   task_id: string | null
   error: string | null
   started_at: string
@@ -1051,12 +1055,13 @@ export interface AutofocusAbortedEvent extends BaseEvent { type: 'autofocus.abor
 export interface AutofocusFailedEvent extends BaseEvent { type: 'autofocus.failed'; run_id: string; reason: string }
 
 export interface FlatWizardStartedEvent extends BaseEvent {
-  type: 'flat_wizard.started'; run_id: string; camera_id: string; total_filters: number
+  type: 'flat_wizard.started'; run_id: string; camera_ids: string[]; total_filters: number
 }
 export interface FlatWizardTrialEvent extends BaseEvent {
   type: 'flat_wizard.trial'
   run_id: string
-  filter_index: number
+  camera_id: string
+  filter_index: number   // index of the camera/filter combination
   filter_name: string | null
   attempt: number
   duration: number
@@ -1066,10 +1071,10 @@ export interface FlatWizardTrialEvent extends BaseEvent {
   saturated: boolean
 }
 export interface FlatWizardFilterSolvedEvent extends BaseEvent {
-  type: 'flat_wizard.filter_solved'; run_id: string; filter_index: number; filter_name: string | null; duration: number
+  type: 'flat_wizard.filter_solved'; run_id: string; camera_id: string; filter_index: number; filter_name: string | null; duration: number
 }
 export interface FlatWizardFilterFailedEvent extends BaseEvent {
-  type: 'flat_wizard.filter_failed'; run_id: string; filter_index: number; filter_name: string | null; error: string
+  type: 'flat_wizard.filter_failed'; run_id: string; camera_id: string; filter_index: number; filter_name: string | null; error: string
 }
 export interface FlatWizardCompletedEvent extends BaseEvent {
   type: 'flat_wizard.completed'; run_id: string; task_id: string | null

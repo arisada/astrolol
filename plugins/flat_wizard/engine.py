@@ -1,6 +1,10 @@
 """Flat wizard engine: per-filter trial-and-error exposure solving.
 
-Algorithm (per filter)
+Every selected camera is solved concurrently (they all face the same flat panel), each
+working through its own filters in order. A filter wheel shared by two cameras is
+locked for the duration of one filter's solve, so neither moves it under the other.
+
+Algorithm (per camera/filter combination)
 -----------------------
 1. Change to the filter (if a filter wheel is configured).
 2. Take a short, unsaved trial exposure at the current trial duration.
@@ -13,13 +17,15 @@ Algorithm (per filter)
 6. Otherwise scale the duration proportionally (``duration *= target_ratio / ratio``)
    and retry, up to ``max_attempts``.
 
-Once every filter has been attempted, one ``ImagingTask`` (frame_type="flat") covering
-all solved filters is queued on the sequencer — this engine only ever takes short,
-unsaved trial exposures; the sequencer runner shoots and saves the real flats.
+Once every combination has been attempted, one ``ImagingTask`` (frame_type="flat") is
+queued on the sequencer with one lane per camera that solved at least one filter — the
+lanes run in parallel. This engine only ever takes short, unsaved trial exposures; the
+sequencer runner shoots and saves the real flats.
 """
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import math
 from datetime import datetime, timezone
 from typing import Any
@@ -32,6 +38,7 @@ from plugins.flat_wizard.models import (
     FlatFilterResult,
     FlatTrial,
     FlatWizardAbortedEvent,
+    FlatWizardCameraSpec,
     FlatWizardCompletedEvent,
     FlatWizardConfig,
     FlatWizardFailedEvent,
@@ -91,7 +98,7 @@ class FlatWizardEngine:
         if self._state("sequencer") is None:
             raise ValueError("The sequencer plugin is not enabled — the flat wizard has nowhere to send the result.")
 
-        run = FlatWizardRun(config=config, total_filters=len(config.filters))
+        run = FlatWizardRun(config=config, total_filters=sum(len(c.filters) for c in config.cameras))
         self._current_run = run
         self._task = asyncio.create_task(self._run(run), name=f"flat_wizard_{run.id}")
         return run
@@ -108,34 +115,19 @@ class FlatWizardEngine:
 
     async def _run(self, run: FlatWizardRun) -> None:
         config = run.config
+        camera_ids = [c.camera_id for c in config.cameras]
         try:
             await self._bus.publish(FlatWizardStartedEvent(
-                run_id=run.id, camera_id=config.camera_id, total_filters=run.total_filters,
+                run_id=run.id, camera_ids=camera_ids, total_filters=run.total_filters,
             ))
-            logger.info("flat_wizard.started", run_id=run.id, camera_id=config.camera_id)
+            logger.info("flat_wizard.started", run_id=run.id, camera_ids=camera_ids)
 
-            for index, spec in enumerate(config.filters):
-                run.current_filter_index = index
-                result = await self._solve_filter(run, spec, index)
-                run.results.append(result)
-                if result.status == "solved":
-                    await self._bus.publish(FlatWizardFilterSolvedEvent(
-                        run_id=run.id, filter_index=index, filter_name=spec.filter_name,
-                        duration=result.solved_duration,  # type: ignore[arg-type]
-                    ))
-                    logger.info(
-                        "flat_wizard.filter_solved", run_id=run.id, filter=spec.filter_name,
-                        duration=result.solved_duration,
-                    )
-                else:
-                    await self._bus.publish(FlatWizardFilterFailedEvent(
-                        run_id=run.id, filter_index=index, filter_name=spec.filter_name,
-                        error=result.error or "unknown error",
-                    ))
-                    logger.warning(
-                        "flat_wizard.filter_failed", run_id=run.id, filter=spec.filter_name,
-                        error=result.error,
-                    )
+            wheel_locks: dict[str, asyncio.Lock] = {}
+            first_index = 0
+            async with asyncio.TaskGroup() as tg:
+                for camera in config.cameras:
+                    tg.create_task(self._solve_camera(run, camera, first_index, wheel_locks))
+                    first_index += len(camera.filters)
 
             await self._queue_sequence(run)
 
@@ -155,24 +147,68 @@ class FlatWizardEngine:
             raise
 
         except Exception as exc:
+            # A TaskGroup wraps failures; report the underlying one, not the wrapper.
+            cause = exc.exceptions[0] if isinstance(exc, BaseExceptionGroup) and exc.exceptions else exc
             run.status = "failed"
-            run.error = str(exc)
+            run.error = str(cause)
             run.completed_at = datetime.now(timezone.utc)
-            await self._bus.publish(FlatWizardFailedEvent(run_id=run.id, reason=str(exc)))
-            logger.error("flat_wizard.failed", run_id=run.id, error=str(exc), exc_info=True)
+            await self._bus.publish(FlatWizardFailedEvent(run_id=run.id, reason=str(cause)))
+            logger.error("flat_wizard.failed", run_id=run.id, error=str(cause), exc_info=True)
+
+    async def _solve_camera(
+        self,
+        run: FlatWizardRun,
+        camera: FlatWizardCameraSpec,
+        first_index: int,
+        wheel_locks: dict[str, asyncio.Lock],
+    ) -> None:
+        """Solve *camera*'s filters in order; *first_index* is its first combination's index."""
+        for offset, spec in enumerate(camera.filters):
+            index = first_index + offset
+            lock = (
+                wheel_locks.setdefault(camera.filter_wheel_id, asyncio.Lock())
+                if camera.filter_wheel_id is not None and spec.filter_name is not None
+                else contextlib.nullcontext()
+            )
+            async with lock:
+                result = await self._solve_filter(run, camera, spec, index)
+            run.results.append(result)
+            if result.status == "solved":
+                await self._bus.publish(FlatWizardFilterSolvedEvent(
+                    run_id=run.id, camera_id=camera.camera_id, filter_index=index,
+                    filter_name=spec.filter_name, duration=result.solved_duration,  # type: ignore[arg-type]
+                ))
+                logger.info(
+                    "flat_wizard.filter_solved", run_id=run.id, camera_id=camera.camera_id,
+                    filter=spec.filter_name, duration=result.solved_duration,
+                )
+            else:
+                await self._bus.publish(FlatWizardFilterFailedEvent(
+                    run_id=run.id, camera_id=camera.camera_id, filter_index=index,
+                    filter_name=spec.filter_name, error=result.error or "unknown error",
+                ))
+                logger.warning(
+                    "flat_wizard.filter_failed", run_id=run.id, camera_id=camera.camera_id,
+                    filter=spec.filter_name, error=result.error,
+                )
 
     async def _solve_filter(
-        self, run: FlatWizardRun, spec: FlatWizardFilterSpec, filter_index: int
+        self, run: FlatWizardRun, camera: FlatWizardCameraSpec, spec: FlatWizardFilterSpec, filter_index: int
     ) -> FlatFilterResult:
         config = run.config
+        camera_id = camera.camera_id
+
+        def result(status: str, **kwargs: Any) -> FlatFilterResult:
+            return FlatFilterResult(camera_id=camera_id, filter_name=spec.filter_name, status=status, **kwargs)
+
         imager = self._state("imager_manager")
         if imager is None:
-            return FlatFilterResult(filter_name=spec.filter_name, status="failed", error="Imager is not available")
+            return result("failed", error="Imager is not available")
 
         if spec.filter_name is not None:
-            error = await self._select_filter(config, spec.filter_name)
+            error = await self._select_filter(camera, spec.filter_name)
             if error is not None:
-                return FlatFilterResult(filter_name=spec.filter_name, status="failed", error=error)
+                return result("failed", error=error)
 
         from astrolol.imaging.models import ExposureRequest
 
@@ -187,8 +223,8 @@ class FlatWizardEngine:
         for attempt in range(1, config.max_attempts + 1):
             clamped = max(config.min_duration, min(config.max_duration, duration))
             if last_clamped is not None and clamped == last_clamped:
-                return FlatFilterResult(
-                    filter_name=spec.filter_name, status="failed", trials=trials,
+                return result(
+                    "failed", trials=trials,
                     error=(
                         f"Stuck at the exposure-duration limit ({clamped:.3f}s) without reaching "
                         "the target ADU — adjust the flat panel brightness or widen the duration range."
@@ -198,21 +234,21 @@ class FlatWizardEngine:
             duration = clamped
 
             req = ExposureRequest(
-                duration=duration, gain=config.gain, binning=config.binning,
+                duration=duration, gain=camera.gain, binning=config.binning,
                 frame_type="flat", save=False,
             )
             try:
-                await imager.expose(config.camera_id, req)
+                await imager.expose(camera_id, req)
             except Exception as exc:
-                return FlatFilterResult(
-                    filter_name=spec.filter_name, status="failed", trials=trials,
+                return result(
+                    "failed", trials=trials,
                     error=f"Trial exposure failed: {exc}",
                 )
 
-            stats = imager.get_last_stats(config.camera_id)
+            stats = imager.get_last_stats(camera_id)
             if stats is None or stats.hist_max <= 0:
-                return FlatFilterResult(
-                    filter_name=spec.filter_name, status="failed", trials=trials,
+                return result(
+                    "failed", trials=trials,
                     error="No exposure statistics were available for the trial frame",
                 )
 
@@ -224,27 +260,27 @@ class FlatWizardEngine:
             )
             trials.append(trial)
             await self._bus.publish(FlatWizardTrialEvent(
-                run_id=run.id, filter_index=filter_index, filter_name=spec.filter_name,
-                attempt=attempt, duration=duration, mean_adu=stats.mean,
+                run_id=run.id, camera_id=camera_id, filter_index=filter_index,
+                filter_name=spec.filter_name, attempt=attempt, duration=duration, mean_adu=stats.mean,
                 full_scale_adu=stats.hist_max, ratio_pct=trial.ratio_pct, saturated=saturated,
             ))
             logger.info(
-                "flat_wizard.trial", run_id=run.id, filter=spec.filter_name, attempt=attempt,
+                "flat_wizard.trial", run_id=run.id, camera_id=camera_id, filter=spec.filter_name, attempt=attempt,
                 duration=round(duration, 4), ratio_pct=trial.ratio_pct, saturated=saturated,
             )
 
             if saturated:
                 if duration <= config.min_duration:
-                    return FlatFilterResult(
-                        filter_name=spec.filter_name, status="failed", trials=trials,
+                    return result(
+                        "failed", trials=trials,
                         error="Saturated even at the minimum exposure duration — reduce the flat panel brightness.",
                     )
                 duration = duration * _SATURATION_BACKOFF
                 continue
 
             if abs(ratio - target_ratio) <= tolerance:
-                return FlatFilterResult(
-                    filter_name=spec.filter_name, status="solved", trials=trials,
+                return result(
+                    "solved", trials=trials,
                     solved_duration=_round_significant(duration),
                 )
 
@@ -254,18 +290,18 @@ class FlatWizardEngine:
 
             duration = duration * (target_ratio / ratio)
 
-        return FlatFilterResult(
-            filter_name=spec.filter_name, status="failed", trials=trials,
+        return result(
+            "failed", trials=trials,
             error=f"Did not converge to the target ADU within {config.max_attempts} attempts.",
         )
 
-    async def _select_filter(self, config: FlatWizardConfig, filter_name: str) -> str | None:
+    async def _select_filter(self, camera: FlatWizardCameraSpec, filter_name: str) -> str | None:
         """Move the filter wheel to *filter_name*. Returns an error string, or None on success."""
         fwm = self._state("filter_wheel_manager")
-        if config.filter_wheel_id is None or fwm is None:
+        if camera.filter_wheel_id is None or fwm is None:
             return f"No filter wheel configured, but filter '{filter_name}' was requested."
         try:
-            status = await fwm.get_status(config.filter_wheel_id)
+            status = await fwm.get_status(camera.filter_wheel_id)
         except Exception as exc:
             return f"Could not read the filter wheel: {exc}"
         names = status.filter_names or []
@@ -275,25 +311,38 @@ class FlatWizardEngine:
         if status.current_slot == slot:
             return None
         try:
-            await fwm.select_filter(config.filter_wheel_id, slot)
+            await fwm.select_filter(camera.filter_wheel_id, slot)
         except Exception as exc:
             return f"Changing to filter '{filter_name}' failed: {exc}"
         return None
 
     async def _queue_sequence(self, run: FlatWizardRun) -> None:
-        """Build one flat-frame ImagingTask from every solved filter and queue it."""
+        """Queue one flat ImagingTask: a lane per camera with at least one solved filter.
+
+        Lanes keep the configured camera and filter order (results arrive in completion
+        order). With no dithering and no slew, every lane free-runs in parallel.
+        """
         from astrolol.core.sequencer.models import ExposureGroup, ImagingTask, Lane, TargetRef
 
         config = run.config
-        groups = [
-            ExposureGroup(
-                filter_name=spec.filter_name, duration=result.solved_duration,  # type: ignore[arg-type]
-                count=spec.count, binning=config.binning, gain=config.gain, frame_type="flat",
-            )
-            for spec, result in zip(config.filters, run.results)
-            if result.status == "solved" and result.solved_duration is not None
-        ]
-        if not groups:
+        solved = {
+            (r.camera_id, r.filter_name): r.solved_duration
+            for r in run.results
+            if r.status == "solved" and r.solved_duration is not None
+        }
+        lanes = []
+        for camera in config.cameras:
+            groups = [
+                ExposureGroup(
+                    filter_name=spec.filter_name, duration=solved[(camera.camera_id, spec.filter_name)],
+                    count=spec.count, binning=config.binning, gain=camera.gain, frame_type="flat",
+                )
+                for spec in camera.filters
+                if (camera.camera_id, spec.filter_name) in solved
+            ]
+            if groups:
+                lanes.append(Lane(camera_id=camera.camera_id, groups=groups))
+        if not lanes:
             return
 
         sequencer = self._state("sequencer")
@@ -304,7 +353,7 @@ class FlatWizardEngine:
         task = ImagingTask(
             name="Flats",
             target=TargetRef(kind="current", name="Flats"),
-            lanes=[Lane(camera_id=config.camera_id, groups=groups)],
+            lanes=lanes,
             slew=False,
             center=False,
             start_guiding=False,

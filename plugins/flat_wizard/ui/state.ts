@@ -2,6 +2,7 @@
 // index.ts and read by FlatWizardPage (full detail) and FlatWizardChip (summary).
 
 export interface FlatWizardLiveTrial {
+  cameraId: string
   filterIndex: number
   filterName: string | null
   attempt: number
@@ -13,6 +14,7 @@ export interface FlatWizardLiveTrial {
 }
 
 export interface FlatWizardLiveResult {
+  cameraId: string
   filterIndex: number
   filterName: string | null
   status: 'solved' | 'failed'

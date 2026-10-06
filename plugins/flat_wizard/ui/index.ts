@@ -14,7 +14,7 @@ registerPluginEventHandlers('flat_wizard', {
     const e = event as Extract<AstrolollEvent, { type: 'flat_wizard.trial' }>
     const current = (cur as FlatWizardLiveState | null | undefined) ?? { totalFilters: e.filter_index + 1, trials: [], liveResults: [] }
     const trial = {
-      filterIndex: e.filter_index, filterName: e.filter_name, attempt: e.attempt,
+      cameraId: e.camera_id, filterIndex: e.filter_index, filterName: e.filter_name, attempt: e.attempt,
       duration: e.duration, meanAdu: e.mean_adu, fullScaleAdu: e.full_scale_adu,
       ratioPct: e.ratio_pct, saturated: e.saturated,
     }
@@ -27,7 +27,7 @@ registerPluginEventHandlers('flat_wizard', {
     const current = (cur as FlatWizardLiveState | null | undefined) ?? { totalFilters: e.filter_index + 1, trials: [], liveResults: [] }
     return {
       ...current,
-      liveResults: [...current.liveResults, { filterIndex: e.filter_index, filterName: e.filter_name, status: 'solved' as const, duration: e.duration }],
+      liveResults: [...current.liveResults, { cameraId: e.camera_id, filterIndex: e.filter_index, filterName: e.filter_name, status: 'solved' as const, duration: e.duration }],
     } satisfies FlatWizardLiveState
   },
   'flat_wizard.filter_failed': (event: AstrolollEvent, cur: unknown) => {
@@ -35,7 +35,7 @@ registerPluginEventHandlers('flat_wizard', {
     const current = (cur as FlatWizardLiveState | null | undefined) ?? { totalFilters: e.filter_index + 1, trials: [], liveResults: [] }
     return {
       ...current,
-      liveResults: [...current.liveResults, { filterIndex: e.filter_index, filterName: e.filter_name, status: 'failed' as const, error: e.error }],
+      liveResults: [...current.liveResults, { cameraId: e.camera_id, filterIndex: e.filter_index, filterName: e.filter_name, status: 'failed' as const, error: e.error }],
     } satisfies FlatWizardLiveState
   },
   'flat_wizard.completed': () => null,

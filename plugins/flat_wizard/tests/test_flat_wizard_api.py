@@ -31,8 +31,7 @@ def client() -> TestClient:
 
 
 _VALID_BODY = {
-    "camera_id": "cam_1",
-    "filters": [{"filter_name": None, "count": 10}],
+    "cameras": [{"camera_id": "cam_1", "filters": [{"filter_name": None, "count": 10}]}],
 }
 
 
@@ -53,8 +52,13 @@ def test_start_validates_required_fields(client: TestClient) -> None:
 
 def test_start_validates_at_least_one_filter(client: TestClient) -> None:
     resp = client.post(
-        "/plugins/flat_wizard/start", json={"camera_id": "cam_1", "filters": []}
+        "/plugins/flat_wizard/start", json={"cameras": [{"camera_id": "cam_1", "filters": []}]}
     )
+    assert resp.status_code == 422
+
+
+def test_start_validates_at_least_one_camera(client: TestClient) -> None:
+    resp = client.post("/plugins/flat_wizard/start", json={"cameras": []})
     assert resp.status_code == 422
 
 
