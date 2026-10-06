@@ -258,6 +258,10 @@ suffixes for plurals and `<tag>…</tag>` + `<Trans>` for inline markup.
 - Keep copy free of implementation detail (see above) in *both* languages. A translation must not add or drop information.
 - Numbers, RA/Dec and other astronomy formats keep their current notation (decimal point). Dates and
   times go through `Intl` with the active language.
+- `cd ui && npm run lint` (ESLint, `eslint-plugin-i18next` `no-literal-string`) fails on literal text in
+  JSX, in core and plugin UI alike. Units, glyphs and the product name are allow-listed in
+  `ui/eslint.config.js`; add to that list for new symbols, never silence the rule on real copy.
+  It checks JSX text only (not `title=`/`placeholder=` attributes), so translate those by hand.
 - `tests/unit/test_ui_locales.py` checks every language file has exactly the English keys and the same
   `{{placeholders}}`/tags; `tests/unit/test_ui_translation_keys.py` checks every literal `t('key')` exists.
   Both run in the normal unit suite.
@@ -386,6 +390,9 @@ python3 -m pytest tests/integration/ -v
 
 # TypeScript type checking (src/ + plugins/)
 cd ui && npm run typecheck
+
+# Lint: no untranslated text in JSX (src/ + plugins/)
+cd ui && npm run lint
 ```
 
 ## Docker development environment

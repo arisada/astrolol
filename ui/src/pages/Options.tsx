@@ -5,7 +5,6 @@ import type { PluginInfo } from '@/api/types'
 import { useStore } from '@/store'
 import { ToggleSwitch } from '@/components/ui/toggle-switch'
 import { Input } from '@/components/ui/input'
-import { PillGroup } from '@/components/ui/pill-group'
 import { SUPPORTED_LANGUAGES, setLanguage } from '@/i18n'
 
 interface IndiSettings {
@@ -234,12 +233,16 @@ export function Options() {
 
       <Section title={t('language.title')}>
         <Row label={t('language.label')}>
-          <PillGroup
-            options={SUPPORTED_LANGUAGES.map((l) => l.code)}
-            value={i18n.resolvedLanguage as string}
-            onChange={persistLanguage}
-            formatLabel={(code) => SUPPORTED_LANGUAGES.find((l) => l.code === code)?.label ?? code}
-          />
+          <select
+            value={i18n.resolvedLanguage}
+            onChange={(e) => persistLanguage(e.target.value)}
+            aria-label={t('language.label')}
+            className="bg-surface border border-surface-border rounded px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-accent"
+          >
+            {SUPPORTED_LANGUAGES.map((l) => (
+              <option key={l.code} value={l.code}>{l.label}</option>
+            ))}
+          </select>
         </Row>
       </Section>
 
