@@ -1,8 +1,10 @@
+import { useTranslation } from 'react-i18next'
 import { useStore } from '@/store'
 import { Chip } from '@/components/ui/badge'
 import type { Phd2PluginState } from './api'
 
 export function Phd2Chip() {
+  const { t } = useTranslation('phd2')
   const phd2 = useStore((s) => (s.pluginStates['phd2'] as Phd2PluginState | null | undefined)?.status)
   if (!phd2?.connected) return null
 
@@ -11,16 +13,16 @@ export function Phd2Chip() {
 
   if (state === 'Guiding') {
     const rmsStr = rms !== null ? ` ${rms.toFixed(2)}"` : ''
-    return <Chip label="PHD2" status={`Guiding${rmsStr}`} variant="green" />
+    return <Chip label="PHD2" status={t('chip.guiding', { rms: rmsStr })} variant="green" />
   }
   if (state === 'Calibrating') {
-    return <Chip label="PHD2" status="Calibrating" variant="amber" pulse />
+    return <Chip label="PHD2" status={t('chip.calibrating')} variant="amber" pulse />
   }
   if (phd2.is_dithering) {
-    return <Chip label="PHD2" status="Dithering" variant="amber" pulse />
+    return <Chip label="PHD2" status={t('chip.dithering')} variant="amber" pulse />
   }
   if (state && state !== 'Stopped' && state !== 'Disconnected' && state !== 'Unknown') {
-    return <Chip label="PHD2" status={state} variant="slate" />
+    return <Chip label="PHD2" status={t(`state.${state.toLowerCase().replace(' ', '_')}`, { defaultValue: state })} variant="slate" />
   }
-  return <Chip label="PHD2" status="Connected" variant="slate" />
+  return <Chip label="PHD2" status={t('chip.connected')} variant="slate" />
 }

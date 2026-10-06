@@ -1,0 +1,63 @@
+{
+  "label": "Guiding",
+  "manifest": {
+    "name": "PHD2 Guiding",
+    "description": "PHD2 autoguider integration — live connection status, guiding metrics, guide graph, and configurable automatic dithering between frames."
+  },
+  "state": {
+    "guiding": "Guiding",
+    "paused": "Paused",
+    "star_loss": "Star loss",
+    "calibrating": "Calibrating",
+    "stopped": "Stopped",
+    "looping": "Looping",
+    "selected": "Star selected",
+    "settling": "Settling",
+    "unknown": "Unknown",
+    "disconnected": "Disconnected"
+  },
+  "chip": {
+    "guiding": "Guiding{{rms}}",
+    "calibrating": "Calibrating",
+    "dithering": "Dithering",
+    "connected": "Connected"
+  },
+  "title": "PHD2 Guiding",
+  "connect": "Connect",
+  "disconnect": "Disconnect",
+  "settingsTitle": "Graph & debug settings",
+  "settings": {
+    "host": "PHD2 host",
+    "port": "PHD2 port",
+    "saving": "Saving…",
+    "scale": "Graph vertical scale",
+    "samples": "Samples shown",
+    "debug": "PHD2 debug logging",
+    "debugHint": "Prints raw JSON-RPC traffic to the server console"
+  },
+  "graph": {
+    "title": "Guide error (arcsec)",
+    "none": "No guide data",
+    "ra": "RA",
+    "dec": "Dec",
+    "rms": "RMS avg"
+  },
+  "metrics": {
+    "rmsRa": "RMS RA",
+    "rmsDec": "RMS Dec",
+    "rmsAvg": "RMS average",
+    "snr": "Star SNR",
+    "pixelScale": "Pixel scale"
+  },
+  "controls": {
+    "guide": "Guide",
+    "resume": "Resume",
+    "pause": "Pause",
+    "stop": "Stop",
+    "dither": "Dither",
+    "dithering": "Dithering…",
+    "ditherBusy": "Dither already in progress",
+    "ditherOnce": "Dither once"
+  },
+  "notConnected": "PHD2 not connected. Configure host/port in Options → Settings, then click Connect."
+}

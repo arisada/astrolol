@@ -1,0 +1,64 @@
+{
+  "label": "Flat Wizard",
+  "manifest": {
+    "name": "Assistant de flats",
+    "description": "Détermine par essais successifs la durée de pose correcte des images de calibration flat (courtes poses de test non enregistrées, convergeant vers un pourcentage cible du puits de potentiel du capteur sans pixel saturé), un filtre à la fois, puis met les flats obtenus en file d'attente dans le séquenceur."
+  },
+  "chip": {
+    "label": "Flats",
+    "saturated": "sat"
+  },
+  "status": {
+    "running": "en cours",
+    "completed": "terminé",
+    "failed": "échec",
+    "aborted": "interrompu",
+    "solved": "résolu"
+  },
+  "title": "Assistant de flats",
+  "abort": "Interrompre",
+  "summary": "{{cameras}} · {{sets}} · {{frames}}",
+  "cameras_one": "{{count}} caméra",
+  "cameras_other": "{{count}} caméras",
+  "sets_one": "{{count}} série",
+  "sets_other": "{{count}} séries",
+  "frames_one": "{{count}} image",
+  "frames_other": "{{count}} images",
+  "start": "Résoudre et mettre les flats en file",
+  "selectOne": "Sélectionnez au moins une combinaison caméra/filtre avec des images.",
+  "startFailed": "Impossible de démarrer l'assistant de flats",
+  "noWheelOnPath": "pas de roue à filtres sur son chemin optique",
+  "noWheel": "Pas de roue à filtres",
+  "noFilter": "sans filtre",
+  "camerasFilters": "Caméras et filtres",
+  "noCamera": "Aucune caméra connectée",
+  "gain": "Gain",
+  "gainPlaceholder": "défaut du pilote",
+  "framesUnit": "images",
+  "target": {
+    "title": "Cible",
+    "fullWell": "Puits de potentiel visé (moyenne)",
+    "tolerance": "Tolérance",
+    "saturation": "Garde de saturation",
+    "saturationHint": "% — considéré comme écrêté au-delà"
+  },
+  "trial": {
+    "title": "Poses d'essai",
+    "start": "Durée initiale",
+    "max": "Durée max (limite de sécurité)",
+    "binning": "Binning",
+    "attempts": "Essais max"
+  },
+  "live": {
+    "title": "Essais en direct",
+    "none": "Aucun essai pour l'instant",
+    "saturated": "saturé"
+  },
+  "results": {
+    "title": "Résultats",
+    "none": "Aucun résultat pour l'instant",
+    "trials_one": "{{duration}} s ({{count}} essai)",
+    "trials_other": "{{duration}} s ({{count}} essais)",
+    "queued": "Mis en file dans le séquenceur (tâche {{id}})"
+  }
+}

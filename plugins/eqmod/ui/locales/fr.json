@@ -1,0 +1,83 @@
+{
+  "label": "EQMOD",
+  "manifest": {
+    "name": "Monture EQMOD",
+    "description": "Pilote natif (non INDI) pour les montures Sky-Watcher via le protocole des contrôleurs moteur (câble EQMOD ou USB intégré) : GoTo, synchronisation, suivi, parcage et guidage par impulsions. Inclut un émulateur de monture ('eqmod_sim') et un proxy de monture INDI permettant à PHD2 et aux autres clients INDI d'utiliser la monture via indiserver."
+  },
+  "flags": {
+    "running": "en marche",
+    "tracking_mode": "mode vitesse",
+    "fast": "grande vitesse",
+    "ccw": "CCW",
+    "blocked": "bloqué",
+    "initialized": "initialisé",
+    "level_switch": "fin de course"
+  },
+  "axis": {
+    "title": "Axe {{name}}",
+    "reversed": "Axe {{name}} (inversé)",
+    "cpr": "CPR",
+    "ratio": "Rapport grande vitesse",
+    "counts": "Position (pas codeur)",
+    "degrees": "Position (° depuis l'origine)",
+    "period": "Période de pas (T1)",
+    "extended": "Statut étendu"
+  },
+  "mount": {
+    "baud": "{{port}} @ {{baud}} bauds",
+    "board": "Version de la carte",
+    "timer": "Fréquence du timer",
+    "tracking": "Suivi",
+    "off": "arrêté",
+    "nudging": "Corrections",
+    "guideRate": "Vitesse de guidage",
+    "guideRateValue": "{{rate}}x sidéral",
+    "pulse": "Impulsion de guidage",
+    "meridian": "Limite du méridien",
+    "meridianValue": "{{deg}}° au-delà du méridien",
+    "margin": "Marge AD avant la limite",
+    "beyond": "dépassée de {{deg}}°",
+    "site": "Site",
+    "noSite": "aucun (pas de Site dans le profil actif)",
+    "parked": "Parquée",
+    "yes": "oui",
+    "no": "non",
+    "park": "Position de parcage (pas codeur)",
+    "sync": "Décalage de synchronisation",
+    "syncValue": "AD {{ra}} min, Dec {{dec}}°",
+    "noSync": "aucun (non synchronisée)"
+  },
+  "settings": {
+    "title": "Réglages",
+    "led": "LED du viseur polaire",
+    "proxy": "Proxy de monture INDI",
+    "apiUrl": "URL de l'API astrolol (depuis le proxy)",
+    "save": "Enregistrer",
+    "saving": "Enregistrement…",
+    "proxyState": {
+      "disabled": "désactivé",
+      "unavailable": "prise en charge INDI indisponible",
+      "loaded": "chargé dans indiserver",
+      "registered": "enregistré, pas encore chargé",
+      "pending": "enregistré : se charge au démarrage d'indiserver (premier appareil INDI)"
+    },
+    "help1": "Publie la monture connectée sur l'indiserver d'astrolol sous le nom <m>{{name}}</m> (un relais vers l'API REST d'astrolol, pas un vrai pilote de monture).",
+    "help2": "PHD2 : connectez-vous à l'indiserver de cette machine (port 7624), choisissez votre caméra de guidage INDI, puis <m>astrolol Mount Proxy</m> comme monture. Les impulsions de guidage utilisent la vitesse de guidage de la monture (paramètre de connexion <m>guide_rate</m>, 0,5x sidéral par défaut).",
+    "help3": "Pilotes INDI qui écoutent un télescope (par ex. le champ d'étoiles du simulateur CCD, ou les en-têtes FITS) : réglez leur télescope actif sur <m>astrolol Mount Proxy</m>."
+  },
+  "bt": {
+    "title": "Connexion par Bluetooth",
+    "intro": "Appairez d'abord l'adaptateur Bluetooth série de la monture sur la page du module <m>Bluetooth série</m>, puis appliquez-le ci-dessous.",
+    "noMount": "Aucune monture <m>eqmod</m> dans votre inventaire — ajoutez-en une d'abord depuis Matériel.",
+    "apply": "Appliquer",
+    "applying": "Application…",
+    "appliesTo": "S'applique à <m>{{name}}</m>",
+    "currently": " — actuellement réglé sur l'appareil appairé <m>{{id}}</m>",
+    "saved": "Enregistré. Reconnectez la monture (ou rechargez le profil) pour que cela prenne effet."
+  },
+  "page": {
+    "title": "EQMOD",
+    "none": "Aucune vraie monture eqmod connectée.",
+    "howto": "Matériel → Charger un pilote → Monture → Autre adaptateur → <m>eqmod</m>, avec les paramètres <m>{{params}}</m>. Ajoutez <m>\"baudrate\"</m> pour éviter la détection automatique (9600 pour un câble EQMOD, 115200 pour l'USB intégré de l'AZ-EQ6), et <m>\"ra_reverse\"</m> / <m>\"dec_reverse\"</m> si une correction va dans le mauvais sens."
+  }
+}

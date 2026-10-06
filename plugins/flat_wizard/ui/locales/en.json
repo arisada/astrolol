@@ -1,0 +1,64 @@
+{
+  "label": "Flat Wizard",
+  "manifest": {
+    "name": "Flat Wizard",
+    "description": "Solves the correct exposure duration for flat calibration frames by trial and error (short unsaved test exposures, converging on a target percentage of the sensor's full well with no saturated pixels), one filter at a time, then queues the resulting flats on the sequencer."
+  },
+  "chip": {
+    "label": "Flats",
+    "saturated": "sat"
+  },
+  "status": {
+    "running": "running",
+    "completed": "completed",
+    "failed": "failed",
+    "aborted": "aborted",
+    "solved": "solved"
+  },
+  "title": "Flat Wizard",
+  "abort": "Abort",
+  "summary": "{{cameras}} · {{sets}} · {{frames}}",
+  "cameras_one": "{{count}} camera",
+  "cameras_other": "{{count}} cameras",
+  "sets_one": "{{count}} set",
+  "sets_other": "{{count}} sets",
+  "frames_one": "{{count}} frame",
+  "frames_other": "{{count}} frames",
+  "start": "Solve & Queue Flats",
+  "selectOne": "Select at least one camera/filter combination with frames.",
+  "startFailed": "Failed to start the flat wizard",
+  "noWheelOnPath": "no filter wheel on its optical path",
+  "noWheel": "No filter wheel",
+  "noFilter": "no filter",
+  "camerasFilters": "Cameras & filters",
+  "noCamera": "No camera connected",
+  "gain": "Gain",
+  "gainPlaceholder": "driver default",
+  "framesUnit": "frames",
+  "target": {
+    "title": "Target",
+    "fullWell": "Target full well (mean)",
+    "tolerance": "Tolerance",
+    "saturation": "Saturation guard",
+    "saturationHint": "% — treat as clipped above this"
+  },
+  "trial": {
+    "title": "Trial exposures",
+    "start": "Starting duration",
+    "max": "Max duration (safety cap)",
+    "binning": "Binning",
+    "attempts": "Max attempts"
+  },
+  "live": {
+    "title": "Live trials",
+    "none": "No trials yet",
+    "saturated": "saturated"
+  },
+  "results": {
+    "title": "Results",
+    "none": "No results yet",
+    "trials_one": "{{duration}}s ({{count}} trial)",
+    "trials_other": "{{duration}}s ({{count}} trials)",
+    "queued": "Queued on the sequencer (task {{id}})"
+  }
+}

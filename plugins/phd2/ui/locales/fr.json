@@ -1,0 +1,63 @@
+{
+  "label": "Guidage",
+  "manifest": {
+    "name": "Guidage PHD2",
+    "description": "Intégration de l'autoguidage PHD2 — état de connexion en direct, métriques de guidage, graphique de guidage et dithering automatique configurable entre les images."
+  },
+  "state": {
+    "guiding": "Guidage",
+    "paused": "En pause",
+    "star_loss": "Étoile perdue",
+    "calibrating": "Calibration",
+    "stopped": "Arrêté",
+    "looping": "Boucle",
+    "selected": "Étoile sélectionnée",
+    "settling": "Stabilisation",
+    "unknown": "Inconnu",
+    "disconnected": "Déconnecté"
+  },
+  "chip": {
+    "guiding": "Guidage{{rms}}",
+    "calibrating": "Calibration",
+    "dithering": "Dithering",
+    "connected": "Connecté"
+  },
+  "title": "Guidage PHD2",
+  "connect": "Connecter",
+  "disconnect": "Déconnecter",
+  "settingsTitle": "Réglages du graphique et du débogage",
+  "settings": {
+    "host": "Hôte PHD2",
+    "port": "Port PHD2",
+    "saving": "Enregistrement…",
+    "scale": "Échelle verticale du graphique",
+    "samples": "Échantillons affichés",
+    "debug": "Journal de débogage PHD2",
+    "debugHint": "Affiche le trafic JSON-RPC brut dans la console du serveur"
+  },
+  "graph": {
+    "title": "Erreur de guidage (arcsec)",
+    "none": "Aucune donnée de guidage",
+    "ra": "AD",
+    "dec": "Dec",
+    "rms": "RMS moy."
+  },
+  "metrics": {
+    "rmsRa": "RMS AD",
+    "rmsDec": "RMS Dec",
+    "rmsAvg": "RMS moyen",
+    "snr": "SNR de l'étoile",
+    "pixelScale": "Échelle de pixel"
+  },
+  "controls": {
+    "guide": "Guider",
+    "resume": "Reprendre",
+    "pause": "Pause",
+    "stop": "Stop",
+    "dither": "Dither",
+    "dithering": "Dithering…",
+    "ditherBusy": "Dither déjà en cours",
+    "ditherOnce": "Un dither"
+  },
+  "notConnected": "PHD2 non connecté. Configurez l'hôte et le port dans Options → Réglages, puis cliquez sur Connecter."
+}

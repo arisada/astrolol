@@ -1,8 +1,10 @@
+import { useTranslation } from 'react-i18next'
 import { useStore } from '@/store'
 import { Chip } from '@/components/ui/badge'
 import type { FlatWizardLiveState } from './state'
 
 export function FlatWizardChip() {
+  const { t } = useTranslation('flat_wizard')
   const fw = useStore((s) => s.pluginStates['flat_wizard'] as FlatWizardLiveState | null | undefined)
   if (!fw) return null
 
@@ -11,8 +13,8 @@ export function FlatWizardChip() {
   const last = fw.trials[fw.trials.length - 1]
   const progress = fw.totalFilters > 0 ? `${fw.liveResults.length}/${fw.totalFilters}` : ''
   const latest = last
-    ? ` · ${last.filterName ?? last.cameraId} ${last.ratioPct.toFixed(0)}%${last.saturated ? ' (sat)' : ''}`
+    ? ` · ${last.filterName ?? last.cameraId} ${last.ratioPct.toFixed(0)}%${last.saturated ? ` (${t('chip.saturated')})` : ''}`
     : ''
 
-  return <Chip label="Flats" status={`${progress}${latest}`} variant="violet" pulse />
+  return <Chip label={t('chip.label')} status={`${progress}${latest}`} variant="violet" pulse />
 }

@@ -1,0 +1,83 @@
+{
+  "label": "EQMOD",
+  "manifest": {
+    "name": "EQMOD Mount",
+    "description": "Native (non-INDI) driver for Sky-Watcher mounts over the motor controller protocol (EQMOD cable or built-in USB): GoTo, sync, tracking, parking and pulse guiding. Includes a mount emulator ('eqmod_sim') and an INDI mount proxy so PHD2 and other INDI clients can use the mount through indiserver."
+  },
+  "flags": {
+    "running": "running",
+    "tracking_mode": "speed mode",
+    "fast": "high speed",
+    "ccw": "CCW",
+    "blocked": "blocked",
+    "initialized": "initialized",
+    "level_switch": "level switch"
+  },
+  "axis": {
+    "title": "{{name}} axis",
+    "reversed": "{{name}} axis (reversed)",
+    "cpr": "CPR",
+    "ratio": "High-speed ratio",
+    "counts": "Position (counts)",
+    "degrees": "Position (deg from home)",
+    "period": "Step period (T1)",
+    "extended": "Extended status"
+  },
+  "mount": {
+    "baud": "{{port}} @ {{baud}} baud",
+    "board": "Board version",
+    "timer": "Timer frequency",
+    "tracking": "Tracking",
+    "off": "off",
+    "nudging": "Nudging",
+    "guideRate": "Guide rate",
+    "guideRateValue": "{{rate}}x sidereal",
+    "pulse": "Guide pulse",
+    "meridian": "Meridian limit",
+    "meridianValue": "{{deg}}° past the meridian",
+    "margin": "RA margin to limit",
+    "beyond": "beyond by {{deg}}°",
+    "site": "Site",
+    "noSite": "none (no Site in active profile)",
+    "parked": "Parked",
+    "yes": "yes",
+    "no": "no",
+    "park": "Park position (counts)",
+    "sync": "Sync offset",
+    "syncValue": "RA {{ra}} min, Dec {{dec}}°",
+    "noSync": "none (not synced)"
+  },
+  "settings": {
+    "title": "Settings",
+    "led": "Polar scope LED",
+    "proxy": "INDI mount proxy",
+    "apiUrl": "astrolol API URL (from the proxy)",
+    "save": "Save",
+    "saving": "Saving…",
+    "proxyState": {
+      "disabled": "disabled",
+      "unavailable": "INDI support unavailable",
+      "loaded": "loaded in indiserver",
+      "registered": "registered, not loaded yet",
+      "pending": "registered: loads when indiserver starts (first INDI device)"
+    },
+    "help1": "Publishes the connected mount on astrolol's indiserver as <m>{{name}}</m> (a relay to astrolol's REST API, not a real mount driver).",
+    "help2": "PHD2: connect to this machine's indiserver (port 7624), pick your INDI guide camera, and pick <m>astrolol Mount Proxy</m> as the mount. Guide pulses run at the mount's guide rate (connect param <m>guide_rate</m>, 0.5x sidereal by default).",
+    "help3": "INDI drivers that snoop a telescope (e.g. the CCD simulator's star field, or FITS headers): set their active telescope to <m>astrolol Mount Proxy</m>."
+  },
+  "bt": {
+    "title": "Connect over Bluetooth",
+    "intro": "Pair the mount's Bluetooth serial adapter first on the <m>Bluetooth Serial</m> plugin page, then apply it below.",
+    "noMount": "No <m>eqmod</m> mount in your inventory yet — add one from Equipment first.",
+    "apply": "Apply",
+    "applying": "Applying…",
+    "appliesTo": "Applies to <m>{{name}}</m>",
+    "currently": " — currently set to the paired device <m>{{id}}</m>",
+    "saved": "Saved. Reconnect the mount (or reload the profile) for it to take effect."
+  },
+  "page": {
+    "title": "EQMOD",
+    "none": "No real eqmod mount connected.",
+    "howto": "Equipment → Load driver → Mount → Other adapter → <m>eqmod</m>, with params <m>{{params}}</m>. Add <m>\"baudrate\"</m> to skip auto-detection (9600 for an EQMOD cable, 115200 for the AZ-EQ6 built-in USB), and <m>\"ra_reverse\"</m> / <m>\"dec_reverse\"</m> if a nudge moves the wrong way."
+  }
+}

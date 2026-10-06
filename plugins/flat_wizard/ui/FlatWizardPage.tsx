@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Sun, StopCircle } from 'lucide-react'
 import { api } from '@/api/client'
 import * as flatWizardApi from './api'
@@ -80,6 +81,7 @@ interface CameraPlan {
 }
 
 export function FlatWizardPage() {
+  const { t } = useTranslation('flat_wizard')
   const connectedDevices = useStore((s) => s.connectedDevices)
   const live = useStore((s) => s.pluginStates['flat_wizard'] as FlatWizardLiveState | null | undefined)
 
@@ -123,7 +125,7 @@ export function FlatWizardPage() {
       hasOpticalPath: path != null,
       // A wheel with no readable filter names can't be driven by name — single pass.
       wheelId: names.length ? wheelId : null,
-      wheelLabel: wheelId ?? (path ? 'no filter wheel on its optical path' : 'no filter wheel'),
+      wheelLabel: wheelId ?? (path ? t('noWheelOnPath') : t('noWheel').toLowerCase()),
       filterNames: names.length ? names : [null],
     }
   })
@@ -200,7 +202,7 @@ export function FlatWizardPage() {
   }, [fetchRun])
 
   const handleStart = useCallback(async () => {
-    if (cameraSpecs.length === 0) { setError('Select at least one camera/filter combination with frames.'); return }
+    if (cameraSpecs.length === 0) { setError(t('selectOne')); return }
     setError(null)
     setBusy(true)
     setRun(null)
@@ -213,9 +215,9 @@ export function FlatWizardPage() {
       pollRef.current = setInterval(fetchRun, 1500)
     } catch (err) {
       setBusy(false)
-      setError(err instanceof Error ? err.message : 'Failed to start the flat wizard')
+      setError(err instanceof Error ? err.message : t('startFailed'))
     }
-  }, [cameraSpecs, settings, fetchRun])
+  }, [cameraSpecs, settings, fetchRun, t])
 
   const handleAbort = useCallback(async () => {
     try { await flatWizardApi.abort(); await fetchRun() }
@@ -229,19 +231,19 @@ export function FlatWizardPage() {
         <div className="flex items-center gap-2 text-slate-200">
           <Sun size={16} />
           <h2 className="text-sm font-medium">Flat Wizard</h2>
-          {run && <StatusPill variant={RUN_PILL_VARIANT[run.status]} status={run.status} />}
+          {run && <StatusPill variant={RUN_PILL_VARIANT[run.status]} status={t(`status.${run.status}`)} />}
         </div>
         {busy ? (
           <Button size="sm" variant="danger" onClick={handleAbort}>
-            <StopCircle size={14} className="mr-1.5" /> Abort
+            <StopCircle size={14} className="mr-1.5" /> {t('abort')}
           </Button>
         ) : (
           <div className="flex items-center gap-3">
             <span className="text-xs text-slate-500">
-              {cameraSpecs.length} camera{cameraSpecs.length === 1 ? '' : 's'} · {comboCount} set{comboCount === 1 ? '' : 's'} · {frameCount} frames
+              {t('summary', { cameras: t('cameras', { count: cameraSpecs.length }), sets: t('sets', { count: comboCount }), frames: t('frames', { count: frameCount }) })}
             </span>
             <Button size="sm" onClick={handleStart} disabled={comboCount === 0}>
-              Solve &amp; Queue Flats
+              {t('start')}
             </Button>
           </div>
         )}
@@ -251,9 +253,9 @@ export function FlatWizardPage() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-0 flex-1">
         <div>
-          <SidebarSection title="Cameras & filters">
+          <SidebarSection title={t('camerasFilters')}>
             {plans.length === 0 ? (
-              <span className="text-xs text-slate-600">No camera connected</span>
+              <span className="text-xs text-slate-600">{t('noCamera')}</span>
             ) : (
               <div className="flex flex-col gap-4">
                 {plans.map((p) => (
@@ -274,16 +276,16 @@ export function FlatWizardPage() {
                           value={p.choice.manualWheelId} disabled={busy || !p.choice.enabled}
                           onChange={(e) => patchCamera(p.cameraId, { manualWheelId: e.target.value })}
                           className="rounded bg-surface-overlay border border-surface-border px-1.5 py-0.5 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-accent">
-                          <option value="">No filter wheel</option>
+                          <option value="">{t('noWheel')}</option>
                           {filterWheels.map((d) => <option key={d.device_id} value={d.device_id}>{d.device_id}</option>)}
                         </select>
                       )}
                       <div className="flex items-center gap-1.5 ml-auto">
-                        <span className="text-xs text-slate-400">Gain</span>
+                        <span className="text-xs text-slate-400">{t('gain')}</span>
                         <Input
                           inputSize="sm" type="number" min={0} disabled={busy || !p.choice.enabled}
                           value={p.choice.gain ?? ''}
-                          placeholder="driver default"
+                          placeholder={t('gainPlaceholder')}
                           onChange={(e) => patchCamera(p.cameraId, {
                             gain: e.target.value === '' ? null : Math.max(0, parseInt(e.target.value, 10) || 0),
                           })}
@@ -303,15 +305,15 @@ export function FlatWizardPage() {
                                 checked={c.enabled}
                                 onChange={(e) => patchCombo(p.cameraId, name, { enabled: e.target.checked })}
                               />
-                              <span className="text-xs text-slate-300 font-mono truncate" title={name ?? 'no filter'}>
-                                {name ?? 'no filter'}
+                              <span className="text-xs text-slate-300 font-mono truncate" title={name ?? t('noFilter')}>
+                                {name ?? t('noFilter')}
                               </span>
                             </label>
                             <CountStepper
                               value={c.count} disabled={off || !c.enabled}
                               onChange={(v) => patchCombo(p.cameraId, name, { count: v })}
                             />
-                            <span className="text-xs text-slate-500">frames</span>
+                            <span className="text-xs text-slate-500">{t('framesUnit')}</span>
                           </div>
                         )
                       })}
@@ -322,10 +324,10 @@ export function FlatWizardPage() {
             )}
           </SidebarSection>
 
-          <SidebarSection title="Target">
+          <SidebarSection title={t('target.title')}>
             <div className="flex flex-col gap-3">
               <div className="flex items-center gap-2">
-                <span className="text-xs text-slate-400 w-36">Target full well (mean)</span>
+                <span className="text-xs text-slate-400 w-36">{t('target.fullWell')}</span>
                 <Input
                   inputSize="sm" type="number" min={1} max={99} disabled={busy}
                   value={settings.target_pct}
@@ -335,7 +337,7 @@ export function FlatWizardPage() {
                 <span className="text-xs text-slate-500">%</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-xs text-slate-400 w-28">Tolerance</span>
+                <span className="text-xs text-slate-400 w-28">{t('target.tolerance')}</span>
                 <Input
                   inputSize="sm" type="number" min={1} max={40} disabled={busy}
                   value={settings.tolerance_pct}
@@ -345,28 +347,28 @@ export function FlatWizardPage() {
                 <span className="text-xs text-slate-500">% ±</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-xs text-slate-400 w-28">Saturation guard</span>
+                <span className="text-xs text-slate-400 w-28">{t('target.saturation')}</span>
                 <Input
                   inputSize="sm" type="number" min={50} max={100} disabled={busy}
                   value={settings.saturation_pct}
                   onChange={(e) => patchSettings('saturation_pct', Math.min(100, Math.max(50, parseFloat(e.target.value) || 0)))}
                   className="w-16"
                 />
-                <span className="text-xs text-slate-500">% — treat as clipped above this</span>
+                <span className="text-xs text-slate-500">{t('target.saturationHint')}</span>
               </div>
             </div>
           </SidebarSection>
 
-          <SidebarSection title="Trial exposures">
+          <SidebarSection title={t('trial.title')}>
             <div className="flex flex-col gap-3">
               <DurationStepper steps={SEED_DURATION_STEPS} value={settings.seed_duration}
-                onChange={(v) => patchSettings('seed_duration', v)} label="Starting duration" />
+                onChange={(v) => patchSettings('seed_duration', v)} label={t('trial.start')} />
               <DurationStepper steps={MAX_DURATION_STEPS} value={settings.max_duration}
-                onChange={(v) => patchSettings('max_duration', v)} label="Max duration (safety cap)" />
+                onChange={(v) => patchSettings('max_duration', v)} label={t('trial.max')} />
               <PillGroup options={BINNINGS} value={settings.binning}
-                onChange={(v) => patchSettings('binning', v)} label="Binning" />
+                onChange={(v) => patchSettings('binning', v)} label={t('trial.binning')} />
               <div className="flex items-center gap-2">
-                <span className="text-xs text-slate-400 w-28">Max attempts</span>
+                <span className="text-xs text-slate-400 w-28">{t('trial.attempts')}</span>
                 <Input
                   inputSize="sm" type="number" min={1} max={20} disabled={busy}
                   value={settings.max_attempts}
@@ -379,51 +381,51 @@ export function FlatWizardPage() {
         </div>
 
         <div className="border-l border-surface-border">
-          <SidebarSection title="Live trials">
+          <SidebarSection title={t('live.title')}>
             {live && live.trials.length > 0 ? (
               <div className="flex flex-col gap-1 max-h-64 overflow-y-auto">
-                {live.trials.slice().reverse().map((t, i) => (
-                  <div key={i} className={`flex items-center gap-2 text-xs font-mono px-1.5 py-1 rounded ${t.saturated ? 'bg-rose-500/10 text-rose-300' : 'bg-surface-overlay text-slate-300'}`}>
-                    <span className="w-28 truncate" title={t.cameraId}>
-                      {plans.length > 1 ? `${t.cameraId} · ` : ''}{t.filterName ?? 'no filter'}
+                {live.trials.slice().reverse().map((tr, i) => (
+                  <div key={i} className={`flex items-center gap-2 text-xs font-mono px-1.5 py-1 rounded ${tr.saturated ? 'bg-rose-500/10 text-rose-300' : 'bg-surface-overlay text-slate-300'}`}>
+                    <span className="w-28 truncate" title={tr.cameraId}>
+                      {plans.length > 1 ? `${tr.cameraId} · ` : ''}{tr.filterName ?? t('noFilter')}
                     </span>
-                    <span className="text-slate-500">#{t.attempt}</span>
-                    <span>{t.duration.toFixed(3)}s</span>
-                    <span>{t.ratioPct.toFixed(1)}%</span>
-                    {t.saturated && <span className="text-rose-400">saturated</span>}
+                    <span className="text-slate-500">#{tr.attempt}</span>
+                    <span>{tr.duration.toFixed(3)}s</span>
+                    <span>{tr.ratioPct.toFixed(1)}%</span>
+                    {tr.saturated && <span className="text-rose-400">{t('live.saturated')}</span>}
                   </div>
                 ))}
               </div>
             ) : (
-              <span className="text-xs text-slate-600">No trials yet</span>
+              <span className="text-xs text-slate-600">{t('live.none')}</span>
             )}
           </SidebarSection>
 
-          <SidebarSection title="Results">
+          <SidebarSection title={t('results.title')}>
             {run && run.results.length > 0 ? (
               <div className="flex flex-col gap-2">
                 {run.results.map((r, i) => (
                   <div key={i} className="flex items-start gap-2 text-xs">
-                    <StatusPill variant={RESULT_PILL_VARIANT[r.status]} status={r.status} />
+                    <StatusPill variant={RESULT_PILL_VARIANT[r.status]} status={t(`status.${r.status}`)} />
                     <div className="flex-1">
                       <div className="text-slate-300 font-mono">
-                        {r.camera_id} · {r.filter_name ?? 'no filter'}
+                        {r.camera_id} · {r.filter_name ?? t('noFilter')}
                       </div>
                       {r.status === 'solved'
-                        ? <div className="text-slate-500">{r.solved_duration?.toFixed(3)}s ({r.trials.length} trials)</div>
+                        ? <div className="text-slate-500">{t('results.trials', { duration: r.solved_duration?.toFixed(3), count: r.trials.length })}</div>
                         : <div className="text-rose-400">{r.error}</div>}
                     </div>
                   </div>
                 ))}
                 {run.task_id && (
-                  <div className="text-xs text-emerald-400 mt-1">Queued on the sequencer (task {run.task_id.slice(0, 8)})</div>
+                  <div className="text-xs text-emerald-400 mt-1">{t('results.queued', { id: run.task_id.slice(0, 8) })}</div>
                 )}
                 {run.status === 'failed' && !run.task_id && (
                   <div className="text-xs text-rose-400 mt-1">{run.error}</div>
                 )}
               </div>
             ) : (
-              <span className="text-xs text-slate-600">No results yet</span>
+              <span className="text-xs text-slate-600">{t('results.none')}</span>
             )}
           </SidebarSection>
         </div>

@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Crosshair, Pause, Play, Settings, Square, Target, Wifi, WifiOff } from 'lucide-react'
 import { useStore } from '@/store'
 import { Button } from '@/components/ui/button'
@@ -51,6 +52,7 @@ function GuideGraph({ points, range, rmsTotal }: {
   range: number
   rmsTotal: number | null | undefined
 }) {
+  const { t } = useTranslation('phd2')
   const wrapRef = useRef<HTMLDivElement>(null)
   const [W, setW] = useState(400)
 
@@ -68,7 +70,7 @@ function GuideGraph({ points, range, rmsTotal }: {
   if (points.length === 0) {
     return (
       <div ref={wrapRef} className="flex items-center justify-center h-24 text-xs text-slate-600">
-        No guide data
+        {t('graph.none')}
       </div>
     )
   }
@@ -103,8 +105,8 @@ function GuideGraph({ points, range, rmsTotal }: {
   if (n > 1) {
     const tLast = Date.parse(points[n - 1].ts)
     const numTicks = Math.min(5, n)
-    for (let t = 0; t < numTicks; t++) {
-      const idx   = Math.round(t * (n - 1) / (numTicks - 1))
+    for (let k = 0; k < numTicks; k++) {
+      const idx   = Math.round(k * (n - 1) / (numTicks - 1))
       const secsAgo = (tLast - Date.parse(points[idx].ts)) / 1000
       xTicks.push({ x: toX(idx), label: fmtAgo(secsAgo) })
     }
@@ -165,10 +167,10 @@ function GuideGraph({ points, range, rmsTotal }: {
         ))}
 
         {/* Legend */}
-        <text x={MARGIN_L + 4}  y={10} fontSize="9" fill="#60a5fa">RA</text>
-        <text x={MARGIN_L + 22} y={10} fontSize="9" fill="#f87171">Dec</text>
+        <text x={MARGIN_L + 4}  y={10} fontSize="9" fill="#60a5fa">{t('graph.ra')}</text>
+        <text x={MARGIN_L + 22} y={10} fontSize="9" fill="#f87171">{t('graph.dec')}</text>
         {rmsY != null && (
-          <text x={MARGIN_L + 44} y={10} fontSize="9" fill="#94a3b8">RMS avg</text>
+          <text x={MARGIN_L + 44} y={10} fontSize="9" fill="#94a3b8">{t('graph.rms')}</text>
         )}
       </svg>
     </div>
@@ -178,6 +180,7 @@ function GuideGraph({ points, range, rmsTotal }: {
 // ── Status badge ──────────────────────────────────────────────────────────────
 
 function StateBadge({ state, connected }: { state: string; connected: boolean }) {
+  const { t } = useTranslation('phd2')
   const colour = !connected
     ? 'text-slate-500 border-slate-700'
     : state === 'Guiding'
@@ -190,7 +193,7 @@ function StateBadge({ state, connected }: { state: string; connected: boolean })
 
   return (
     <span className={`text-xs font-mono px-2 py-0.5 rounded border ${colour}`}>
-      {connected ? state : 'Disconnected'}
+      {connected ? t(`state.${state.toLowerCase().replace(' ', '_')}`, { defaultValue: state }) : t('state.disconnected')}
     </span>
   )
 }
@@ -213,6 +216,7 @@ function Metric({ label, value, unit }: { label: string; value: number | null | 
 // TODO: audit Connect/Disconnect button style against Equipment page for consistency
 
 export function Phd2Page() {
+  const { t } = useTranslation('phd2')
   const allGuidePoints = useStore((s) => (s.pluginStates['phd2'] as Phd2PluginState | null)?.guidePoints ?? [])
   const status         = useStore((s) => (s.pluginStates['phd2'] as Phd2PluginState | null)?.status ?? null)
 
@@ -308,7 +312,7 @@ export function Phd2Page() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Crosshair size={20} className="text-accent" />
-          <h1 className="text-base font-semibold text-slate-200">PHD2 Guiding</h1>
+          <h1 className="text-base font-semibold text-slate-200">{t('title')}</h1>
           {status && <StateBadge state={status.state} connected={status.connected} />}
         </div>
         <div className="flex items-center gap-2">
@@ -318,15 +322,15 @@ export function Phd2Page() {
             onClick={() => act(connected ? phd2Api.disconnect : phd2Api.connect)}
           >
             {connected
-              ? <><WifiOff size={12} className="mr-1" /> Disconnect</>
-              : <><Wifi size={12} className="mr-1" /> Connect</>
+              ? <><WifiOff size={12} className="mr-1" /> {t('disconnect')}</>
+              : <><Wifi size={12} className="mr-1" /> {t('connect')}</>
             }
           </Button>
           <Button
             size="icon"
             variant="ghost"
             onClick={() => setShowSettings((v) => !v)}
-            title="Graph & debug settings"
+            title={t('settingsTitle')}
             className={showSettings ? 'text-accent' : ''}
           >
             <Settings size={15} />
@@ -338,7 +342,7 @@ export function Phd2Page() {
       {showSettings && (
         <Card className="p-3 bg-surface-raised flex flex-col gap-3">
           <div className="flex items-center justify-between">
-            <span className="text-xs text-slate-400">PHD2 host</span>
+            <span className="text-xs text-slate-400">{t('settings.host')}</span>
             <Input
               inputSize="sm"
               className="!w-36"
@@ -348,7 +352,7 @@ export function Phd2Page() {
             />
           </div>
           <div className="flex items-center justify-between">
-            <span className="text-xs text-slate-400">PHD2 port</span>
+            <span className="text-xs text-slate-400">{t('settings.port')}</span>
             <Input
               inputSize="sm"
               type="number"
@@ -358,10 +362,10 @@ export function Phd2Page() {
               onBlur={savePhd2Settings}
             />
           </div>
-          {settingsSaving && <span className="text-xs text-slate-500">Saving…</span>}
+          {settingsSaving && <span className="text-xs text-slate-500">{t('settings.saving')}</span>}
           <div className="border-t border-surface-border" />
           <div className="flex items-center justify-between">
-            <span className="text-xs text-slate-400">Graph vertical scale</span>
+            <span className="text-xs text-slate-400">{t('settings.scale')}</span>
             <select
               className="rounded bg-surface-overlay border border-surface-border px-2 py-1 text-xs text-slate-200 focus:outline-none"
               value={graphRange}
@@ -373,7 +377,7 @@ export function Phd2Page() {
             </select>
           </div>
           <div className="flex items-center justify-between">
-            <span className="text-xs text-slate-400">Samples shown</span>
+            <span className="text-xs text-slate-400">{t('settings.samples')}</span>
             <select
               className="rounded bg-surface-overlay border border-surface-border px-2 py-1 text-xs text-slate-200 focus:outline-none"
               value={maxSamples}
@@ -386,29 +390,29 @@ export function Phd2Page() {
           </div>
           <div className="flex items-center justify-between">
             <div>
-              <p className="text-xs text-slate-400">PHD2 debug logging</p>
-              <p className="text-xs text-slate-600">Prints raw JSON-RPC traffic to the server console</p>
+              <p className="text-xs text-slate-400">{t('settings.debug')}</p>
+              <p className="text-xs text-slate-600">{t('settings.debugHint')}</p>
             </div>
-            <ToggleSwitch checked={debugEnabled} onChange={toggleDebug} label="PHD2 debug logging" />
+            <ToggleSwitch checked={debugEnabled} onChange={toggleDebug} label={t('settings.debug')} />
           </div>
         </Card>
       )}
 
       {/* Guide graph — full available width */}
       <div className="border border-surface-border rounded p-3 bg-surface-raised">
-        <p className="text-xs text-slate-500 mb-2">Guide error (arcsec)</p>
+        <p className="text-xs text-slate-500 mb-2">{t('graph.title')}</p>
         <GuideGraph points={guidePoints} range={graphRange} rmsTotal={status?.rms_total} />
       </div>
 
       {/* Metrics */}
       <div className="border border-surface-border rounded p-3 bg-surface-raised flex flex-col gap-1.5">
-        <Metric label="RMS RA"      value={status?.rms_ra}    unit={'"'} />
-        <Metric label="RMS Dec"     value={status?.rms_dec}   unit={'"'} />
-        <Metric label="RMS average" value={status?.rms_total} unit={'"'} />
+        <Metric label={t('metrics.rmsRa')}      value={status?.rms_ra}    unit={'"'} />
+        <Metric label={t('metrics.rmsDec')}     value={status?.rms_dec}   unit={'"'} />
+        <Metric label={t('metrics.rmsAvg')} value={status?.rms_total} unit={'"'} />
         <div className="border-t border-surface-border my-1" />
-        <Metric label="Star SNR" value={status?.star_snr} />
+        <Metric label={t('metrics.snr')} value={status?.star_snr} />
         <div className="flex items-center justify-between">
-          <span className="text-xs text-slate-500">Pixel scale</span>
+          <span className="text-xs text-slate-500">{t('metrics.pixelScale')}</span>
           <span className="text-xs font-mono text-slate-200">
             {status?.pixel_scale != null ? `${status.pixel_scale.toFixed(2)}" /px` : '—'}
           </span>
@@ -423,7 +427,7 @@ export function Phd2Page() {
             onClick={() => act(() => phd2Api.guide())}
             disabled={!connected || (guiding && !paused)}
           >
-            <Play size={12} className="mr-1" /> Guide
+            <Play size={12} className="mr-1" /> {t('controls.guide')}
           </Button>
 
           <Button
@@ -433,8 +437,8 @@ export function Phd2Page() {
             disabled={!connected || (!guiding && !paused)}
           >
             {paused
-              ? <><Play size={12} className="mr-1" /> Resume</>
-              : <><Pause size={12} className="mr-1" /> Pause</>
+              ? <><Play size={12} className="mr-1" /> {t('controls.resume')}</>
+              : <><Pause size={12} className="mr-1" /> {t('controls.pause')}</>
             }
           </Button>
 
@@ -444,7 +448,7 @@ export function Phd2Page() {
             onClick={() => act(phd2Api.stop)}
             disabled={!connected || (!guiding && !paused)}
           >
-            <Square size={12} className="mr-1" /> Stop
+            <Square size={12} className="mr-1" /> {t('controls.stop')}
           </Button>
 
           <Button
@@ -452,10 +456,10 @@ export function Phd2Page() {
             variant="outline"
             onClick={() => act(() => phd2Api.dither())}
             disabled={!connected || !guiding || dithering}
-            title={dithering ? 'Dither already in progress' : 'Dither once'}
+            title={dithering ? t('controls.ditherBusy') : t('controls.ditherOnce')}
           >
             <Target size={12} className="mr-1" />
-            {dithering ? 'Dithering…' : 'Dither'}
+            {dithering ? t('controls.dithering') : t('controls.dither')}
           </Button>
         </div>
         {error && <p className="text-xs text-status-error">{error}</p>}
@@ -463,7 +467,7 @@ export function Phd2Page() {
 
       {!connected && (
         <p className="text-xs text-slate-500">
-          PHD2 not connected. Configure host/port in Options → Settings, then click Connect.
+          {t('notConnected')}
         </p>
       )}
     </div>
