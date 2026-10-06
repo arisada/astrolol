@@ -142,6 +142,13 @@ class BlueZBackend:
         return found
 
     async def pair(self, mac: str, pin: str | None) -> tuple[str, int]:
+        """Pair + trust only. Deliberately does NOT call Device1.Connect():
+        that asks BlueZ to connect every profile the device advertises, which
+        fails outright (``br-connection-profile-unavailable``) for a bare SPP
+        module that exposes nothing else. We don't need a BlueZ-level
+        connection anyway -- the RFCOMM link itself is opened directly as a
+        raw socket in ``open_socket``, independent of Device1's connect state.
+        """
         await self._ensure_agent()
         if pin is not None:
             self._pending_pins[mac.upper()] = pin
@@ -151,7 +158,6 @@ class BlueZBackend:
             if not paired:
                 await device.call_pair()
             await props.call_set("org.bluez.Device1", "Trusted", _bool_variant(True))
-            await device.call_connect()
             name = (await props.call_get("org.bluez.Device1", "Alias")).value
         finally:
             self._pending_pins.pop(mac.upper(), None)
