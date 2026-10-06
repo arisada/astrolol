@@ -28,6 +28,8 @@ from plugins.eqmod.protocol import (
     SkywatcherProtocol,
     step_period_for_rate,
 )
+from astrolol.devices.bluetooth.manager import BluetoothManager
+from astrolol.devices.bluetooth.transport import BluetoothRfcommTransport
 from plugins.eqmod.transport import SerialTransport, detect_baudrate
 
 logger = structlog.get_logger()
@@ -90,21 +92,29 @@ class EqmodMount:
         self,
         port: str | None = None,
         baudrate: int | None = None,
+        bluetooth_device_id: str | None = None,
         ra_reverse: bool = False,
         dec_reverse: bool = False,
         guide_rate: float = DEFAULT_GUIDE_RATE,
         meridian_limit_deg: float = DEFAULT_MERIDIAN_LIMIT_DEG,
         state_key: str | None = None,
         transport_factory: Callable[[str, int], Any] = SerialTransport,
+        bluetooth_manager: "BluetoothManager | None" = None,
+        bluetooth_transport_factory: Callable[["BluetoothManager", str], Any] = BluetoothRfcommTransport,
         **_kwargs: object,
     ) -> None:
         self._guide_rate = float(guide_rate)
         self._meridian_limit_deg = float(meridian_limit_deg)
         self._port = port
+        self._bluetooth_device_id = bluetooth_device_id
+        self._bluetooth_manager = bluetooth_manager
         self._requested_baudrate = baudrate
         self._reverse = {Axis.RA: bool(ra_reverse), Axis.DEC: bool(dec_reverse)}
-        self._state_key = state_key or (Path(port).name if port else "eqmod")
+        self._state_key = state_key or (
+            Path(port).name if port else bluetooth_device_id or "eqmod"
+        )
         self._transport_factory = transport_factory
+        self._bluetooth_transport_factory = bluetooth_transport_factory
         self._transport: Any = None
         self._proto: SkywatcherProtocol | None = None
         self._baudrate: int | None = None
@@ -132,13 +142,24 @@ class EqmodMount:
     # --- Lifecycle ---
 
     async def connect(self) -> None:
-        if not self._port:
-            raise ValueError('eqmod needs a "port" connect param, e.g. {"port": "/dev/ttyUSB0"}')
+        if not self._port and not self._bluetooth_device_id:
+            raise ValueError(
+                'eqmod needs either a "port" connect param (e.g. {"port": "/dev/ttyUSB0"}) or a '
+                '"bluetooth_device_id" (pick one from the Bluetooth Serial plugin page, then its '
+                'id from the mount\'s connection panel)'
+            )
         if not MIN_GUIDE_RATE <= self._guide_rate <= MAX_GUIDE_RATE:
             raise ValueError(f"guide_rate must be between {MIN_GUIDE_RATE} and {MAX_GUIDE_RATE} (x sidereal)")
         _check_meridian_limit(self._meridian_limit_deg)
-        baudrate = self._requested_baudrate or await detect_baudrate(self._port)
-        transport = self._transport_factory(self._port, baudrate)
+        baudrate: int | None
+        if self._bluetooth_device_id:
+            if self._bluetooth_manager is None:
+                raise ValueError("eqmod: Bluetooth support is not wired up (no BluetoothManager)")
+            transport = self._bluetooth_transport_factory(self._bluetooth_manager, self._bluetooth_device_id)
+            baudrate = None  # RFCOMM is a reliable byte stream; no baud negotiation applies
+        else:
+            baudrate = self._requested_baudrate or await detect_baudrate(self._port)
+            transport = self._transport_factory(self._port, baudrate)
         await transport.open()
         proto = SkywatcherProtocol(transport)
         try:
@@ -530,6 +551,7 @@ class EqmodMount:
         return {
             "port": self._port,
             "baudrate": self._baudrate,
+            "bluetooth_device_id": self._bluetooth_device_id,
             "board_version": f"{self._board_version:06X}" if self._board_version is not None else None,
             "timer_freq": self._timer_freq,
             "tracking": self._tracking,

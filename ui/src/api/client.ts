@@ -23,6 +23,7 @@ import type {
   MountStatus,
   MountTarget,
   OpticalPath,
+  PairedSerialDevice,
   PluginInfo,
   Profile,
   SetPropertyRequest,
@@ -71,6 +72,13 @@ export const api = {
         method: 'POST',
         body: JSON.stringify(body),
       }),
+  },
+
+  // Read-only: scanning/pairing/forgetting is owned by the bluetooth_serial plugin.
+  // Exposed from core so any adapter's connection UI (e.g. eqmod) can list paired
+  // devices without depending on that plugin.
+  bluetooth: {
+    paired: () => request<PairedSerialDevice[]>('/devices/bluetooth/paired'),
   },
 
   imager: {

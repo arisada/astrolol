@@ -19,6 +19,7 @@ from fastapi.exceptions import HTTPException
 from fastapi.responses import JSONResponse
 
 from astrolol.api.static import mount_ui
+from astrolol.api.bluetooth import router as bluetooth_router
 from astrolol.api.devices import router as devices_router
 from astrolol.api.filter_wheel import router as filter_wheel_router
 from astrolol.api.focuser import router as focuser_router
@@ -40,6 +41,9 @@ from astrolol.app import (
 )
 from astrolol.core.events import EventBus
 from astrolol.core.plugin_api import LogScope, PluginContext
+from astrolol.devices.bluetooth.backend import BlueZBackend
+from astrolol.devices.bluetooth.manager import BluetoothManager
+from astrolol.devices.bluetooth.store import BluetoothDeviceStore
 from astrolol.devices.manager import DeviceManager
 from astrolol.filter_wheel import FilterWheelManager
 from astrolol.focuser import FocuserManager
@@ -118,11 +122,15 @@ def create_app() -> FastAPI:
     imager_manager = ImagerManager(device_manager=device_manager, event_bus=event_bus, profile_store=profile_store, equipment_store=equipment_store, mount_manager=mount_manager)
     focuser_manager = FocuserManager(device_manager=device_manager, event_bus=event_bus)
     filter_wheel_manager = FilterWheelManager(device_manager=device_manager, event_bus=event_bus)
+    bluetooth_manager = BluetoothManager(
+        backend=BlueZBackend(), store=BluetoothDeviceStore(_settings.bluetooth_devices_file)
+    )
 
     app.state.registry = registry
     app.state.plugin_manager = pm
     app.state.event_bus = event_bus
     app.state.device_manager = device_manager
+    app.state.bluetooth_manager = bluetooth_manager
     app.state.imager_manager = imager_manager
     app.state.mount_manager = mount_manager
     app.state.focuser_manager = focuser_manager
@@ -140,6 +148,7 @@ def create_app() -> FastAPI:
         device_registry=registry,
         profile_store=profile_store,
         equipment_store=equipment_store,
+        bluetooth_manager=bluetooth_manager,
     )
     discovered_plugins = discover_plugins()
     # Auto-enable each enabled plugin's declared dependencies (e.g. "target"
@@ -162,6 +171,7 @@ def create_app() -> FastAPI:
     app.state.log_scopes = _CORE_SCOPES + plugin_scopes
 
     app.include_router(devices_router)
+    app.include_router(bluetooth_router)
     app.include_router(properties_router)
     app.include_router(profiles_router)
     app.include_router(inventory_router)

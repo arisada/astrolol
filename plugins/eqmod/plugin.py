@@ -42,7 +42,16 @@ class EqmodPlugin:
 
     def setup(self, app: FastAPI, ctx: PluginContext) -> None:
         ctx.device_registry.register_mount("eqmod_sim", EqmodSimMount)
-        ctx.device_registry.register_mount("eqmod", EqmodMount)
+        # Factory (not EqmodMount directly) injects the shared BluetoothManager so a
+        # mount configured with "bluetooth_device_id" can open an RFCOMM link without
+        # eqmod importing the bluetooth_serial plugin (or knowing it exists) — see
+        # astrolol/devices/bluetooth/. DEFAULT_CONNECT_PARAMS is copied over so the
+        # "Load driver" form still prefills the same default as a plain EqmodMount.
+        def _eqmod_factory(**params: object) -> EqmodMount:
+            return EqmodMount(bluetooth_manager=ctx.bluetooth_manager, **params)
+
+        _eqmod_factory.DEFAULT_CONNECT_PARAMS = EqmodMount.DEFAULT_CONNECT_PARAMS
+        ctx.device_registry.register_mount("eqmod", _eqmod_factory)
         self._ctx = ctx
         self._proxy = IndiProxyRegistration(
             getattr(ctx.device_registry, "indi_manager", None),

@@ -53,6 +53,7 @@ class PluginContext:
     device_registry: Any   # astrolol.devices.registry.DeviceRegistry
     profile_store: Any = None     # astrolol.profiles.store.ProfileStore
     equipment_store: Any = None   # astrolol.equipment.store.EquipmentStore
+    bluetooth_manager: Any = None  # astrolol.devices.bluetooth.BluetoothManager
 
     def get_plugin_settings(self, plugin_id: str, model: type[T]) -> T:
         """Return plugin settings parsed into *model*, falling back to defaults."""

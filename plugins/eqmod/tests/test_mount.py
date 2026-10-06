@@ -185,6 +185,38 @@ async def test_connect_runs_handshake_and_initializes() -> None:
     assert diag["axes"]["DEC"]["high_speed_ratio"] == HS_RATIO
 
 
+async def test_connect_requires_port_or_bluetooth_device_id() -> None:
+    with pytest.raises(ValueError, match="bluetooth_device_id"):
+        await EqmodMount().connect()
+
+
+async def test_connect_over_bluetooth_skips_baudrate_detection() -> None:
+    ctrl = _FakeController()
+    opened_with: list[tuple[object, str]] = []
+
+    def factory(manager, device_id):
+        opened_with.append((manager, device_id))
+        return ctrl
+
+    fake_manager = object()
+    mount = EqmodMount(
+        bluetooth_device_id="AA:BB:CC:DD:EE:FF",
+        bluetooth_manager=fake_manager,
+        bluetooth_transport_factory=factory,
+    )
+    await mount.connect()
+    assert ctrl.opened and ctrl.initialized
+    assert opened_with == [(fake_manager, "AA:BB:CC:DD:EE:FF")]
+    diag = await mount.diagnostics()
+    assert diag["bluetooth_device_id"] == "AA:BB:CC:DD:EE:FF"
+    assert diag["baudrate"] is None
+
+
+async def test_connect_over_bluetooth_without_manager_raises() -> None:
+    with pytest.raises(ValueError, match="BluetoothManager"):
+        await EqmodMount(bluetooth_device_id="AA:BB:CC:DD:EE:FF").connect()
+
+
 async def test_connect_failure_closes_transport() -> None:
     class _Broken(_FakeController):
         async def request(self, command: bytes) -> bytes:

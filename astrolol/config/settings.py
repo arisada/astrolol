@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     jpeg_quality: int = 85
     profiles_file: Path = _BASE / "profiles.json"
     inventory_file: Path = _BASE / "inventory.json"
+    bluetooth_devices_file: Path = _BASE / "bluetooth_devices.json"
     log_file: Path = _BASE / "astrolol.log"
 
     # INDI server settings (advanced — normally hidden in UI)

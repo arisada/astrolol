@@ -31,6 +31,7 @@ class MountDiagnostics(BaseModel):
     device_id: str
     port: str | None = None
     baudrate: int | None = None
+    bluetooth_device_id: str | None = None
     board_version: str | None = None
     timer_freq: int | None = None
     tracking: bool = False

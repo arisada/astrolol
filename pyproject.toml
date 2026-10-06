@@ -24,6 +24,7 @@ dependencies = [
     "pyserial>=3.5",
     "zeroconf>=0.131",
     "ifaddr>=0.2",
+    "dbus-next>=0.2.3",
 ]
 
 [project.scripts]

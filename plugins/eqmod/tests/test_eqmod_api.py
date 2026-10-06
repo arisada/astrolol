@@ -119,7 +119,9 @@ def test_setup_registers_real_eqmod_adapter() -> None:
         device_registry=registry,
     )
     EqmodPlugin().setup(FastAPI(), ctx)
-    assert registry.mounts["eqmod"] is EqmodMount
+    # Registered as a factory (not the class directly) so a BluetoothManager can be
+    # injected without eqmod importing the bluetooth_serial plugin — see plugin.py.
+    assert isinstance(registry.mounts["eqmod"](port="/dev/fake"), EqmodMount)
     assert registry.default_connect_params("mount", "eqmod") == {"port": "/dev/ttyUSB0"}
     assert registry.default_connect_params("mount", "eqmod_sim") == {"state_key": "default"}
 

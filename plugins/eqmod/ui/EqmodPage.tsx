@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ToggleSwitch } from '@/components/ui/toggle-switch'
+import { BluetoothDevicePicker } from '@/components/ui/bluetooth-picker'
 import {
   getDiagnostics, getIndiProxy, getSettings, putSettings,
   type AxisDiagnostics, type EqmodSettings, type IndiProxyStatus, type MountDiagnostics,
@@ -211,6 +212,40 @@ function SettingsCard() {
   )
 }
 
+function BluetoothConnectHelper() {
+  const [deviceId, setDeviceId] = useState<string | null>(null)
+  const [copied, setCopied] = useState(false)
+  const snippet = deviceId ? JSON.stringify({ bluetooth_device_id: deviceId }) : null
+
+  const copy = () => {
+    if (!snippet) return
+    navigator.clipboard.writeText(snippet).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    })
+  }
+
+  return (
+    <div className="bg-surface-raised border border-surface-border rounded p-4 flex flex-col gap-2 text-sm">
+      <p className="text-slate-300 font-medium">Connect over Bluetooth</p>
+      <p className="text-xs text-slate-500">
+        Pair the mount's Bluetooth serial adapter first on the{' '}
+        <span className="font-mono">Bluetooth Serial</span> plugin page, then pick it here to get the
+        connect params to paste into Equipment → Load driver (no MAC address or channel needed).
+      </p>
+      <div className="flex items-center gap-2">
+        <div className="flex-1">
+          <BluetoothDevicePicker value={deviceId} onChange={setDeviceId} />
+        </div>
+        <Button size="sm" variant="outline" disabled={!snippet} onClick={copy}>
+          {copied ? 'Copied' : 'Copy params'}
+        </Button>
+      </div>
+      {snippet && <p className="text-xs text-slate-500 font-mono">{snippet}</p>}
+    </div>
+  )
+}
+
 export function EqmodPage() {
   const [mounts, setMounts] = useState<MountDiagnostics[] | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -243,6 +278,7 @@ export function EqmodPage() {
         </div>
       )}
       {mounts?.map((d) => <MountCard key={d.device_id} d={d} />)}
+      <BluetoothConnectHelper />
       <SettingsCard />
     </div>
   )

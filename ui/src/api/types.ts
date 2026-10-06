@@ -4,6 +4,14 @@
 export type DeviceKind = 'camera' | 'mount' | 'focuser' | 'filter_wheel' | 'rotator' | 'indi'
 export type DeviceState = 'disconnected' | 'connecting' | 'connected' | 'busy' | 'error'
 
+export interface PairedSerialDevice {
+  id: string
+  mac: string
+  name: string
+  channel: number
+  paired_at: string
+}
+
 export interface DeviceConfig {
   device_id?: string
   kind: DeviceKind
