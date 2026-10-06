@@ -1,0 +1,83 @@
+{
+  "label": "Autofocus",
+  "manifest": {
+    "name": "Autofocus",
+    "description": "Automated focuser optimisation using the V-curve (FWHM vs. position) method: takes exposures at several focuser positions, fits a parabola to the measured star size, and moves to the computed optimal focus position."
+  },
+  "chip": {
+    "label": "Autofocus",
+    "step": "Step{{progress}}{{fwhm}}"
+  },
+  "status": {
+    "running": "running",
+    "completed": "completed",
+    "failed": "failed",
+    "aborted": "aborted"
+  },
+  "decrease": "Decrease",
+  "increase": "Increase",
+  "noData": "No data yet",
+  "hfdAxis": "HFD px",
+  "fwhmAxis": "FWHM px",
+  "stretchTitle": "Toggle auto-stretch / linear preview",
+  "autoStretch": "Auto-stretch",
+  "linear": "Linear",
+  "focusStep": "Focus step",
+  "startHint": "Start an autofocus run to see the image",
+  "stepTitle": "Step {{step}}: pos {{position}}, {{metric}} {{value}}",
+  "camera": {
+    "title": "Camera",
+    "none": "No camera connected"
+  },
+  "focuser": {
+    "title": "Focuser",
+    "none": "No focuser connected"
+  },
+  "vcurve": {
+    "title": "V-Curve",
+    "metric": "Sharpness metric",
+    "algo": "Fit algorithm",
+    "parabola": "parabola",
+    "hyperbola": "hyperbola",
+    "stepSize": "Step size",
+    "steps": "steps",
+    "eachSide": "Steps each side — ",
+    "total": "{{count}} total",
+    "startPos": "Start position",
+    "optional": "(optional)",
+    "currentPos": "current: {{position}}",
+    "currentPosPlaceholder": "current position",
+    "useCurrent": "Use current position",
+    "track": "Track the same stars",
+    "trackHint": "Prefer the stars found on the first exposure over a fresh set each step",
+    "trackLabel": "Track the same stars across the sweep"
+  },
+  "exposure": {
+    "title": "Exposure",
+    "duration": "Duration",
+    "binning": "Binning",
+    "gain": "Gain",
+    "gainPlaceholder": "driver default",
+    "filter": "Filter",
+    "keep": "Keep current",
+    "slot": "Slot {{n}}"
+  },
+  "running": "Running…",
+  "start": "Start Autofocus",
+  "abort": "Abort",
+  "needDevices": "Camera and focuser must be connected.",
+  "startFailed": "Failed to start autofocus",
+  "progress": {
+    "title": "Progress",
+    "step": "Step {{current}} / {{total}}",
+    "steps": "{{total}} steps",
+    "position": "Position:",
+    "stars": "Stars:"
+  },
+  "result": {
+    "title": "Result",
+    "optimal": "Optimal position:",
+    "best": "Best {{metric}}:",
+    "at": "at {{position}}"
+  }
+}

@@ -1,0 +1,84 @@
+{
+  "label": "Résolution astrométrique",
+  "manifest": {
+    "name": "Résolution astrométrique",
+    "description": "Résolution astrométrique via astap_cli. Résout des images FITS pour déterminer les coordonnées de pointage (AD/Dec), la rotation du champ et l'échelle de pixel. Gère les résolutions simultanées et l'annulation."
+  },
+  "chip": {
+    "label": "Résolution",
+    "solving": "Résolution",
+    "exposing": "Pose"
+  },
+  "status": {
+    "pending": "en attente",
+    "exposing": "pose",
+    "solving": "résolution",
+    "completed": "terminé",
+    "failed": "échec",
+    "cancelled": "annulé"
+  },
+  "result": {
+    "solved": "Résolu",
+    "ra": "AD",
+    "dec": "Dec",
+    "rotation": "Rotation",
+    "scale": "Échelle",
+    "field": "Champ",
+    "time": "Durée",
+    "offset": "Écart de la monture",
+    "dRa": "ΔAD",
+    "dDec": "ΔDec",
+    "total": "Total"
+  },
+  "cancel": "Annuler",
+  "settings": {
+    "title": "Réglages",
+    "bin": "Exécutable ASTAP",
+    "db": "Chemin de la base d'étoiles",
+    "radius": "Rayon de recherche (°)",
+    "tolerance": "Tolérance",
+    "pixel": "Taille de pixel (µm, facultatif)",
+    "pixelPlaceholder": "ex. 3.76",
+    "save": "Enregistrer",
+    "saving": "Enregistrement…"
+  },
+  "db": {
+    "missing": "Base d'étoiles introuvable",
+    "empty": "Le dossier <code>{{path}}</code> est vide ou absent.",
+    "install": "Installer d05",
+    "installing": "Installation…"
+  },
+  "log": {
+    "resize": "Faites glisser pour redimensionner",
+    "empty": "Journal de résolution"
+  },
+  "viewer": {
+    "alt": "Dernière pose",
+    "none": "Pas encore d'image"
+  },
+  "title": "Résolution astrométrique",
+  "settingsTitle": "Réglages",
+  "solveFailed": "Échec de la résolution",
+  "camera": {
+    "title": "Caméra",
+    "none": "Aucune caméra connectée"
+  },
+  "exposure": {
+    "title": "Pose",
+    "binning": "Binning"
+  },
+  "after": {
+    "title": "Après la résolution",
+    "nothing": "Ne rien faire",
+    "sync": "Synchroniser la monture",
+    "sync_slew": "Synchroniser et pointer",
+    "noMount": "Aucune monture connectée"
+  },
+  "action": {
+    "solving": "Résolution…",
+    "exposing": "Pose…",
+    "start": "Poser et résoudre",
+    "halt": "Arrêter"
+  },
+  "recent": "Résolutions récentes"
+}

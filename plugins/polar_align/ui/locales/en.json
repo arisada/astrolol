@@ -1,0 +1,89 @@
+{
+  "label": "Polar Align",
+  "manifest": {
+    "name": "Polar Alignment",
+    "description": "Polar scope reticle view and a plate-solve wizard that slews the mount through several points, fits its actual mechanical pole offset from true north/south, and guides altitude/azimuth adjustment."
+  },
+  "chip": {
+    "label": "Polar Align",
+    "fitting": "Fitting{{progress}}",
+    "point": " point {{index}}/3",
+    "converging": "Converging{{err}}",
+    "alt": "alt",
+    "az": "az"
+  },
+  "status": {
+    "running": "running",
+    "converging": "converging",
+    "completed": "completed",
+    "failed": "failed",
+    "cancelled": "cancelled"
+  },
+  "side": {
+    "east": "east",
+    "west": "west"
+  },
+  "altHigh": "{{arcmin}}′ too high — lower the altitude adjustment",
+  "altLow": "{{arcmin}}′ too low — raise the altitude adjustment",
+  "azEast": "{{arcmin}}′ east of true north — decrease azimuth",
+  "azWest": "{{arcmin}}′ west of true north — increase azimuth",
+  "quality": {
+    "excellent": "Excellent",
+    "good": "Good",
+    "fair": "Fair",
+    "poor": "Needs work",
+    "total": "{{label}} ({{total}}′ total)"
+  },
+  "reticleFailed": "Failed to read reticle",
+  "needDevices": "A mount and camera must be connected.",
+  "decInvalid": "Dec must be a number between -80 and 80, or blank for automatic.",
+  "startFailed": "Failed to start",
+  "toggleFailed": "Failed to toggle auto-refresh",
+  "title": "Polar Alignment",
+  "mount": "Mount",
+  "reticle": {
+    "title": "Polar Scope Reticle",
+    "intro": "The dot shows where Polaris should sit on your polar scope's reticle right now. With tracking off, rotate the RA axis by hand until the real star (seen through your eyepiece) matches the dot's position below.",
+    "invert": "Assume a typical inverting scope",
+    "invertHint": "Most polar scopes have no erecting prism, so a simple lens flips the image both left-right and top-bottom at once — equivalent to a 180° rotation, not a mirror. Leave this on unless you know yours shows the sky upright.",
+    "invertLabel": "Assume a typical 180deg-inverting scope",
+    "angle": "Angle:",
+    "none": "No reading yet"
+  },
+  "wizard": {
+    "title": "Plate-Solve Wizard",
+    "camera": "Camera",
+    "noneConnected": "None connected",
+    "exposure": "Exposure (s)",
+    "binning": "Binning",
+    "dec": "Dec (°)",
+    "auto": "Auto",
+    "decHint": "Leave blank to let the wizard choose a well-conditioned Dec (not the mount's current one).",
+    "recheck": "Live-adjustment rechecks",
+    "sameExposure": "{{value}} (same)",
+    "radius": "Search radius (°)",
+    "recheckHint": "Used for every reading while turning the knobs — a shorter exposure and a tight search radius (the mount hasn't been slewed) make each recheck fast. Leave exposure blank to reuse the fit's own.",
+    "starting": "Starting…",
+    "start": "Start 3-Point Fit",
+    "startHint": "Slews to 3 points at one Dec, all on the side of the meridian the mount is currently pointing at, so no meridian flip happens mid-run (a flip would invalidate the fit). The mount stays on the last point for the rechecks.",
+    "pointProgress": "Point {{done}} / 3",
+    "pointCount": "{{count}} points",
+    "plan": "Dec {{dec}}° · {{side}} of the meridian",
+    "planAuto": " (auto)",
+    "initial": "Initial fit:",
+    "latest": "Latest reading:",
+    "knobs": "Turn the altitude/azimuth adjustment knobs toward the initial fit's numbers above, then recheck to see the error shrink -- no need to re-slew between readings.",
+    "recheckFailed": "Recheck failed: {{error}}",
+    "recheckNow": "Recheck now",
+    "rechecking": "Rechecking…",
+    "done": "Done",
+    "autoRefresh": "Auto-refresh",
+    "every": "Every {{seconds}}s",
+    "seconds": "seconds",
+    "stopAuto": "Stop auto-refresh",
+    "startAuto": "Start auto-refresh",
+    "autoHint": "Rechecks automatically on this interval while you turn the knobs, even if nobody clicks Recheck — keeps going from the server side, so it survives this tab reloading or closing.",
+    "cancel": "Cancel",
+    "startNew": "Start New Fit"
+  }
+}

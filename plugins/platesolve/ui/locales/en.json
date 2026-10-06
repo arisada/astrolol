@@ -1,0 +1,84 @@
+{
+  "label": "Plate Solving",
+  "manifest": {
+    "name": "Plate Solving",
+    "description": "Astrometric plate solving via astap_cli. Solves FITS images to determine pointing coordinates (RA/Dec), field rotation, and pixel scale. Supports concurrent solves and cancellation."
+  },
+  "chip": {
+    "label": "Plate Solve",
+    "solving": "Solving",
+    "exposing": "Exposing"
+  },
+  "status": {
+    "pending": "pending",
+    "exposing": "exposing",
+    "solving": "solving",
+    "completed": "completed",
+    "failed": "failed",
+    "cancelled": "cancelled"
+  },
+  "result": {
+    "solved": "Solved",
+    "ra": "RA",
+    "dec": "Dec",
+    "rotation": "Rotation",
+    "scale": "Scale",
+    "field": "Field",
+    "time": "Time",
+    "offset": "Mount offset",
+    "dRa": "ΔRA",
+    "dDec": "ΔDec",
+    "total": "Total"
+  },
+  "cancel": "Cancel",
+  "settings": {
+    "title": "Settings",
+    "bin": "ASTAP binary",
+    "db": "Star database path",
+    "radius": "Search radius (°)",
+    "tolerance": "Tolerance",
+    "pixel": "Pixel size (µm, optional)",
+    "pixelPlaceholder": "e.g. 3.76",
+    "save": "Save",
+    "saving": "Saving…"
+  },
+  "db": {
+    "missing": "Star database not found",
+    "empty": "Directory <code>{{path}}</code> is empty or missing.",
+    "install": "Install d05",
+    "installing": "Installing…"
+  },
+  "log": {
+    "resize": "Drag to resize",
+    "empty": "Plate-solve log"
+  },
+  "viewer": {
+    "alt": "Latest exposure",
+    "none": "No image yet"
+  },
+  "title": "Plate Solving",
+  "settingsTitle": "Settings",
+  "solveFailed": "Solve failed",
+  "camera": {
+    "title": "Camera",
+    "none": "No camera connected"
+  },
+  "exposure": {
+    "title": "Exposure",
+    "binning": "Binning"
+  },
+  "after": {
+    "title": "After solve",
+    "nothing": "Do nothing",
+    "sync": "Sync mount",
+    "sync_slew": "Sync and slew",
+    "noMount": "No mount connected"
+  },
+  "action": {
+    "solving": "Solving…",
+    "exposing": "Exposing…",
+    "start": "Expose & Solve",
+    "halt": "Halt"
+  },
+  "recent": "Recent solves"
+}

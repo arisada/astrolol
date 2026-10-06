@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import type { ReticleState } from '@/api/types'
 
 // Clock-position mapping: angle_deg=0 is straight up (the reticle's 0deg/12-o'clock
@@ -14,6 +15,7 @@ function clockToXY(angleDeg: number, radius: number, cx: number, cy: number) {
 }
 
 export function ReticleDial({ state }: { state: ReticleState | null }) {
+  const { t } = useTranslation('polar_align')
   const SIZE = 220
   const C = SIZE / 2
   const R = 86 // the engraved circle Polaris's dot should sit on
@@ -50,11 +52,11 @@ export function ReticleDial({ state }: { state: ReticleState | null }) {
       {state ? (
         <div className="text-center text-xs text-slate-400 space-y-0.5">
           <div>
-            Angle: <span className="text-slate-200 font-mono">{state.angle_deg.toFixed(1)}&deg;</span>
+            {t('reticle.angle')} <span className="text-slate-200 font-mono">{state.angle_deg.toFixed(1)}&deg;</span>
           </div>
         </div>
       ) : (
-        <p className="text-xs text-slate-600">No reading yet</p>
+        <p className="text-xs text-slate-600">{t('reticle.none')}</p>
       )}
     </div>
   )

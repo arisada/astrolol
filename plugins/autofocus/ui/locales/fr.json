@@ -1,0 +1,83 @@
+{
+  "label": "Autofocus",
+  "manifest": {
+    "name": "Autofocus",
+    "description": "Optimisation automatique du focuser par la méthode de la courbe en V (FWHM en fonction de la position) : prend des poses à plusieurs positions du focuser, ajuste une parabole sur la taille mesurée des étoiles et se déplace vers la position de mise au point optimale calculée."
+  },
+  "chip": {
+    "label": "Autofocus",
+    "step": "Pas{{progress}}{{fwhm}}"
+  },
+  "status": {
+    "running": "en cours",
+    "completed": "terminé",
+    "failed": "échec",
+    "aborted": "interrompu"
+  },
+  "decrease": "Diminuer",
+  "increase": "Augmenter",
+  "noData": "Pas encore de données",
+  "hfdAxis": "HFD px",
+  "fwhmAxis": "FWHM px",
+  "stretchTitle": "Basculer entre aperçu étiré automatiquement / linéaire",
+  "autoStretch": "Étirement auto",
+  "linear": "Linéaire",
+  "focusStep": "Pas de mise au point",
+  "startHint": "Lancez un autofocus pour voir l'image",
+  "stepTitle": "Pas {{step}} : pos {{position}}, {{metric}} {{value}}",
+  "camera": {
+    "title": "Caméra",
+    "none": "Aucune caméra connectée"
+  },
+  "focuser": {
+    "title": "Focuser",
+    "none": "Aucun focuser connecté"
+  },
+  "vcurve": {
+    "title": "Courbe en V",
+    "metric": "Mesure de netteté",
+    "algo": "Algorithme d'ajustement",
+    "parabola": "parabole",
+    "hyperbola": "hyperbole",
+    "stepSize": "Taille du pas",
+    "steps": "pas",
+    "eachSide": "Pas de chaque côté — ",
+    "total": "{{count}} au total",
+    "startPos": "Position de départ",
+    "optional": "(facultatif)",
+    "currentPos": "actuelle : {{position}}",
+    "currentPosPlaceholder": "position actuelle",
+    "useCurrent": "Utiliser la position actuelle",
+    "track": "Suivre les mêmes étoiles",
+    "trackHint": "Privilégier les étoiles trouvées sur la première pose plutôt qu'un nouvel ensemble à chaque pas",
+    "trackLabel": "Suivre les mêmes étoiles pendant le balayage"
+  },
+  "exposure": {
+    "title": "Pose",
+    "duration": "Durée",
+    "binning": "Binning",
+    "gain": "Gain",
+    "gainPlaceholder": "défaut du pilote",
+    "filter": "Filtre",
+    "keep": "Garder l'actuel",
+    "slot": "Position {{n}}"
+  },
+  "running": "En cours…",
+  "start": "Lancer l'autofocus",
+  "abort": "Interrompre",
+  "needDevices": "Une caméra et un focuser doivent être connectés.",
+  "startFailed": "Impossible de démarrer l'autofocus",
+  "progress": {
+    "title": "Progression",
+    "step": "Pas {{current}} / {{total}}",
+    "steps": "{{total}} pas",
+    "position": "Position :",
+    "stars": "Étoiles :"
+  },
+  "result": {
+    "title": "Résultat",
+    "optimal": "Position optimale :",
+    "best": "Meilleur {{metric}} :",
+    "at": "à {{position}}"
+  }
+}

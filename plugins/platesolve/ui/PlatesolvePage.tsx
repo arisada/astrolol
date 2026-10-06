@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { Trans, useTranslation } from 'react-i18next'
 import { fmtRA, fmtDec } from '@/utils/formatting'
 import { AlertTriangle, Camera, Download, ScanSearch, Settings, StopCircle, X } from 'lucide-react'
 import { api } from '@/api/client'
@@ -75,6 +76,7 @@ function fmtSep(arcsec: number): string {
 // ── Result panel ───────────────────────────────────────────────────────────────
 
 function ResultPanel({ job }: { job: SolveJob }) {
+  const { t } = useTranslation('platesolve')
   const result = job.result!
   const raHint = job.request.ra_hint
   const decHint = job.request.dec_hint
@@ -86,31 +88,31 @@ function ResultPanel({ job }: { job: SolveJob }) {
 
   return (
     <div className="mx-4 mb-3 rounded-lg border border-green-500/30 bg-green-500/5 p-3">
-      <div className="text-xs font-medium text-green-400 uppercase tracking-wider mb-2">Solved</div>
+      <div className="text-xs font-medium text-green-400 uppercase tracking-wider mb-2">{t('result.solved')}</div>
       <div className="grid grid-cols-1 gap-y-1 text-xs">
-        <div><span className="text-slate-500">RA</span>
+        <div><span className="text-slate-500">{t('result.ra')}</span>
           <span className="ml-2 font-mono text-slate-200">{fmtRA(result.ra / 15)}</span></div>
-        <div><span className="text-slate-500">Dec</span>
+        <div><span className="text-slate-500">{t('result.dec')}</span>
           <span className="ml-2 font-mono text-slate-200">{fmtDec(result.dec)}</span></div>
-        <div><span className="text-slate-500">Rotation</span>
+        <div><span className="text-slate-500">{t('result.rotation')}</span>
           <span className="ml-2 font-mono text-slate-200">{result.rotation.toFixed(2)}°</span></div>
-        <div><span className="text-slate-500">Scale</span>
+        <div><span className="text-slate-500">{t('result.scale')}</span>
           <span className="ml-2 font-mono text-slate-200">{result.pixel_scale.toFixed(3)}″/px</span></div>
-        <div><span className="text-slate-500">Field</span>
+        <div><span className="text-slate-500">{t('result.field')}</span>
           <span className="ml-2 font-mono text-slate-200">{fmtField(result.field_w)} × {fmtField(result.field_h)}</span></div>
-        <div><span className="text-slate-500">Time</span>
+        <div><span className="text-slate-500">{t('result.time')}</span>
           <span className="ml-2 font-mono text-slate-200">{(result.duration_ms / 1000).toFixed(1)}s</span></div>
       </div>
       {totalArcsec != null && deltaRaArcsec != null && deltaDecArcsec != null && (
         <>
           <div className="mt-2 mb-1 border-t border-green-500/20" />
-          <div className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">Mount offset</div>
+          <div className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">{t('result.offset')}</div>
           <div className="grid grid-cols-1 gap-y-1 text-xs">
-            <div><span className="text-slate-500">ΔRA</span>
+            <div><span className="text-slate-500">{t('result.dRa')}</span>
               <span className="ml-2 font-mono text-slate-300">{fmtOffset(deltaRaArcsec)}</span></div>
-            <div><span className="text-slate-500">ΔDec</span>
+            <div><span className="text-slate-500">{t('result.dDec')}</span>
               <span className="ml-2 font-mono text-slate-300">{fmtOffset(deltaDecArcsec)}</span></div>
-            <div><span className="text-slate-500">Total</span>
+            <div><span className="text-slate-500">{t('result.total')}</span>
               <span className="ml-2 font-mono text-amber-400 font-medium">{fmtSep(totalArcsec)}</span></div>
           </div>
         </>
@@ -122,12 +124,13 @@ function ResultPanel({ job }: { job: SolveJob }) {
 // ── Job history row ────────────────────────────────────────────────────────────
 
 function JobRow({ job, onCancel }: { job: SolveJob; onCancel: (id: string) => void }) {
+  const { t } = useTranslation('platesolve')
   const filename = job.request.fits_path.split('/').pop() ?? job.request.fits_path
   const active = job.status === 'pending' || job.status === 'solving'
   return (
     <div className="flex items-start gap-2 py-2 border-b border-surface-border last:border-0">
       <div className="mt-0.5 shrink-0">
-        <StatusPill status={job.status} variant={SOLVE_PILL_VARIANT[job.status]}
+        <StatusPill status={t(`status.${job.status}`)} variant={SOLVE_PILL_VARIANT[job.status]}
           pulse={job.status === 'exposing' || job.status === 'solving'} />
       </div>
       <div className="flex-1 min-w-0">
@@ -144,7 +147,7 @@ function JobRow({ job, onCancel }: { job: SolveJob; onCancel: (id: string) => vo
       </div>
       {active && (
         <button onClick={() => onCancel(job.id)}
-          className="shrink-0 text-slate-600 hover:text-slate-300 transition-colors" title="Cancel">
+          className="shrink-0 text-slate-600 hover:text-slate-300 transition-colors" title={t('cancel')}>
           <X size={14} />
         </button>
       )}
@@ -186,6 +189,7 @@ function NumericInput({ value, onChange, placeholder, allowNull }: {
 }
 
 function SettingsPanel({ settings, onChange }: { settings: PlatesolveSettings; onChange: (s: PlatesolveSettings) => void }) {
+  const { t } = useTranslation('platesolve')
   const [saving, setSaving] = useState(false)
   const [local, setLocal] = useState(settings)
   useEffect(() => { setLocal(settings) }, [settings])
@@ -204,33 +208,33 @@ function SettingsPanel({ settings, onChange }: { settings: PlatesolveSettings; o
 
   return (
     <div className="border-b border-surface-border p-4 flex flex-col gap-3">
-      <h3 className="text-xs font-medium text-slate-500 uppercase tracking-wider">Settings</h3>
+      <h3 className="text-xs font-medium text-slate-500 uppercase tracking-wider">{t('settings.title')}</h3>
       <div className="flex flex-col gap-1">
-        <span className="text-xs text-slate-400">ASTAP binary</span>
+        <span className="text-xs text-slate-400">{t('settings.bin')}</span>
         {inp(local.astap_bin, (v) => setLocal({ ...local, astap_bin: v }))}
       </div>
       <div className="flex flex-col gap-1">
-        <span className="text-xs text-slate-400">Star database path</span>
+        <span className="text-xs text-slate-400">{t('settings.db')}</span>
         {inp(local.astap_db_path, (v) => setLocal({ ...local, astap_db_path: v }))}
       </div>
       <div className="flex flex-col gap-1">
-        <span className="text-xs text-slate-400">Search radius (°)</span>
+        <span className="text-xs text-slate-400">{t('settings.radius')}</span>
         <NumericInput value={local.astap_search_radius}
           onChange={(v) => setLocal({ ...local, astap_search_radius: v ?? 30 })} />
       </div>
       <div className="flex flex-col gap-1">
-        <span className="text-xs text-slate-400">Tolerance</span>
+        <span className="text-xs text-slate-400">{t('settings.tolerance')}</span>
         <NumericInput value={local.astap_tolerance}
           onChange={(v) => setLocal({ ...local, astap_tolerance: v ?? 0.007 })} />
       </div>
       <div className="flex flex-col gap-1">
-        <span className="text-xs text-slate-400">Pixel size (µm, optional)</span>
+        <span className="text-xs text-slate-400">{t('settings.pixel')}</span>
         <NumericInput value={local.pixel_size_um} allowNull
           onChange={(v) => setLocal({ ...local, pixel_size_um: v })}
-          placeholder="e.g. 3.76" />
+          placeholder={t('settings.pixelPlaceholder')} />
       </div>
       <Button size="sm" onClick={save} disabled={saving} className="self-start">
-        {saving ? 'Saving…' : 'Save'}
+        {saving ? t('settings.saving') : t('settings.save')}
       </Button>
     </div>
   )
@@ -243,13 +247,14 @@ function DbWarningBanner({ dbPath, onInstall, installing }: {
   onInstall: () => void
   installing: boolean
 }) {
+  const { t } = useTranslation('platesolve')
   return (
     <div className="mx-4 mb-3 flex items-start gap-3 rounded-lg border border-yellow-600/40 bg-yellow-500/10 px-3 py-2">
       <AlertTriangle size={14} className="text-yellow-500 shrink-0 mt-0.5" />
       <div className="flex-1 min-w-0">
-        <p className="text-xs text-yellow-300 font-medium">Star database not found</p>
+        <p className="text-xs text-yellow-300 font-medium">{t('db.missing')}</p>
         <p className="text-xs text-yellow-600 mt-0.5 break-all">
-          Directory <code className="font-mono">{dbPath}</code> is empty or missing.
+          <Trans t={t} i18nKey="db.empty" values={{ path: dbPath }} components={{ code: <code className="font-mono" /> }} />
         </p>
       </div>
       <Button
@@ -260,7 +265,7 @@ function DbWarningBanner({ dbPath, onInstall, installing }: {
         className="shrink-0 border-yellow-600/50 text-yellow-400 hover:bg-yellow-500/10"
       >
         <Download size={12} className="mr-1" />
-        {installing ? 'Installing…' : 'Install d05'}
+        {installing ? t('db.installing') : t('db.install')}
       </Button>
     </div>
   )
@@ -269,6 +274,7 @@ function DbWarningBanner({ dbPath, onInstall, installing }: {
 // ── Plate-solve log panel ──────────────────────────────────────────────────────
 
 function SolveLog() {
+  const { t } = useTranslation('platesolve')
   const log = useStore((s) => s.log.filter((e) => e.component === 'platesolve'))
   const containerRef  = useRef<HTMLDivElement>(null)
   const atBottomRef   = useRef(false)
@@ -316,7 +322,7 @@ function SolveLog() {
       <div
         onMouseDown={onDragMouseDown}
         className="h-1.5 cursor-ns-resize bg-surface-border hover:bg-accent/50 active:bg-accent transition-colors"
-        title="Drag to resize"
+        title={t('log.resize')}
       />
       <div
         ref={containerRef}
@@ -325,7 +331,7 @@ function SolveLog() {
         style={{ height: height - 6 }}
       >
         {log.length === 0 ? (
-          <span className="text-xs text-slate-700">Plate-solve log</span>
+          <span className="text-xs text-slate-700">{t('log.empty')}</span>
         ) : (
           [...log].reverse().map((e) => (
             <div key={e.id} className="flex gap-2 text-xs leading-5">
@@ -344,11 +350,12 @@ function SolveLog() {
 // ── Image viewer ───────────────────────────────────────────────────────────────
 
 function ImageViewer({ image }: { image: { previewUrl: string; width: number; height: number; duration: number } | null }) {
+  const { t } = useTranslation('platesolve')
   return (
     <div className="flex-1 bg-black flex items-center justify-center relative min-h-0">
       {image ? (
         <>
-          <img src={image.previewUrl} alt="Latest exposure"
+          <img src={image.previewUrl} alt={t('viewer.alt')}
             className="max-w-full max-h-full object-contain" />
           <div className="absolute bottom-2 left-2 text-xs text-slate-400 bg-black/60 px-2 py-1 rounded">
             {image.width}×{image.height} · {image.duration}s
@@ -357,7 +364,7 @@ function ImageViewer({ image }: { image: { previewUrl: string; width: number; he
       ) : (
         <div className="text-slate-600 text-sm flex flex-col items-center gap-2">
           <Camera size={32} />
-          <span>No image yet</span>
+          <span>{t('viewer.none')}</span>
         </div>
       )}
     </div>
@@ -367,6 +374,7 @@ function ImageViewer({ image }: { image: { previewUrl: string; width: number; he
 // ── Main page ──────────────────────────────────────────────────────────────────
 
 export function PlatesolvePage() {
+  const { t } = useTranslation('platesolve')
   const connectedDevices = useStore((s) => s.connectedDevices)
   const latestImages     = useStore((s) => s.latestImages)
   const solveJobsMap     = useStore((s) => (s.pluginStates['platesolve'] as PlateSolvePluginState | null)?.jobs ?? {})
@@ -447,7 +455,7 @@ export function PlatesolvePage() {
         setBusy(false)
       }
     } else if (activeSolveJob.status === 'failed') {
-      setError(activeSolveJob.error ?? 'Solve failed')
+      setError(activeSolveJob.error ?? t('solveFailed'))
       setBusy(false)
     } else if (activeSolveJob.status === 'cancelled') {
       setBusy(false)
@@ -541,11 +549,11 @@ export function PlatesolvePage() {
         <div className="border-b border-surface-border p-4 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <ScanSearch size={16} className="text-accent" />
-            <span className="text-sm font-semibold text-slate-200">Plate Solving</span>
+            <span className="text-sm font-semibold text-slate-200">{t('title')}</span>
           </div>
           <button onClick={() => setShowSettings((v) => !v)}
             className={`text-slate-500 hover:text-slate-300 transition-colors ${showSettings ? 'text-accent' : ''}`}
-            title="Settings">
+            title={t('settingsTitle')}>
             <Settings size={14} />
           </button>
         </div>
@@ -567,9 +575,9 @@ export function PlatesolvePage() {
         )}
 
         {/* Camera */}
-        <SidebarSection title="Camera">
+        <SidebarSection title={t('camera.title')}>
           {cameras.length === 0 ? (
-            <span className="text-xs text-slate-600">No camera connected</span>
+            <span className="text-xs text-slate-600">{t('camera.none')}</span>
           ) : cameras.length === 1 ? (
             <span className="text-xs text-slate-300 font-mono">{cameras[0].device_id}</span>
           ) : (
@@ -581,7 +589,7 @@ export function PlatesolvePage() {
         </SidebarSection>
 
         {/* Exposure */}
-        <SidebarSection title="Exposure">
+        <SidebarSection title={t('exposure.title')}>
           <div className="flex flex-col gap-3">
             <DurationStepper steps={PLATESOLVE_EXPOSURE_STEPS} value={duration} onChange={(v) => patchSettings({ exposure_duration: v })} />
 
@@ -589,7 +597,7 @@ export function PlatesolvePage() {
               options={BINNINGS}
               value={binning}
               onChange={(b) => patchSettings({ binning: b })}
-              label="Binning"
+              label={t('exposure.binning')}
               formatLabel={(b) => `${b}×${b}`}
             />
 
@@ -597,25 +605,22 @@ export function PlatesolvePage() {
         </SidebarSection>
 
         {/* After solve */}
-        <SidebarSection title="After solve">
+        <SidebarSection title={t('after.title')}>
           <div className="flex flex-col gap-1.5">
             {(['nothing', 'sync', 'sync_slew'] as const).map((v) => {
-              const labels: Record<AfterSolve, string> = {
-                nothing: 'Do nothing', sync: 'Sync mount', sync_slew: 'Sync and slew',
-              }
               return (
                 <label key={v} className="flex items-center gap-2 cursor-pointer select-none">
                   <input type="radio" name="afterSolve" value={v}
                     checked={afterSolve === v} onChange={() => patchSettings({ after_solve: v })}
                     className="accent-accent" />
                   <span className={`text-xs ${afterSolve === v ? 'text-slate-200' : 'text-slate-400'}`}>
-                    {labels[v]}
+                    {t(`after.${v}`)}
                   </span>
                 </label>
               )
             })}
             {afterSolve !== 'nothing' && !mount && (
-              <p className="text-xs text-yellow-600 mt-1">No mount connected</p>
+              <p className="text-xs text-yellow-600 mt-1">{t('after.noMount')}</p>
             )}
           </div>
         </SidebarSection>
@@ -626,13 +631,13 @@ export function PlatesolvePage() {
           <Button onClick={handleExposeAndSolve} disabled={busy || !camera} className="w-full">
             <ScanSearch size={14} className="mr-2" />
             {busy
-              ? (activeSolveJob?.status === 'solving' ? 'Solving…' : 'Exposing…')
-              : 'Expose & Solve'}
+              ? (activeSolveJob?.status === 'solving' ? t('action.solving') : t('action.exposing'))
+              : t('action.start')}
           </Button>
           {busy && (
             <Button variant="danger" onClick={handleHalt} className="w-full">
               <StopCircle size={14} className="mr-2" />
-              Halt
+              {t('action.halt')}
             </Button>
           )}
         </div>
@@ -646,7 +651,7 @@ export function PlatesolvePage() {
 
         {/* Job history */}
         {jobs.length > 0 && (
-          <SidebarSection title="Recent solves">
+          <SidebarSection title={t('recent')}>
             {jobs.map((job) => <JobRow key={job.id} job={job} onCancel={handleCancel} />)}
           </SidebarSection>
         )}

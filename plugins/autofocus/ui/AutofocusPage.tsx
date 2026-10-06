@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { ChevronDown, ChevronUp, Contrast, Focus, StopCircle } from 'lucide-react'
 import { api } from '@/api/client'
 import * as autofocusApi from './api'
@@ -46,6 +47,7 @@ function IntegerStepper({
   progression: number[]
   min?: number
 }) {
+  const { t } = useTranslation('autofocus')
   const [raw, setRaw] = useState(String(value))
   const editingRef = useRef(false)
 
@@ -73,7 +75,7 @@ function IntegerStepper({
     <div className="flex flex-col gap-1">
       <label className="text-xs text-slate-400">{label}</label>
       <div className="flex items-center gap-1">
-        <Button size="icon" variant="outline" onClick={stepDown} title="Decrease">
+        <Button size="icon" variant="outline" onClick={stepDown} title={t('decrease')}>
           <ChevronDown size={14} />
         </Button>
         <input
@@ -87,7 +89,7 @@ function IntegerStepper({
           }}
           className="flex-1 min-w-0 text-center text-xs font-mono text-slate-200 bg-surface-overlay border border-surface-border rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-accent"
         />
-        <Button size="icon" variant="outline" onClick={stepUp} title="Increase">
+        <Button size="icon" variant="outline" onClick={stepUp} title={t('increase')}>
           <ChevronUp size={14} />
         </Button>
         {unit && <span className="text-xs text-slate-500">{unit}</span>}
@@ -111,6 +113,7 @@ function UCurveChart({
   fitAlgo: FitAlgo
   metric: FocusMetric
 }) {
+  const { t } = useTranslation('autofocus')
   const W = 260, H = 150
   const pad = { t: 8, r: 10, b: 24, l: 34 }
   const cw = W - pad.l - pad.r
@@ -119,7 +122,7 @@ function UCurveChart({
   if (dataPoints.length === 0) {
     return (
       <div className="flex items-center justify-center h-[150px] text-xs text-slate-600">
-        No data yet
+        {t('noData')}
       </div>
     )
   }
@@ -170,7 +173,7 @@ function UCurveChart({
       ))}
 
       <text x={7} y={pad.t + ch / 2} textAnchor="middle" fill="#475569" fontSize={7}
-        transform={`rotate(-90 7 ${pad.t + ch / 2})`}>{metric === 'hfd' ? 'HFD px' : 'FWHM px'}</text>
+        transform={`rotate(-90 7 ${pad.t + ch / 2})`}>{metric === 'hfd' ? t('hfdAxis') : t('fwhmAxis')}</text>
 
       {Array.from({ length: Math.min(5, positions.length) }, (_, i) => {
         const pos = rangeX === 0
@@ -226,6 +229,7 @@ const DEFAULT_SETTINGS: AutofocusSettings = {
 // ── Main page component ───────────────────────────────────────────────────────
 
 export function AutofocusPage() {
+  const { t } = useTranslation('autofocus')
   const connectedDevices = useStore((s) => s.connectedDevices)
 
   const cameras      = connectedDevices.filter((d) => d.kind === 'camera')
@@ -347,7 +351,7 @@ export function AutofocusPage() {
 
   // ── Actions ────────────────────────────────────────────────────────────────
   const handleStart = useCallback(async () => {
-    if (!cameraId || !focuserId) { setError('Camera and focuser must be connected.'); return }
+    if (!cameraId || !focuserId) { setError(t('needDevices')); return }
     setError(null)
     setBusy(true)
     setRun(null)
@@ -370,9 +374,9 @@ export function AutofocusPage() {
       pollRef.current = setInterval(fetchRun, 1500)
     } catch (err) {
       setBusy(false)
-      setError(err instanceof Error ? err.message : 'Failed to start autofocus')
+      setError(err instanceof Error ? err.message : t('startFailed'))
     }
-  }, [cameraId, focuserId, resolvedFilterWheel, settings, startPositionRaw, fetchRun])
+  }, [cameraId, focuserId, resolvedFilterWheel, settings, startPositionRaw, fetchRun, t])
 
   const handleAbort = useCallback(async () => {
     try { await autofocusApi.abort(); await fetchRun() }
@@ -402,19 +406,19 @@ export function AutofocusPage() {
           <Button
             size="sm" variant="outline"
             onClick={() => setStretchMode((m) => (m === 'auto' ? 'linear' : 'auto'))}
-            title="Toggle auto-stretch / linear preview"
+            title={t('stretchTitle')}
             className="absolute top-2 right-2 z-10 bg-black/60 backdrop-blur-sm"
           >
             <Contrast size={13} className="mr-1.5" />
-            {stretchMode === 'auto' ? 'Auto-stretch' : 'Linear'}
+            {stretchMode === 'auto' ? t('autoStretch') : t('linear')}
           </Button>
         )}
         {previewUrl ? (
-          <img src={previewUrl} alt="Focus step" className="max-w-full max-h-full object-contain" />
+          <img src={previewUrl} alt={t('focusStep')} className="max-w-full max-h-full object-contain" />
         ) : (
           <div className="flex flex-col items-center gap-3 text-slate-600">
             <Focus size={48} strokeWidth={1} />
-            <p className="text-sm">Start an autofocus run to see the image</p>
+            <p className="text-sm">{t('startHint')}</p>
           </div>
         )}
 
@@ -425,7 +429,7 @@ export function AutofocusPage() {
               <button
                 key={dp.step}
                 onClick={() => setPreviewStep(dp.step)}
-                title={`Step ${dp.step}: pos ${dp.position}, ${(run.config.metric ?? 'fwhm').toUpperCase()} ${dp.fwhm.toFixed(2)}`}
+                title={t('stepTitle', { step: dp.step, position: dp.position, metric: (run.config.metric ?? 'fwhm').toUpperCase(), value: dp.fwhm.toFixed(2) })}
                 className={`flex-none text-[10px] px-1.5 py-0.5 rounded transition-colors ${
                   (previewStep ?? run.current_step) === dp.step
                     ? 'bg-accent text-white'
@@ -448,9 +452,9 @@ export function AutofocusPage() {
       <CollapsibleSidebar>
 
         {/* Camera */}
-        <SidebarSection title="Camera">
+        <SidebarSection title={t('camera.title')}>
           {cameras.length === 0 ? (
-            <span className="text-xs text-slate-600">No camera connected</span>
+            <span className="text-xs text-slate-600">{t('camera.none')}</span>
           ) : cameras.length === 1 ? (
             <span className="text-xs text-slate-300 font-mono">{cameras[0].device_id}</span>
           ) : (
@@ -462,9 +466,9 @@ export function AutofocusPage() {
         </SidebarSection>
 
         {/* Focuser */}
-        <SidebarSection title="Focuser">
+        <SidebarSection title={t('focuser.title')}>
           {focuserCandidates.length === 0 ? (
-            <span className="text-xs text-slate-600">No focuser connected</span>
+            <span className="text-xs text-slate-600">{t('focuser.none')}</span>
           ) : focuserCandidates.length === 1 ? (
             <span className="text-xs text-slate-300 font-mono">{focuserCandidates[0].device_id}</span>
           ) : (
@@ -476,7 +480,7 @@ export function AutofocusPage() {
         </SidebarSection>
 
         {/* V-curve configuration */}
-        <SidebarSection title="V-Curve">
+        <SidebarSection title={t('vcurve.title')}>
           <div className="flex flex-col gap-3">
 
             {/* Metric selector */}
@@ -484,7 +488,7 @@ export function AutofocusPage() {
               options={['fwhm', 'hfd'] as FocusMetric[]}
               value={settings.metric}
               onChange={(m) => patchSettings('metric', m)}
-              label="Sharpness metric"
+              label={t('vcurve.metric')}
               formatLabel={(m) => m.toUpperCase()}
               stretch
             />
@@ -494,14 +498,15 @@ export function AutofocusPage() {
               options={['parabola', 'hyperbola'] as FitAlgo[]}
               value={settings.fit_algo}
               onChange={(a) => patchSettings('fit_algo', a)}
-              label="Fit algorithm"
+              label={t('vcurve.algo')}
+              formatLabel={(a) => t(`vcurve.${a}`)}
               stretch
             />
 
             {/* Step size */}
             <IntegerStepper
-              label="Step size"
-              unit="steps"
+              label={t('vcurve.stepSize')}
+              unit={t('vcurve.steps')}
               value={settings.step_size}
               onChange={(v) => patchSettings('step_size', Math.max(1, v))}
               progression={STEP_SIZE_PROGRESSION}
@@ -511,7 +516,7 @@ export function AutofocusPage() {
             {/* Steps each side */}
             <div className="flex flex-col gap-1">
               <label className="text-xs text-slate-400">
-                Steps each side — <span className="text-slate-300">{settings.num_steps * 2 + 1} total</span>
+                {t('vcurve.eachSide')}<span className="text-slate-300">{t('vcurve.total', { count: settings.num_steps * 2 + 1 })}</span>
               </label>
               <div className="flex items-center gap-2">
                 <input
@@ -526,19 +531,19 @@ export function AutofocusPage() {
             {/* Manual starting position */}
             <div className="flex flex-col gap-1">
               <label className="text-xs text-slate-400">
-                Start position <span className="text-slate-600">(optional)</span>
+                {t('vcurve.startPos')} <span className="text-slate-600">{t('vcurve.optional')}</span>
               </label>
               <div className="flex items-center gap-1">
                 <Input
                   inputSize="sm"
                   type="text" inputMode="numeric"
-                  placeholder={focuserPosition !== null ? `current: ${focuserPosition}` : 'current position'}
+                  placeholder={focuserPosition !== null ? t('vcurve.currentPos', { position: focuserPosition }) : t('vcurve.currentPosPlaceholder')}
                   value={startPositionRaw}
                   onChange={(e) => setStartPositionRaw(e.target.value.replace(/[^0-9]/g, ''))}
                   className="flex-1"
                 />
                 {startPositionRaw && (
-                  <Button size="icon" variant="outline" onClick={() => setStartPositionRaw('')} title="Use current position">
+                  <Button size="icon" variant="outline" onClick={() => setStartPositionRaw('')} title={t('vcurve.useCurrent')}>
                     ×
                   </Button>
                 )}
@@ -548,13 +553,13 @@ export function AutofocusPage() {
             {/* Lock onto the same stars for every step */}
             <div className="flex items-center justify-between gap-2 pt-1">
               <label className="text-xs text-slate-400 leading-tight">
-                Track the same stars
+                {t('vcurve.track')}
                 <span className="block text-[10px] text-slate-600">
-                  Prefer the stars found on the first exposure over a fresh set each step
+                  {t('vcurve.trackHint')}
                 </span>
               </label>
               <ToggleSwitch
-                label="Track the same stars across the sweep"
+                label={t('vcurve.trackLabel')}
                 checked={settings.lock_stars}
                 onChange={() => patchSettings('lock_stars', !settings.lock_stars)}
               />
@@ -563,10 +568,10 @@ export function AutofocusPage() {
         </SidebarSection>
 
         {/* Exposure */}
-        <SidebarSection title="Exposure">
+        <SidebarSection title={t('exposure.title')}>
           <div className="flex flex-col gap-3">
             <div className="flex flex-col gap-1">
-              <label className="text-xs text-slate-400">Duration</label>
+              <label className="text-xs text-slate-400">{t('exposure.duration')}</label>
               <DurationStepper steps={AUTOFOCUS_EXPOSURE_STEPS} value={settings.exposure_time} onChange={(v) => patchSettings('exposure_time', v)} />
             </div>
 
@@ -574,16 +579,16 @@ export function AutofocusPage() {
               options={BINNINGS}
               value={settings.binning}
               onChange={(b) => patchSettings('binning', b)}
-              label="Binning"
+              label={t('exposure.binning')}
               formatLabel={(b) => `${b}×${b}`}
             />
 
             <div className="flex flex-col gap-1">
-              <label className="text-xs text-slate-400">Gain <span className="text-slate-600">(optional)</span></label>
+              <label className="text-xs text-slate-400">{t('exposure.gain')} <span className="text-slate-600">{t('vcurve.optional')}</span></label>
               <Input
                 inputSize="sm"
                 type="number" min={0}
-                placeholder="driver default"
+                placeholder={t('exposure.gainPlaceholder')}
                 value={settings.gain ?? ''}
                 onChange={(e) => patchSettings('gain', e.target.value ? parseInt(e.target.value, 10) : null)}
               />
@@ -591,19 +596,19 @@ export function AutofocusPage() {
 
             {filterWheelCandidates.length > 0 && (
               <div className="flex flex-col gap-1">
-                <label className="text-xs text-slate-400">Filter <span className="text-slate-600">(optional)</span></label>
+                <label className="text-xs text-slate-400">{t('exposure.filter')} <span className="text-slate-600">{t('vcurve.optional')}</span></label>
                 <select
                   value={settings.filter_slot ?? ''}
                   onChange={(e) => patchSettings('filter_slot', e.target.value ? parseInt(e.target.value, 10) : null)}
                   className="w-full rounded bg-surface-overlay border border-surface-border px-2 py-1.5 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-accent"
                 >
-                  <option value="">Keep current</option>
+                  <option value="">{t('exposure.keep')}</option>
                   {filterWheelStatus?.filter_names.length
                     ? filterWheelStatus.filter_names.map((name, i) => (
                         <option key={i + 1} value={i + 1}>{name}</option>
                       ))
                     : Array.from({ length: filterWheelStatus?.filter_count ?? 5 }, (_, i) => (
-                        <option key={i + 1} value={i + 1}>Slot {i + 1}</option>
+                        <option key={i + 1} value={i + 1}>{t('exposure.slot', { n: i + 1 })}</option>
                       ))
                   }
                 </select>
@@ -621,27 +626,27 @@ export function AutofocusPage() {
             className="w-full"
           >
             <Focus size={13} className="mr-2" />
-            {busy ? 'Running…' : 'Start Autofocus'}
+            {busy ? t('running') : t('start')}
           </Button>
           {busy && (
             <Button variant="danger" onClick={handleAbort} className="w-full">
               <StopCircle size={13} className="mr-2" />
-              Abort
+              {t('abort')}
             </Button>
           )}
         </div>
 
         {/* Progress */}
         {run && (
-          <SidebarSection title="Progress">
+          <SidebarSection title={t('progress.title')}>
             <div className="flex flex-col gap-2">
               <div className="flex items-center justify-between">
                 <span className="text-xs text-slate-300">
                   {run.status === 'running'
-                    ? `Step ${run.current_step} / ${run.total_steps}`
-                    : `${run.total_steps} steps`}
+                    ? t('progress.step', { current: run.current_step, total: run.total_steps })
+                    : t('progress.steps', { total: run.total_steps })}
                 </span>
-                <StatusPill status={run.status} variant={RUN_PILL_VARIANT[run.status]} pulse={run.status === 'running'} />
+                <StatusPill status={t(`status.${run.status}`)} variant={RUN_PILL_VARIANT[run.status]} pulse={run.status === 'running'} />
               </div>
 
               {run.total_steps > 0 && (
@@ -662,14 +667,14 @@ export function AutofocusPage() {
                 const metricLabel = (run.config.metric ?? 'fwhm').toUpperCase()
                 return (
                   <div className="text-xs text-slate-400 space-y-0.5">
-                    <div>Position: <span className="text-slate-200 font-mono">{latest.position}</span></div>
+                    <div>{t('progress.position')} <span className="text-slate-200 font-mono">{latest.position}</span></div>
                     <div>
                       {metricLabel}:{' '}
                       <span className={`font-mono ${latest === bestDataPoint ? 'text-green-400' : 'text-slate-200'}`}>
                         {latest.fwhm > 0 ? `${latest.fwhm.toFixed(2)} px` : '—'}
                       </span>
                     </div>
-                    <div>Stars: <span className="text-slate-200 font-mono">{latest.star_count}</span></div>
+                    <div>{t('progress.stars')} <span className="text-slate-200 font-mono">{latest.star_count}</span></div>
                   </div>
                 )
               })()}
@@ -681,7 +686,7 @@ export function AutofocusPage() {
 
         {/* V-curve chart */}
         {run && run.data_points.length > 0 && (
-          <SidebarSection title="V-Curve">
+          <SidebarSection title={t('vcurve.title')}>
             <UCurveChart
               dataPoints={run.data_points}
               curveFit={run.curve_fit}
@@ -694,16 +699,16 @@ export function AutofocusPage() {
 
         {/* Result */}
         {run?.status === 'completed' && run.optimal_position !== null && (
-          <SidebarSection title="Result">
+          <SidebarSection title={t('result.title')}>
             <div className="flex flex-col gap-1.5">
               <div className="flex items-baseline gap-2">
-                <span className="text-xs text-slate-400">Optimal position:</span>
+                <span className="text-xs text-slate-400">{t('result.optimal')}</span>
                 <span className="text-lg font-mono text-green-400">{run.optimal_position}</span>
               </div>
               {bestDataPoint && (
                 <div className="text-xs text-slate-500">
-                  Best {(run.config.metric ?? 'fwhm').toUpperCase()}: <span className="text-slate-300 font-mono">{bestDataPoint.fwhm.toFixed(2)} px</span>
-                  {' '}at {bestDataPoint.position}
+                  {t('result.best', { metric: (run.config.metric ?? 'fwhm').toUpperCase() })} <span className="text-slate-300 font-mono">{bestDataPoint.fwhm.toFixed(2)} px</span>
+                  {' '}{t('result.at', { position: bestDataPoint.position })}
                 </div>
               )}
             </div>

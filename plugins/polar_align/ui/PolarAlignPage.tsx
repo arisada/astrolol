@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import { Compass, RefreshCw, StopCircle } from 'lucide-react'
 import * as polarAlignApi from './api'
 import { ReticleDial } from './ReticleDial'
@@ -17,16 +19,16 @@ const RUN_PILL_VARIANT: Record<WizardStatus, StatusPillVariant> = {
   running: 'amber', converging: 'accent', completed: 'green', failed: 'red', cancelled: 'slate',
 }
 
-function altHint(arcmin: number): string {
+function altHint(t: TFunction, arcmin: number): string {
   return arcmin >= 0
-    ? `${arcmin.toFixed(1)}′ too high — lower the altitude adjustment`
-    : `${(-arcmin).toFixed(1)}′ too low — raise the altitude adjustment`
+    ? t('altHigh', { arcmin: arcmin.toFixed(1) })
+    : t('altLow', { arcmin: (-arcmin).toFixed(1) })
 }
 
-function azHint(arcmin: number): string {
+function azHint(t: TFunction, arcmin: number): string {
   return arcmin >= 0
-    ? `${arcmin.toFixed(1)}′ east of true north — decrease azimuth`
-    : `${(-arcmin).toFixed(1)}′ west of true north — increase azimuth`
+    ? t('azEast', { arcmin: arcmin.toFixed(1) })
+    : t('azWest', { arcmin: (-arcmin).toFixed(1) })
 }
 
 // Thresholds on the combined (quadrature-summed) alt/az error — rough amateur-imaging
@@ -43,24 +45,23 @@ function paQuality(altArcmin: number, azArcmin: number): PaQuality {
   return 'poor'
 }
 
-const QUALITY_LABEL: Record<PaQuality, string> = {
-  excellent: 'Excellent', good: 'Good', fair: 'Fair', poor: 'Needs work',
-}
 const QUALITY_CLASS: Record<PaQuality, string> = {
   excellent: 'text-emerald-400', good: 'text-sky-400', fair: 'text-amber-400', poor: 'text-red-400',
 }
 
 function QualityBadge({ altArcmin, azArcmin }: { altArcmin: number; azArcmin: number }) {
+  const { t } = useTranslation('polar_align')
   const q = paQuality(altArcmin, azArcmin)
   const total = Math.hypot(altArcmin, azArcmin)
   return (
     <span className={`text-xs font-medium ${QUALITY_CLASS[q]}`}>
-      {QUALITY_LABEL[q]} ({total.toFixed(1)}′ total)
+      {t('quality.total', { label: t(`quality.${q}`), total: total.toFixed(1) })}
     </span>
   )
 }
 
 export function PolarAlignPage() {
+  const { t } = useTranslation('polar_align')
   const connectedDevices = useStore((s) => s.connectedDevices)
   const mounts = connectedDevices.filter((d) => d.kind === 'mount')
   const cameras = connectedDevices.filter((d) => d.kind === 'camera')
@@ -92,8 +93,8 @@ export function PolarAlignPage() {
   const fetchReticle = useCallback(() => {
     polarAlignApi.getReticle()
       .then((s) => { setReticle(s); setReticleError(null) })
-      .catch((e) => setReticleError(e instanceof Error ? e.message : 'Failed to read reticle'))
-  }, [])
+      .catch((e) => setReticleError(e instanceof Error ? e.message : t('reticleFailed')))
+  }, [t])
 
   useEffect(() => {
     fetchReticle()
@@ -154,8 +155,8 @@ export function PolarAlignPage() {
   }, [fetchRun])
 
   const handleStart = useCallback(async () => {
-    if (!mountId || !cameraId) { setWizardError('A mount and camera must be connected.'); return }
-    if (decInvalid) { setWizardError('Dec must be a number between -80 and 80, or blank for automatic.'); return }
+    if (!mountId || !cameraId) { setWizardError(t('needDevices')); return }
+    if (decInvalid) { setWizardError(t('decInvalid')); return }
     setWizardError(null)
     setBusy(true)
     setRun(null)
@@ -168,10 +169,10 @@ export function PolarAlignPage() {
       pollRef.current = setInterval(fetchRun, 1500)
     } catch (e) {
       setBusy(false)
-      setWizardError(e instanceof Error ? e.message : 'Failed to start')
+      setWizardError(e instanceof Error ? e.message : t('startFailed'))
     }
   }, [mountId, cameraId, exposureS, binning, decOverride, decInvalid, convergeExposureS,
-      convergeSearchRadiusDeg, fetchRun, setWizardError])
+      convergeSearchRadiusDeg, fetchRun, setWizardError, t])
 
   const [rechecking, setRechecking] = useState(false)
   const handleRecheck = useCallback(async () => {
@@ -201,11 +202,11 @@ export function PolarAlignPage() {
       }
       await fetchRun()
     } catch (e) {
-      setWizardError(e instanceof Error ? e.message : 'Failed to toggle auto-refresh')
+      setWizardError(e instanceof Error ? e.message : t('toggleFailed'))
     } finally {
       setAutoRefreshBusy(false)
     }
-  }, [run?.auto_refresh_interval_s, autoRefreshIntervalInput, fetchRun, setWizardError])
+  }, [run?.auto_refresh_interval_s, autoRefreshIntervalInput, fetchRun, setWizardError, t])
 
   const handleStop = useCallback(async () => {
     try {
@@ -227,12 +228,12 @@ export function PolarAlignPage() {
   return (
     <div className="p-4 md:p-6 max-w-2xl space-y-4 overflow-y-auto h-full">
       <h1 className="text-lg font-semibold text-slate-100 flex items-center gap-2">
-        <Compass size={18} /> Polar Alignment
+        <Compass size={18} /> {t('title')}
       </h1>
 
       {mounts.length > 0 && (
         <div className="flex items-center gap-2 text-xs">
-          <span className="text-slate-400">Mount</span>
+          <span className="text-slate-400">{t('mount')}</span>
           {mounts.length === 1 ? (
             <span className="text-slate-300 font-mono">{mounts[0].device_id}</span>
           ) : (
@@ -245,24 +246,20 @@ export function PolarAlignPage() {
       )}
 
       {/* ── Part 1: reticle ── */}
-      <Card title="Polar Scope Reticle" className="p-4 space-y-3">
+      <Card title={t('reticle.title')} className="p-4 space-y-3">
         <p className="text-xs text-slate-500">
-          The dot shows where Polaris should sit on your polar scope's reticle right now.
-          With tracking off, rotate the RA axis by hand until the real star (seen through
-          your eyepiece) matches the dot's position below.
+          {t('reticle.intro')}
         </p>
 
         <div className="flex items-start justify-between gap-3 rounded border border-surface-border bg-surface-overlay/50 px-3 py-2">
           <label className="text-xs text-slate-400 leading-tight">
-            Assume a typical inverting scope
+            {t('reticle.invert')}
             <span className="block text-[10px] text-slate-600">
-              Most polar scopes have no erecting prism, so a simple lens flips the image
-              both left-right and top-bottom at once — equivalent to a 180° rotation, not
-              a mirror. Leave this on unless you know yours shows the sky upright.
+              {t('reticle.invertHint')}
             </span>
           </label>
           <ToggleSwitch
-            label="Assume a typical 180deg-inverting scope"
+            label={t('reticle.invertLabel')}
             checked={assumeInvertingScope}
             onChange={() => setAssumeInvertingScope(!assumeInvertingScope)}
           />
@@ -276,14 +273,14 @@ export function PolarAlignPage() {
       </Card>
 
       {/* ── Part 2: wizard ── */}
-      <Card title="Plate-Solve Wizard" className="p-4 space-y-3">
+      <Card title={t('wizard.title')} className="p-4 space-y-3">
         {!run && (
           <>
             <div className="grid grid-cols-2 gap-3">
               <div className="flex flex-col gap-1">
-                <label className="text-xs text-slate-400">Camera</label>
+                <label className="text-xs text-slate-400">{t('wizard.camera')}</label>
                 {cameras.length === 0 ? (
-                  <span className="text-xs text-slate-600">None connected</span>
+                  <span className="text-xs text-slate-600">{t('wizard.noneConnected')}</span>
                 ) : cameras.length === 1 ? (
                   <span className="text-xs text-slate-300 font-mono">{cameras[0].device_id}</span>
                 ) : (
@@ -294,43 +291,41 @@ export function PolarAlignPage() {
                 )}
               </div>
               <div className="flex flex-col gap-1">
-                <label className="text-xs text-slate-400">Exposure (s)</label>
+                <label className="text-xs text-slate-400">{t('wizard.exposure')}</label>
                 <Input inputSize="sm" type="number" min={0.1} step={0.5}
                   value={exposureS} onChange={(e) => setExposureS(Number(e.target.value) || 1)} />
               </div>
             </div>
 
             <PillGroup options={[1, 2, 3, 4]} value={binning} onChange={setBinning}
-              label="Binning" formatLabel={(b) => `${b}×${b}`} />
+              label={t('wizard.binning')} formatLabel={(b) => `${b}×${b}`} />
 
             <div className="flex flex-col gap-1">
-              <label className="text-xs text-slate-400">Dec (°)</label>
-              <Input inputSize="sm" type="number" min={-80} max={80} step={5} placeholder="Auto"
+              <label className="text-xs text-slate-400">{t('wizard.dec')}</label>
+              <Input inputSize="sm" type="number" min={-80} max={80} step={5} placeholder={t('wizard.auto')}
                 value={decInput} onChange={(e) => setDecInput(e.target.value)} />
               <span className="text-[10px] text-slate-600">
-                Leave blank to let the wizard choose a well-conditioned Dec (not the mount's current one).
+                {t('wizard.decHint')}
               </span>
             </div>
 
             <div className="rounded border border-surface-border bg-surface-overlay/30 p-2.5 space-y-2">
-              <p className="text-xs text-slate-400">Live-adjustment rechecks</p>
+              <p className="text-xs text-slate-400">{t('wizard.recheck')}</p>
               <div className="grid grid-cols-2 gap-3">
                 <div className="flex flex-col gap-1">
-                  <label className="text-xs text-slate-500">Exposure (s)</label>
-                  <Input inputSize="sm" type="number" min={0.1} step={0.5} placeholder={`${exposureS} (same)`}
+                  <label className="text-xs text-slate-500">{t('wizard.exposure')}</label>
+                  <Input inputSize="sm" type="number" min={0.1} step={0.5} placeholder={t('wizard.sameExposure', { value: exposureS })}
                     value={convergeExposureInput} onChange={(e) => setConvergeExposureInput(e.target.value)} />
                 </div>
                 <div className="flex flex-col gap-1">
-                  <label className="text-xs text-slate-500">Search radius (°)</label>
+                  <label className="text-xs text-slate-500">{t('wizard.radius')}</label>
                   <Input inputSize="sm" type="number" min={0.5} step={0.5}
                     value={convergeSearchRadiusDeg}
                     onChange={(e) => setConvergeSearchRadiusDeg(Number(e.target.value) || 0.5)} />
                 </div>
               </div>
               <p className="text-[10px] text-slate-600">
-                Used for every reading while turning the knobs — a shorter exposure and a
-                tight search radius (the mount hasn't been slewed) make each recheck fast.
-                Leave exposure blank to reuse the fit's own.
+                {t('wizard.recheckHint')}
               </p>
             </div>
 
@@ -338,12 +333,10 @@ export function PolarAlignPage() {
 
             <Button onClick={handleStart} disabled={busy || mounts.length === 0 || cameras.length === 0} className="w-full">
               <Compass size={13} className="mr-2" />
-              {busy ? 'Starting…' : 'Start 3-Point Fit'}
+              {busy ? t('wizard.starting') : t('wizard.start')}
             </Button>
             <p className="text-xs text-slate-600">
-              Slews to 3 points at one Dec, all on the side of the meridian the mount is
-              currently pointing at, so no meridian flip happens mid-run (a flip would
-              invalidate the fit). The mount stays on the last point for the rechecks.
+              {t('wizard.startHint')}
             </p>
           </>
         )}
@@ -352,9 +345,9 @@ export function PolarAlignPage() {
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <span className="text-xs text-slate-300">
-                {run.status === 'running' ? `Point ${run.points.length} / 3` : `${run.points.length} points`}
+                {run.status === 'running' ? t('wizard.pointProgress', { done: run.points.length }) : t('wizard.pointCount', { count: run.points.length })}
               </span>
-              <StatusPill status={run.status} variant={RUN_PILL_VARIANT[run.status]}
+              <StatusPill status={t(`status.${run.status}`)} variant={RUN_PILL_VARIANT[run.status]}
                 pulse={run.status === 'running' || run.status === 'converging'} />
             </div>
 
@@ -367,8 +360,8 @@ export function PolarAlignPage() {
 
             {run.plan && (
               <p className="text-xs text-slate-500">
-                Dec {run.plan.dec_jnow_deg.toFixed(0)}° · {run.plan.side} of the meridian
-                {run.request.dec_deg == null ? ' (auto)' : ''}
+                {t('wizard.plan', { dec: run.plan.dec_jnow_deg.toFixed(0), side: t(`side.${run.plan.side}`, { defaultValue: run.plan.side }) })}
+                {run.request.dec_deg == null ? t('wizard.planAuto') : ''}
               </p>
             )}
 
@@ -384,11 +377,11 @@ export function PolarAlignPage() {
             {run.result && (
               <div className="rounded border border-surface-border bg-surface-overlay/50 p-2.5 space-y-1">
                 <div className="flex items-center justify-between">
-                  <p className="text-xs text-slate-400">Initial fit:</p>
+                  <p className="text-xs text-slate-400">{t('wizard.initial')}</p>
                   <QualityBadge altArcmin={run.result.alt_error_arcmin} azArcmin={run.result.az_error_arcmin} />
                 </div>
-                <p className="text-xs text-slate-200">{altHint(run.result.alt_error_arcmin)}</p>
-                <p className="text-xs text-slate-200">{azHint(run.result.az_error_arcmin)}</p>
+                <p className="text-xs text-slate-200">{altHint(t, run.result.alt_error_arcmin)}</p>
+                <p className="text-xs text-slate-200">{azHint(t, run.result.az_error_arcmin)}</p>
               </div>
             )}
 
@@ -397,17 +390,15 @@ export function PolarAlignPage() {
                 {run.live_offset ? (
                   <div className="rounded border border-amber-500/30 bg-amber-500/10 p-2.5 space-y-1">
                     <div className="flex items-center justify-between">
-                      <p className="text-xs text-amber-300">Latest reading:</p>
+                      <p className="text-xs text-amber-300">{t('wizard.latest')}</p>
                       <QualityBadge altArcmin={run.live_offset.alt_error_arcmin} azArcmin={run.live_offset.az_error_arcmin} />
                     </div>
-                    <p className="text-xs text-slate-200">{altHint(run.live_offset.alt_error_arcmin)}</p>
-                    <p className="text-xs text-slate-200">{azHint(run.live_offset.az_error_arcmin)}</p>
+                    <p className="text-xs text-slate-200">{altHint(t, run.live_offset.alt_error_arcmin)}</p>
+                    <p className="text-xs text-slate-200">{azHint(t, run.live_offset.az_error_arcmin)}</p>
                   </div>
                 ) : (
                   <p className="text-xs text-slate-500">
-                    Turn the altitude/azimuth adjustment knobs toward the initial fit's
-                    numbers above, then recheck to see the error shrink -- no need to
-                    re-slew between readings.
+                    {t('wizard.knobs')}
                   </p>
                 )}
 
@@ -418,26 +409,26 @@ export function PolarAlignPage() {
                         [{new Date(run.last_recheck_at).toLocaleTimeString()}]
                       </span>
                     )}
-                    Recheck failed: {run.last_recheck_error}
+                    {t('wizard.recheckFailed', { error: run.last_recheck_error })}
                   </p>
                 )}
 
                 <div className="flex gap-2">
                   <Button size="sm" onClick={handleRecheck} disabled={rechecking} className="flex-1">
                     <RefreshCw size={13} className="mr-1.5" />
-                    {rechecking ? 'Rechecking…' : 'Recheck now'}
+                    {rechecking ? t('wizard.rechecking') : t('wizard.recheckNow')}
                   </Button>
                   <Button size="sm" variant="outline" onClick={handleStop}>
-                    Done
+                    {t('wizard.done')}
                   </Button>
                 </div>
 
                 <div className="rounded border border-surface-border bg-surface-overlay/30 p-2.5 space-y-2">
                   <div className="flex items-center justify-between">
-                    <p className="text-xs text-slate-400">Auto-refresh</p>
+                    <p className="text-xs text-slate-400">{t('wizard.autoRefresh')}</p>
                     {run.auto_refresh_interval_s != null && (
                       <span className="text-[10px] text-emerald-400">
-                        Every {run.auto_refresh_interval_s}s
+                        {t('wizard.every', { seconds: run.auto_refresh_interval_s })}
                       </span>
                     )}
                   </div>
@@ -447,16 +438,14 @@ export function PolarAlignPage() {
                       disabled={run.auto_refresh_interval_s != null}
                       onChange={(e) => setAutoRefreshIntervalInput(Number(e.target.value) || 5)}
                       className="w-20" />
-                    <span className="text-xs text-slate-500">seconds</span>
+                    <span className="text-xs text-slate-500">{t('wizard.seconds')}</span>
                     <Button size="sm" variant={run.auto_refresh_interval_s != null ? 'outline' : 'default'}
                       onClick={handleToggleAutoRefresh} disabled={autoRefreshBusy} className="flex-1">
-                      {run.auto_refresh_interval_s != null ? 'Stop auto-refresh' : 'Start auto-refresh'}
+                      {run.auto_refresh_interval_s != null ? t('wizard.stopAuto') : t('wizard.startAuto')}
                     </Button>
                   </div>
                   <p className="text-[10px] text-slate-600">
-                    Rechecks automatically on this interval while you turn the knobs,
-                    even if nobody clicks Recheck — keeps going from the server side, so
-                    it survives this tab reloading or closing.
+                    {t('wizard.autoHint')}
                   </p>
                 </div>
               </div>
@@ -465,13 +454,13 @@ export function PolarAlignPage() {
             {run.status === 'running' && (
               <Button size="sm" variant="danger" onClick={handleStop} className="w-full">
                 <StopCircle size={13} className="mr-1.5" />
-                Cancel
+                {t('wizard.cancel')}
               </Button>
             )}
 
             {isTerminal && (
               <Button size="sm" variant="outline" onClick={handleStartNew} className="w-full">
-                Start New Fit
+                {t('wizard.startNew')}
               </Button>
             )}
           </div>

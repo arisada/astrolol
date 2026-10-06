@@ -1,0 +1,89 @@
+{
+  "label": "Mise en station",
+  "manifest": {
+    "name": "Mise en station polaire",
+    "description": "Vue du réticule de la lunette polaire et assistant de résolution astrométrique qui pointe la monture sur plusieurs positions, calcule le décalage mécanique réel du pôle par rapport au vrai nord/sud et guide le réglage en hauteur/azimut."
+  },
+  "chip": {
+    "label": "Mise en station",
+    "fitting": "Calcul{{progress}}",
+    "point": " point {{index}}/3",
+    "converging": "Convergence{{err}}",
+    "alt": "haut.",
+    "az": "az."
+  },
+  "status": {
+    "running": "en cours",
+    "converging": "convergence",
+    "completed": "terminé",
+    "failed": "échec",
+    "cancelled": "annulé"
+  },
+  "side": {
+    "east": "est",
+    "west": "ouest"
+  },
+  "altHigh": "{{arcmin}}′ trop haut — baissez le réglage en hauteur",
+  "altLow": "{{arcmin}}′ trop bas — montez le réglage en hauteur",
+  "azEast": "{{arcmin}}′ à l'est du vrai nord — diminuez l'azimut",
+  "azWest": "{{arcmin}}′ à l'ouest du vrai nord — augmentez l'azimut",
+  "quality": {
+    "excellent": "Excellente",
+    "good": "Bonne",
+    "fair": "Correcte",
+    "poor": "À améliorer",
+    "total": "{{label}} ({{total}}′ au total)"
+  },
+  "reticleFailed": "Impossible de lire le réticule",
+  "needDevices": "Une monture et une caméra doivent être connectées.",
+  "decInvalid": "La déclinaison doit être un nombre entre -80 et 80, ou vide pour le mode automatique.",
+  "startFailed": "Échec du démarrage",
+  "toggleFailed": "Impossible de basculer le rafraîchissement automatique",
+  "title": "Mise en station polaire",
+  "mount": "Monture",
+  "reticle": {
+    "title": "Réticule de la lunette polaire",
+    "intro": "Le point indique où la Polaire doit se trouver sur le réticule de votre lunette polaire en ce moment. Suivi arrêté, tournez l'axe AD à la main jusqu'à ce que la vraie étoile (vue dans l'oculaire) coïncide avec la position du point ci-dessous.",
+    "invert": "Supposer une lunette inverseuse classique",
+    "invertHint": "La plupart des lunettes polaires n'ont pas de prisme redresseur : une simple lentille retourne l'image à la fois de gauche à droite et de haut en bas — soit une rotation de 180°, pas un miroir. Laissez cette option activée sauf si la vôtre montre le ciel à l'endroit.",
+    "invertLabel": "Supposer une lunette classique inversant de 180°",
+    "angle": "Angle :",
+    "none": "Pas encore de mesure"
+  },
+  "wizard": {
+    "title": "Assistant de résolution astrométrique",
+    "camera": "Caméra",
+    "noneConnected": "Aucune connectée",
+    "exposure": "Pose (s)",
+    "binning": "Binning",
+    "dec": "Déc (°)",
+    "auto": "Auto",
+    "decHint": "Laissez vide pour que l'assistant choisisse une déclinaison bien conditionnée (pas celle de la monture actuelle).",
+    "recheck": "Revérifications pendant le réglage",
+    "sameExposure": "{{value}} (identique)",
+    "radius": "Rayon de recherche (°)",
+    "recheckHint": "Utilisé pour chaque mesure pendant que vous tournez les vis — une pose plus courte et un rayon de recherche serré (la monture n'a pas bougé) rendent chaque revérification rapide. Laissez la pose vide pour reprendre celle du calcul.",
+    "starting": "Démarrage…",
+    "start": "Lancer le calcul sur 3 points",
+    "startHint": "Pointe 3 positions à la même déclinaison, toutes du côté du méridien vers lequel la monture pointe actuellement, afin qu'aucun retournement n'ait lieu en cours de route (il invaliderait le calcul). La monture reste sur le dernier point pour les revérifications.",
+    "pointProgress": "Point {{done}} / 3",
+    "pointCount": "{{count}} points",
+    "plan": "Déc {{dec}}° · {{side}} du méridien",
+    "planAuto": " (auto)",
+    "initial": "Calcul initial :",
+    "latest": "Dernière mesure :",
+    "knobs": "Tournez les vis de réglage en hauteur/azimut vers les valeurs du calcul initial ci-dessus, puis revérifiez pour voir l'erreur diminuer — inutile de repointer entre les mesures.",
+    "recheckFailed": "Échec de la revérification : {{error}}",
+    "recheckNow": "Revérifier maintenant",
+    "rechecking": "Revérification…",
+    "done": "Terminé",
+    "autoRefresh": "Rafraîchissement auto",
+    "every": "Toutes les {{seconds}} s",
+    "seconds": "secondes",
+    "stopAuto": "Arrêter le rafraîchissement auto",
+    "startAuto": "Démarrer le rafraîchissement auto",
+    "autoHint": "Revérifie automatiquement à cet intervalle pendant que vous tournez les vis, même si personne ne clique sur Revérifier — continue côté serveur, donc survit au rechargement ou à la fermeture de cet onglet.",
+    "cancel": "Annuler",
+    "startNew": "Nouveau calcul"
+  }
+}
