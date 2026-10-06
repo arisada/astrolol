@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Chip } from '@/components/ui/badge'
 import type { NetworkMode, NetworkStatus, SystemStatus } from '@/api/types'
 import * as api from './api'
@@ -13,6 +14,7 @@ interface SystemChipState {
 }
 
 export function SystemChip() {
+  const { t } = useTranslation('system')
   const [state, setState] = useState<SystemChipState | null>(null)
 
   const load = async () => {
@@ -50,14 +52,14 @@ export function SystemChip() {
 
   // Underpowered — most urgent: overrides network/temperature display
   if (state.underpowered) {
-    return <Chip label="Power" status="Underpowered" variant="red" pulse />
+    return <Chip label={t('chip.power')} status={t('chip.underpowered')} variant="red" pulse />
   }
 
   // Hotspot mode — most visible: device is sharing its WiFi
   if (state.mode === 'hotspot') {
-    const ssid = state.hotspot_ssid ?? 'Hotspot'
+    const ssid = state.hotspot_ssid ?? t('chip.hotspot')
     const suffix = state.ip ? ` · ${state.ip}` : ''
-    return <Chip label="AP" status={`${ssid}${suffix}`} variant="blue" pulse />
+    return <Chip label={t('chip.ap')} status={`${ssid}${suffix}`} variant="blue" pulse />
   }
 
   // WiFi connected — show SSID or IP
@@ -65,18 +67,18 @@ export function SystemChip() {
     const tempSuffix = state.temperature !== null && state.temperature >= 70
       ? ` · ${state.temperature.toFixed(0)}°C`
       : ''
-    const label = state.ssid ?? state.ip ?? 'Wi-Fi'
-    return <Chip label="Wi-Fi" status={`${label}${tempSuffix}`} variant="green" />
+    const label = state.ssid ?? state.ip ?? t('chip.wifi')
+    return <Chip label={t('chip.wifi')} status={`${label}${tempSuffix}`} variant="green" />
   }
 
   // Temperature warning even when offline
   if (state.temperature !== null && state.temperature >= 80) {
-    return <Chip label="Temp" status={`${state.temperature.toFixed(0)}°C`} variant="red" pulse />
+    return <Chip label={t('chip.temp')} status={`${state.temperature.toFixed(0)}°C`} variant="red" pulse />
   }
 
   // Disconnected — only show if nmcli is available (meaning we're on a Pi)
   if (state.mode === 'disconnected') {
-    return <Chip label="Wi-Fi" status="Offline" variant="slate" />
+    return <Chip label={t('chip.wifi')} status={t('chip.offline')} variant="slate" />
   }
 
   return null

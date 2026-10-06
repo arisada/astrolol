@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { ChevronDown, ChevronUp } from 'lucide-react'
 import { useStore } from '@/store'
 import { CollapsibleSidebar } from '@/components/ui/collapsible-sidebar'
@@ -33,6 +34,7 @@ function Section({ label, children, defaultOpen = false }: { label: string; chil
 }
 
 export function ViewerPage() {
+  const { t } = useTranslation('viewer')
   const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS)
   const [flat, setFlat] = useState(false)
   const [detail, setDetail] = useState<DetailState | null>(null)
@@ -40,7 +42,7 @@ export function ViewerPage() {
   const connectedMounts = useStore((s) => s.connectedDevices.filter((d) => d.kind === 'mount'))
   const liveIndexCounter = useStore((s) => s.pluginStates['viewer'] as number | undefined)
 
-  const bumpRefresh = () => setRefreshToken((t) => t + 1)
+  const bumpRefresh = () => setRefreshToken((n) => n + 1)
 
   // A live capture or background rescan changed the index — refresh the current view.
   useEffect(() => { if (liveIndexCounter != null) bumpRefresh() }, [liveIndexCounter])
@@ -87,13 +89,13 @@ export function ViewerPage() {
         </div>
 
         <CollapsibleSidebar>
-          <Section label="Filters" defaultOpen>
+          <Section label={t('sections.filters')} defaultOpen>
             <FilterSidebar filters={filters} onChange={setFilters} flat={flat} onFlatChange={setFlat} />
           </Section>
-          <Section label="Totals per object">
+          <Section label={t('sections.totals')}>
             <RollupPanel />
           </Section>
-          <Section label="Library settings">
+          <Section label={t('sections.library')}>
             <SettingsPanel onLibraryChanged={bumpRefresh} />
           </Section>
         </CollapsibleSidebar>

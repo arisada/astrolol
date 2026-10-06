@@ -1,0 +1,78 @@
+{
+  "label": "Cible",
+  "manifest": {
+    "name": "Cible",
+    "description": "Recherchez des objets du ciel par nom, consultez les heures de lever/coucher/passage au méridien et un graphique de hauteur, définissez la cible de la monture et gérez une liste de favoris."
+  },
+  "types": {
+    "galaxy": "Galaxie",
+    "galaxy_cluster": "Amas de galaxies",
+    "galaxy_group": "Groupe de galaxies",
+    "galaxy_pair": "Paire de galaxies",
+    "galaxy_triple": "Triplet de galaxies",
+    "globular_cluster": "Amas globulaire",
+    "hii_region": "Région HII",
+    "emission_nebula": "Nébuleuse en émission",
+    "planetary_nebula": "Nébuleuse planétaire",
+    "reflection_nebula": "Nébuleuse par réflexion",
+    "open_cluster": "Amas ouvert",
+    "supernova_remnant": "Rémanent de supernova",
+    "star": "Étoile",
+    "double_star": "Étoile double",
+    "nova": "Nova",
+    "cluster_nebula": "Amas + nébuleuse",
+    "stellar_association": "Association stellaire",
+    "solar_system": "Système solaire",
+    "other": "Autre",
+    "mount_position": "Position de la monture"
+  },
+  "title": "Cible",
+  "search": {
+    "placeholder": "Rechercher un objet — M42, NGC 891, Andromède…"
+  },
+  "toast": {
+    "ephemerisFailed": "Échec du calcul des éphémérides",
+    "targetSet": "Cible définie : {{name}}",
+    "setFailed": "Impossible de définir la cible",
+    "slewing": "Pointage vers {{name}}…",
+    "slewFailed": "Échec du pointage",
+    "settingsFailed": "Impossible d'enregistrer les réglages",
+    "already": "Déjà dans les favoris",
+    "added": "{{name}} ajouté aux favoris",
+    "saved": "« {{name}} » enregistré dans les favoris"
+  },
+  "favorites": {
+    "title": "Favoris",
+    "saveMount": "Enregistrer la position de la monture",
+    "saveMountTitle": "Enregistrer la position actuelle de la monture comme favori",
+    "namePlaceholder": "Nommer cette position…",
+    "save": "Enregistrer",
+    "cancel": "Annuler",
+    "empty": "Aucun favori pour l'instant — recherchez un objet et enregistrez-le.",
+    "remove": "Retirer des favoris"
+  },
+  "card": {
+    "ra": "AD (J2000)",
+    "dec": "Dec (J2000)",
+    "computing": "Calcul des éphémérides…",
+    "noLocation": "Aucun lieu d'observation défini — configurez-le dans le profil actif.",
+    "circumpolar": "Circumpolaire — toujours au-dessus de l'horizon",
+    "neverRises": "Ne se lève jamais depuis votre position",
+    "notVisible": "Pas visible au-dessus de {{alt}}° pendant la nuit",
+    "bestWindow": "Meilleure fenêtre : ",
+    "peaks": " · culmine à <hl>{{alt}}°</hl>",
+    "peakAt": " à {{time}}",
+    "rise": "Lever",
+    "transit": "Passage",
+    "set": "Coucher",
+    "prevNight": "Nuit précédente",
+    "tonight": "Aller à cette nuit",
+    "nextNight": "Nuit suivante",
+    "moon": "Lune éclairée à {{percent}} %",
+    "away": ", à {{deg}}°",
+    "interference": " — gêne probable",
+    "setTarget": "Définir la cible",
+    "slew": "Pointer la cible",
+    "addFavorite": "Ajouter aux favoris"
+  }
+}

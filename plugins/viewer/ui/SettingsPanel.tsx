@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -11,6 +12,7 @@ function formatBytes(n: number): string {
 }
 
 export function SettingsPanel({ onLibraryChanged }: { onLibraryChanged: () => void }) {
+  const { t } = useTranslation('viewer')
   const [libraryDir, setLibraryDir] = useState('')
   const [status, setStatus] = useState<api.LibraryStatus | null>(null)
   const [rejected, setRejected] = useState<api.RejectedItem[]>([])
@@ -79,7 +81,7 @@ export function SettingsPanel({ onLibraryChanged }: { onLibraryChanged: () => vo
   }
 
   const emptyRejected = async () => {
-    if (!window.confirm(`Permanently delete ${status?.rejected_count ?? 0} rejected file(s)? This cannot be undone.`)) return
+    if (!window.confirm(t('settings.confirmEmpty', { count: status?.rejected_count ?? 0 }))) return
     try {
       await api.emptyRejected()
       setRejected([])
@@ -94,45 +96,45 @@ export function SettingsPanel({ onLibraryChanged }: { onLibraryChanged: () => vo
       {error && <p className="text-status-error">{error}</p>}
 
       <div className="flex flex-col gap-1">
-        <span className="text-slate-400">Library directory</span>
+        <span className="text-slate-400">{t('settings.library')}</span>
         <div className="flex gap-1">
           <Input value={libraryDir} onChange={(e) => setLibraryDir(e.target.value)} className="text-xs" />
-          <Button size="sm" onClick={saveLibraryDir}>Save</Button>
+          <Button size="sm" onClick={saveLibraryDir}>{t('settings.save')}</Button>
         </div>
-        <span className="text-slate-500">Changing this re-scans and drops anything outside the new path from the index.</span>
+        <span className="text-slate-500">{t('settings.libraryHint')}</span>
       </div>
 
       <div className="flex gap-2">
         {status?.rescanning ? (
-          <Button size="sm" variant="danger" onClick={cancel} className="flex-1">Cancel rescan</Button>
+          <Button size="sm" variant="danger" onClick={cancel} className="flex-1">{t('settings.cancelRescan')}</Button>
         ) : (
-          <Button size="sm" onClick={rescan} className="flex-1">Rescan library</Button>
+          <Button size="sm" onClick={rescan} className="flex-1">{t('settings.rescan')}</Button>
         )}
       </div>
 
       {status && (
         <div className="grid grid-cols-2 gap-y-0.5 border-t border-surface-border pt-2 text-slate-400">
-          <span>Indexed frames</span><span className="text-slate-200">{status.image_count}</span>
-          <span>Disk free</span><span className="text-slate-200">{formatBytes(status.free_bytes)} / {formatBytes(status.total_bytes)}</span>
+          <span>{t('settings.indexed')}</span><span className="text-slate-200">{status.image_count}</span>
+          <span>{t('settings.disk')}</span><span className="text-slate-200">{formatBytes(status.free_bytes)} / {formatBytes(status.total_bytes)}</span>
         </div>
       )}
 
       <div className="border-t border-surface-border pt-2">
         <button onClick={loadRejected} className="flex items-center justify-between w-full text-slate-400 hover:text-slate-300">
-          <span>Rejected ({status?.rejected_count ?? 0} · {formatBytes(status?.rejected_bytes ?? 0)})</span>
+          <span>{t('settings.rejected', { count: status?.rejected_count ?? 0, size: formatBytes(status?.rejected_bytes ?? 0) })}</span>
         </button>
         {showRejected && (
           <div className="flex flex-col gap-1 mt-2">
-            {rejected.length === 0 && <span className="text-slate-500">Nothing rejected.</span>}
+            {rejected.length === 0 && <span className="text-slate-500">{t('settings.nothing')}</span>}
             {rejected.map((r) => (
               <div key={r.relative_path} className="flex items-center justify-between gap-2">
                 <span className="truncate text-slate-300">{r.relative_path}</span>
-                <button onClick={() => unreject(r)} className="text-slate-500 hover:text-accent shrink-0">Restore</button>
+                <button onClick={() => unreject(r)} className="text-slate-500 hover:text-accent shrink-0">{t('settings.restore')}</button>
               </div>
             ))}
             {rejected.length > 0 && (
               <Button size="sm" variant="danger" onClick={emptyRejected} className="mt-1">
-                <Trash2 size={12} className="mr-1" /> Empty rejected (permanent)
+                <Trash2 size={12} className="mr-1" /> {t('settings.empty')}
               </Button>
             )}
           </div>

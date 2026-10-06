@@ -1,0 +1,78 @@
+{
+  "label": "Target",
+  "manifest": {
+    "name": "Target",
+    "description": "Search sky objects by name, view rise/set/transit times and an altitude graph, set the mount target, and manage a favourites list."
+  },
+  "types": {
+    "galaxy": "Galaxy",
+    "galaxy_cluster": "Galaxy Cluster",
+    "galaxy_group": "Galaxy Group",
+    "galaxy_pair": "Galaxy Pair",
+    "galaxy_triple": "Galaxy Triple",
+    "globular_cluster": "Globular Cluster",
+    "hii_region": "HII Region",
+    "emission_nebula": "Emission Nebula",
+    "planetary_nebula": "Planetary Nebula",
+    "reflection_nebula": "Reflection Nebula",
+    "open_cluster": "Open Cluster",
+    "supernova_remnant": "Supernova Remnant",
+    "star": "Star",
+    "double_star": "Double Star",
+    "nova": "Nova",
+    "cluster_nebula": "Cluster + Nebula",
+    "stellar_association": "Stellar Association",
+    "solar_system": "Solar System",
+    "other": "Other",
+    "mount_position": "Mount Position"
+  },
+  "title": "Target",
+  "search": {
+    "placeholder": "Search objects — M42, NGC 891, Andromeda…"
+  },
+  "toast": {
+    "ephemerisFailed": "Ephemeris computation failed",
+    "targetSet": "Target set: {{name}}",
+    "setFailed": "Failed to set target",
+    "slewing": "Slewing to {{name}}…",
+    "slewFailed": "Slew failed",
+    "settingsFailed": "Failed to save settings",
+    "already": "Already in favourites",
+    "added": "{{name}} added to favourites",
+    "saved": "\"{{name}}\" saved to favourites"
+  },
+  "favorites": {
+    "title": "Favourites",
+    "saveMount": "Save mount position",
+    "saveMountTitle": "Save current mount position as a favourite",
+    "namePlaceholder": "Name this position…",
+    "save": "Save",
+    "cancel": "Cancel",
+    "empty": "No favourites yet — search for an object and save it.",
+    "remove": "Remove from favourites"
+  },
+  "card": {
+    "ra": "RA (J2000)",
+    "dec": "Dec (J2000)",
+    "computing": "Computing ephemeris…",
+    "noLocation": "No observer location set — configure it in the active profile.",
+    "circumpolar": "Circumpolar — always above horizon",
+    "neverRises": "Never rises from your location",
+    "notVisible": "Not visible above {{alt}}° during darkness",
+    "bestWindow": "Best window: ",
+    "peaks": " · peaks at <hl>{{alt}}°</hl>",
+    "peakAt": " at {{time}}",
+    "rise": "Rise",
+    "transit": "Transit",
+    "set": "Set",
+    "prevNight": "Previous night",
+    "tonight": "Jump to tonight",
+    "nextNight": "Next night",
+    "moon": "Moon {{percent}}% illuminated",
+    "away": ", {{deg}}° away",
+    "interference": " — interference likely",
+    "setTarget": "Set Target",
+    "slew": "Slew to Target",
+    "addFavorite": "Add to Favourites"
+  }
+}

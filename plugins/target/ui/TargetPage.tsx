@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { MapPin, Star } from 'lucide-react'
 import { useStore } from '@/store'
 import type { EphemerisResult, FavoriteTarget, TargetSettings } from './api'
@@ -22,6 +23,7 @@ function makeFavoriteId(): string {
 }
 
 export function TargetPage() {
+  const { t } = useTranslation('target')
   const connectedDevices = useStore((s) => s.connectedDevices)
   const mountIds = connectedDevices.filter((d) => d.kind === 'mount').map((d) => d.device_id)
   const mountStatuses = useStore((s) => s.mountStatuses)
@@ -65,7 +67,7 @@ export function TargetPage() {
     setEphemeris(null)
     getEphemeris(selected.ra, selected.dec, obsDate ?? undefined)
       .then((data) => { if (!cancelled) setEphemeris(data) })
-      .catch(() => { if (!cancelled) showToast('Ephemeris computation failed', false) })
+      .catch(() => { if (!cancelled) showToast(t('toast.ephemerisFailed'), false) })
       .finally(() => { if (!cancelled) setEphLoading(false) })
     return () => { cancelled = true }
   }, [selected, obsDate])
@@ -79,9 +81,9 @@ export function TargetPage() {
     if (!selected) return
     try {
       await setMountTarget(mountId, selected.ra, selected.dec, selected.name)
-      showToast(`Target set: ${selected.name}`)
+      showToast(t('toast.targetSet', { name: selected.name }))
     } catch (e) {
-      showToast('Failed to set target', false)
+      showToast(t('toast.setFailed'), false)
     }
   }
 
@@ -90,9 +92,9 @@ export function TargetPage() {
     try {
       await setMountTarget(mountId, selected.ra, selected.dec, selected.name)
       await slewMount(mountId)
-      showToast(`Slewing to ${selected.name}…`)
+      showToast(t('toast.slewing', { name: selected.name }))
     } catch (e) {
-      showToast('Slew failed', false)
+      showToast(t('toast.slewFailed'), false)
     }
   }
 
@@ -101,7 +103,7 @@ export function TargetPage() {
     try {
       await putSettings(updated)
     } catch {
-      showToast('Failed to save settings', false)
+      showToast(t('toast.settingsFailed'), false)
     }
   }
 
@@ -112,7 +114,7 @@ export function TargetPage() {
       (f) => Math.abs(f.ra - selected.ra) < 0.0003 && Math.abs(f.dec - selected.dec) < 0.0003,
     )
     if (exists) {
-      showToast('Already in favourites')
+      showToast(t('toast.already'))
       return
     }
     const newFav: FavoriteTarget = {
@@ -126,7 +128,7 @@ export function TargetPage() {
       added_at: new Date().toISOString(),
     }
     saveSettings({ ...settings, favorites: [...settings.favorites, newFav] })
-    showToast(`${selected.name} added to favourites`)
+    showToast(t('toast.added', { name: selected.name }))
   }
 
   function openMountSaveForm() {
@@ -147,7 +149,7 @@ export function TargetPage() {
       (f) => Math.abs(f.ra - raDeg) < 0.0003 && Math.abs(f.dec - dec!) < 0.0003,
     )
     if (exists) {
-      showToast('Already in favourites')
+      showToast(t('toast.already'))
       setShowMountSave(false)
       return
     }
@@ -162,7 +164,7 @@ export function TargetPage() {
       added_at: new Date().toISOString(),
     }
     saveSettings({ ...settings, favorites: [...settings.favorites, newFav] })
-    showToast(`"${mountSaveName.trim()}" saved to favourites`)
+    showToast(t('toast.saved', { name: mountSaveName.trim() }))
     setShowMountSave(false)
     setMountSaveName('')
   }
@@ -199,7 +201,7 @@ export function TargetPage() {
 
       {/* Search */}
       <section>
-        <h1 className="text-base font-semibold text-slate-300 mb-3">Target</h1>
+        <h1 className="text-base font-semibold text-slate-300 mb-3">{t('title')}</h1>
         <SearchBox onSelect={handleSelect} />
       </section>
 
@@ -225,7 +227,7 @@ export function TargetPage() {
           <div className="flex items-center gap-2 mb-3">
             <Star className="h-4 w-4 text-amber-400" />
             <h2 className="text-sm font-semibold text-slate-400">
-              Favourites
+              {t('favorites.title')}
               {settings.favorites.length > 0 && (
                 <span className="ml-2 text-xs text-slate-600">({settings.favorites.length})</span>
               )}
@@ -234,10 +236,10 @@ export function TargetPage() {
               <button
                 onClick={openMountSaveForm}
                 className="ml-auto flex items-center gap-1 text-xs text-slate-500 hover:text-indigo-400 transition-colors"
-                title="Save current mount position as a favourite"
+                title={t('favorites.saveMountTitle')}
               >
                 <MapPin className="h-3.5 w-3.5" />
-                Save mount position
+                {t('favorites.saveMount')}
               </button>
             )}
           </div>
@@ -253,7 +255,7 @@ export function TargetPage() {
                   if (e.key === 'Enter') handleSaveMountPosition()
                   if (e.key === 'Escape') setShowMountSave(false)
                 }}
-                placeholder="Name this position…"
+                placeholder={t('favorites.namePlaceholder')}
                 className="flex-1 text-sm bg-slate-800 border border-slate-600 rounded px-2.5 py-1.5 text-slate-200 placeholder-slate-500 focus:outline-none focus:border-indigo-500"
               />
               <button
@@ -261,13 +263,13 @@ export function TargetPage() {
                 disabled={!mountSaveName.trim()}
                 className="text-xs px-3 py-1.5 rounded bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white transition-colors"
               >
-                Save
+                {t('favorites.save')}
               </button>
               <button
                 onClick={() => setShowMountSave(false)}
                 className="text-xs px-2 py-1.5 rounded text-slate-500 hover:text-slate-300 transition-colors"
               >
-                Cancel
+                {t('favorites.cancel')}
               </button>
             </div>
           )}

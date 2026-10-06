@@ -3,6 +3,7 @@
 // Y-axis: -10° to 90°.
 // Shows twilight shading, min-altitude line, rise/transit/set markers, altitude curve.
 
+import { useTranslation } from 'react-i18next'
 import type { AltitudePoint, EphemerisResult } from './api'
 
 interface Props {
@@ -77,8 +78,8 @@ function isMidnight(ms: number): boolean {
   return d.getHours() === 0 && d.getMinutes() === 0
 }
 
-function formatDate(ms: number): string {
-  return new Date(ms).toLocaleDateString([], { day: 'numeric', month: 'short' })
+function formatDate(ms: number, lng: string): string {
+  return new Date(ms).toLocaleDateString(lng, { day: 'numeric', month: 'short' })
 }
 
 function vMarker(
@@ -102,6 +103,7 @@ function vMarker(
 }
 
 export function AltitudeChart({ ephemeris, minAlt }: Props) {
+  const { t, i18n } = useTranslation('target')
   const { altitude_curve, twilight, rise, transit, set, peak_time } = ephemeris
 
   if (altitude_curve.length === 0) return null
@@ -252,9 +254,9 @@ export function AltitudeChart({ ephemeris, minAlt }: Props) {
 
       {/* Rise / transit / set markers — clipped so labels stay inside */}
       <g clipPath={`url(#${clipId})`}>
-        {vMarker(rise,                domain, 'rgb(74,222,128)',  'Rise',    'rise')}
-        {vMarker(transit ?? peak_time, domain, 'rgb(250,204,21)', 'Transit', 'transit')}
-        {vMarker(set,                 domain, 'rgb(248,113,113)', 'Set',     'set')}
+        {vMarker(rise,                domain, 'rgb(74,222,128)',  t('card.rise'),    'rise')}
+        {vMarker(transit ?? peak_time, domain, 'rgb(250,204,21)', t('card.transit'), 'transit')}
+        {vMarker(set,                 domain, 'rgb(248,113,113)', t('card.set'),     'set')}
       </g>
 
       {/* X-axis ticks */}
@@ -273,7 +275,7 @@ export function AltitudeChart({ ephemeris, minAlt }: Props) {
             )}
             {midnight && (
               <text x={x} y={PAD.top + CHART_H + 22} fill="rgba(203,213,225,0.55)" fontSize={8} textAnchor="middle">
-                {formatDate(ms)}
+                {formatDate(ms, i18n.language)}
               </text>
             )}
           </g>

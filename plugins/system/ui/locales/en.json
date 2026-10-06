@@ -1,0 +1,160 @@
+{
+  "label": "System",
+  "manifest": {
+    "name": "System",
+    "description": "Device management for the host running astrolol. Manages WiFi connections and access-point mode, shows CPU / memory / temperature / disk statistics, monitors power/thermal throttling, and provides reboot / shutdown / restart controls."
+  },
+  "chip": {
+    "power": "Power",
+    "underpowered": "Underpowered",
+    "ap": "AP",
+    "hotspot": "Hotspot",
+    "wifi": "Wi-Fi",
+    "temp": "Temp",
+    "offline": "Offline"
+  },
+  "mode": {
+    "wifi": "Wi-Fi",
+    "hotspot": "Hotspot",
+    "disconnected": "Offline",
+    "unknown": "Unknown"
+  },
+  "loading": "Loading…",
+  "password": "Password",
+  "connect": "Connect",
+  "errors": {
+    "unreachable": "Cannot reach backend",
+    "scan": "Scan failed",
+    "connect": "Connection failed",
+    "disconnect": "Disconnect failed",
+    "hotspotStart": "Failed to start hotspot",
+    "hotspotStop": "Failed to stop hotspot",
+    "throttle": "Failed to update throttle monitor",
+    "interval": "Failed to update throttle check interval",
+    "save": "Save failed",
+    "tz": "Failed to set timezone",
+    "hostname": "Failed to set hostname",
+    "delete": "Delete failed"
+  },
+  "msg": {
+    "connected": "Connected to {{ssid}}",
+    "disconnected": "Disconnected",
+    "hotspotStarted": "Hotspot \"{{ssid}}\" started",
+    "hotspotStopped": "Hotspot stopped",
+    "saved": "Settings saved",
+    "tz": "Timezone set to {{tz}}",
+    "hostname": "Hostname changed to {{hostname}}",
+    "deleted": "Deleted connection \"{{name}}\""
+  },
+  "title": "System",
+  "stats": {
+    "title": "System",
+    "platform": "Platform",
+    "uptime": "Uptime",
+    "cpu": "CPU",
+    "cpuSub": "{{value}}% utilisation",
+    "memory": "Memory",
+    "rootDisk": "Root disk",
+    "temperature": "Temperature"
+  },
+  "power": {
+    "title": "Power",
+    "underpowered": "System is currently underpowered — check the power supply.",
+    "ok": "Power supply OK",
+    "underVoltage": "Under-voltage",
+    "throttled": "Throttled",
+    "freqCapped": "Frequency capped",
+    "softTemp": "Soft temp limit",
+    "now": "Now",
+    "sinceBoot": "Since boot",
+    "okState": "OK",
+    "source": "Source: {{source}} · raw {{raw}}",
+    "monitor": "Monitor throttling",
+    "monitorHint": "Warn in the logs when the system becomes underpowered",
+    "every": " · checked every {{seconds}}s",
+    "interval": "Check interval",
+    "unavailable": "Throttling status unavailable (vcgencmd not found and no sysfs support detected)."
+  },
+  "storage": {
+    "title": "Storage",
+    "free": "{{free}} GB free / {{total}} GB"
+  },
+  "network": {
+    "title": "Network",
+    "noNmcli": "NetworkManager (nmcli) not found. WiFi management requires NetworkManager on the host.",
+    "ssid": "SSID",
+    "ip": "IP",
+    "gateway": "Gateway",
+    "hotspotSsid": "Hotspot SSID",
+    "clients": "Clients connect to",
+    "noConnection": "No active wireless connection.",
+    "disconnect": "Disconnect",
+    "startHotspot": "Start Hotspot",
+    "starting": "Starting…",
+    "stopHotspot": "Stop Hotspot",
+    "stopping": "Stopping…",
+    "scan": "Scan Networks",
+    "scanning": "Scanning…",
+    "found_one": "{{count}} network found",
+    "found_other": "{{count}} networks found",
+    "none": "No networks found. Try scanning again."
+  },
+  "saved": {
+    "title": "Saved WiFi Connections",
+    "auto": "Auto-connect",
+    "manual": "Manual",
+    "delete": "Delete saved connection"
+  },
+  "usb": {
+    "title": "USB Devices",
+    "busDev": "{{ids}} · Bus {{bus}} Dev {{dev}}"
+  },
+  "hotspot": {
+    "title": "Hotspot Settings",
+    "ssid": "SSID",
+    "password": "Password",
+    "interface": "Interface",
+    "save": "Save",
+    "cancel": "Cancel",
+    "edit": "Edit"
+  },
+  "hostname": {
+    "title": "Hostname",
+    "label": "Hostname",
+    "fqdn": "FQDN",
+    "placeholder": "e.g. astrolol-pi",
+    "saving": "Saving…",
+    "reboot": "Changing the hostname requires a reboot to take full effect."
+  },
+  "time": {
+    "title": "Time & Timezone",
+    "local": "Local time",
+    "utc": "UTC",
+    "timezone": "Timezone",
+    "ntp": "NTP sync",
+    "synced": "Synchronized",
+    "notSynced": "Not synced",
+    "change": "Change timezone",
+    "apply": "Apply",
+    "saving": "Saving…",
+    "hint": "Correct timezone is critical for accurate sky calculations."
+  },
+  "controls": {
+    "title": "Controls",
+    "restart": "Restart App",
+    "confirmRestart": "Confirm Restart",
+    "reboot": "Reboot Device",
+    "confirmReboot": "Confirm Reboot",
+    "shutdown": "Shutdown Device",
+    "confirmShutdown": "Confirm Shutdown",
+    "hint": "Click once to arm, again to confirm. Reboot/Shutdown require passwordless sudo."
+  },
+  "sudo": {
+    "title": "Sudo Permissions",
+    "nmcli": "nmcli (network management)",
+    "reboot": "reboot",
+    "shutdown": "shutdown / poweroff",
+    "setup": "Setup instructions",
+    "runAsRoot": "Run as root on the host:"
+  }
+}

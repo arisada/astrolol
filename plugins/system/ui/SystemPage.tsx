@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   Monitor,
   Power,
@@ -88,13 +89,15 @@ function Gauge({ value, label, sublabel, warn = 80, danger = 90 }: {
 // ── Network mode badge ─────────────────────────────────────────────────────────
 
 function NetworkModeBadge({ mode }: { mode: NetworkMode }) {
-  const config: Record<NetworkMode, { label: string; cls: string }> = {
-    wifi:         { label: 'Wi-Fi',   cls: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' },
-    hotspot:      { label: 'Hotspot', cls: 'bg-sky-500/20 text-sky-300 border-sky-500/30' },
-    disconnected: { label: 'Offline', cls: 'bg-slate-700/50 text-slate-400 border-slate-600/40' },
-    unknown:      { label: 'Unknown', cls: 'bg-slate-700/50 text-slate-400 border-slate-600/40' },
+  const { t } = useTranslation('system')
+  const config: Record<NetworkMode, string> = {
+    wifi:         'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
+    hotspot:      'bg-sky-500/20 text-sky-300 border-sky-500/30',
+    disconnected: 'bg-slate-700/50 text-slate-400 border-slate-600/40',
+    unknown:      'bg-slate-700/50 text-slate-400 border-slate-600/40',
   }
-  const { label, cls } = config[mode]
+  const cls = config[mode]
+  const label = t(`mode.${mode}`)
   return (
     <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded border text-xs font-medium ${cls}`}>
       {label}
@@ -130,6 +133,7 @@ function WifiRow({
   onConnect: (password: string) => void
   connecting: boolean
 }) {
+  const { t } = useTranslation('system')
   const [expanded, setExpanded] = useState(false)
   const [password, setPassword] = useState('')
 
@@ -159,7 +163,7 @@ function WifiRow({
         <div className="px-3 pb-3 flex gap-2">
           <input
             type="password"
-            placeholder="Password"
+            placeholder={t('password')}
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter' && password) onConnect(password) }}
@@ -171,7 +175,7 @@ function WifiRow({
             disabled={connecting || !password}
             className="px-3 py-1.5 rounded bg-accent hover:bg-accent/80 text-white text-xs font-medium disabled:opacity-50 transition-colors"
           >
-            {connecting ? '…' : 'Connect'}
+            {connecting ? '…' : t('connect')}
           </button>
         </div>
       )}
@@ -246,6 +250,7 @@ function ConfirmButton({
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export function SystemPage() {
+  const { t } = useTranslation('system')
   const [sysStatus, setSysStatus]   = useState<SystemStatus | null>(null)
   const [throttleStatus, setThrottleStatus] = useState<ThrottleStatus | null>(null)
   const [netStatus, setNetStatus]   = useState<NetworkStatus | null>(null)
@@ -293,7 +298,7 @@ export function SystemPage() {
       setDraftSettings((d) => d ?? s)
       setError(null)
     } catch {
-      setError('Cannot reach backend')
+      setError(t('errors.unreachable'))
     }
     try {
       setThrottleStatus(await api.getThrottleStatus())
@@ -312,7 +317,7 @@ export function SystemPage() {
     Promise.all([
       api.getSudoSetup().then(setSudoSetup).catch(() => {}),
       api.getStorage().then(setStorage).catch(() => {}),
-      api.getTimeInfo().then((t) => { setTimeInfo(t); setSelectedTz(t.timezone) }).catch(() => {}),
+      api.getTimeInfo().then((ti) => { setTimeInfo(ti); setSelectedTz(ti.timezone) }).catch(() => {}),
       api.getHostname().then((h) => { setHostname(h); setDraftHostname(h.hostname) }).catch(() => {}),
       api.getUsbDevices().then(setUsbDevices).catch(() => {}),
       api.listSavedConnections().then(setSavedConns).catch(() => {}),
@@ -325,7 +330,7 @@ export function SystemPage() {
     try {
       setNetworks(await api.scanWifi())
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Scan failed')
+      setError(e instanceof Error ? e.message : t('errors.scan'))
     } finally {
       setScanning(false)
     }
@@ -336,11 +341,11 @@ export function SystemPage() {
     setError(null)
     try {
       await api.connectWifi(ssid, password)
-      setMsg(`Connected to ${ssid}`)
+      setMsg(t('msg.connected', { ssid }))
       setNetworks(null)
       await loadCore()
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Connection failed')
+      setError(e instanceof Error ? e.message : t('errors.connect'))
     } finally {
       setConnecting(null)
     }
@@ -350,10 +355,10 @@ export function SystemPage() {
     setError(null)
     try {
       await api.disconnectWifi()
-      setMsg('Disconnected')
+      setMsg(t('msg.disconnected'))
       await loadCore()
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Disconnect failed')
+      setError(e instanceof Error ? e.message : t('errors.disconnect'))
     }
   }
 
@@ -363,10 +368,10 @@ export function SystemPage() {
     setError(null)
     try {
       const result = await api.startHotspot(draftSettings.hotspot_ssid, draftSettings.hotspot_password)
-      setMsg(`Hotspot "${result.ssid}" started`)
+      setMsg(t('msg.hotspotStarted', { ssid: result.ssid }))
       await loadCore()
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to start hotspot')
+      setError(e instanceof Error ? e.message : t('errors.hotspotStart'))
     } finally {
       setHotspotBusy(false)
     }
@@ -377,10 +382,10 @@ export function SystemPage() {
     setError(null)
     try {
       await api.stopHotspot()
-      setMsg('Hotspot stopped')
+      setMsg(t('msg.hotspotStopped'))
       await loadCore()
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to stop hotspot')
+      setError(e instanceof Error ? e.message : t('errors.hotspotStop'))
     } finally {
       setHotspotBusy(false)
     }
@@ -394,7 +399,7 @@ export function SystemPage() {
       setSettings(updated)
       setDraftSettings((d) => d ? { ...d, throttle_monitor_enabled: updated.throttle_monitor_enabled } : d)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to update throttle monitor')
+      setError(e instanceof Error ? e.message : t('errors.throttle'))
     }
   }
 
@@ -406,7 +411,7 @@ export function SystemPage() {
       setSettings(updated)
       setDraftSettings((d) => d ? { ...d, throttle_check_interval_seconds: updated.throttle_check_interval_seconds } : d)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to update throttle check interval')
+      setError(e instanceof Error ? e.message : t('errors.interval'))
     }
   }
 
@@ -416,9 +421,9 @@ export function SystemPage() {
       await api.putSettings(draftSettings)
       setSettings(draftSettings)
       setEditingSettings(false)
-      setMsg('Settings saved')
+      setMsg(t('msg.saved'))
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Save failed')
+      setError(e instanceof Error ? e.message : t('errors.save'))
     }
   }
 
@@ -429,9 +434,9 @@ export function SystemPage() {
       await api.setTimezone(selectedTz)
       const updated = await api.getTimeInfo()
       setTimeInfo(updated)
-      setMsg(`Timezone set to ${selectedTz}`)
+      setMsg(t('msg.tz', { tz: selectedTz }))
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to set timezone')
+      setError(e instanceof Error ? e.message : t('errors.tz'))
     } finally {
       setSavingTz(false)
     }
@@ -453,9 +458,9 @@ export function SystemPage() {
       const updated = await api.setHostname(draftHostname)
       setHostname(updated)
       setEditingHostname(false)
-      setMsg(`Hostname changed to ${updated.hostname}`)
+      setMsg(t('msg.hostname', { hostname: updated.hostname }))
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to set hostname')
+      setError(e instanceof Error ? e.message : t('errors.hostname'))
     } finally {
       setSavingHostname(false)
     }
@@ -466,9 +471,9 @@ export function SystemPage() {
     try {
       await api.deleteSavedConnection(name)
       setSavedConns((c) => c?.filter((x) => x.name !== name) ?? null)
-      setMsg(`Deleted connection "${name}"`)
+      setMsg(t('msg.deleted', { name }))
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Delete failed')
+      setError(e instanceof Error ? e.message : t('errors.delete'))
     } finally {
       setDeletingConn(null)
     }
@@ -481,7 +486,7 @@ export function SystemPage() {
   return (
     <div className="p-4 md:p-6 max-w-2xl space-y-4 overflow-y-auto h-full">
       <div className="flex items-center justify-between">
-        <h1 className="text-lg font-semibold text-slate-100">System</h1>
+        <h1 className="text-lg font-semibold text-slate-100">{t('title')}</h1>
         {sysStatus && (
           <span className="text-xs text-slate-500 font-mono">{sysStatus.hostname}</span>
         )}
@@ -499,22 +504,22 @@ export function SystemPage() {
       )}
 
       {/* ── System stats ─────────────────────────────────────────────────── */}
-      <Section title="System" icon={Monitor}>
+      <Section title={t('stats.title')} icon={Monitor}>
         {sysStatus ? (
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-x-6 gap-y-1 text-xs mb-3">
-              <div className="text-slate-500">Platform <span className="text-slate-300 font-mono">{sysStatus.platform}</span></div>
-              <div className="text-slate-500">Uptime <span className="text-slate-300">{fmtUptime(sysStatus.uptime_seconds)}</span></div>
+              <div className="text-slate-500">{t('stats.platform')} <span className="text-slate-300 font-mono">{sysStatus.platform}</span></div>
+              <div className="text-slate-500">{t('stats.uptime')} <span className="text-slate-300">{fmtUptime(sysStatus.uptime_seconds)}</span></div>
             </div>
-            <Gauge value={sysStatus.cpu_percent} label="CPU" sublabel={`${sysStatus.cpu_percent.toFixed(1)}% utilisation`} />
+            <Gauge value={sysStatus.cpu_percent} label={t('stats.cpu')} sublabel={t('stats.cpuSub', { value: sysStatus.cpu_percent.toFixed(1) })} />
             <Gauge
               value={sysStatus.memory_percent}
-              label="Memory"
+              label={t('stats.memory')}
               sublabel={`${fmtBytes(sysStatus.memory_used_mb)} / ${fmtBytes(sysStatus.memory_total_mb)}`}
             />
             <Gauge
               value={sysStatus.disk_percent}
-              label="Root disk"
+              label={t('stats.rootDisk')}
               sublabel={`${sysStatus.disk_used_gb.toFixed(1)} GB / ${sysStatus.disk_total_gb.toFixed(1)} GB`}
             />
             {sysStatus.temperature_celsius !== null && (
@@ -523,7 +528,7 @@ export function SystemPage() {
                   sysStatus.temperature_celsius >= 80 ? 'text-rose-400' :
                   sysStatus.temperature_celsius >= 70 ? 'text-amber-400' : 'text-slate-400'
                 } />
-                <span className="text-xs text-slate-400">Temperature</span>
+                <span className="text-xs text-slate-400">{t('stats.temperature')}</span>
                 <span className={`text-sm font-mono font-medium ml-auto ${
                   sysStatus.temperature_celsius >= 80 ? 'text-rose-300' :
                   sysStatus.temperature_celsius >= 70 ? 'text-amber-300' : 'text-slate-200'
@@ -534,54 +539,54 @@ export function SystemPage() {
             )}
           </div>
         ) : (
-          <p className="text-xs text-slate-600">Loading…</p>
+          <p className="text-xs text-slate-600">{t('loading')}</p>
         )}
       </Section>
 
       {/* ── Power / throttling ──────────────────────────────────────────── */}
-      <Section title="Power" icon={Zap}>
+      <Section title={t('power.title')} icon={Zap}>
         {throttleStatus ? (
           throttleStatus.available ? (
             <div className="space-y-3">
               {throttleStatus.underpowered ? (
                 <div className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-300 flex items-center gap-2">
-                  <Zap size={14} className="flex-none" /> System is currently underpowered — check the power supply.
+                  <Zap size={14} className="flex-none" /> {t('power.underpowered')}
                 </div>
               ) : (
                 <div className="flex items-center gap-2 text-xs text-emerald-400">
-                  <CheckCircle size={13} className="flex-none" /> Power supply OK
+                  <CheckCircle size={13} className="flex-none" /> {t('power.ok')}
                 </div>
               )}
               <div className="grid grid-cols-2 gap-x-6 gap-y-1.5 text-xs">
                 {[
-                  { label: 'Under-voltage', now: throttleStatus.under_voltage, ever: throttleStatus.under_voltage_occurred },
-                  { label: 'Throttled', now: throttleStatus.throttled, ever: throttleStatus.throttled_occurred },
-                  { label: 'Frequency capped', now: throttleStatus.freq_capped, ever: throttleStatus.freq_capped_occurred },
-                  { label: 'Soft temp limit', now: throttleStatus.soft_temp_limit, ever: throttleStatus.soft_temp_limit_occurred },
+                  { label: t('power.underVoltage'), now: throttleStatus.under_voltage, ever: throttleStatus.under_voltage_occurred },
+                  { label: t('power.throttled'), now: throttleStatus.throttled, ever: throttleStatus.throttled_occurred },
+                  { label: t('power.freqCapped'), now: throttleStatus.freq_capped, ever: throttleStatus.freq_capped_occurred },
+                  { label: t('power.softTemp'), now: throttleStatus.soft_temp_limit, ever: throttleStatus.soft_temp_limit_occurred },
                 ].map(({ label, now, ever }) => (
                   <div key={label} className="flex items-center justify-between">
                     <span className="text-slate-500">{label}</span>
                     <span className={now ? 'text-rose-400 font-medium' : ever ? 'text-amber-400' : 'text-slate-400'}>
-                      {now ? 'Now' : ever ? 'Since boot' : 'OK'}
+                      {now ? t('power.now') : ever ? t('power.sinceBoot') : t('power.okState')}
                     </span>
                   </div>
                 ))}
               </div>
               <p className="text-[10px] text-slate-600">
-                Source: {throttleStatus.source} · raw {throttleStatus.raw_hex}
+                {t('power.source', { source: throttleStatus.source, raw: throttleStatus.raw_hex })}
               </p>
               <div className="border-t border-surface-border pt-3 flex items-center justify-between">
                 <div>
-                  <p className="text-xs text-slate-400">Monitor throttling</p>
+                  <p className="text-xs text-slate-400">{t('power.monitor')}</p>
                   <p className="text-xs text-slate-600">
-                    Warn in the logs when the system becomes underpowered
-                    {settings ? ` · checked every ${settings.throttle_check_interval_seconds}s` : ''}
+                    {t('power.monitorHint')}
+                    {settings ? t('power.every', { seconds: settings.throttle_check_interval_seconds }) : ''}
                   </p>
                 </div>
                 <ToggleSwitch
                   checked={settings?.throttle_monitor_enabled ?? true}
                   onChange={handleToggleThrottleMonitor}
-                  label="Monitor throttling"
+                  label={t('power.monitor')}
                 />
               </div>
               {settings?.throttle_monitor_enabled && (
@@ -589,23 +594,23 @@ export function SystemPage() {
                   steps={[1, 2, 5, 10, 15, 30, 60, 120, 300, 600]}
                   value={settings.throttle_check_interval_seconds}
                   onChange={handleSetThrottleInterval}
-                  label="Check interval"
+                  label={t('power.interval')}
                 />
               )}
             </div>
           ) : (
             <p className="text-xs text-slate-600">
-              Throttling status unavailable (vcgencmd not found and no sysfs support detected).
+              {t('power.unavailable')}
             </p>
           )
         ) : (
-          <p className="text-xs text-slate-600">Loading…</p>
+          <p className="text-xs text-slate-600">{t('loading')}</p>
         )}
       </Section>
 
       {/* ── Storage ──────────────────────────────────────────────────────── */}
       {storage && storage.length > 0 && (
-        <Section title="Storage" icon={HardDrive}>
+        <Section title={t('storage.title')} icon={HardDrive}>
           <div className="space-y-3">
             {storage.map((disk) => (
               <div key={disk.mountpoint}>
@@ -617,7 +622,7 @@ export function SystemPage() {
                     )}
                   </div>
                   <span className="text-slate-500">
-                    {disk.free_gb.toFixed(1)} GB free / {disk.total_gb.toFixed(1)} GB
+                    {t('storage.free', { free: disk.free_gb.toFixed(1), total: disk.total_gb.toFixed(1) })}
                   </span>
                 </div>
                 <div className="h-1.5 bg-surface-overlay rounded-full overflow-hidden">
@@ -637,10 +642,10 @@ export function SystemPage() {
       )}
 
       {/* ── Network ──────────────────────────────────────────────────────── */}
-      <Section title="Network" icon={Wifi}>
+      <Section title={t('network.title')} icon={Wifi}>
         {!nmcliOk && (
           <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 px-3 py-2 text-xs text-amber-300 mb-4">
-            NetworkManager (nmcli) not found. WiFi management requires NetworkManager on the host.
+            {t('network.noNmcli')}
           </div>
         )}
 
@@ -654,30 +659,30 @@ export function SystemPage() {
             </div>
             {isWifi && netStatus.ssid && (
               <div className="grid grid-cols-2 gap-y-1 text-xs">
-                <span className="text-slate-500">SSID</span>
+                <span className="text-slate-500">{t('network.ssid')}</span>
                 <span className="text-slate-200 font-mono">{netStatus.ssid}</span>
                 {netStatus.ip_address && <>
-                  <span className="text-slate-500">IP</span>
+                  <span className="text-slate-500">{t('network.ip')}</span>
                   <span className="text-slate-200 font-mono">{netStatus.ip_address}</span>
                 </>}
                 {netStatus.gateway && <>
-                  <span className="text-slate-500">Gateway</span>
+                  <span className="text-slate-500">{t('network.gateway')}</span>
                   <span className="text-slate-200 font-mono">{netStatus.gateway}</span>
                 </>}
               </div>
             )}
             {isHotspot && (
               <div className="grid grid-cols-2 gap-y-1 text-xs">
-                <span className="text-slate-500">Hotspot SSID</span>
+                <span className="text-slate-500">{t('network.hotspotSsid')}</span>
                 <span className="text-slate-200 font-mono">{netStatus.hotspot_ssid ?? '—'}</span>
                 {netStatus.hotspot_ip && <>
-                  <span className="text-slate-500">Clients connect to</span>
+                  <span className="text-slate-500">{t('network.clients')}</span>
                   <span className="text-slate-200 font-mono">{netStatus.hotspot_ip}</span>
                 </>}
               </div>
             )}
             {netStatus.mode === 'disconnected' && (
-              <p className="text-xs text-slate-500">No active wireless connection.</p>
+              <p className="text-xs text-slate-500">{t('network.noConnection')}</p>
             )}
           </div>
         )}
@@ -689,7 +694,7 @@ export function SystemPage() {
                 onClick={handleDisconnect}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-surface-border bg-surface-overlay hover:bg-surface-border text-slate-300 text-xs font-medium transition-colors"
               >
-                <WifiOff size={12} /> Disconnect
+                <WifiOff size={12} /> {t('network.disconnect')}
               </button>
             )}
             {!isHotspot && (
@@ -699,7 +704,7 @@ export function SystemPage() {
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-sky-500/30 bg-sky-500/10 hover:bg-sky-500/20 text-sky-300 text-xs font-medium disabled:opacity-50 transition-colors"
               >
                 <Radio size={12} />
-                {hotspotBusy ? 'Starting…' : 'Start Hotspot'}
+                {hotspotBusy ? t('network.starting') : t('network.startHotspot')}
               </button>
             )}
             {isHotspot && (
@@ -709,7 +714,7 @@ export function SystemPage() {
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-500/30 bg-slate-500/10 hover:bg-slate-500/20 text-slate-300 text-xs font-medium disabled:opacity-50 transition-colors"
               >
                 <WifiOff size={12} />
-                {hotspotBusy ? 'Stopping…' : 'Stop Hotspot'}
+                {hotspotBusy ? t('network.stopping') : t('network.stopHotspot')}
               </button>
             )}
             {!isHotspot && (
@@ -719,7 +724,7 @@ export function SystemPage() {
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-surface-border bg-surface-overlay hover:bg-surface-border text-slate-300 text-xs font-medium disabled:opacity-50 transition-colors"
               >
                 <RefreshCw size={12} className={scanning ? 'animate-spin' : ''} />
-                {scanning ? 'Scanning…' : 'Scan Networks'}
+                {scanning ? t('network.scanning') : t('network.scan')}
               </button>
             )}
           </div>
@@ -728,10 +733,10 @@ export function SystemPage() {
         {networks !== null && (
           <div className="mt-4 space-y-2">
             <p className="text-xs text-slate-500 mb-2">
-              {networks.length} network{networks.length !== 1 ? 's' : ''} found
+              {t('network.found', { count: networks.length })}
             </p>
             {networks.length === 0 ? (
-              <p className="text-xs text-slate-600">No networks found. Try scanning again.</p>
+              <p className="text-xs text-slate-600">{t('network.none')}</p>
             ) : (
               networks.map((n) => (
                 <WifiRow
@@ -748,21 +753,21 @@ export function SystemPage() {
 
       {/* ── Saved WiFi connections ───────────────────────────────────────── */}
       {savedConns !== null && savedConns.length > 0 && (
-        <Section title="Saved WiFi Connections" icon={Wifi}>
+        <Section title={t('saved.title')} icon={Wifi}>
           <div className="space-y-2">
             {savedConns.map((conn) => (
               <div key={conn.name} className="flex items-center gap-3 py-1">
                 <div className="flex-1 min-w-0">
                   <p className="text-sm text-slate-200 truncate">{conn.name}</p>
                   <p className="text-xs text-slate-500">
-                    {conn.autoconnect ? 'Auto-connect' : 'Manual'}
+                    {conn.autoconnect ? t('saved.auto') : t('saved.manual')}
                     {conn.interface ? ` · ${conn.interface}` : ''}
                   </p>
                 </div>
                 <button
                   onClick={() => handleDeleteConnection(conn.name)}
                   disabled={deletingConn === conn.name}
-                  title="Delete saved connection"
+                  title={t('saved.delete')}
                   className="p-1.5 rounded hover:bg-rose-500/10 text-slate-500 hover:text-rose-400 transition-colors disabled:opacity-50"
                 >
                   <Trash2 size={13} />
@@ -775,7 +780,7 @@ export function SystemPage() {
 
       {/* ── USB devices ──────────────────────────────────────────────────── */}
       {usbDevices !== null && usbDevices.length > 0 && (
-        <Section title="USB Devices" icon={Usb}>
+        <Section title={t('usb.title')} icon={Usb}>
           <div className="space-y-2">
             {usbDevices.map((dev) => (
               <div key={`${dev.bus}-${dev.device}`} className="flex items-start gap-3">
@@ -783,7 +788,7 @@ export function SystemPage() {
                 <div className="min-w-0">
                   <p className="text-sm text-slate-200 truncate">{dev.name}</p>
                   <p className="text-xs text-slate-600 font-mono">
-                    {dev.vendor_id}:{dev.product_id} · Bus {dev.bus} Dev {dev.device}
+                    {t('usb.busDev', { ids: `${dev.vendor_id}:${dev.product_id}`, bus: dev.bus, dev: dev.device })}
                   </p>
                 </div>
               </div>
@@ -793,11 +798,11 @@ export function SystemPage() {
       )}
 
       {/* ── Hotspot settings ──────────────────────────────────────────────── */}
-      <Section title="Hotspot Settings" icon={Radio}>
+      <Section title={t('hotspot.title')} icon={Radio}>
         {draftSettings && (
           <div className="space-y-3">
             <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 items-center text-xs">
-              <label className="text-slate-400">SSID</label>
+              <label className="text-slate-400">{t('hotspot.ssid')}</label>
               {editingSettings ? (
                 <input
                   value={draftSettings.hotspot_ssid}
@@ -806,7 +811,7 @@ export function SystemPage() {
                 />
               ) : <span className="text-slate-200 font-mono">{draftSettings.hotspot_ssid}</span>}
 
-              <label className="text-slate-400">Password</label>
+              <label className="text-slate-400">{t('hotspot.password')}</label>
               {editingSettings ? (
                 <input
                   type="text"
@@ -816,7 +821,7 @@ export function SystemPage() {
                 />
               ) : <span className="text-slate-200 font-mono">{'•'.repeat(Math.min(draftSettings.hotspot_password.length, 12))}</span>}
 
-              <label className="text-slate-400">Interface</label>
+              <label className="text-slate-400">{t('hotspot.interface')}</label>
               {editingSettings ? (
                 <input
                   value={draftSettings.hotspot_interface}
@@ -829,11 +834,11 @@ export function SystemPage() {
             <div className="flex gap-2 pt-1">
               {editingSettings ? (
                 <>
-                  <button onClick={handleSaveSettings} className="px-3 py-1.5 rounded bg-accent hover:bg-accent/80 text-white text-xs font-medium transition-colors">Save</button>
-                  <button onClick={() => { setDraftSettings(settings); setEditingSettings(false) }} className="px-3 py-1.5 rounded bg-surface-overlay hover:bg-surface-border text-slate-300 text-xs font-medium transition-colors">Cancel</button>
+                  <button onClick={handleSaveSettings} className="px-3 py-1.5 rounded bg-accent hover:bg-accent/80 text-white text-xs font-medium transition-colors">{t('hotspot.save')}</button>
+                  <button onClick={() => { setDraftSettings(settings); setEditingSettings(false) }} className="px-3 py-1.5 rounded bg-surface-overlay hover:bg-surface-border text-slate-300 text-xs font-medium transition-colors">{t('hotspot.cancel')}</button>
                 </>
               ) : (
-                <button onClick={() => setEditingSettings(true)} className="px-3 py-1.5 rounded bg-surface-overlay hover:bg-surface-border text-slate-300 text-xs font-medium transition-colors">Edit</button>
+                <button onClick={() => setEditingSettings(true)} className="px-3 py-1.5 rounded bg-surface-overlay hover:bg-surface-border text-slate-300 text-xs font-medium transition-colors">{t('hotspot.edit')}</button>
               )}
             </div>
           </div>
@@ -841,22 +846,22 @@ export function SystemPage() {
       </Section>
 
       {/* ── Hostname ──────────────────────────────────────────────────────── */}
-      <Section title="Hostname" icon={Server}>
+      <Section title={t('hostname.title')} icon={Server}>
         {hostnameInfo ? (
           <div className="space-y-3">
             <div className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-2 items-center text-xs">
-              <span className="text-slate-400">Hostname</span>
+              <span className="text-slate-400">{t('hostname.label')}</span>
               {editingHostname ? (
                 <input
                   value={draftHostname}
                   onChange={(e) => setDraftHostname(e.target.value)}
                   className="rounded bg-surface-overlay border border-surface-border px-2 py-1 text-slate-200 font-mono focus:outline-none focus:ring-1 focus:ring-accent"
-                  placeholder="e.g. astrolol-pi"
+                  placeholder={t('hostname.placeholder')}
                 />
               ) : <span className="text-slate-200 font-mono">{hostnameInfo.hostname}</span>}
               {hostnameInfo.fqdn && !editingHostname && (
                 <>
-                  <span className="text-slate-400">FQDN</span>
+                  <span className="text-slate-400">{t('hostname.fqdn')}</span>
                   <span className="text-slate-500 font-mono">{hostnameInfo.fqdn}</span>
                 </>
               )}
@@ -869,39 +874,39 @@ export function SystemPage() {
                     disabled={savingHostname || !draftHostname}
                     className="px-3 py-1.5 rounded bg-accent hover:bg-accent/80 text-white text-xs font-medium disabled:opacity-50 transition-colors"
                   >
-                    {savingHostname ? 'Saving…' : 'Save'}
+                    {savingHostname ? t('hostname.saving') : t('hotspot.save')}
                   </button>
-                  <button onClick={() => { setDraftHostname(hostnameInfo.hostname); setEditingHostname(false) }} className="px-3 py-1.5 rounded bg-surface-overlay hover:bg-surface-border text-slate-300 text-xs font-medium transition-colors">Cancel</button>
+                  <button onClick={() => { setDraftHostname(hostnameInfo.hostname); setEditingHostname(false) }} className="px-3 py-1.5 rounded bg-surface-overlay hover:bg-surface-border text-slate-300 text-xs font-medium transition-colors">{t('hotspot.cancel')}</button>
                 </>
               ) : (
-                <button onClick={() => setEditingHostname(true)} className="px-3 py-1.5 rounded bg-surface-overlay hover:bg-surface-border text-slate-300 text-xs font-medium transition-colors">Edit</button>
+                <button onClick={() => setEditingHostname(true)} className="px-3 py-1.5 rounded bg-surface-overlay hover:bg-surface-border text-slate-300 text-xs font-medium transition-colors">{t('hotspot.edit')}</button>
               )}
             </div>
-            <p className="text-xs text-slate-600">Changing the hostname requires a reboot to take full effect.</p>
+            <p className="text-xs text-slate-600">{t('hostname.reboot')}</p>
           </div>
-        ) : <p className="text-xs text-slate-600">Loading…</p>}
+        ) : <p className="text-xs text-slate-600">{t('loading')}</p>}
       </Section>
 
       {/* ── Time & Timezone ───────────────────────────────────────────────── */}
-      <Section title="Time & Timezone" icon={Clock}>
+      <Section title={t('time.title')} icon={Clock}>
         {timeInfo ? (
           <div className="space-y-3">
             <div className="grid grid-cols-2 gap-y-1.5 text-xs">
-              <span className="text-slate-500">Local time</span>
+              <span className="text-slate-500">{t('time.local')}</span>
               <span className="text-slate-200 font-mono">{timeInfo.datetime_local.replace('T', ' ')}</span>
-              <span className="text-slate-500">UTC</span>
+              <span className="text-slate-500">{t('time.utc')}</span>
               <span className="text-slate-200 font-mono">{timeInfo.datetime_utc.replace('T', ' ')}</span>
-              <span className="text-slate-500">Timezone</span>
+              <span className="text-slate-500">{t('time.timezone')}</span>
               <span className="text-slate-200">{timeInfo.timezone}</span>
-              <span className="text-slate-500">NTP sync</span>
+              <span className="text-slate-500">{t('time.ntp')}</span>
               <span className={timeInfo.ntp_synced ? 'text-emerald-400' : 'text-amber-400'}>
-                {timeInfo.ntp_synced ? 'Synchronized' : 'Not synced'}
+                {timeInfo.ntp_synced ? t('time.synced') : t('time.notSynced')}
               </span>
             </div>
 
             <div className="flex items-end gap-2 pt-1">
               <div className="flex-1">
-                <label className="text-xs text-slate-400 block mb-1">Change timezone</label>
+                <label className="text-xs text-slate-400 block mb-1">{t('time.change')}</label>
                 <select
                   value={selectedTz}
                   onChange={(e) => setSelectedTz(e.target.value)}
@@ -922,32 +927,32 @@ export function SystemPage() {
                 disabled={savingTz || selectedTz === timeInfo.timezone}
                 className="px-3 py-1.5 rounded bg-accent hover:bg-accent/80 text-white text-xs font-medium disabled:opacity-50 transition-colors"
               >
-                {savingTz ? 'Saving…' : 'Apply'}
+                {savingTz ? t('time.saving') : t('time.apply')}
               </button>
             </div>
-            <p className="text-xs text-slate-600">Correct timezone is critical for accurate sky calculations.</p>
+            <p className="text-xs text-slate-600">{t('time.hint')}</p>
           </div>
-        ) : <p className="text-xs text-slate-600">Loading…</p>}
+        ) : <p className="text-xs text-slate-600">{t('loading')}</p>}
       </Section>
 
       {/* ── Controls ──────────────────────────────────────────────────────── */}
-      <Section title="Controls" icon={Power}>
+      <Section title={t('controls.title')} icon={Power}>
         <div className="flex flex-wrap gap-2">
-          <ConfirmButton label="Restart App" confirmLabel="Confirm Restart" icon={RotateCcw} onClick={async () => { try { await api.restartApp() } catch {} }} variant="warning" />
-          <ConfirmButton label="Reboot Device" confirmLabel="Confirm Reboot" icon={RefreshCw} onClick={async () => { try { await api.reboot() } catch {} }} variant="warning" />
-          <ConfirmButton label="Shutdown Device" confirmLabel="Confirm Shutdown" icon={Power} onClick={async () => { try { await api.shutdown() } catch {} }} variant="danger" />
+          <ConfirmButton label={t('controls.restart')} confirmLabel={t('controls.confirmRestart')} icon={RotateCcw} onClick={async () => { try { await api.restartApp() } catch {} }} variant="warning" />
+          <ConfirmButton label={t('controls.reboot')} confirmLabel={t('controls.confirmReboot')} icon={RefreshCw} onClick={async () => { try { await api.reboot() } catch {} }} variant="warning" />
+          <ConfirmButton label={t('controls.shutdown')} confirmLabel={t('controls.confirmShutdown')} icon={Power} onClick={async () => { try { await api.shutdown() } catch {} }} variant="danger" />
         </div>
-        <p className="text-xs text-slate-600 mt-3">Click once to arm, again to confirm. Reboot/Shutdown require passwordless sudo.</p>
+        <p className="text-xs text-slate-600 mt-3">{t('controls.hint')}</p>
       </Section>
 
       {/* ── Sudo permissions ──────────────────────────────────────────────── */}
       {sudoSetup && (
-        <Section title="Sudo Permissions" icon={Shield}>
+        <Section title={t('sudo.title')} icon={Shield}>
           <div className="space-y-2">
             {[
-              { label: 'nmcli (network management)', ok: sudoSetup.nmcli_sudo_ok },
-              { label: 'reboot', ok: sudoSetup.reboot_sudo_ok },
-              { label: 'shutdown / poweroff', ok: sudoSetup.shutdown_sudo_ok },
+              { label: t('sudo.nmcli'), ok: sudoSetup.nmcli_sudo_ok },
+              { label: t('sudo.reboot'), ok: sudoSetup.reboot_sudo_ok },
+              { label: t('sudo.shutdown'), ok: sudoSetup.shutdown_sudo_ok },
             ].map(({ label, ok }) => (
               <div key={label} className="flex items-center gap-2 text-xs">
                 {ok ? <CheckCircle size={12} className="text-emerald-400 flex-none" /> : <XCircle size={12} className="text-rose-400 flex-none" />}
@@ -961,11 +966,11 @@ export function SystemPage() {
                   className="text-xs text-accent hover:underline flex items-center gap-1"
                 >
                   {showSudoHelp ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-                  Setup instructions
+                  {t('sudo.setup')}
                 </button>
                 {showSudoHelp && (
                   <div className="mt-2 rounded bg-surface-overlay border border-surface-border p-3 space-y-1">
-                    <p className="text-xs text-slate-400 mb-2">Run as root on the host:</p>
+                    <p className="text-xs text-slate-400 mb-2">{t('sudo.runAsRoot')}</p>
                     {sudoSetup.setup_commands.map((cmd, i) => (
                       <pre key={i} className="text-xs text-slate-300 font-mono break-all whitespace-pre-wrap">{cmd}</pre>
                     ))}

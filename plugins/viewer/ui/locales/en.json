@@ -1,0 +1,100 @@
+{
+  "label": "Viewer",
+  "manifest": {
+    "name": "Viewer",
+    "description": "Browse every FITS frame astrolol has captured, filter by frame type / date / coordinates, inspect metadata, preview with adjustable stretch, and set a past frame's coordinates as the mount target."
+  },
+  "loading": "Loading…",
+  "sections": {
+    "filters": "Filters",
+    "totals": "Totals per object",
+    "library": "Library settings"
+  },
+  "filters": {
+    "frameType": "Frame type",
+    "object": "Object",
+    "any": "Any",
+    "search": "Search (object or filename)",
+    "from": "From",
+    "to": "To",
+    "flat": "Flat list (ungrouped)",
+    "clear": "Clear filters"
+  },
+  "rollup": {
+    "none": "No light frames indexed yet.",
+    "object": "Object",
+    "frames": "Frames",
+    "integration": "Integration",
+    "nights": "Nights"
+  },
+  "table": {
+    "confirmReject": "Reject {{file}}? It moves to _rejected/ and can be undone from Settings.",
+    "captured": "Captured",
+    "file": "File",
+    "size": "Size",
+    "actions": "Actions",
+    "view": "View",
+    "noCoords": "No coordinates recorded for this frame",
+    "setTarget": "Set as mount target (does not slew)",
+    "reject": "Reject",
+    "none": "No frames match these filters.",
+    "loadMore": "Load more ({{count}}/{{total}})"
+  },
+  "groups": {
+    "unnamed": "(unnamed)",
+    "summary": "{{night}} · {{frames}} · {{duration}}",
+    "frames_one": "{{count}} frame",
+    "frames_other": "{{count}} frames",
+    "setTarget": "Set this group's coordinates as the mount target (does not slew)",
+    "none": "No captures indexed yet.",
+    "prev": "Prev",
+    "next": "Next",
+    "page": "Page {{page}} of {{pages}}"
+  },
+  "detail": {
+    "previous": "Previous (←)",
+    "next": "Next (→)",
+    "close": "Close (Esc)",
+    "noPreview": "No preview",
+    "setTarget": "Set as target",
+    "setTargetTitle": "Sets the mount target — does not slew",
+    "rejectTitle": "Move to _rejected/",
+    "download": "Download the original FITS",
+    "selectMount": "Select mount…",
+    "object": "Object",
+    "frameType": "Frame type",
+    "captured": "Captured",
+    "estimated": " (est.)",
+    "exposure": "Exposure",
+    "gain": "Gain",
+    "binning": "Binning",
+    "filter": "Filter",
+    "camera": "Camera",
+    "telescope": "Telescope",
+    "temp": "Temp",
+    "size": "Size",
+    "radec": "RA / Dec",
+    "coordSource": "Coord. source",
+    "wcs": "Plate-solved position",
+    "mountPointing": "The mount's reported pointing at capture time — not a measurement",
+    "quality": "Quality",
+    "hfr": "HFR",
+    "autoStretch": "Auto stretch",
+    "linear": "Linear",
+    "jpegQuality": "JPEG quality"
+  },
+  "settings": {
+    "library": "Library directory",
+    "save": "Save",
+    "libraryHint": "Changing this re-scans and drops anything outside the new path from the index.",
+    "cancelRescan": "Cancel rescan",
+    "rescan": "Rescan library",
+    "indexed": "Indexed frames",
+    "disk": "Disk free",
+    "rejected": "Rejected ({{count}} · {{size}})",
+    "nothing": "Nothing rejected.",
+    "restore": "Restore",
+    "empty": "Empty rejected (permanent)",
+    "confirmEmpty": "Permanently delete {{count}} rejected file(s)? This cannot be undone."
+  }
+}

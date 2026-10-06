@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Input } from '@/components/ui/input'
 import { ToggleSwitch } from '@/components/ui/toggle-switch'
 import * as api from './api'
@@ -23,6 +24,8 @@ export function FilterSidebar({
   flat: boolean
   onFlatChange: (v: boolean) => void
 }) {
+  const { t } = useTranslation('viewer')
+  const { t: tc } = useTranslation()
   const [facets, setFacets] = useState<api.Facets | null>(null)
 
   useEffect(() => {
@@ -38,7 +41,7 @@ export function FilterSidebar({
   return (
     <div className="flex flex-col gap-3 p-3">
       <div className="flex flex-col gap-1.5">
-        <span className="text-xs text-slate-400">Frame type</span>
+        <span className="text-xs text-slate-400">{t('filters.frameType')}</span>
         <div className="flex flex-wrap gap-1">
           {FRAME_TYPES.map((ft) => (
             <button
@@ -50,19 +53,19 @@ export function FilterSidebar({
                   : 'border-surface-border text-slate-400 hover:border-slate-500'
               }`}
             >
-              {ft}
+              {tc(`frameType.${ft}`)}
             </button>
           ))}
         </div>
       </div>
 
       <div className="flex flex-col gap-1">
-        <span className="text-xs text-slate-400">Object</span>
+        <span className="text-xs text-slate-400">{t('filters.object')}</span>
         <Input
           list="viewer-objects"
           value={filters.objectName}
           onChange={(e) => onChange({ ...filters, objectName: e.target.value })}
-          placeholder="Any"
+          placeholder={t('filters.any')}
           className="text-xs"
         />
         <datalist id="viewer-objects">
@@ -71,7 +74,7 @@ export function FilterSidebar({
       </div>
 
       <div className="flex flex-col gap-1">
-        <span className="text-xs text-slate-400">Search (object or filename)</span>
+        <span className="text-xs text-slate-400">{t('filters.search')}</span>
         <Input
           value={filters.search}
           onChange={(e) => onChange({ ...filters, search: e.target.value })}
@@ -82,20 +85,20 @@ export function FilterSidebar({
 
       <div className="grid grid-cols-2 gap-2">
         <div className="flex flex-col gap-1">
-          <span className="text-xs text-slate-400">From</span>
+          <span className="text-xs text-slate-400">{t('filters.from')}</span>
           <Input type="date" value={filters.dateFrom}
             onChange={(e) => onChange({ ...filters, dateFrom: e.target.value })} className="text-xs" />
         </div>
         <div className="flex flex-col gap-1">
-          <span className="text-xs text-slate-400">To</span>
+          <span className="text-xs text-slate-400">{t('filters.to')}</span>
           <Input type="date" value={filters.dateTo}
             onChange={(e) => onChange({ ...filters, dateTo: e.target.value })} className="text-xs" />
         </div>
       </div>
 
       <div className="flex items-center justify-between pt-2 border-t border-surface-border">
-        <span className="text-xs text-slate-400">Flat list (ungrouped)</span>
-        <ToggleSwitch checked={flat} onChange={() => onFlatChange(!flat)} label="Flat list" />
+        <span className="text-xs text-slate-400">{t('filters.flat')}</span>
+        <ToggleSwitch checked={flat} onChange={() => onFlatChange(!flat)} label={t('filters.flat')} />
       </div>
 
       {(filters.frameTypes.length > 0 || filters.objectName || filters.search || filters.dateFrom || filters.dateTo) && (
@@ -103,7 +106,7 @@ export function FilterSidebar({
           onClick={() => onChange(EMPTY_FILTERS)}
           className="text-xs text-slate-500 hover:text-slate-300 self-start"
         >
-          Clear filters
+          {t('filters.clear')}
         </button>
       )}
     </div>

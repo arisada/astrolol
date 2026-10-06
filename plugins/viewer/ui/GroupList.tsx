@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import { ChevronDown, ChevronRight, Crosshair } from 'lucide-react'
 import * as api from './api'
 import { FrameTable } from './FrameTable'
@@ -11,8 +13,8 @@ function formatDuration(totalSeconds: number): string {
   return `${m}m`
 }
 
-function groupLabel(g: api.GroupSummary): string {
-  const name = g.object_name || '(unnamed)'
+function groupLabel(t: TFunction, g: api.GroupSummary): string {
+  const name = g.object_name || t('groups.unnamed')
   const parts = [name]
   if (g.filter_name) parts.push(g.filter_name)
   if (g.frame_type !== 'dark' && g.exposure_s != null) parts.push(`${g.exposure_s}s`)
@@ -63,6 +65,7 @@ export function GroupList({
   onView: (id: string, siblingIds: string[]) => void
   onSetTarget: (image: api.ImageRecord) => void
 }) {
+  const { t } = useTranslation('viewer')
   const [groups, setGroups] = useState<api.GroupSummary[]>([])
   const [total, setTotal] = useState(0)
   const [page, setPage] = useState(1)
@@ -95,8 +98,8 @@ export function GroupList({
   return (
     <div className="flex flex-col gap-1 p-3">
       {error && <p className="text-xs text-status-error">{error}</p>}
-      {loading && groups.length === 0 && <p className="text-xs text-slate-500">Loading…</p>}
-      {!loading && groups.length === 0 && <p className="text-xs text-slate-500">No captures indexed yet.</p>}
+      {loading && groups.length === 0 && <p className="text-xs text-slate-500">{t('loading')}</p>}
+      {!loading && groups.length === 0 && <p className="text-xs text-slate-500">{t('groups.none')}</p>}
       {groups.map((g) => {
         const key = groupKeyOf(g)
         const isOpen = expanded === key
@@ -109,9 +112,9 @@ export function GroupList({
               {isOpen ? <ChevronDown size={14} className="text-slate-500 shrink-0" /> : <ChevronRight size={14} className="text-slate-500 shrink-0" />}
               <img src={api.thumbnailUrl(g.representative_id)} alt="" className="w-12 h-12 object-cover rounded bg-black shrink-0" loading="lazy" />
               <div className="flex-1 min-w-0">
-                <div className="text-sm text-slate-200 truncate">{groupLabel(g)}</div>
+                <div className="text-sm text-slate-200 truncate">{groupLabel(t, g)}</div>
                 <div className="text-xs text-slate-500">
-                  {g.night} · {g.count} frames · {formatDuration(g.total_exposure_s)}
+                  {t('groups.summary', { night: g.night, frames: t('groups.frames', { count: g.count }), duration: formatDuration(g.total_exposure_s) })}
                 </div>
               </div>
               {g.ra_deg != null && (
@@ -121,7 +124,7 @@ export function GroupList({
                     onSetTarget({ ...emptyRecord, id: g.representative_id, ra_deg: g.ra_deg, dec_deg: g.dec_deg, object_name: g.object_name })
                   }}
                   className="text-slate-500 hover:text-accent p-1 shrink-0"
-                  title="Set this group's coordinates as the mount target (does not slew)"
+                  title={t('groups.setTarget')}
                 >
                   <Crosshair size={14} />
                 </button>
@@ -142,9 +145,9 @@ export function GroupList({
       })}
       {total > 50 && (
         <div className="flex items-center justify-between pt-2 text-xs text-slate-500">
-          <button disabled={page <= 1} onClick={() => setPage((p) => p - 1)} className="disabled:opacity-30">Prev</button>
-          <span>Page {page} of {Math.ceil(total / 50)}</span>
-          <button disabled={page * 50 >= total} onClick={() => setPage((p) => p + 1)} className="disabled:opacity-30">Next</button>
+          <button disabled={page <= 1} onClick={() => setPage((p) => p - 1)} className="disabled:opacity-30">{t('groups.prev')}</button>
+          <span>{t('groups.page', { page, pages: Math.ceil(total / 50) })}</span>
+          <button disabled={page * 50 >= total} onClick={() => setPage((p) => p + 1)} className="disabled:opacity-30">{t('groups.next')}</button>
         </div>
       )}
     </div>

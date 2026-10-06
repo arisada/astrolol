@@ -3,6 +3,8 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { Search, X } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
+import { typeKey } from './FavoritesList'
 
 export interface ObjectMatch {
   name: string
@@ -37,6 +39,7 @@ interface Props {
 }
 
 export function SearchBox({ onSelect }: Props) {
+  const { t } = useTranslation('target')
   const [query, setQuery] = useState('')
   const [results, setResults] = useState<ObjectMatch[]>([])
   const [open, setOpen] = useState(false)
@@ -113,7 +116,7 @@ export function SearchBox({ onSelect }: Props) {
           onKeyDown={onKeyDown}
           onFocus={() => results.length > 0 && setOpen(true)}
           onBlur={() => setTimeout(() => setOpen(false), 150)}
-          placeholder="Search objects — M42, NGC 891, Andromeda…"
+          placeholder={t('search.placeholder')}
           className="w-full pl-10 pr-9 py-2.5 rounded-lg bg-slate-800 border border-slate-700 text-sm text-slate-100 placeholder:text-slate-500 focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500/40"
           aria-autocomplete="list"
           aria-expanded={open}
@@ -151,7 +154,7 @@ export function SearchBox({ onSelect }: Props) {
                 </span>
               )}
               <span className={`shrink-0 text-xs px-1.5 py-0.5 rounded font-medium ${typeBadgeClass(obj.type)}`}>
-                {obj.type}
+                {t(`types.${typeKey(obj.type)}`, { defaultValue: obj.type })}
               </span>
             </li>
           ))}

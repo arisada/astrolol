@@ -1,0 +1,160 @@
+{
+  "label": "Système",
+  "manifest": {
+    "name": "Système",
+    "description": "Gestion de la machine qui exécute astrolol. Gère les connexions WiFi et le mode point d'accès, affiche les statistiques CPU / mémoire / température / disque, surveille le bridage d'alimentation et thermique, et fournit les commandes de redémarrage et d'extinction."
+  },
+  "chip": {
+    "power": "Alim.",
+    "underpowered": "Sous-alimenté",
+    "ap": "PA",
+    "hotspot": "Hotspot",
+    "wifi": "Wi-Fi",
+    "temp": "Temp.",
+    "offline": "Hors ligne"
+  },
+  "mode": {
+    "wifi": "Wi-Fi",
+    "hotspot": "Hotspot",
+    "disconnected": "Hors ligne",
+    "unknown": "Inconnu"
+  },
+  "loading": "Chargement…",
+  "password": "Mot de passe",
+  "connect": "Connecter",
+  "errors": {
+    "unreachable": "Impossible de joindre le serveur",
+    "scan": "Échec de la recherche",
+    "connect": "Échec de la connexion",
+    "disconnect": "Échec de la déconnexion",
+    "hotspotStart": "Impossible de démarrer le hotspot",
+    "hotspotStop": "Impossible d'arrêter le hotspot",
+    "throttle": "Impossible de mettre à jour la surveillance du bridage",
+    "interval": "Impossible de mettre à jour l'intervalle de vérification du bridage",
+    "save": "Échec de l'enregistrement",
+    "tz": "Impossible de définir le fuseau horaire",
+    "hostname": "Impossible de définir le nom d'hôte",
+    "delete": "Échec de la suppression"
+  },
+  "msg": {
+    "connected": "Connecté à {{ssid}}",
+    "disconnected": "Déconnecté",
+    "hotspotStarted": "Hotspot « {{ssid}} » démarré",
+    "hotspotStopped": "Hotspot arrêté",
+    "saved": "Réglages enregistrés",
+    "tz": "Fuseau horaire réglé sur {{tz}}",
+    "hostname": "Nom d'hôte changé en {{hostname}}",
+    "deleted": "Connexion « {{name}} » supprimée"
+  },
+  "title": "Système",
+  "stats": {
+    "title": "Système",
+    "platform": "Plateforme",
+    "uptime": "Disponibilité",
+    "cpu": "CPU",
+    "cpuSub": "{{value}} % d'utilisation",
+    "memory": "Mémoire",
+    "rootDisk": "Disque système",
+    "temperature": "Température"
+  },
+  "power": {
+    "title": "Alimentation",
+    "underpowered": "Le système est actuellement sous-alimenté — vérifiez l'alimentation.",
+    "ok": "Alimentation correcte",
+    "underVoltage": "Sous-tension",
+    "throttled": "Bridé",
+    "freqCapped": "Fréquence limitée",
+    "softTemp": "Limite de température logicielle",
+    "now": "Maintenant",
+    "sinceBoot": "Depuis le démarrage",
+    "okState": "OK",
+    "source": "Source : {{source}} · brut {{raw}}",
+    "monitor": "Surveiller le bridage",
+    "monitorHint": "Avertit dans les journaux lorsque le système devient sous-alimenté",
+    "every": " · vérifié toutes les {{seconds}} s",
+    "interval": "Intervalle de vérification",
+    "unavailable": "État du bridage indisponible (vcgencmd introuvable et aucune prise en charge sysfs détectée)."
+  },
+  "storage": {
+    "title": "Stockage",
+    "free": "{{free}} Go libres / {{total}} Go"
+  },
+  "network": {
+    "title": "Réseau",
+    "noNmcli": "NetworkManager (nmcli) introuvable. La gestion du WiFi nécessite NetworkManager sur la machine.",
+    "ssid": "SSID",
+    "ip": "IP",
+    "gateway": "Passerelle",
+    "hotspotSsid": "SSID du hotspot",
+    "clients": "Les clients se connectent à",
+    "noConnection": "Aucune connexion sans fil active.",
+    "disconnect": "Déconnecter",
+    "startHotspot": "Démarrer le hotspot",
+    "starting": "Démarrage…",
+    "stopHotspot": "Arrêter le hotspot",
+    "stopping": "Arrêt…",
+    "scan": "Rechercher des réseaux",
+    "scanning": "Recherche…",
+    "found_one": "{{count}} réseau trouvé",
+    "found_other": "{{count}} réseaux trouvés",
+    "none": "Aucun réseau trouvé. Relancez la recherche."
+  },
+  "saved": {
+    "title": "Connexions WiFi enregistrées",
+    "auto": "Connexion automatique",
+    "manual": "Manuelle",
+    "delete": "Supprimer la connexion enregistrée"
+  },
+  "usb": {
+    "title": "Périphériques USB",
+    "busDev": "{{ids}} · Bus {{bus}} Périph. {{dev}}"
+  },
+  "hotspot": {
+    "title": "Réglages du hotspot",
+    "ssid": "SSID",
+    "password": "Mot de passe",
+    "interface": "Interface",
+    "save": "Enregistrer",
+    "cancel": "Annuler",
+    "edit": "Modifier"
+  },
+  "hostname": {
+    "title": "Nom d'hôte",
+    "label": "Nom d'hôte",
+    "fqdn": "FQDN",
+    "placeholder": "ex. astrolol-pi",
+    "saving": "Enregistrement…",
+    "reboot": "Changer le nom d'hôte nécessite un redémarrage pour prendre pleinement effet."
+  },
+  "time": {
+    "title": "Heure et fuseau horaire",
+    "local": "Heure locale",
+    "utc": "UTC",
+    "timezone": "Fuseau horaire",
+    "ntp": "Synchronisation NTP",
+    "synced": "Synchronisée",
+    "notSynced": "Non synchronisée",
+    "change": "Changer de fuseau horaire",
+    "apply": "Appliquer",
+    "saving": "Enregistrement…",
+    "hint": "Un fuseau horaire correct est essentiel pour des calculs du ciel précis."
+  },
+  "controls": {
+    "title": "Commandes",
+    "restart": "Redémarrer l'application",
+    "confirmRestart": "Confirmer le redémarrage",
+    "reboot": "Redémarrer l'appareil",
+    "confirmReboot": "Confirmer le redémarrage",
+    "shutdown": "Éteindre l'appareil",
+    "confirmShutdown": "Confirmer l'extinction",
+    "hint": "Cliquez une fois pour armer, une seconde fois pour confirmer. Le redémarrage et l'extinction nécessitent sudo sans mot de passe."
+  },
+  "sudo": {
+    "title": "Permissions sudo",
+    "nmcli": "nmcli (gestion du réseau)",
+    "reboot": "reboot",
+    "shutdown": "shutdown / poweroff",
+    "setup": "Instructions de configuration",
+    "runAsRoot": "À exécuter en root sur la machine :"
+  }
+}

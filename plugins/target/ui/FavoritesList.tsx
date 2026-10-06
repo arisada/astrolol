@@ -1,5 +1,6 @@
 // Favourites panel: list saved targets, recall on click, delete, inline name editing.
 
+import { useTranslation } from 'react-i18next'
 import { BookmarkX, ChevronRight, Star } from 'lucide-react'
 import type { FavoriteTarget } from './api'
 
@@ -27,16 +28,22 @@ const TYPE_DOT: Record<string, string> = {
   'Mount Position': 'bg-emerald-400',
 }
 
+/** i18n key suffix for an object type name, e.g. 'Cluster + Nebula' -> 'cluster_nebula'. */
+export function typeKey(type: string): string {
+  return type.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '')
+}
+
 function typeDot(type: string): string {
   return TYPE_DOT[type] ?? 'bg-slate-500'
 }
 
 export function FavoritesList({ favorites, onRecall, onDelete }: Props) {
+  const { t } = useTranslation('target')
   if (favorites.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-8 text-slate-600 text-sm gap-2">
         <Star className="h-6 w-6 opacity-40" />
-        <span>No favourites yet — search for an object and save it.</span>
+        <span>{t('favorites.empty')}</span>
       </div>
     )
   }
@@ -62,7 +69,7 @@ export function FavoritesList({ favorites, onRecall, onDelete }: Props) {
             <div className="flex items-center gap-2 mt-0.5">
               <span className="text-[10px] font-mono text-slate-500">{fmtCoord(fav.ra, fav.dec)}</span>
               {fav.object_type && (
-                <span className="text-[10px] text-slate-600">{fav.object_type}</span>
+                <span className="text-[10px] text-slate-600">{t(`types.${typeKey(fav.object_type)}`, { defaultValue: fav.object_type })}</span>
               )}
             </div>
             {fav.notes && (
@@ -77,7 +84,7 @@ export function FavoritesList({ favorites, onRecall, onDelete }: Props) {
           <button
             onClick={(e) => { e.stopPropagation(); onDelete(fav.id) }}
             className="shrink-0 p-1 rounded text-slate-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-all"
-            title="Remove from favourites"
+            title={t('favorites.remove')}
           >
             <BookmarkX className="h-3.5 w-3.5" />
           </button>

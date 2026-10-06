@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { ChevronLeft, ChevronRight, Crosshair, Download, Trash2, X } from 'lucide-react'
 import { api as coreApi } from '@/api/client'
 import { useStore } from '@/store'
@@ -45,6 +46,7 @@ export function ImageDetail({
   onNavigate: (id: string) => void
   onRejected: () => void
 }) {
+  const { t } = useTranslation('viewer')
   const [record, setRecord] = useState<api.ImageRecord | null>(null)
   const [stats, setStats] = useState<api.ImageStats | null>(null)
   const [stretch, setStretch] = useState<Stretch>(DEFAULT_STRETCH)
@@ -99,7 +101,7 @@ export function ImageDetail({
 
   const reject = async () => {
     if (!record) return
-    if (!window.confirm(`Reject ${record.path.split('/').pop()}? It moves to _rejected/ and can be undone from Settings.`)) return
+    if (!window.confirm(t('table.confirmReject', { file: record.path.split('/').pop() }))) return
     try {
       await api.rejectImage(record.id)
       onRejected()
@@ -111,7 +113,7 @@ export function ImageDetail({
   if (!record) {
     return (
       <div className="fixed inset-0 bg-black/80 z-50 flex items-center justify-center">
-        {error ? <p className="text-status-error text-sm">{error}</p> : <p className="text-slate-400 text-sm">Loading…</p>}
+        {error ? <p className="text-status-error text-sm">{error}</p> : <p className="text-slate-400 text-sm">{t('loading')}</p>}
       </div>
     )
   }
@@ -127,16 +129,16 @@ export function ImageDetail({
             {index >= 0 && (
               <span className="text-xs text-slate-500 font-mono mr-1">{index + 1}/{siblingIds.length}</span>
             )}
-            <Button size="icon" variant="ghost" onClick={() => goto('prev')} disabled={!hasPrev} title="Previous (←)"><ChevronLeft size={16} /></Button>
-            <Button size="icon" variant="ghost" onClick={() => goto('next')} disabled={!hasNext} title="Next (→)"><ChevronRight size={16} /></Button>
-            <Button size="icon" variant="ghost" onClick={onClose} title="Close (Esc)"><X size={16} /></Button>
+            <Button size="icon" variant="ghost" onClick={() => goto('prev')} disabled={!hasPrev} title={t('detail.previous')}><ChevronLeft size={16} /></Button>
+            <Button size="icon" variant="ghost" onClick={() => goto('next')} disabled={!hasNext} title={t('detail.next')}><ChevronRight size={16} /></Button>
+            <Button size="icon" variant="ghost" onClick={onClose} title={t('detail.close')}><X size={16} /></Button>
           </div>
         </div>
         <ZoomableImage
           className="flex-1"
           src={previewSrc}
           resetKey={record.id}
-          empty={<span className="text-slate-500 text-sm">No preview</span>}
+          empty={<span className="text-slate-500 text-sm">{t('detail.noPreview')}</span>}
         >
           {stats && (
             <div className="absolute bottom-2 right-2 bg-black/60 rounded p-1">
@@ -159,58 +161,58 @@ export function ImageDetail({
         <div className="flex gap-2">
           <Button size="sm" className="flex-1" onClick={setTarget}
             disabled={record.ra_deg == null || !mountId}
-            title={record.ra_deg == null ? 'No coordinates recorded for this frame' : 'Sets the mount target — does not slew'}
+            title={record.ra_deg == null ? t('table.noCoords') : t('detail.setTargetTitle')}
           >
-            <Crosshair size={12} className="mr-1" /> Set as target
+            <Crosshair size={12} className="mr-1" /> {t('detail.setTarget')}
           </Button>
-          <Button size="sm" variant="danger" onClick={reject} title="Move to _rejected/">
+          <Button size="sm" variant="danger" onClick={reject} title={t('detail.rejectTitle')}>
             <Trash2 size={12} />
           </Button>
           <a href={api.fitsDownloadUrl(record.id)} download>
-            <Button size="sm" variant="outline" title="Download the original FITS"><Download size={12} /></Button>
+            <Button size="sm" variant="outline" title={t('detail.download')}><Download size={12} /></Button>
           </a>
         </div>
 
         {connectedMounts.length > 1 && (
           <select value={mountId} onChange={(e) => setMountId(e.target.value)}
             className="rounded bg-surface-overlay border border-surface-border px-2 py-1 text-slate-200">
-            <option value="">Select mount…</option>
+            <option value="">{t('detail.selectMount')}</option>
             {connectedMounts.map((m) => <option key={m.device_id} value={m.device_id}>{m.driver_name ?? m.device_id}</option>)}
           </select>
         )}
 
         <div className="grid grid-cols-2 gap-y-1 border-t border-surface-border pt-2">
-          <span className="text-slate-500">Object</span><span className="text-slate-200">{record.object_name || '—'}</span>
-          <span className="text-slate-500">Frame type</span><span className="text-slate-200">{record.frame_type}</span>
-          <span className="text-slate-500">Captured</span>
-          <span className="text-slate-200">{record.captured_at.replace('T', ' ').slice(0, 19)}{record.captured_at_estimated && ' (est.)'}</span>
-          <span className="text-slate-500">Exposure</span><span className="text-slate-200">{fmt(record.exposure_s, 2, 's')}</span>
-          <span className="text-slate-500">Gain</span><span className="text-slate-200">{record.gain ?? '—'}</span>
-          <span className="text-slate-500">Binning</span><span className="text-slate-200">{record.binning ?? '—'}</span>
-          <span className="text-slate-500">Filter</span><span className="text-slate-200">{record.filter_name || '—'}</span>
-          <span className="text-slate-500">Camera</span><span className="text-slate-200">{record.camera_name || '—'}</span>
-          <span className="text-slate-500">Telescope</span><span className="text-slate-200">{record.telescope_name || '—'}</span>
-          <span className="text-slate-500">Temp</span><span className="text-slate-200">{fmt(record.ccd_temp, 1, '°C')}</span>
-          <span className="text-slate-500">Size</span><span className="text-slate-200">{record.width}×{record.height}</span>
-          <span className="text-slate-500">RA / Dec</span>
+          <span className="text-slate-500">{t('detail.object')}</span><span className="text-slate-200">{record.object_name || '—'}</span>
+          <span className="text-slate-500">{t('detail.frameType')}</span><span className="text-slate-200">{record.frame_type}</span>
+          <span className="text-slate-500">{t('detail.captured')}</span>
+          <span className="text-slate-200">{record.captured_at.replace('T', ' ').slice(0, 19)}{record.captured_at_estimated && t('detail.estimated')}</span>
+          <span className="text-slate-500">{t('detail.exposure')}</span><span className="text-slate-200">{fmt(record.exposure_s, 2, 's')}</span>
+          <span className="text-slate-500">{t('detail.gain')}</span><span className="text-slate-200">{record.gain ?? '—'}</span>
+          <span className="text-slate-500">{t('detail.binning')}</span><span className="text-slate-200">{record.binning ?? '—'}</span>
+          <span className="text-slate-500">{t('detail.filter')}</span><span className="text-slate-200">{record.filter_name || '—'}</span>
+          <span className="text-slate-500">{t('detail.camera')}</span><span className="text-slate-200">{record.camera_name || '—'}</span>
+          <span className="text-slate-500">{t('detail.telescope')}</span><span className="text-slate-200">{record.telescope_name || '—'}</span>
+          <span className="text-slate-500">{t('detail.temp')}</span><span className="text-slate-200">{fmt(record.ccd_temp, 1, '°C')}</span>
+          <span className="text-slate-500">{t('detail.size')}</span><span className="text-slate-200">{record.width}×{record.height}</span>
+          <span className="text-slate-500">{t('detail.radec')}</span>
           <span className="text-slate-200">
             {record.ra_deg != null ? `${record.ra_deg.toFixed(3)}° / ${record.dec_deg!.toFixed(3)}°` : '—'}
           </span>
           {record.coord_source && (
             <>
-              <span className="text-slate-500">Coord. source</span>
+              <span className="text-slate-500">{t('detail.coordSource')}</span>
               <span className="text-slate-200" title={
                 record.coord_source === 'wcs'
-                  ? 'Plate-solved position'
-                  : 'The mount\'s reported pointing at capture time — not a measurement'
+                  ? t('detail.wcs')
+                  : t('detail.mountPointing')
               }>
                 {record.coord_source}
               </span>
             </>
           )}
-          <span className="text-slate-500">Quality</span>
+          <span className="text-slate-500">{t('detail.quality')}</span>
           <span className="text-slate-200">
-            {record.star_count != null ? `${record.star_count}★` : '—'} · HFR {fmt(record.hfr, 2)}
+            {record.star_count != null ? `${record.star_count}★` : '—'} · {t('detail.hfr')} {fmt(record.hfr, 2)}
           </span>
         </div>
 
@@ -219,11 +221,11 @@ export function ImageDetail({
             <button
               onClick={() => { setStretch((s) => ({ ...s, mode: 'auto' })); setRenderStretch((s) => ({ ...s, mode: 'auto' })) }}
               className={`flex-1 px-2 py-0.5 rounded border text-xs ${stretch.mode === 'auto' ? 'border-accent text-accent bg-accent/10' : 'border-surface-border text-slate-400'}`}
-            >Auto stretch</button>
+            >{t('detail.autoStretch')}</button>
             <button
               onClick={() => { setStretch((s) => ({ ...s, mode: 'linear' })); setRenderStretch((s) => ({ ...s, mode: 'linear' })) }}
               className={`flex-1 px-2 py-0.5 rounded border text-xs ${stretch.mode === 'linear' ? 'border-accent text-accent bg-accent/10' : 'border-surface-border text-slate-400'}`}
-            >Linear</button>
+            >{t('detail.linear')}</button>
           </div>
           {stretch.mode === 'auto' && (
             <StretchControls
@@ -240,7 +242,7 @@ export function ImageDetail({
             />
           )}
           <LabeledSlider
-            label="JPEG quality" value={stretch.quality} min={10} max={100} step={5}
+            label={t('detail.jpegQuality')} value={stretch.quality} min={10} max={100} step={5}
             format={(v) => String(v)}
             onChange={(v) => setStretch((s) => ({ ...s, quality: v }))}
             onCommit={(v) => setRenderStretch((s) => ({ ...s, quality: v }))}

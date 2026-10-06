@@ -67,8 +67,11 @@ def test_keys_exist(path: Path, cat_dir: Path, plugin_id: str | None) -> None:
         if fn not in aliases:
             continue
         ns = aliases[fn]
-        if plugin_id is not None:
+        if plugin_id is not None and ns == plugin_id:
             cat = json.loads((cat_dir / "en.json").read_text())
+        elif plugin_id is not None:
+            # a plugin borrowing a core namespace (e.g. `common`) via a second useTranslation()
+            cat = _catalogue(ROOT / "ui/src/locales/en", ns)
         else:
             cat = _catalogue(cat_dir, ns)
         if "${" in key:

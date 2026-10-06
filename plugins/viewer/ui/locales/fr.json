@@ -1,0 +1,100 @@
+{
+  "label": "Visionneuse",
+  "manifest": {
+    "name": "Visionneuse",
+    "description": "Parcourez toutes les images FITS capturées par astrolol, filtrez par type d'image / date / coordonnées, consultez les métadonnées, prévisualisez avec un étirement réglable et définissez les coordonnées d'une ancienne image comme cible de la monture."
+  },
+  "loading": "Chargement…",
+  "sections": {
+    "filters": "Filtres",
+    "totals": "Totaux par objet",
+    "library": "Réglages de la bibliothèque"
+  },
+  "filters": {
+    "frameType": "Type d'image",
+    "object": "Objet",
+    "any": "Tous",
+    "search": "Recherche (objet ou nom de fichier)",
+    "from": "Du",
+    "to": "Au",
+    "flat": "Liste à plat (non groupée)",
+    "clear": "Effacer les filtres"
+  },
+  "rollup": {
+    "none": "Aucune image light indexée pour l'instant.",
+    "object": "Objet",
+    "frames": "Images",
+    "integration": "Intégration",
+    "nights": "Nuits"
+  },
+  "table": {
+    "confirmReject": "Rejeter {{file}} ? Il est déplacé dans _rejected/ et peut être restauré depuis les Réglages.",
+    "captured": "Capturée",
+    "file": "Fichier",
+    "size": "Taille",
+    "actions": "Actions",
+    "view": "Voir",
+    "noCoords": "Aucune coordonnée enregistrée pour cette image",
+    "setTarget": "Définir comme cible de la monture (sans pointer)",
+    "reject": "Rejeter",
+    "none": "Aucune image ne correspond à ces filtres.",
+    "loadMore": "Charger plus ({{count}}/{{total}})"
+  },
+  "groups": {
+    "unnamed": "(sans nom)",
+    "summary": "{{night}} · {{frames}} · {{duration}}",
+    "frames_one": "{{count}} image",
+    "frames_other": "{{count}} images",
+    "setTarget": "Définir les coordonnées de ce groupe comme cible de la monture (sans pointer)",
+    "none": "Aucune capture indexée pour l'instant.",
+    "prev": "Préc.",
+    "next": "Suiv.",
+    "page": "Page {{page}} sur {{pages}}"
+  },
+  "detail": {
+    "previous": "Précédente (←)",
+    "next": "Suivante (→)",
+    "close": "Fermer (Échap)",
+    "noPreview": "Pas d'aperçu",
+    "setTarget": "Définir comme cible",
+    "setTargetTitle": "Définit la cible de la monture — sans pointer",
+    "rejectTitle": "Déplacer dans _rejected/",
+    "download": "Télécharger le FITS d'origine",
+    "selectMount": "Choisir la monture…",
+    "object": "Objet",
+    "frameType": "Type d'image",
+    "captured": "Capturée",
+    "estimated": " (est.)",
+    "exposure": "Pose",
+    "gain": "Gain",
+    "binning": "Binning",
+    "filter": "Filtre",
+    "camera": "Caméra",
+    "telescope": "Télescope",
+    "temp": "Temp.",
+    "size": "Taille",
+    "radec": "AD / Dec",
+    "coordSource": "Source coord.",
+    "wcs": "Position résolue astrométriquement",
+    "mountPointing": "Pointage rapporté par la monture au moment de la capture — pas une mesure",
+    "quality": "Qualité",
+    "hfr": "HFR",
+    "autoStretch": "Étirement auto",
+    "linear": "Linéaire",
+    "jpegQuality": "Qualité JPEG"
+  },
+  "settings": {
+    "library": "Dossier de la bibliothèque",
+    "save": "Enregistrer",
+    "libraryHint": "Le modifier relance une analyse et retire de l'index tout ce qui est hors du nouveau chemin.",
+    "cancelRescan": "Annuler l'analyse",
+    "rescan": "Réanalyser la bibliothèque",
+    "indexed": "Images indexées",
+    "disk": "Disque libre",
+    "rejected": "Rejetées ({{count}} · {{size}})",
+    "nothing": "Rien de rejeté.",
+    "restore": "Restaurer",
+    "empty": "Vider les rejetées (définitif)",
+    "confirmEmpty": "Supprimer définitivement {{count}} fichier(s) rejeté(s) ? Cette action est irréversible."
+  }
+}

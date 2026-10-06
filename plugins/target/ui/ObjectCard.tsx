@@ -2,6 +2,8 @@
 // and action buttons for a selected sky object.
 
 import { useState } from 'react'
+import { Trans, useTranslation } from 'react-i18next'
+import { typeKey } from './FavoritesList'
 import { AlertTriangle, BookmarkPlus, ChevronLeft, ChevronRight, Crosshair, Moon, Navigation } from 'lucide-react'
 import type { ObjectMatch } from './SearchBox'
 import type { EphemerisResult } from './api'
@@ -29,8 +31,8 @@ function shiftDate(base: string, delta: number): string {
   return `${y}-${m}-${day}`
 }
 
-function formatObsDate(dateStr: string): string {
-  return new Date(dateStr + 'T12:00:00').toLocaleDateString([], {
+function formatObsDate(dateStr: string, lng: string): string {
+  return new Date(dateStr + 'T12:00:00').toLocaleDateString(lng, {
     weekday: 'short', day: 'numeric', month: 'short', year: 'numeric',
   })
 }
@@ -51,9 +53,9 @@ function fmt(degrees: number, isRa = false): string {
   return `${sign}${dd}° ${mm}′ ${ss}″`
 }
 
-function fmtTime(iso: string | null): string {
+function fmtTime(iso: string | null, lng: string): string {
   if (!iso) return '—'
-  return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', hour12: false })
+  return new Date(iso).toLocaleTimeString(lng, { hour: '2-digit', minute: '2-digit', hour12: false })
 }
 
 function moonIcon(illumination: number): string {
@@ -69,6 +71,8 @@ export function ObjectCard({
   onObsDateChange,
   onSetTarget, onSetAndSlew, onAddToFavorites,
 }: Props) {
+  const { t, i18n } = useTranslation('target')
+  const lng = i18n.language
   const [selectedMount, setSelectedMount] = useState<string>(mountIds[0] ?? '')
 
   const hasMounts = mountIds.length > 0
@@ -86,19 +90,19 @@ export function ObjectCard({
           )}
         </div>
         <span className="text-xs px-2 py-1 rounded bg-slate-700 text-slate-300 font-medium mt-0.5">
-          {object.type}
+          {t(`types.${typeKey(object.type)}`, { defaultValue: object.type })}
         </span>
       </div>
 
       {/* Coordinates */}
       <div className="grid grid-cols-2 gap-px bg-slate-700/30 border-b border-slate-700/50">
         <div className="px-4 py-2 bg-slate-800/40">
-          <p className="text-[10px] text-slate-500 uppercase tracking-wide mb-0.5">RA (J2000)</p>
+          <p className="text-[10px] text-slate-500 uppercase tracking-wide mb-0.5">{t('card.ra')}</p>
           <p className="text-sm font-mono text-slate-200">{fmt(object.ra, true)}</p>
           <p className="text-[10px] text-slate-600 mt-0.5">{object.ra.toFixed(4)}°</p>
         </div>
         <div className="px-4 py-2 bg-slate-800/40">
-          <p className="text-[10px] text-slate-500 uppercase tracking-wide mb-0.5">Dec (J2000)</p>
+          <p className="text-[10px] text-slate-500 uppercase tracking-wide mb-0.5">{t('card.dec')}</p>
           <p className="text-sm font-mono text-slate-200">{fmt(object.dec)}</p>
           <p className="text-[10px] text-slate-600 mt-0.5">{object.dec.toFixed(4)}°</p>
         </div>
@@ -109,14 +113,14 @@ export function ObjectCard({
         {loading && (
           <div className="flex items-center gap-2 text-sm text-slate-500 py-2">
             <span className="animate-spin inline-block w-3 h-3 border-2 border-slate-600 border-t-indigo-400 rounded-full" />
-            Computing ephemeris…
+            {t('card.computing')}
           </div>
         )}
 
         {!loading && ephemeris?.observer_location_missing && (
           <div className="flex items-center gap-2 text-sm text-amber-400 py-1">
             <AlertTriangle className="h-4 w-4 shrink-0" />
-            No observer location set — configure it in the active profile.
+            {t('card.noLocation')}
           </div>
         )}
 
@@ -125,24 +129,24 @@ export function ObjectCard({
             {/* Summary line */}
             <div className="mb-3">
               {ephemeris.circumpolar && (
-                <p className="text-sm text-emerald-400 font-medium">Circumpolar — always above horizon</p>
+                <p className="text-sm text-emerald-400 font-medium">{t('card.circumpolar')}</p>
               )}
               {ephemeris.never_rises && (
-                <p className="text-sm text-slate-500 font-medium">Never rises from your location</p>
+                <p className="text-sm text-slate-500 font-medium">{t('card.neverRises')}</p>
               )}
               {!ephemeris.circumpolar && !ephemeris.never_rises && ephemeris.not_observable_at_night && (
                 <p className="text-sm text-amber-400 font-medium">
-                  Not visible above {minAlt}° during darkness
+                  {t('card.notVisible', { alt: minAlt })}
                 </p>
               )}
               {!ephemeris.circumpolar && !ephemeris.never_rises && !ephemeris.not_observable_at_night && ephemeris.imaging_window_start && (
                 <p className="text-sm text-slate-300">
-                  <span className="text-indigo-400 font-medium">Best window: </span>
-                  {fmtTime(ephemeris.imaging_window_start)} → {fmtTime(ephemeris.imaging_window_end)}
+                  <span className="text-indigo-400 font-medium">{t('card.bestWindow')}</span>
+                  {fmtTime(ephemeris.imaging_window_start, lng)} → {fmtTime(ephemeris.imaging_window_end, lng)}
                   {ephemeris.peak_alt != null && (
                     <span className="text-slate-500">
-                      {' '}· peaks at <span className="text-slate-300">{ephemeris.peak_alt.toFixed(0)}°</span>
-                      {ephemeris.peak_time && <> at {fmtTime(ephemeris.peak_time)}</>}
+                      <Trans t={t} i18nKey="card.peaks" values={{ alt: ephemeris.peak_alt.toFixed(0) }} components={{ hl: <span className="text-slate-300" /> }} />
+                      {ephemeris.peak_time && t('card.peakAt', { time: fmtTime(ephemeris.peak_time, lng) })}
                     </span>
                   )}
                 </p>
@@ -153,16 +157,16 @@ export function ObjectCard({
             {!ephemeris.never_rises && (
               <div className="flex gap-1 mb-3">
                 {(ephemeris.circumpolar
-                  ? [['Transit', ephemeris.transit ?? ephemeris.peak_time, 'text-yellow-400']] as [string, string | null, string][]
+                  ? [['transit', ephemeris.transit ?? ephemeris.peak_time, 'text-yellow-400']] as [string, string | null, string][]
                   : [
-                      ['Rise',    ephemeris.rise,    'text-emerald-400'],
-                      ['Transit', ephemeris.transit ?? ephemeris.peak_time, 'text-yellow-400'],
-                      ['Set',     ephemeris.set,     'text-red-400'],
+                      ['rise',    ephemeris.rise,    'text-emerald-400'],
+                      ['transit', ephemeris.transit ?? ephemeris.peak_time, 'text-yellow-400'],
+                      ['set',     ephemeris.set,     'text-red-400'],
                     ] as [string, string | null, string][]
-                ).map(([label, iso, color]) => (
-                  <div key={label} className="flex-1 rounded-lg bg-slate-900/50 px-3 py-2 text-center">
-                    <p className={`text-[10px] uppercase tracking-wide font-medium mb-1 ${color}`}>{label}</p>
-                    <p className="text-sm font-mono text-slate-200 whitespace-nowrap">{fmtTime(iso)}</p>
+                ).map(([key, iso, color]) => (
+                  <div key={key} className="flex-1 rounded-lg bg-slate-900/50 px-3 py-2 text-center">
+                    <p className={`text-[10px] uppercase tracking-wide font-medium mb-1 ${color}`}>{t(`card.${key}`)}</p>
+                    <p className="text-sm font-mono text-slate-200 whitespace-nowrap">{fmtTime(iso, lng)}</p>
                   </div>
                 ))}
               </div>
@@ -177,21 +181,21 @@ export function ObjectCard({
                     <button
                       onClick={() => onObsDateChange(shiftDate(ephemeris.obs_date, -1))}
                       className="p-1 rounded text-slate-400 hover:text-slate-200 hover:bg-slate-700/50 transition-colors"
-                      title="Previous night"
+                      title={t('card.prevNight')}
                     >
                       <ChevronLeft className="h-4 w-4" />
                     </button>
                     <button
                       onClick={() => onObsDateChange(null)}
                       className="text-xs text-slate-400 hover:text-slate-200 transition-colors"
-                      title="Jump to tonight"
+                      title={t('card.tonight')}
                     >
-                      {formatObsDate(ephemeris.obs_date)}
+                      {formatObsDate(ephemeris.obs_date, lng)}
                     </button>
                     <button
                       onClick={() => onObsDateChange(shiftDate(ephemeris.obs_date, +1))}
                       className="p-1 rounded text-slate-400 hover:text-slate-200 hover:bg-slate-700/50 transition-colors"
-                      title="Next night"
+                      title={t('card.nextNight')}
                     >
                       <ChevronRight className="h-4 w-4" />
                     </button>
@@ -211,12 +215,10 @@ export function ObjectCard({
                 <Moon className="h-3.5 w-3.5 shrink-0" />
                 <span>
                   {moonIcon(ephemeris.moon_illumination)}{' '}
-                  Moon {(ephemeris.moon_illumination * 100).toFixed(0)}% illuminated
-                  {ephemeris.moon_separation != null && (
-                    <>, {ephemeris.moon_separation.toFixed(0)}° away</>
-                  )}
+                  {t('card.moon', { percent: (ephemeris.moon_illumination * 100).toFixed(0) })}
+                  {ephemeris.moon_separation != null && t('card.away', { deg: ephemeris.moon_separation.toFixed(0) })}
                   {ephemeris.moon_separation != null && ephemeris.moon_separation < 15 && (
-                    <span className="font-medium"> — interference likely</span>
+                    <span className="font-medium">{t('card.interference')}</span>
                   )}
                 </span>
               </div>
@@ -244,7 +246,7 @@ export function ObjectCard({
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-700 hover:bg-slate-600 text-slate-200 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
             <Crosshair className="h-3.5 w-3.5" />
-            Set Target
+            {t('card.setTarget')}
           </button>
 
           <button
@@ -253,7 +255,7 @@ export function ObjectCard({
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
             <Navigation className="h-3.5 w-3.5" />
-            Slew to Target
+            {t('card.slew')}
             <ChevronRight className="h-3 w-3 opacity-70" />
           </button>
 
@@ -262,7 +264,7 @@ export function ObjectCard({
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-slate-700 hover:bg-slate-600 text-amber-400 hover:text-amber-300 transition-colors"
           >
             <BookmarkPlus className="h-3.5 w-3.5" />
-            Add to Favourites
+            {t('card.addFavorite')}
           </button>
         </div>
       </div>
