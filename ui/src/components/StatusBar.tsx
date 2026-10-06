@@ -5,6 +5,7 @@
  */
 import { useEffect, useState } from 'react'
 import { Wifi, WifiOff } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { useStore } from '@/store'
 import { getAllPluginEntries } from '@/plugin-registry'
 import type { ConnectedDevice } from '@/api/types'
@@ -49,6 +50,7 @@ function useCountdown(exposure: { startedAt: number; duration: number } | null |
 // ---------------------------------------------------------------------------
 
 function MountChip({ device }: { device: ConnectedDevice }) {
+  const { t } = useTranslation()
   const status = useStore((s) => s.mountStatuses[device.device_id])
 
   if (!status) {
@@ -56,18 +58,19 @@ function MountChip({ device }: { device: ConnectedDevice }) {
   }
 
   if (status.is_slewing) {
-    return <Chip label={shortName(device)} status="Slewing" variant="amber" pulse />
+    return <Chip label={shortName(device)} status={t('status.slewing')} variant="amber" pulse />
   }
   if (status.is_parked) {
-    return <Chip label={shortName(device)} status="Parked" variant="slate" />
+    return <Chip label={shortName(device)} status={t('status.parked')} variant="slate" />
   }
   if (status.is_tracking) {
-    return <Chip label={shortName(device)} status="Tracking" variant="green" />
+    return <Chip label={shortName(device)} status={t('status.tracking')} variant="green" />
   }
-  return <Chip label={shortName(device)} status="Not tracking" variant="red" />
+  return <Chip label={shortName(device)} status={t('status.notTracking')} variant="red" />
 }
 
 function ImagerChip({ device }: { device: ConnectedDevice }) {
+  const { t } = useTranslation()
   const busy    = useStore((s) => s.imagerBusy[device.device_id])
   const looping = useStore((s) => s.imagerLooping[device.device_id])
   const exposure = useStore((s) => s.imagerExposures[device.device_id])
@@ -75,37 +78,40 @@ function ImagerChip({ device }: { device: ConnectedDevice }) {
 
   if (busy && remaining !== null) {
     const countdown = fmtSeconds(remaining)
-    return <Chip label={shortName(device)} status={looping ? `Loop ${countdown}` : countdown} variant="blue" />
+    return <Chip label={shortName(device)} status={looping ? t('status.loop', { time: countdown }) : countdown} variant="blue" />
   }
   if (looping) {
     // Between subs in a loop — downloading / processing
-    return <Chip label={shortName(device)} status="Downloading…" variant="blue" />
+    return <Chip label={shortName(device)} status={t('status.downloading')} variant="blue" />
   }
 
   // Show cooler status when active and not yet at target — requires cameraStatus
   // (populated by useStatusPolling)
-  return <Chip label={shortName(device)} status="Idle" variant="slate" />
+  return <Chip label={shortName(device)} status={t('status.idle')} variant="slate" />
 }
 
 function CoolerChip({ device }: { device: ConnectedDevice }) {
+  const { t } = useTranslation()
   const cam = useStore((s) => s.cameraStatuses[device.device_id])
   if (!cam?.cooler_on || cam.temperature === null) return null
   const temp = cam.temperature.toFixed(0)
   const power = cam.cooler_power !== null ? ` ${cam.cooler_power.toFixed(0)}%` : ''
-  return <Chip label={shortName(device)} status={`Cooling ${temp}°C${power}`} variant="blue" />
+  return <Chip label={shortName(device)} status={t('status.cooling', { temp, power })} variant="blue" />
 }
 
 function FocuserChip({ device }: { device: ConnectedDevice }) {
+  const { t } = useTranslation()
   const status = useStore((s) => s.focuserStatuses[device.device_id])
   if (!status?.is_moving) return null
   const pos = status.position !== null ? ` → ${status.position}` : ''
-  return <Chip label={shortName(device)} status={`Moving${pos}`} variant="amber" pulse />
+  return <Chip label={shortName(device)} status={t('status.moving', { pos })} variant="amber" pulse />
 }
 
 function FilterWheelChip({ device }: { device: ConnectedDevice }) {
+  const { t } = useTranslation()
   const status = useStore((s) => s.filterWheelStatuses[device.device_id])
   if (!status?.is_moving) return null
-  return <Chip label={shortName(device)} status="Rotating" variant="amber" pulse />
+  return <Chip label={shortName(device)} status={t('status.rotating')} variant="amber" pulse />
 }
 
 // ---------------------------------------------------------------------------
@@ -113,6 +119,7 @@ function FilterWheelChip({ device }: { device: ConnectedDevice }) {
 // ---------------------------------------------------------------------------
 
 export function StatusBar() {
+  const { t } = useTranslation()
   const wsConnected    = useStore((s) => s.wsConnected)
   const devices        = useStore((s) => s.connectedDevices)
 
@@ -146,7 +153,7 @@ export function StatusBar() {
           ? <Wifi size={12} />
           : <WifiOff size={12} />}
         <span className="hidden sm:inline">
-          {wsConnected ? 'live' : 'reconnecting…'}
+          {wsConnected ? t('ws.live') : t('ws.reconnecting')}
         </span>
       </span>
     </div>

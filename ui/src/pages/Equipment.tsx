@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import {
   Camera, ChevronLeft, CircleDot, Compass, Crosshair, Focus, Globe,
   Link2, LoaderPinwheel, MapPin, PackagePlus, Pencil, Plug, PlugZap, Plus, RefreshCw,
@@ -29,15 +30,6 @@ function suggestDeviceId(kind: DeviceKind, driver: DriverEntry | null): string {
   const raw = driver.executable.replace(/^indi_/, '') || driver.manufacturer
   const slug = raw.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/, '').slice(0, 40)
   return slug ? `${kind}_${slug}` : ''
-}
-
-const KIND_LABELS: Record<DeviceKind, string> = {
-  camera: 'Camera',
-  mount: 'Mount',
-  focuser: 'Focuser',
-  filter_wheel: 'Filter Wheel',
-  rotator: 'Rotator',
-  indi: 'INDI Device',
 }
 
 const KIND_ADAPTER: Record<DeviceKind, string> = {
@@ -83,22 +75,24 @@ function KindIcon({ kind, size = 28 }: { kind: DeviceKind; size?: number }) {
 // ---------------------------------------------------------------------------
 
 function StepBack({ onClick }: { onClick: () => void }) {
+  const { t } = useTranslation('equipment')
   return (
     <button
       onClick={onClick}
       className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-300 mb-4 transition-colors"
     >
-      <ChevronLeft size={14} /> Back
+      <ChevronLeft size={14} /> {t('wizard.back')}
     </button>
   )
 }
 
 // Step 1 — choose device type
 function TypeStep({ onSelect }: { onSelect: (kind: DeviceKind) => void }) {
+  const { t } = useTranslation('equipment')
   const kinds: DeviceKind[] = ['camera', 'mount', 'focuser', 'filter_wheel']
   return (
     <div>
-      <p className="text-xs text-slate-500 mb-4">What do you want to connect?</p>
+      <p className="text-xs text-slate-500 mb-4">{t('wizard.typeQuestion')}</p>
       <div className="grid grid-cols-2 gap-3">
         {kinds.map((kind) => (
           <button
@@ -107,7 +101,7 @@ function TypeStep({ onSelect }: { onSelect: (kind: DeviceKind) => void }) {
             className="flex flex-col items-center gap-3 rounded-lg border border-surface-border bg-surface-raised px-4 py-6 text-slate-400 transition-all hover:border-accent hover:text-slate-100 hover:bg-surface-overlay"
           >
             <KindIcon kind={kind} size={32} />
-            <span className="text-sm font-medium">{KIND_LABELS[kind]}</span>
+            <span className="text-sm font-medium">{t(`kind.${kind}`)}</span>
           </button>
         ))}
       </div>
@@ -127,30 +121,31 @@ function SourceStep({
   onChooseGeneric: () => void
   onBack: () => void
 }) {
+  const { t } = useTranslation('equipment')
   return (
     <div>
       <StepBack onClick={onBack} />
       <p className="text-xs text-slate-500 mb-4">
-        <span className="text-slate-300 font-medium">{KIND_LABELS[kind]}</span>
-        {' · '}How is it connected?
+        <span className="text-slate-300 font-medium">{t(`kind.${kind}`)}</span>
+        {' · '}{t('wizard.howConnected')}
       </p>
       <div className="flex flex-col gap-2">
         <button
           onClick={onChooseIndi}
           className="text-left rounded px-3 py-2.5 text-sm text-slate-300 border border-transparent hover:border-surface-border hover:bg-surface-raised transition-colors"
         >
-          Browse INDI drivers
+          {t('wizard.browseIndi')}
           <span className="block text-xs text-slate-500 mt-0.5">
-            Starts indiserver and loads a driver from the catalog
+            {t('wizard.browseIndiHint')}
           </span>
         </button>
         <button
           onClick={onChooseGeneric}
           className="text-left rounded px-3 py-2.5 text-sm text-slate-300 border border-transparent hover:border-surface-border hover:bg-surface-raised transition-colors"
         >
-          Other adapter
+          {t('wizard.otherAdapter')}
           <span className="block text-xs text-slate-500 mt-0.5">
-            Native (non-INDI) drivers and simulators — e.g. plugins that register their own adapter
+            {t('wizard.otherAdapterHint')}
           </span>
         </button>
       </div>
@@ -170,14 +165,15 @@ function ManufacturerStep({
   onSelect: (manufacturer: string | null) => void
   onBack: () => void
 }) {
+  const { t } = useTranslation('equipment')
   const manufacturers = [...new Set(drivers.map((d) => d.manufacturer))].sort()
 
   return (
     <div>
       <StepBack onClick={onBack} />
       <p className="text-xs text-slate-500 mb-4">
-        <span className="text-slate-300 font-medium">{KIND_LABELS[kind]}</span>
-        {' · '}Select manufacturer
+        <span className="text-slate-300 font-medium">{t(`kind.${kind}`)}</span>
+        {' · '}{t('wizard.selectManufacturer')}
       </p>
       <div className="flex flex-col gap-1.5 max-h-72 overflow-y-auto pr-1">
         {manufacturers.map((m) => (
@@ -193,7 +189,7 @@ function ManufacturerStep({
           onClick={() => onSelect(null)}
           className="text-left rounded px-3 py-2 text-xs text-slate-500 hover:text-slate-400 transition-colors mt-1 border-t border-surface-border pt-3"
         >
-          Enter manually…
+          {t('wizard.enterManually')}
         </button>
       </div>
     </div>
@@ -214,16 +210,17 @@ function ModelStep({
   onSelect: (driver: DriverEntry) => void
   onBack: () => void
 }) {
+  const { t } = useTranslation('equipment')
   const models = drivers.filter((d) => d.manufacturer === manufacturer)
 
   return (
     <div>
       <StepBack onClick={onBack} />
       <p className="text-xs text-slate-500 mb-4">
-        <span className="text-slate-300 font-medium">{KIND_LABELS[kind]}</span>
+        <span className="text-slate-300 font-medium">{t(`kind.${kind}`)}</span>
         {' · '}
         <span className="text-slate-300">{manufacturer}</span>
-        {' · '}Select model
+        {' · '}{t('wizard.selectModel')}
       </p>
       <div className="flex flex-col gap-1.5 max-h-72 overflow-y-auto pr-1">
         {models.map((d) => (
@@ -255,6 +252,7 @@ function ManualStep({
   loading: boolean
   error: string | null
 }) {
+  const { t } = useTranslation('equipment')
   const [executable, setExecutable] = useState('')
   const [deviceNameHint, setDeviceNameHint] = useState('')
 
@@ -262,17 +260,17 @@ function ManualStep({
     <div>
       <StepBack onClick={onBack} />
       <p className="text-xs text-slate-500 mb-4">
-        <span className="text-slate-300 font-medium">{KIND_LABELS[kind]}</span>
-        {' · '}Enter driver manually
+        <span className="text-slate-300 font-medium">{t(`kind.${kind}`)}</span>
+        {' · '}{t('wizard.enterDriver')}
       </p>
 
       <div className="flex flex-col gap-3">
         <div className="flex flex-col gap-1">
           <label className="text-xs text-slate-400">
-            Driver executable <span className="text-status-error">*</span>
+            {t('wizard.executable')} <span className="text-status-error">*</span>
           </label>
           <Input
-            placeholder="e.g. indi_asi_ccd"
+            placeholder={t('wizard.executablePlaceholder')}
             value={executable}
             onChange={(e) => setExecutable(e.target.value)}
             autoFocus
@@ -281,11 +279,11 @@ function ManualStep({
 
         <div className="flex flex-col gap-1">
           <label className="text-xs text-slate-400">
-            INDI device name hint
-            <span className="ml-2 text-slate-600">(optional — leave blank to auto-discover)</span>
+            {t('wizard.deviceHint')}
+            <span className="ml-2 text-slate-600">{t('wizard.deviceHintOptional')}</span>
           </label>
           <Input
-            placeholder="e.g. ZWO CCD ASI294MC Pro"
+            placeholder={t('wizard.deviceHintPlaceholder')}
             value={deviceNameHint}
             onChange={(e) => setDeviceNameHint(e.target.value)}
           />
@@ -302,7 +300,7 @@ function ManualStep({
           onClick={() => onLoadDriver(deviceNameHint.trim(), executable.trim())}
         >
           <Plug size={14} className="mr-2" />
-          {loading ? 'Loading driver…' : 'Load driver'}
+          {loading ? t('wizard.loadingDriver') : t('wizard.loadDriver')}
         </Button>
       </div>
     </div>
@@ -328,6 +326,7 @@ function GenericAdapterStep({
   connecting: boolean
   error: string | null
 }) {
+  const { t } = useTranslation('equipment')
   const [adapterKey, setAdapterKey] = useState(adapterKeys[0] ?? '')
   const [deviceId, setDeviceId] = useState('')
   const [paramsText, setParamsText] = useState('{}')
@@ -359,7 +358,7 @@ function GenericAdapterStep({
     try {
       params = paramsText.trim() ? JSON.parse(paramsText) : {}
     } catch {
-      setParamsError('Params must be valid JSON, e.g. {"state_key": "rig1"}')
+      setParamsError(t('wizard.paramsInvalid'))
       return
     }
     setParamsError(null)
@@ -371,8 +370,7 @@ function GenericAdapterStep({
       <div>
         <StepBack onClick={onBack} />
         <p className="text-sm text-slate-500">
-          No non-INDI adapters are registered for {KIND_LABELS[kind]}. Enable a plugin that
-          registers one (e.g. the EQMOD plugin's mount emulator) and reload.
+          {t('wizard.noAdapters', { kind: t(`kind.${kind}`) })}
         </p>
       </div>
     )
@@ -382,12 +380,12 @@ function GenericAdapterStep({
     <div>
       <StepBack onClick={onBack} />
       <p className="text-xs text-slate-500 mb-4">
-        <span className="text-slate-300 font-medium">{KIND_LABELS[kind]}</span>
-        {' · '}Other adapter
+        <span className="text-slate-300 font-medium">{t(`kind.${kind}`)}</span>
+        {' · '}{t('wizard.otherAdapter')}
       </p>
       <div className="flex flex-col gap-3">
         <div className="flex flex-col gap-1">
-          <label className="text-xs text-slate-400">Adapter</label>
+          <label className="text-xs text-slate-400">{t('wizard.adapter')}</label>
           <select
             value={adapterKey}
             onChange={(e) => setAdapterKey(e.target.value)}
@@ -402,26 +400,26 @@ function GenericAdapterStep({
 
         <div className="flex flex-col gap-1">
           <label className="text-xs text-slate-400">
-            Device ID
-            <span className="ml-2 text-slate-600">(leave blank to auto-generate)</span>
+            {t('wizard.deviceId')}
+            <span className="ml-2 text-slate-600">{t('wizard.deviceIdOptional')}</span>
           </label>
           <Input
-            placeholder="auto-generated"
+            placeholder={t('wizard.autoGenerated')}
             value={deviceId}
             onChange={(e) => setDeviceId(e.target.value)}
             className={deviceIdInvalid ? 'border-status-error focus-visible:ring-status-error' : ''}
           />
           {deviceIdInvalid && (
             <p className="text-xs text-status-error">
-              Only letters, digits, hyphens, and underscores. Must start with a letter or digit (max 64 chars).
+              {t('wizard.deviceIdInvalid')}
             </p>
           )}
         </div>
 
         <div className="flex flex-col gap-1">
           <label className="text-xs text-slate-400">
-            Connect params (JSON)
-            <span className="ml-2 text-slate-600">adapter-specific, e.g. {'{"state_key": "rig1"}'}</span>
+            {t('wizard.params')}
+            <span className="ml-2 text-slate-600">{t('wizard.paramsHint', { example: '{"state_key": "rig1"}' })}</span>
           </label>
           <textarea
             value={paramsText}
@@ -444,7 +442,7 @@ function GenericAdapterStep({
           onClick={handleConnect}
         >
           <Plug size={14} className="mr-2" />
-          {connecting ? 'Connecting…' : 'Connect'}
+          {connecting ? t('wizard.connecting') : t('wizard.connect')}
         </Button>
       </div>
     </div>
@@ -464,6 +462,7 @@ function PropEditor({
   value: PreConnectProps[string] | undefined
   onChange: (spec: PreConnectProps[string]) => void
 }) {
+  const { t } = useTranslation('equipment')
   if (prop.type === 'switch') {
     // Fall back to the driver's current snapshot value so the user sees the
     // existing state even if this prop hasn't been added to preConnectProps yet.
@@ -480,7 +479,7 @@ function PropEditor({
           className="bg-surface border border-surface-border rounded px-3 py-1.5 text-sm text-slate-200
             focus:outline-none focus:ring-1 focus:ring-accent"
         >
-          {rule === 'atmost1' && <option value="">— none —</option>}
+          {rule === 'atmost1' && <option value="">{t('wizard.none')}</option>}
           {prop.widgets.map((w) => (
             <option key={w.name} value={w.name}>
               {w.label}
@@ -595,6 +594,7 @@ function ConfigureStep({
   deviceId: string
   onDeviceIdChange: (id: string) => void
 }) {
+  const { t } = useTranslation('equipment')
   // Only show writable properties that aren't CONNECTION itself
   const editable = properties.filter(
     (p) => p.name !== 'CONNECTION' && p.permission !== 'ro' && p.type !== 'blob',
@@ -617,20 +617,20 @@ function ConfigureStep({
     <div>
       <StepBack onClick={onBack} />
       <p className="text-xs text-slate-500 mb-4">
-        <span className="text-slate-300 font-medium">{KIND_LABELS[kind]}</span>
+        <span className="text-slate-300 font-medium">{t(`kind.${kind}`)}</span>
         {driver && (
           <>
             {' · '}
             <span className="text-slate-300">{driver.label}</span>
           </>
         )}
-        {' · '}Configure &amp; connect
+        {' · '}{t('wizard.configure')}
       </p>
 
       {/* Device name — show picker if multiple, plain label if one */}
       <div className="flex flex-col gap-3 mb-4 pb-4 border-b border-surface-border">
         <div className="flex flex-col gap-1">
-          <label className="text-xs text-slate-400">INDI device name</label>
+          <label className="text-xs text-slate-400">{t('wizard.indiName')}</label>
           {discoveredDeviceNames.length > 1 ? (
             <select
               value={selectedDeviceName}
@@ -644,32 +644,32 @@ function ConfigureStep({
             </select>
           ) : (
             <p className="text-sm text-slate-200 bg-surface border border-surface-border rounded px-3 py-1.5">
-              {selectedDeviceName || <span className="text-slate-600 italic">discovering…</span>}
+              {selectedDeviceName || <span className="text-slate-600 italic">{t('wizard.discovering')}</span>}
             </p>
           )}
         </div>
 
         <div className="flex flex-col gap-1">
           <label className="text-xs text-slate-400">
-            Device ID
-            <span className="ml-2 text-slate-600">(leave blank to auto-generate)</span>
+            {t('wizard.deviceId')}
+            <span className="ml-2 text-slate-600">{t('wizard.deviceIdOptional')}</span>
           </label>
           <Input
-            placeholder={suggestDeviceId(kind, driver) || 'auto-generated'}
+            placeholder={suggestDeviceId(kind, driver) || t('wizard.autoGenerated')}
             value={deviceId}
             onChange={(e) => onDeviceIdChange(e.target.value)}
             className={deviceIdInvalid ? 'border-status-error focus-visible:ring-status-error' : ''}
           />
           {deviceIdInvalid && (
             <p className="text-xs text-status-error">
-              Only letters, digits, hyphens, and underscores. Must start with a letter or digit (max 64 chars).
+              {t('wizard.deviceIdInvalid')}
             </p>
           )}
         </div>
       </div>
 
       {editable.length === 0 ? (
-        <p className="text-sm text-slate-500 mb-4">No configurable properties. Click Connect to proceed.</p>
+        <p className="text-sm text-slate-500 mb-4">{t('wizard.noProps')}</p>
       ) : (
         <div className="flex flex-col gap-6 mb-4 max-h-64 overflow-y-auto pr-1">
           {Object.entries(groups).map(([group, props]) => (
@@ -707,7 +707,7 @@ function ConfigureStep({
         onClick={onConnect}
       >
         <Plug size={14} className="mr-2" />
-        {connecting ? 'Connecting…' : 'Connect'}
+        {connecting ? t('wizard.connecting') : t('wizard.connect')}
       </Button>
     </div>
   )
@@ -736,6 +736,7 @@ function DeviceRow({
   onImport: () => void
   isCompanion?: boolean
 }) {
+  const { t } = useTranslation('equipment')
   return (
     <div
       className={[
@@ -755,8 +756,8 @@ function DeviceRow({
         <div className="flex flex-col gap-0.5">
           <span className="text-sm font-medium text-slate-200">{d.device_id}</span>
           <span className="text-xs text-slate-500">
-            {KIND_LABELS[d.kind] ?? d.kind}
-            {isCompanion && <span className="ml-1 text-slate-600">· auto-discovered</span>}
+            {t(`kind.${d.kind}`, { defaultValue: d.kind })}
+            {isCompanion && <span className="ml-1 text-slate-600">· {t('device.autoDiscovered')}</span>}
           </span>
         </div>
       </div>
@@ -766,7 +767,7 @@ function DeviceRow({
           variant="ghost"
           size="icon"
           onClick={(e) => { e.stopPropagation(); onImport() }}
-          title="Import to inventory"
+          title={t('device.import')}
         >
           <PackagePlus size={14} className="text-slate-400" />
         </Button>
@@ -775,7 +776,7 @@ function DeviceRow({
             variant="ghost"
             size="icon"
             onClick={(e) => { e.stopPropagation(); onReconnect(d.device_id) }}
-            title="Reconnect"
+            title={t('device.reconnect')}
           >
             <Link2 size={14} className="text-slate-400" />
           </Button>
@@ -784,7 +785,7 @@ function DeviceRow({
             variant="ghost"
             size="icon"
             onClick={(e) => { e.stopPropagation(); onDisconnect(d.device_id) }}
-            title="Disconnect (keep registered)"
+            title={t('device.disconnect')}
           >
             <PlugZap size={14} className="text-slate-400" />
           </Button>
@@ -794,7 +795,7 @@ function DeviceRow({
             variant="ghost"
             size="icon"
             onClick={(e) => { e.stopPropagation(); onRemove(d.device_id) }}
-            title="Remove device"
+            title={t('device.remove')}
           >
             <Trash2 size={14} className="text-slate-500" />
           </Button>
@@ -807,17 +808,6 @@ function DeviceRow({
 // ---------------------------------------------------------------------------
 // Inventory helpers
 // ---------------------------------------------------------------------------
-
-const ITEM_TYPE_LABELS: Record<EquipmentItemType, string> = {
-  site: 'Observation Site',
-  mount: 'Mount',
-  ota: 'Telescope / OTA',
-  camera: 'Camera',
-  filter_wheel: 'Filter Wheel',
-  focuser: 'Focuser',
-  rotator: 'Rotator',
-  gps: 'GPS',
-}
 
 function ItemTypeIcon({ type, size = 16 }: { type: EquipmentItemType; size?: number }) {
   if (type === 'site') return <MapPin size={size} />
@@ -911,6 +901,7 @@ function ItemForm({
   onSave: (item: EquipmentItem | Omit<EquipmentItem, 'id'>) => Promise<void>
   onCancel: () => void
 }) {
+  const { t } = useTranslation('equipment')
   const [form, setForm] = useState<EquipmentItem | Omit<EquipmentItem, 'id'>>(initial)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -951,7 +942,7 @@ function ItemForm({
         connectParams = connectParamsText.trim() ? JSON.parse(connectParamsText) : {}
         setConnectParamsError(null)
       } catch {
-        setConnectParamsError('Connect params must be valid JSON, e.g. {"state_key": "rig1"}')
+        setConnectParamsError(t('form.paramsInvalid'))
         return
       }
     }
@@ -974,16 +965,16 @@ function ItemForm({
     >
       <div className="flex items-center gap-2 text-xs font-medium text-slate-400 uppercase tracking-wider">
         <ItemTypeIcon type={type} size={13} />
-        {ITEM_TYPE_LABELS[type]}
+        {t(`itemType.${type}`)}
       </div>
 
-      <FieldRow label="Name">
+      <FieldRow label={t('form.name')}>
         <input
           ref={nameRef}
           required
           value={(form as {name: string}).name}
           onChange={(e) => set('name', e.target.value)}
-          placeholder={`e.g. ${ITEM_EXAMPLE_NAMES[type]}`}
+          placeholder={t('form.eg', { example: type === 'site' ? t('form.exampleSite') : ITEM_EXAMPLE_NAMES[type] })}
           className="bg-surface border border-surface-border rounded px-3 py-1.5 text-sm text-slate-200
             focus:outline-none focus:ring-1 focus:ring-accent w-full"
         />
@@ -992,43 +983,43 @@ function ItemForm({
       {/* INDI fields — for all INDI device types */}
       {type !== 'site' && type !== 'ota' && (
         <>
-          <FieldRow label="INDI driver">
+          <FieldRow label={t('form.indiDriver')}>
             <input
               value={(form as { indi_driver: string | null }).indi_driver ?? ''}
               onChange={(e) => set('indi_driver', e.target.value || null)}
-              placeholder="e.g. indi_eqmod_telescope"
+              placeholder={t('form.indiDriverPlaceholder')}
               className="bg-surface border border-surface-border rounded px-3 py-1.5 text-sm text-slate-200
                 focus:outline-none focus:ring-1 focus:ring-accent w-full"
             />
           </FieldRow>
-          <FieldRow label="INDI device name">
+          <FieldRow label={t('form.indiDeviceName')}>
             <input
               value={(form as { indi_device_name: string | null }).indi_device_name ?? ''}
               onChange={(e) => set('indi_device_name', e.target.value || null)}
-              placeholder="Announced by driver, e.g. EQ6 Mount"
+              placeholder={t('form.indiDeviceNamePlaceholder')}
               className="bg-surface border border-surface-border rounded px-3 py-1.5 text-sm text-slate-200
                 focus:outline-none focus:ring-1 focus:ring-accent w-full"
             />
           </FieldRow>
 
           <p className="text-xs text-slate-600 -mb-1">
-            Or, for a non-INDI adapter (native driver, simulator, …):
+            {t('form.nonIndi')}
           </p>
-          <FieldRow label="Adapter key">
+          <FieldRow label={t('form.adapterKey')}>
             <input
               value={(form as { adapter_key: string | null }).adapter_key ?? ''}
               onChange={(e) => set('adapter_key', e.target.value || null)}
-              placeholder="e.g. eqmod_sim"
+              placeholder={t('form.adapterKeyPlaceholder')}
               className="bg-surface border border-surface-border rounded px-3 py-1.5 text-sm text-slate-200
                 focus:outline-none focus:ring-1 focus:ring-accent w-full"
             />
           </FieldRow>
-          <FieldRow label="Connect params (JSON)">
+          <FieldRow label={t('form.params')}>
             <textarea
               value={connectParamsText}
               onChange={(e) => setConnectParamsText(e.target.value)}
               rows={3}
-              placeholder='e.g. {"state_key": "rig1"}'
+              placeholder={t('form.paramsPlaceholder')}
               className="bg-surface border border-surface-border rounded px-3 py-1.5 text-sm text-slate-200
                 font-mono focus:outline-none focus:ring-1 focus:ring-accent w-full"
             />
@@ -1040,14 +1031,14 @@ function ItemForm({
       {/* Site fields */}
       {type === 'site' && (
         <>
-          <FieldRow label="Latitude">
+          <FieldRow label={t('form.latitude')}>
             <DmsInput
               value={(form as { latitude: number }).latitude}
               onChange={(v) => set('latitude', v)}
               mode="lat"
             />
           </FieldRow>
-          <FieldRow label="Longitude">
+          <FieldRow label={t('form.longitude')}>
             <DmsInput
               value={(form as { longitude: number }).longitude}
               onChange={(v) => set('longitude', v)}
@@ -1055,7 +1046,7 @@ function ItemForm({
             />
           </FieldRow>
           <div className="grid grid-cols-2 gap-3">
-            <FieldRow label="Altitude (m)">
+            <FieldRow label={t('form.altitude')}>
               <input
                 type="number" step="1"
                 value={(form as { altitude: number }).altitude}
@@ -1064,7 +1055,7 @@ function ItemForm({
                   focus:outline-none focus:ring-1 focus:ring-accent w-full"
               />
             </FieldRow>
-            <FieldRow label="Timezone">
+            <FieldRow label={t('form.timezone')}>
               <TimezoneSelect
                 value={(form as { timezone: string }).timezone}
                 onChange={(v) => set('timezone', v)}
@@ -1077,7 +1068,7 @@ function ItemForm({
       {/* OTA fields */}
       {type === 'ota' && (
         <div className="grid grid-cols-2 gap-3">
-          <FieldRow label="Focal length (mm)">
+          <FieldRow label={t('form.focalLength')}>
             <input
               type="number" step="1" min="0"
               value={(form as { focal_length: number }).focal_length}
@@ -1086,7 +1077,7 @@ function ItemForm({
                 focus:outline-none focus:ring-1 focus:ring-accent w-full"
             />
           </FieldRow>
-          <FieldRow label="Aperture (mm)">
+          <FieldRow label={t('form.aperture')}>
             <input
               type="number" step="1" min="0"
               value={(form as { aperture: number }).aperture}
@@ -1101,22 +1092,22 @@ function ItemForm({
       {/* Camera extra fields */}
       {type === 'camera' && (
         <div className="flex gap-3">
-          <FieldRow label="Pixel size (µm)">
+          <FieldRow label={t('form.pixelSize')}>
             <input
               type="number" step="0.01" min="0"
               value={(form as { pixel_size_um: number | null }).pixel_size_um ?? ''}
               onChange={(e) => set('pixel_size_um', e.target.value ? parseFloat(e.target.value) : null)}
-              placeholder="e.g. 3.76"
+              placeholder={t('form.pixelSizePlaceholder')}
               className="bg-surface border border-surface-border rounded px-3 py-1.5 text-sm text-slate-200
                 focus:outline-none focus:ring-1 focus:ring-accent w-40"
             />
           </FieldRow>
-          <FieldRow label="Default gain">
+          <FieldRow label={t('form.defaultGain')}>
             <input
               type="number" step="1" min="0"
               value={(form as { default_gain: number | null }).default_gain ?? ''}
               onChange={(e) => set('default_gain', e.target.value ? parseInt(e.target.value, 10) : null)}
-              placeholder="driver default is risky — set this"
+              placeholder={t('form.defaultGainPlaceholder')}
               className="bg-surface border border-surface-border rounded px-3 py-1.5 text-sm text-slate-200
                 focus:outline-none focus:ring-1 focus:ring-accent w-56"
             />
@@ -1126,7 +1117,7 @@ function ItemForm({
 
       {/* Filter wheel extra field */}
       {type === 'filter_wheel' && (
-        <FieldRow label="Filter names (comma-separated)">
+        <FieldRow label={t('form.filterNames')}>
           <input
             value={filterNamesText}
             onChange={(e) => {
@@ -1146,10 +1137,10 @@ function ItemForm({
 
       <div className="flex gap-2">
         <Button type="submit" disabled={saving}>
-          {saving ? 'Saving…' : 'Save'}
+          {saving ? t('form.saving') : t('form.save')}
         </Button>
         <Button type="button" variant="ghost" onClick={onCancel}>
-          Cancel
+          {t('form.cancel')}
         </Button>
       </div>
     </form>
@@ -1164,6 +1155,7 @@ function InventorySection({ importItem, onImportDone }: {
   importItem?: Omit<EquipmentItem, 'id'> | null
   onImportDone?: () => void
 }) {
+  const { t } = useTranslation('equipment')
   const [items, setItems] = useState<EquipmentItem[]>([])
   const [creating, setCreating] = useState<Omit<EquipmentItem, 'id'> | null>(null)
   const [editing, setEditing] = useState<string | null>(null)  // item id
@@ -1193,7 +1185,7 @@ function InventorySection({ importItem, onImportDone }: {
   }
 
   const handleDelete = async (id: string) => {
-    if (!confirm('Remove this item from inventory?')) return
+    if (!confirm(t('inventory.confirmRemove'))) return
     await api.inventory.delete(id)
     if (editing === id) setEditing(null)
     load()
@@ -1201,9 +1193,9 @@ function InventorySection({ importItem, onImportDone }: {
 
   // Group items by type for display
   const grouped = items.reduce<Partial<Record<EquipmentItemType, EquipmentItem[]>>>((acc, item) => {
-    const t = item.type as EquipmentItemType
-    if (!acc[t]) acc[t] = []
-    acc[t]!.push(item)
+    const ty = item.type as EquipmentItemType
+    if (!acc[ty]) acc[ty] = []
+    acc[ty]!.push(item)
     return acc
   }, {})
 
@@ -1214,7 +1206,7 @@ function InventorySection({ importItem, onImportDone }: {
       {/* Add button */}
       <div className="flex items-center justify-between">
         <p className="text-xs text-slate-500">
-          {items.length === 0 ? 'Your equipment inventory is empty.' : `${items.length} item${items.length !== 1 ? 's' : ''}`}
+          {items.length === 0 ? t('inventory.empty') : t('inventory.items', { count: items.length })}
         </p>
         <div className="relative">
           <Button
@@ -1223,23 +1215,23 @@ function InventorySection({ importItem, onImportDone }: {
             onClick={() => setShowTypeMenu((v) => !v)}
           >
             <Plus size={14} className="mr-1.5" />
-            Add equipment
+            {t('inventory.add')}
           </Button>
           {showTypeMenu && (
             <div className="absolute right-0 top-full mt-1 z-10 bg-surface border border-surface-border rounded shadow-lg min-w-44">
-              {allTypes.map((t) => (
+              {allTypes.map((ty) => (
                 <button
-                  key={t}
+                  key={ty}
                   className="flex items-center gap-2 w-full px-3 py-2 text-sm text-slate-300
                     hover:bg-surface-raised transition-colors text-left"
                   onClick={() => {
-                    setCreating(emptyForm(t))
+                    setCreating(emptyForm(ty))
                     setEditing(null)
                     setShowTypeMenu(false)
                   }}
                 >
-                  <ItemTypeIcon type={t} size={13} />
-                  {ITEM_TYPE_LABELS[t]}
+                  <ItemTypeIcon type={ty} size={13} />
+                  {t(`itemType.${ty}`)}
                 </button>
               ))}
             </div>
@@ -1264,7 +1256,7 @@ function InventorySection({ importItem, onImportDone }: {
           <div key={type}>
             <h3 className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
               <ItemTypeIcon type={type} size={11} />
-              {ITEM_TYPE_LABELS[type]}
+              {t(`itemType.${type}`)}
             </h3>
             <div className="flex flex-col gap-2">
               {group.map((item) => (
@@ -1288,7 +1280,7 @@ function InventorySection({ importItem, onImportDone }: {
                           variant="ghost"
                           size="icon"
                           onClick={() => { setEditing(item.id); setCreating(null) }}
-                          title="Edit"
+                          title={t('inventory.edit')}
                         >
                           <Pencil size={13} className="text-slate-400" />
                         </Button>
@@ -1296,7 +1288,7 @@ function InventorySection({ importItem, onImportDone }: {
                           variant="ghost"
                           size="icon"
                           onClick={() => handleDelete(item.id)}
-                          title="Delete"
+                          title={t('inventory.delete')}
                         >
                           <Trash2 size={13} className="text-slate-500" />
                         </Button>
@@ -1312,7 +1304,7 @@ function InventorySection({ importItem, onImportDone }: {
 
       {items.length === 0 && !creating && (
         <p className="text-sm text-slate-600 text-center py-8">
-          Click "Add equipment" to build your inventory.
+          {t('inventory.hint')}
         </p>
       )}
     </div>
@@ -1324,6 +1316,7 @@ function InventorySection({ importItem, onImportDone }: {
 // ---------------------------------------------------------------------------
 
 export function Equipment() {
+  const { t } = useTranslation('equipment')
   const connectedDevices = useStore((s) => s.connectedDevices)
   const setConnectedDevices = useStore((s) => s.setConnectedDevices)
 
@@ -1575,9 +1568,9 @@ export function Equipment() {
     <>
     <div className="p-6 max-w-3xl">
       <div className="flex items-center justify-between mb-4">
-        <h1 className="text-lg font-semibold text-slate-100">Equipment</h1>
+        <h1 className="text-lg font-semibold text-slate-100">{t('title')}</h1>
         {activeTab === 'connections' && (
-          <Button variant="ghost" size="icon" onClick={refresh} title="Refresh">
+          <Button variant="ghost" size="icon" onClick={refresh} title={t('refresh')}>
             <RefreshCw size={15} />
           </Button>
         )}
@@ -1596,7 +1589,7 @@ export function Equipment() {
                 : 'border-transparent text-slate-500 hover:text-slate-300',
             ].join(' ')}
           >
-            {tab}
+            {t(`tabs.${tab}`)}
           </button>
         ))}
       </div>
@@ -1615,10 +1608,10 @@ export function Equipment() {
       {/* Connected devices */}
       <section className="mb-8">
         <h2 className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-3">
-          Connected
+          {t('connected')}
         </h2>
         {connectedDevices.length === 0 ? (
-          <p className="text-sm text-slate-500">No devices connected.</p>
+          <p className="text-sm text-slate-500">{t('noDevices')}</p>
         ) : (
           <div className="flex flex-col gap-3">
             {connectedDevices
@@ -1666,7 +1659,7 @@ export function Equipment() {
       {/* Connect wizard */}
       <section>
         <h2 className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-3">
-          Load driver
+          {t('loadDriver')}
         </h2>
         <div className="bg-surface-raised border border-surface-border rounded p-4">
           {step === 'type' && (
@@ -1710,7 +1703,7 @@ export function Equipment() {
           {step === 'loading' && (
             <div className="flex items-center gap-3 py-6 text-slate-400 text-sm">
               <RefreshCw size={16} className="animate-spin shrink-0" />
-              Loading driver…
+              {t('loading')}
             </div>
           )}
           {step === 'manual' && (

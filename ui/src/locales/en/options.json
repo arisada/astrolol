@@ -1,0 +1,76 @@
+{
+  "tokens": {
+    "D": "ISO date (YYYY-MM-DD)",
+    "T": "Time (HHMMSS)",
+    "U": "Home directory",
+    "O": "Object / target name",
+    "F": "Frame type (light/dark/flat/bias)",
+    "N": "Counter (6-digit, zero-padded, per camera)",
+    "C": "Camera name (device ID)",
+    "f": "Filter name (empty if no filter wheel)",
+    "E": "Exposure time (seconds)",
+    "G": "Gain"
+  },
+  "tokenRef": {
+    "hide": "Hide token reference",
+    "show": "Show token reference"
+  },
+  "language": {
+    "title": "Language",
+    "label": "Interface language"
+  },
+  "saving": {
+    "title": "Image Saving",
+    "dir": "Save directory",
+    "dirHint": "Directory template for saved subs. Supports % tokens.",
+    "filename": "Filename template",
+    "filenameHint": "Without extension — <code>.fits</code> is appended automatically.",
+    "example": "Example:",
+    "saving": "Saving…",
+    "saved": "Saved.",
+    "error": "Failed to save settings."
+  },
+  "indi": {
+    "title": "INDI Server",
+    "manage": "Manage indiserver automatically",
+    "manageHint": "astrolol will start and stop indiserver as needed",
+    "runDir": "Run directory",
+    "runDirHint": "Directory for the INDI FIFO and state file (persisted)",
+    "localUpload": "Local image transfer",
+    "localUploadHint": "Driver writes FITS directly to disk — eliminates base64 encoding over TCP.",
+    "uploadDir": "Upload directory",
+    "uploadDirHint": "Shared directory where the driver saves images",
+    "hideAdvanced": "Hide advanced settings",
+    "showAdvanced": "Show advanced settings",
+    "host": "INDI server host",
+    "hostHint": "Only used when automatic management is disabled",
+    "port": "INDI server port",
+    "portHint": "Default: 7624",
+    "logging": "INDI protocol logging",
+    "loggingHint": "Log XML traffic to console and log file. Resets to Off on restart.",
+    "logOff": "Off",
+    "logTags": "Tags only",
+    "logFull": "Full XML",
+    "lowMemory": "Low memory mode",
+    "lowMemoryHint": "Serialise image processing and plate solving. Use on Raspberry Pi or other memory-constrained hardware to avoid OOM kills."
+  },
+  "plugins": {
+    "title": "Plugins",
+    "restartPending": "Restart required to take effect",
+    "saved": "Saved.",
+    "saveError": "Failed to save plugin settings.",
+    "restarting": "Restarting…",
+    "restartNeeded": "Restart required for changes to take effect.",
+    "restartNow": "Restart now"
+  },
+  "server": {
+    "title": "Server",
+    "restart": "Restart astrolol",
+    "restarting": "Restarting…",
+    "stopIndi": "Stop INDI server",
+    "stopping": "Stopping…",
+    "indiStopped": "INDI server stopped.",
+    "indiStopFailed": "Failed to stop INDI server."
+  },
+  "title": "Options"
+}

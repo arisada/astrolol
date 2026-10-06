@@ -10,6 +10,7 @@ import { Profiles } from './pages/Profiles'
 import { api } from '@/api/client'
 import { useStore } from '@/store'
 import { getPluginEntry } from '@/plugin-registry'
+import { setLanguage } from '@/i18n'
 
 export function App() {
   const setPluginInfos = useStore((s) => s.setPluginInfos)
@@ -20,6 +21,12 @@ export function App() {
       .then(setPluginInfos)
       .catch(() => {})
   }, [setPluginInfos])
+
+  useEffect(() => {
+    api.settings.get()
+      .then((s) => setLanguage(s.language ?? 'en'))
+      .catch(() => {})
+  }, [])
 
   const enabledPlugins = pluginInfos.filter((p) => p.enabled)
 

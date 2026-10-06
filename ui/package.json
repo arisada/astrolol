@@ -11,9 +11,11 @@
     "generate-api-types": "npx openapi-typescript http://localhost:8000/openapi.json -o src/api/schema.d.ts"
   },
   "dependencies": {
+    "i18next": "^26.4.2",
     "lucide-react": "^0.378.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
+    "react-i18next": "^17.0.16",
     "react-router-dom": "^6.23.1",
     "zustand": "^4.5.2"
   },

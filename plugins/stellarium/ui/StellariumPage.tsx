@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Trans, useTranslation } from 'react-i18next'
 
 interface StellariumStatus {
   running: boolean
@@ -14,7 +15,13 @@ function StatusDot({ ok }: { ok: boolean }) {
   )
 }
 
+const RICH = {
+  hl: <span className="text-slate-300" />,
+  mono: <span className="text-slate-300 font-mono" />,
+}
+
 export function StellariumPage() {
+  const { t } = useTranslation('stellarium')
   const [status, setStatus] = useState<StellariumStatus | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -25,7 +32,7 @@ export function StellariumPage() {
       setStatus(s)
       setError(null)
     } catch {
-      setError('Cannot reach backend')
+      setError(t('unreachable'))
     }
   }
 
@@ -47,17 +54,17 @@ export function StellariumPage() {
   }
 
   if (error) return <div className="p-6 text-status-error text-sm">{error}</div>
-  if (!status) return <div className="p-6 text-slate-500 text-sm">Loading…</div>
+  if (!status) return <div className="p-6 text-slate-500 text-sm">{t('loading')}</div>
 
   return (
     <div className="p-6 max-w-xl">
-      <h1 className="text-lg font-semibold text-slate-100 mb-6">Stellarium Server</h1>
+      <h1 className="text-lg font-semibold text-slate-100 mb-6">{t('title')}</h1>
 
       <div className="bg-surface-raised rounded-lg p-4 space-y-3 mb-6">
         <div className="flex items-center justify-between">
           <span className="text-sm text-slate-300 flex items-center">
             <StatusDot ok={status.running} />
-            {status.running ? 'Running' : 'Stopped'}
+            {status.running ? t('running') : t('stopped')}
           </span>
           <button
             onClick={toggle}
@@ -67,42 +74,25 @@ export function StellariumPage() {
                 ? 'bg-slate-600 hover:bg-slate-500 text-white'
                 : 'bg-accent hover:bg-accent/80 text-white'}`}
           >
-            {busy ? '…' : status.running ? 'Stop' : 'Start'}
+            {busy ? '…' : status.running ? t('stop') : t('start')}
           </button>
         </div>
         <div className="flex gap-6 text-xs text-slate-500 pt-1 border-t border-slate-700">
-          <span>Port: <span className="text-slate-300 font-mono">{status.port}</span></span>
-          <span>Clients: <span className="text-slate-300">{status.clients_connected}</span></span>
+          <span>{t('port')} <span className="text-slate-300 font-mono">{status.port}</span></span>
+          <span>{t('clients')} <span className="text-slate-300">{status.clients_connected}</span></span>
         </div>
       </div>
 
       <div className="text-sm text-slate-400 space-y-3">
-        <p className="font-semibold text-slate-300">How to connect Stellarium</p>
+        <p className="font-semibold text-slate-300">{t('howto.title')}</p>
         <ol className="list-decimal list-inside space-y-1.5 text-xs text-slate-500">
-          <li>Plugins → Telescope Control → enable the plugin → configure</li>
-          <li>Click <span className="text-slate-300">Add a new telescope</span></li>
-          <li>
-            Telescope controlled by:{' '}
-            <span className="text-slate-300 font-mono">3rd party software or remote computer</span>
-          </li>
-          <li>
-            Connection type: <span className="text-slate-300 font-mono">TCP</span>
-          </li>
-          <li>
-            Host: <span className="text-slate-300 font-mono">astrolol-host</span>, Port:{' '}
-            <span className="text-slate-300 font-mono">{status.port}</span>
-          </li>
-          <li>Save and connect. The telescope reticle should appear on the sky.</li>
-          <li>
-            In telescope properties, set{' '}
-            <span className="text-slate-300">Coordinate system: J2000</span> (this is
-            the default).
-          </li>
+          {[1, 2, 3, 4, 5, 6, 7].map((n) => (
+            <li key={n}>
+              <Trans t={t} i18nKey={`howto.step${n}`} values={{ port: status.port }} components={RICH} />
+            </li>
+          ))}
         </ol>
-        <p className="text-xs text-slate-600 pt-2">
-          Right-click any object → Current object → Slew telescope to issue a GoTo.
-          Position is pushed to Stellarium every 500 ms.
-        </p>
+        <p className="text-xs text-slate-600 pt-2">{t('howto.footer')}</p>
       </div>
     </div>
   )

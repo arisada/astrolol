@@ -1,0 +1,12 @@
+{
+  "title": "Journal des événements",
+  "all": "Tous",
+  "errors": "Erreurs",
+  "verbosityTitle": "Verbosité des journaux",
+  "verbosity": "Verbosité",
+  "resets": "réinitialisée au redémarrage",
+  "debug": "debug",
+  "empty": "Aucun événement pour l'instant.",
+  "noMatch": "Aucun événement ne correspond aux filtres sélectionnés.",
+  "footer": "{{count}} derniers événements en mémoire · Historique complet dans <code>astrolol.log</code>"
+}

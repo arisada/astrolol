@@ -1,0 +1,94 @@
+{
+  "rates": {
+    "guide": "Guidage",
+    "centering": "Centrage",
+    "find": "Recherche",
+    "max": "Max"
+  },
+  "tracking": {
+    "sidereal": "Sidéral",
+    "lunar": "Lunaire",
+    "solar": "Solaire"
+  },
+  "pier": {
+    "East": "Est",
+    "West": "Ouest"
+  },
+  "meridianDistance": {
+    "before": "{{time}} avant le méridien",
+    "after": "{{time}} après le méridien"
+  },
+  "none": {
+    "title": "Aucune monture connectée.",
+    "hint": "Connectez une monture dans Matériel ou activez un profil."
+  },
+  "slewing": "Pointage…",
+  "indiProps": "Propriétés INDI",
+  "position": {
+    "title": "Position",
+    "ra": "AD",
+    "dec": "Dec",
+    "alt": "Haut.",
+    "az": "Az",
+    "ha": "AH",
+    "lst": "TSL",
+    "pier": "Côté"
+  },
+  "target": {
+    "title": "Cible",
+    "set": "Définir la cible",
+    "slew": "Pointer",
+    "sync": "Synchroniser",
+    "stop": "Stop",
+    "live": "↺ direct"
+  },
+  "trackingCard": {
+    "title": "Suivi",
+    "toggle": "Activer/désactiver le suivi",
+    "on": "Oui",
+    "off": "Non",
+    "unpark": "Déparquez la monture pour activer le suivi.",
+    "firmware": "Les vitesses lunaire et solaire nécessitent la prise en charge par le firmware."
+  },
+  "park": {
+    "title": "Parcage",
+    "unpark": "Déparquer",
+    "park": "Parquer",
+    "setPosition": "Définir comme position de parcage",
+    "setPositionTitle": "Définir la position actuelle comme position de parcage",
+    "parked": "La monture est parquée.",
+    "auto": "Parquer automatiquement à",
+    "localTime": "heure locale"
+  },
+  "meridian": {
+    "title": "Méridien et horizon",
+    "flip": "Retournement au méridien",
+    "flipTitle": "Effectuer le retournement au méridien",
+    "haUnknown": "Angle horaire inconnu",
+    "wrongSide": "Le côté {{side}} du pilier est déjà le côté normal pour cet angle horaire",
+    "notCrossed": "La monture n'a pas encore franchi le méridien",
+    "tooFar": "Plus de 2 h après le méridien — pointez d'abord la cible",
+    "noFlip": "Côté {{side}} : pas de retournement nécessaire",
+    "waiting": "En attente du passage au méridien",
+    "slewFirst": "Pointez la cible avant de retourner",
+    "autoFlip": "Retourner automatiquement quand AH >",
+    "limit": "Limite du méridien",
+    "limitTitle": "De combien l'axe AD peut tourner au-delà du méridien, dans les deux sens. Au-delà, le suivi s'arrête et les pointages/corrections sont refusés. Appliqué par les montures qui le gèrent (EQMOD) ; les pilotes INDI conservent leurs propres limites.",
+    "limitUnit": "° au-delà du méridien ({{time}} h)",
+    "horizon": "Limite d'horizon",
+    "horizonTitle": "Horizon plat : les GOTO vers des cibles situées en dessous sont refusés. Quand une monture en suivi passe en dessous, l'action choisie est exécutée une fois.",
+    "horizonUnit": "° de hauteur, puis",
+    "stopTracking": "arrêter le suivi",
+    "park": "parquer",
+    "nothing": "ne rien faire"
+  },
+  "nudge": {
+    "title": "Corrections",
+    "rate": "Vitesse",
+    "hold": "Maintenir pour déplacer, relâcher pour arrêter",
+    "north": "Nord",
+    "south": "Sud",
+    "east": "Est",
+    "west": "Ouest"
+  }
+}

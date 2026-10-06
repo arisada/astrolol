@@ -1,0 +1,12 @@
+{
+  "title": "Event Log",
+  "all": "All",
+  "errors": "Errors",
+  "verbosityTitle": "Log verbosity",
+  "verbosity": "Verbosity",
+  "resets": "resets on restart",
+  "debug": "debug",
+  "empty": "No events yet.",
+  "noMatch": "No events match the selected filters.",
+  "footer": "Last {{count}} events in memory · Full history in <code>astrolol.log</code>"
+}

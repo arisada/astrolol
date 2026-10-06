@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { ChevronRight, X } from 'lucide-react'
 import { api } from '@/api/client'
 import type { DeviceProperty, IndiDeviceMessage, PropertyWidget } from '@/api/types'
@@ -97,6 +98,7 @@ function NumberProperty({
 }) {
   const isReadOnly = prop.permission === 'ro'
   const [localValues, setLocalValues] = useState<Record<string, string>>({})
+  const { t } = useTranslation()
   const focusedRef = useRef(false)
 
   // Sync from server when not editing
@@ -150,7 +152,7 @@ function NumberProperty({
       ))}
       {!isReadOnly && (
         <Button size="sm" variant="outline" className="self-start h-6 text-xs px-2" onClick={handleSet}>
-          Set
+          {t('deviceProps.set')}
         </Button>
       )}
     </div>
@@ -170,6 +172,7 @@ function TextProperty({
 }) {
   const isReadOnly = prop.permission === 'ro'
   const [localValues, setLocalValues] = useState<Record<string, string>>({})
+  const { t } = useTranslation()
   const focusedRef = useRef(false)
 
   useEffect(() => {
@@ -212,7 +215,7 @@ function TextProperty({
       ))}
       {!isReadOnly && (
         <Button size="sm" variant="outline" className="self-start h-6 text-xs px-2" onClick={handleSet}>
-          Set
+          {t('deviceProps.set')}
         </Button>
       )}
     </div>
@@ -247,6 +250,7 @@ function PropertyRow({
   prop: DeviceProperty
   deviceId: string
 }) {
+  const { t } = useTranslation()
   return (
     <div className="py-2.5 border-b border-surface-border last:border-0">
       {/* Header: state dot + human label + internal name */}
@@ -275,7 +279,7 @@ function PropertyRow({
           <LightProperty widgets={prop.widgets} />
         )}
         {prop.type === 'blob' && (
-          <span className="text-xs text-slate-600">BLOB (binary)</span>
+          <span className="text-xs text-slate-600">{t('deviceProps.blob')}</span>
         )}
       </div>
     </div>
@@ -287,6 +291,7 @@ function PropertyRow({
 // ---------------------------------------------------------------------------
 
 function MessagesTab({ indiDeviceName }: { indiDeviceName: string | null }) {
+  const { t } = useTranslation()
   const [messages, setMessages] = useState<IndiDeviceMessage[]>([])
   const [error, setError] = useState<string | null>(null)
 
@@ -317,13 +322,13 @@ function MessagesTab({ indiDeviceName }: { indiDeviceName: string | null }) {
   }, [indiDeviceName])
 
   if (!indiDeviceName) {
-    return <p className="text-xs text-slate-500 p-4">Not an INDI device.</p>
+    return <p className="text-xs text-slate-500 p-4">{t('deviceProps.notIndi')}</p>
   }
   if (error) {
     return <p className="text-xs text-status-error p-4">{error}</p>
   }
   if (messages.length === 0) {
-    return <p className="text-xs text-slate-500 p-4">No messages from driver.</p>
+    return <p className="text-xs text-slate-500 p-4">{t('deviceProps.noMessages')}</p>
   }
   return (
     <div className="flex flex-col gap-0">
@@ -351,6 +356,7 @@ interface Props {
 type Tab = 'properties' | 'messages'
 
 export function DevicePropertiesPanel({ deviceId, onClose }: Props) {
+  const { t } = useTranslation()
   const [tab, setTab] = useState<Tab>('properties')
   const [properties, setProperties] = useState<DeviceProperty[]>([])
   const [error, setError] = useState<string | null>(null)
@@ -406,28 +412,28 @@ export function DevicePropertiesPanel({ deviceId, onClose }: Props) {
         <div>
           <p className="text-sm font-semibold text-slate-100">{deviceId}</p>
           <p className="text-xs text-slate-500">
-            {indiDeviceName ?? 'Device properties'}
+            {indiDeviceName ?? t('deviceProps.title')}
           </p>
         </div>
-        <Button variant="ghost" size="icon" onClick={onClose} title="Close panel">
+        <Button variant="ghost" size="icon" onClick={onClose} title={t('deviceProps.close')}>
           <X size={14} />
         </Button>
       </div>
 
       {/* Tabs */}
       <div className="flex border-b border-surface-border flex-shrink-0">
-        {(['properties', 'messages'] as Tab[]).map((t) => (
+        {(['properties', 'messages'] as Tab[]).map((name) => (
           <button
-            key={t}
-            onClick={() => setTab(t)}
+            key={name}
+            onClick={() => setTab(name)}
             className={[
               'px-4 py-2 text-xs font-medium capitalize transition-colors',
-              tab === t
+              tab === name
                 ? 'text-slate-100 border-b-2 border-accent -mb-px'
                 : 'text-slate-500 hover:text-slate-300',
             ].join(' ')}
           >
-            {t}
+            {t(`deviceProps.tabs.${name}`)}
           </button>
         ))}
       </div>
@@ -438,7 +444,7 @@ export function DevicePropertiesPanel({ deviceId, onClose }: Props) {
           error ? (
             <p className="text-xs text-status-error p-4">{error}</p>
           ) : properties.length === 0 ? (
-            <p className="text-xs text-slate-500 p-4">Loading properties…</p>
+            <p className="text-xs text-slate-500 p-4">{t('deviceProps.loading')}</p>
           ) : (
             groups.map(([group, props]) => {
               const isOpen = openGroup === group

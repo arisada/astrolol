@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import { fmtRA, fmtDec } from '@/utils/formatting'
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Crosshair, RefreshCw, RotateCw, Settings, StopCircle } from 'lucide-react'
 import { api } from '@/api/client'
@@ -16,23 +18,14 @@ import { DevicePropertiesPanel } from '@/components/DevicePropertiesPanel'
 // Constants
 // ---------------------------------------------------------------------------
 
-const DEFAULT_MOVE_RATES = [
-  { label: 'Guide',   rate: 'guide'     },
-  { label: 'Center',  rate: 'centering' },
-  { label: 'Find',    rate: 'find'      },
-  { label: 'Max',     rate: 'max'       },
-]
+const DEFAULT_MOVE_RATES = ['guide', 'centering', 'find', 'max']
 
 /** Extract rate options from a TELESCOPE_SLEW_RATE switch property. */
 function slewRatesFromProperty(prop: DeviceProperty): { label: string; rate: string }[] {
   return prop.widgets.map((w) => ({ label: String(w.label || w.name), rate: String(w.name) }))
 }
 
-const TRACKING_MODES: { label: string; mode: TrackingMode }[] = [
-  { label: 'Sidereal', mode: 'sidereal' },
-  { label: 'Lunar',    mode: 'lunar'    },
-  { label: 'Solar',    mode: 'solar'    },
-]
+const TRACKING_MODES: TrackingMode[] = ['sidereal', 'lunar', 'solar']
 
 // ---------------------------------------------------------------------------
 // Pure formatting helpers
@@ -48,12 +41,12 @@ function fmtHA(ha: number | null | undefined): string {
   return `${sign}${h}h ${String(m).padStart(2, '0')}m`
 }
 
-function fmtMeridianDistance(ha: number): string {
+function fmtMeridianDistance(ha: number, t: TFunction): string {
   const abs = Math.abs(ha)
   const h = Math.floor(abs)
   const m = Math.floor((abs - h) * 60)
   const parts = h > 0 ? `${h}h ${m}m` : `${m}m`
-  return ha < 0 ? `${parts} to meridian` : `${parts} past meridian`
+  return t(ha < 0 ? 'meridianDistance.before' : 'meridianDistance.after', { time: parts })
 }
 
 // ---------------------------------------------------------------------------
@@ -135,6 +128,7 @@ function FrameToggle({ jnow, onChange }: { jnow: boolean; onChange: (jnow: boole
 // ---------------------------------------------------------------------------
 
 function MountControls({ deviceId }: { deviceId: string }) {
+  const { t } = useTranslation('mount')
   const status = useStore((s) => s.mountStatuses[deviceId] ?? null)
   const [showIndiPanel, setShowIndiPanel] = useState(false)
 
@@ -166,8 +160,10 @@ function MountControls({ deviceId }: { deviceId: string }) {
   }, [deviceId])
 
   const moveRates = useMemo(
-    () => slewRateProp ? slewRatesFromProperty(slewRateProp) : DEFAULT_MOVE_RATES,
-    [slewRateProp],
+    () => slewRateProp
+      ? slewRatesFromProperty(slewRateProp)
+      : DEFAULT_MOVE_RATES.map((rate) => ({ label: t(`rates.${rate}`), rate })),
+    [slewRateProp, t],
   )
 
   const saveMountSettings = useCallback((updated: MountDeviceSettings) => {
@@ -211,6 +207,7 @@ function MountControls({ deviceId }: { deviceId: string }) {
   // MountManager.meridian_flip_due. Flipping from the normal side would raise the counterweight.
   // Without a reported pier side, fall back to "past the meridian, by at most 2 h".
   const pierSide   = status?.pier_side ?? null
+  const pierSideLabel = pierSide ? t(`pier.${pierSide}`, { defaultValue: pierSide }) : ''
   const flipDue: boolean | null = ha != null && pierSide != null
     ? pierSide !== ((((ha + 12) % 24 + 24) % 24 - 12) >= 0 ? 'East' : 'West')
     : null
@@ -237,14 +234,14 @@ function MountControls({ deviceId }: { deviceId: string }) {
           <h2 className="text-slate-200 font-semibold truncate">{deviceId}</h2>
           <div className="flex items-center gap-2">
             {isSlewing && (
-              <span className="text-xs text-yellow-400 animate-pulse">Slewing…</span>
+              <span className="text-xs text-yellow-400 animate-pulse">{t('slewing')}</span>
             )}
             {status && <StateBadge state={status.state} />}
             <Button
               variant="ghost"
               size="icon"
               onClick={() => setShowIndiPanel((v) => !v)}
-              title="INDI properties"
+              title={t('indiProps')}
               className={showIndiPanel ? 'text-accent' : ''}
             >
               <Settings size={15} />
@@ -256,36 +253,36 @@ function MountControls({ deviceId }: { deviceId: string }) {
         )}
 
         {/* Live position */}
-        <Card title="Position" action={<FrameToggle jnow={positionJnow} onChange={setPositionJnow} />} className="p-4 flex flex-col gap-3">
+        <Card title={t('position.title')} action={<FrameToggle jnow={positionJnow} onChange={setPositionJnow} />} className="p-4 flex flex-col gap-3">
           <div className="grid grid-cols-2 gap-x-8 gap-y-1 font-mono text-sm">
-            <span className="text-slate-500 text-xs">RA</span>
-            <span className="text-slate-500 text-xs">Dec</span>
+            <span className="text-slate-500 text-xs">{t('position.ra')}</span>
+            <span className="text-slate-500 text-xs">{t('position.dec')}</span>
             <span className="text-slate-200">{fmtRA(positionJnow ? status?.ra_jnow : status?.ra)}</span>
             <span className="text-slate-200">{fmtDec(positionJnow ? status?.dec_jnow : status?.dec)}</span>
-            <span className="text-slate-500 text-xs mt-1">Alt</span>
-            <span className="text-slate-500 text-xs mt-1">Az</span>
+            <span className="text-slate-500 text-xs mt-1">{t('position.alt')}</span>
+            <span className="text-slate-500 text-xs mt-1">{t('position.az')}</span>
             <span className="text-slate-300">{status?.alt != null ? `${status.alt.toFixed(1)}°` : '—'}</span>
             <span className="text-slate-300">{status?.az  != null ? `${status.az.toFixed(1)}°`  : '—'}</span>
-            <span className="text-slate-500 text-xs mt-1">HA</span>
-            <span className="text-slate-500 text-xs mt-1">LST</span>
+            <span className="text-slate-500 text-xs mt-1">{t('position.ha')}</span>
+            <span className="text-slate-500 text-xs mt-1">{t('position.lst')}</span>
             <span className="text-slate-300">{fmtHA(ha)}</span>
             <span className="text-slate-300">{lst != null ? fmtRA(lst) : '—'}</span>
-            <span className="text-slate-500 text-xs mt-1">Pier</span>
+            <span className="text-slate-500 text-xs mt-1">{t('position.pier')}</span>
             <span className="text-slate-500 text-xs mt-1" />
-            <span className="text-slate-300">{status?.pier_side ?? '—'}</span>
+            <span className="text-slate-300">{status?.pier_side ? t(`pier.${status.pier_side}`, { defaultValue: status.pier_side }) : '—'}</span>
             <span />
           </div>
         </Card>
 
         {/* Target */}
-        <Card title="Target" action={<FrameToggle jnow={targetJnow} onChange={setTargetJnow} />} className="p-4 flex flex-col gap-3">
+        <Card title={t('target.title')} action={<FrameToggle jnow={targetJnow} onChange={setTargetJnow} />} className="p-4 flex flex-col gap-3">
           <div className="flex flex-col gap-2">
             <div className="flex items-center gap-2">
-              <span className="text-xs text-slate-500 w-8 shrink-0">RA</span>
+              <span className="text-xs text-slate-500 w-8 shrink-0">{t('position.ra')}</span>
               <DmsInput value={slewRa} onChange={(v) => { slewEdited.current = true; setSlewRa(v) }} mode="ra" />
             </div>
             <div className="flex items-center gap-2">
-              <span className="text-xs text-slate-500 w-8 shrink-0">Dec</span>
+              <span className="text-xs text-slate-500 w-8 shrink-0">{t('position.dec')}</span>
               <DmsInput value={slewDec} onChange={(v) => { slewEdited.current = true; setSlewDec(v) }} mode="lat" />
             </div>
           </div>
@@ -294,20 +291,20 @@ function MountControls({ deviceId }: { deviceId: string }) {
               const frame: CoordFrame = targetJnow ? 'jnow' : 'icrs'
               act(() => api.mount.setTarget(deviceId, slewRa * 15, slewDec, undefined, undefined, frame))
             }}>
-              <Crosshair size={12} className="mr-1" /> Set Target
+              <Crosshair size={12} className="mr-1" /> {t('target.set')}
             </Button>
             <Button size="sm" onClick={() => act(async () => {
               const frame: CoordFrame = targetJnow ? 'jnow' : 'icrs'
               await api.mount.setTarget(deviceId, slewRa * 15, slewDec, undefined, undefined, frame)
               await api.mount.slew(deviceId)
             })}>
-              Slew
+              {t('target.slew')}
             </Button>
             <Button size="sm" variant="outline" onClick={() => act(() => api.mount.sync(deviceId, slewRa * 15, slewDec))}>
-              <RotateCw size={12} className="mr-1" /> Sync
+              <RotateCw size={12} className="mr-1" /> {t('target.sync')}
             </Button>
             <Button size="sm" variant="ghost" onClick={() => act(() => api.mount.stop(deviceId))}>
-              <StopCircle size={12} className="mr-1" /> Stop
+              <StopCircle size={12} className="mr-1" /> {t('target.stop')}
             </Button>
             {slewEdited.current && (
               <button
@@ -321,22 +318,22 @@ function MountControls({ deviceId }: { deviceId: string }) {
                   setSlewDec(dec)
                 }}
               >
-                ↺ live
+                {t('target.live')}
               </button>
             )}
           </div>
         </Card>
 
         {/* Tracking */}
-        <Card title="Tracking" className="p-4 flex flex-col gap-3">
+        <Card title={t('trackingCard.title')} className="p-4 flex flex-col gap-3">
           <div className="flex items-center gap-3">
             <ToggleSwitch
               checked={isTracking}
-              label="Toggle tracking"
+              label={t('trackingCard.toggle')}
               disabled={isParked}
               onChange={() => act(() => api.mount.setTracking(deviceId, !isTracking, isTracking ? undefined : trackingMode))}
             />
-            <span className="text-sm text-slate-300 w-6">{isTracking ? 'On' : 'Off'}</span>
+            <span className="text-sm text-slate-300 w-6">{isTracking ? t('trackingCard.on') : t('trackingCard.off')}</span>
             <select
               disabled={isParked}
               className="ml-auto rounded bg-surface-overlay border border-surface-border px-2 py-1 text-xs text-slate-200 focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed"
@@ -347,17 +344,17 @@ function MountControls({ deviceId }: { deviceId: string }) {
                 act(() => api.mount.setTracking(deviceId, true, m))
               }}
             >
-              {TRACKING_MODES.map(({ label, mode }) => <option key={mode} value={mode}>{label}</option>)}
+              {TRACKING_MODES.map((mode) => <option key={mode} value={mode}>{t(`tracking.${mode}`)}</option>)}
             </select>
           </div>
           {isParked
-            ? <p className="text-xs text-slate-500">Unpark the mount to enable tracking.</p>
-            : <p className="text-xs text-slate-600">Lunar / Solar rates require firmware support.</p>
+            ? <p className="text-xs text-slate-500">{t('trackingCard.unpark')}</p>
+            : <p className="text-xs text-slate-600">{t('trackingCard.firmware')}</p>
           }
         </Card>
 
         {/* Park */}
-        <Card title="Park" className="p-4 flex flex-col gap-3">
+        <Card title={t('park.title')} className="p-4 flex flex-col gap-3">
           <div className="flex items-center gap-3 flex-wrap">
             <Button
               size="sm"
@@ -367,18 +364,18 @@ function MountControls({ deviceId }: { deviceId: string }) {
                 : () => api.mount.park(deviceId)
               )}
             >
-              {isParked ? 'Unpark' : 'Park'}
+              {isParked ? t('park.unpark') : t('park.park')}
             </Button>
             <Button
               size="sm"
               variant="ghost"
               disabled={isParked}
               onClick={() => act(() => api.mount.setParkPosition(deviceId))}
-              title="Set current position as the park position"
+              title={t('park.setPositionTitle')}
             >
-              Set as park position
+              {t('park.setPosition')}
             </Button>
-            {isParked && <span className="text-xs text-slate-500">Mount is parked.</span>}
+            {isParked && <span className="text-xs text-slate-500">{t('park.parked')}</span>}
           </div>
           <label className="flex items-center gap-2 flex-wrap">
             <input
@@ -387,7 +384,7 @@ function MountControls({ deviceId }: { deviceId: string }) {
               checked={mountSettings.auto_park_enabled}
               onChange={(e) => saveMountSettings({ ...mountSettings, auto_park_enabled: e.target.checked })}
             />
-            <span className="text-xs text-slate-400">Park automatically at</span>
+            <span className="text-xs text-slate-400">{t('park.auto')}</span>
             <input
               type="time"
               disabled={!mountSettings.auto_park_enabled}
@@ -396,14 +393,14 @@ function MountControls({ deviceId }: { deviceId: string }) {
               className="rounded border border-surface-border bg-surface-overlay px-2 py-0.5 text-xs text-slate-200 font-mono
                 focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-40 disabled:cursor-not-allowed"
             />
-            <span className="text-xs text-slate-600">local time</span>
+            <span className="text-xs text-slate-600">{t('park.localTime')}</span>
           </label>
         </Card>
 
         {/* Meridian */}
-        <Card title="Meridian & horizon" className="p-4 flex flex-col gap-3">
+        <Card title={t('meridian.title')} className="p-4 flex flex-col gap-3">
           {ha != null && (
-            <p className="text-xs text-slate-500">{fmtMeridianDistance(ha)}</p>
+            <p className="text-xs text-slate-500">{fmtMeridianDistance(ha, t)}</p>
           )}
           <div className="flex items-center gap-3">
             <Button
@@ -412,25 +409,25 @@ function MountControls({ deviceId }: { deviceId: string }) {
               disabled={!canFlip}
               onClick={() => act(() => api.mount.meridianFlip(deviceId))}
               title={
-                canFlip            ? 'Perform meridian flip' :
-                ha == null         ? 'Hour angle unknown' :
-                flipDue === false  ? `Pier ${pierSide} is already the normal side for this hour angle` :
-                ha <= 0            ? 'Mount has not crossed the meridian yet' :
-                                     'More than 2 h past meridian — slew to target first'
+                canFlip            ? t('meridian.flipTitle') :
+                ha == null         ? t('meridian.haUnknown') :
+                flipDue === false  ? t('meridian.wrongSide', { side: pierSideLabel }) :
+                ha <= 0            ? t('meridian.notCrossed') :
+                                     t('meridian.tooFar')
               }
             >
-              <RefreshCw size={12} className="mr-1.5" /> Meridian Flip
+              <RefreshCw size={12} className="mr-1.5" /> {t('meridian.flip')}
             </Button>
             {ha != null && !canFlip && flipDue === false && (
               <span className="text-xs text-slate-600">
-                {ha >= 0 ? `Pier ${pierSide}: no flip needed` : 'Waiting for meridian crossing'}
+                {ha >= 0 ? t('meridian.noFlip', { side: pierSideLabel }) : t('meridian.waiting')}
               </span>
             )}
             {ha != null && !canFlip && flipDue === null && ha <= 0 && (
-              <span className="text-xs text-slate-600">Waiting for meridian crossing</span>
+              <span className="text-xs text-slate-600">{t('meridian.waiting')}</span>
             )}
             {ha != null && !canFlip && flipDue === null && ha > 2.0 && (
-              <span className="text-xs text-yellow-700">Slew to target before flipping</span>
+              <span className="text-xs text-yellow-700">{t('meridian.slewFirst')}</span>
             )}
           </div>
           <label className="flex items-center gap-2 flex-wrap">
@@ -440,7 +437,7 @@ function MountControls({ deviceId }: { deviceId: string }) {
               checked={mountSettings.auto_flip_enabled}
               onChange={(e) => saveMountSettings({ ...mountSettings, auto_flip_enabled: e.target.checked })}
             />
-            <span className="text-xs text-slate-400">Flip automatically when HA &gt;</span>
+            <span className="text-xs text-slate-400">{t('meridian.autoFlip')}</span>
             <input
               type="time"
               disabled={!mountSettings.auto_flip_enabled}
@@ -452,27 +449,27 @@ function MountControls({ deviceId }: { deviceId: string }) {
           </label>
           <div
             className="flex items-center gap-2 flex-wrap"
-            title="How far the RA axis may turn past the meridian, either way. Past it, tracking stops and slews/nudges are refused. Enforced by mounts that support it (EQMOD); INDI drivers keep their own limits."
+            title={t('meridian.limitTitle')}
           >
-            <span className="text-xs text-slate-400">Meridian limit</span>
+            <span className="text-xs text-slate-400">{t('meridian.limit')}</span>
             <DegreesInput
               value={mountSettings.meridian_limit_deg}
               min={0} max={60}
               onCommit={(v) => saveMountSettings({ ...mountSettings, meridian_limit_deg: v })}
             />
-            <span className="text-xs text-slate-600">° past the meridian ({hoursToHHMM(mountSettings.meridian_limit_deg / 15)} h)</span>
+            <span className="text-xs text-slate-600">{t('meridian.limitUnit', { time: hoursToHHMM(mountSettings.meridian_limit_deg / 15) })}</span>
           </div>
           <div
             className="flex items-center gap-2 flex-wrap"
-            title="Flat horizon: GOTOs to targets below it are refused. When a tracking mount sinks below it, the chosen action runs once."
+            title={t('meridian.horizonTitle')}
           >
-            <span className="text-xs text-slate-400">Horizon limit</span>
+            <span className="text-xs text-slate-400">{t('meridian.horizon')}</span>
             <DegreesInput
               value={mountSettings.horizon_min_alt_deg}
               min={-10} max={60}
               onCommit={(v) => saveMountSettings({ ...mountSettings, horizon_min_alt_deg: v })}
             />
-            <span className="text-xs text-slate-600">° altitude, then</span>
+            <span className="text-xs text-slate-600">{t('meridian.horizonUnit')}</span>
             <select
               className="rounded bg-surface-overlay border border-surface-border px-2 py-0.5 text-xs text-slate-200 focus:outline-none"
               value={mountSettings.horizon_action}
@@ -480,17 +477,17 @@ function MountControls({ deviceId }: { deviceId: string }) {
                 ...mountSettings, horizon_action: e.target.value as MountDeviceSettings['horizon_action'],
               })}
             >
-              <option value="stop_tracking">stop tracking</option>
-              <option value="park">park</option>
-              <option value="none">do nothing</option>
+              <option value="stop_tracking">{t('meridian.stopTracking')}</option>
+              <option value="park">{t('meridian.park')}</option>
+              <option value="none">{t('meridian.nothing')}</option>
             </select>
           </div>
         </Card>
 
         {/* Nudge */}
-        <Card title="Nudge" className="p-4 flex flex-col gap-3">
+        <Card title={t('nudge.title')} className="p-4 flex flex-col gap-3">
           <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-500">Rate</span>
+            <span className="text-xs text-slate-500">{t('nudge.rate')}</span>
             <select
               className="rounded bg-surface-overlay border border-surface-border px-2 py-1 text-xs text-slate-200 focus:outline-none"
               value={rateIdx}
@@ -498,22 +495,22 @@ function MountControls({ deviceId }: { deviceId: string }) {
             >
               {moveRates.map((s, i) => <option key={s.rate} value={i}>{s.label}</option>)}
             </select>
-            <span className="text-xs text-slate-600 ml-2">Hold to move, release to stop</span>
+            <span className="text-xs text-slate-600 ml-2">{t('nudge.hold')}</span>
           </div>
           {/* D-pad */}
           <div className="flex flex-col items-center gap-1 self-center select-none">
-            <Button size="icon" variant="outline" {...dpadBtn('N', 'North')} >
+            <Button size="icon" variant="outline" {...dpadBtn('N', t('nudge.north'))} >
               <ArrowUp size={16} />
             </Button>
             <div className="flex gap-8">
-              <Button size="icon" variant="outline" {...dpadBtn('W', 'West')} >
+              <Button size="icon" variant="outline" {...dpadBtn('W', t('nudge.west'))} >
                 <ArrowLeft size={16} />
               </Button>
-              <Button size="icon" variant="outline" {...dpadBtn('E', 'East')} >
+              <Button size="icon" variant="outline" {...dpadBtn('E', t('nudge.east'))} >
                 <ArrowRight size={16} />
               </Button>
             </div>
-            <Button size="icon" variant="outline" {...dpadBtn('S', 'South')} >
+            <Button size="icon" variant="outline" {...dpadBtn('S', t('nudge.south'))} >
               <ArrowDown size={16} />
             </Button>
           </div>
@@ -532,13 +529,14 @@ function MountControls({ deviceId }: { deviceId: string }) {
 // ---------------------------------------------------------------------------
 
 export function Mount() {
+  const { t } = useTranslation('mount')
   const mounts = useStore((s) => s.connectedDevices.filter((d) => d.kind === 'mount'))
 
   if (mounts.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center h-full gap-2 text-slate-600">
-        <span className="text-sm">No mount connected.</span>
-        <span className="text-xs">Connect a mount in Equipment or activate a profile.</span>
+        <span className="text-sm">{t('none.title')}</span>
+        <span className="text-xs">{t('none.hint')}</span>
       </div>
     )
   }

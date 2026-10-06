@@ -1,4 +1,5 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 
 const ZOOM_MIN = 1
 // Generous cap so "1x" (native resolution) has room — a large preview shown in a small
@@ -32,9 +33,10 @@ interface ZoomableImageProps {
  * `oneToOne` handle for external "Fit"/"1x" controls.
  */
 export const ZoomableImage = forwardRef<ZoomableImageHandle, ZoomableImageProps>(
-function ZoomableImage({ src, alt = 'Preview', empty, children, className, resetKey }, ref) {
+function ZoomableImage({ src, alt, empty, children, className, resetKey }, ref) {
   const containerRef = useRef<HTMLDivElement>(null)
   const imgRef = useRef<HTMLImageElement>(null)
+  const { t } = useTranslation()
   const [zoom, setZoom] = useState(1)
   const [pan, setPan] = useState({ x: 0, y: 0 })
   const [dragging, setDragging] = useState(false)
@@ -201,7 +203,7 @@ function ZoomableImage({ src, alt = 'Preview', empty, children, className, reset
           <img
             ref={imgRef}
             src={src}
-            alt={alt}
+            alt={alt ?? t('zoom.preview')}
             draggable={false}
             onLoad={() => setLoaded(true)}
             className="max-w-full max-h-full object-contain select-none"
@@ -221,8 +223,8 @@ function ZoomableImage({ src, alt = 'Preview', empty, children, className, reset
           <div className="absolute top-2 right-2 flex items-center gap-1 bg-black/60 rounded px-1.5 py-1">
             <span className="text-xs text-slate-400 font-mono w-10 text-center">{zoom.toFixed(1)}×</span>
             {zoom > 1 && (
-              <button onClick={resetZoom} className="text-xs text-slate-400 hover:text-slate-200 px-1" title="Reset zoom (double-click image)">
-                reset
+              <button onClick={resetZoom} className="text-xs text-slate-400 hover:text-slate-200 px-1" title={t('zoom.resetTitle')}>
+                {t('zoom.reset')}
               </button>
             )}
           </div>

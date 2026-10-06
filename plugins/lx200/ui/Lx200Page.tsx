@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Trans, useTranslation } from 'react-i18next'
 
 interface Lx200Status {
   running: boolean
@@ -14,47 +15,40 @@ function StatusDot({ ok }: { ok: boolean }) {
   )
 }
 
+const RICH = { mono: <span className="text-slate-300 font-mono" /> }
+
+const SETUP_APPS = [
+  { name: 'Stellarium', key: 'stellarium', steps: 3 },
+  { name: 'SkySafari', key: 'skysafari', steps: 4 },
+  { name: 'Cartes du Ciel', key: 'cartes', steps: 2 },
+] as const
+
 function SetupInstructions({ port }: { port: number }) {
+  const { t } = useTranslation('lx200')
   return (
     <div className="mt-6 text-sm text-slate-400 space-y-4">
-      <p className="font-semibold text-slate-300">How to connect a planetarium app</p>
+      <p className="font-semibold text-slate-300">{t('setup.title')}</p>
 
-      <div>
-        <p className="text-slate-300 mb-1">Stellarium</p>
-        <ol className="list-decimal list-inside space-y-1 text-xs text-slate-500">
-          <li>Plugins → Telescope Control → enable → configure</li>
-          <li>Add telescope → type: <span className="text-slate-300 font-mono">TCP</span></li>
-          <li>Host: <span className="text-slate-300 font-mono">astrolol-host</span>, Port: <span className="text-slate-300 font-mono">{port}</span></li>
-        </ol>
-      </div>
+      {SETUP_APPS.map(({ name, key, steps }) => (
+        <div key={key}>
+          <p className="text-slate-300 mb-1">{name}</p>
+          <ol className="list-decimal list-inside space-y-1 text-xs text-slate-500">
+            {Array.from({ length: steps }, (_, n) => (
+              <li key={n}>
+                <Trans t={t} i18nKey={`setup.${key}.step${n + 1}`} values={{ port }} components={RICH} />
+              </li>
+            ))}
+          </ol>
+        </div>
+      ))}
 
-      <div>
-        <p className="text-slate-300 mb-1">SkySafari</p>
-        <ol className="list-decimal list-inside space-y-1 text-xs text-slate-500">
-          <li>Settings → Telescope → Setup</li>
-          <li>Telescope type: <span className="text-slate-300 font-mono">Meade LX200 Classic</span></li>
-          <li>Mount type: <span className="text-slate-300 font-mono">Alt-Az</span> or <span className="text-slate-300 font-mono">Equatorial</span></li>
-          <li>Connect via: <span className="text-slate-300 font-mono">WiFi</span>, IP: astrolol-host, Port: <span className="text-slate-300 font-mono">{port}</span></li>
-        </ol>
-      </div>
-
-      <div>
-        <p className="text-slate-300 mb-1">Cartes du Ciel</p>
-        <ol className="list-decimal list-inside space-y-1 text-xs text-slate-500">
-          <li>Telescope → Setup → driver: <span className="text-slate-300 font-mono">Meade LX200</span></li>
-          <li>Connection: <span className="text-slate-300 font-mono">TCP</span>, host: astrolol-host, port: <span className="text-slate-300 font-mono">{port}</span></li>
-        </ol>
-      </div>
-
-      <p className="text-xs text-slate-600 pt-2">
-        Coordinates exchanged in J2000 (ICRS). GoTo slews the mount; Sync updates the mount's
-        pointing model. Stop/Abort halts any ongoing slew.
-      </p>
+      <p className="text-xs text-slate-600 pt-2">{t('setup.footer')}</p>
     </div>
   )
 }
 
 export function Lx200Page() {
+  const { t } = useTranslation('lx200')
   const [status, setStatus] = useState<Lx200Status | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
@@ -65,7 +59,7 @@ export function Lx200Page() {
       setStatus(s)
       setError(null)
     } catch {
-      setError('Cannot reach backend')
+      setError(t('unreachable'))
     }
   }
 
@@ -93,18 +87,18 @@ export function Lx200Page() {
   }
 
   if (!status) {
-    return <div className="p-6 text-slate-500 text-sm">Loading…</div>
+    return <div className="p-6 text-slate-500 text-sm">{t('loading')}</div>
   }
 
   return (
     <div className="p-6 max-w-xl">
-      <h1 className="text-lg font-semibold text-slate-100 mb-6">LX200 Server</h1>
+      <h1 className="text-lg font-semibold text-slate-100 mb-6">{t('title')}</h1>
 
       <div className="bg-surface-raised rounded-lg p-4 space-y-3">
         <div className="flex items-center justify-between">
           <span className="text-sm text-slate-300 flex items-center">
             <StatusDot ok={status.running} />
-            {status.running ? 'Running' : 'Stopped'}
+            {status.running ? t('running') : t('stopped')}
           </span>
           <button
             onClick={toggle}
@@ -114,16 +108,16 @@ export function Lx200Page() {
                 ? 'bg-slate-600 hover:bg-slate-500 text-white'
                 : 'bg-accent hover:bg-accent/80 text-white'}`}
           >
-            {busy ? '…' : status.running ? 'Stop' : 'Start'}
+            {busy ? '…' : status.running ? t('stop') : t('start')}
           </button>
         </div>
 
         <div className="flex gap-6 text-xs text-slate-500 pt-1 border-t border-slate-700">
           <span>
-            Port: <span className="text-slate-300 font-mono">{status.port}</span>
+            {t('port')} <span className="text-slate-300 font-mono">{status.port}</span>
           </span>
           <span>
-            Clients connected: <span className="text-slate-300">{status.clients_connected}</span>
+            {t('clients')} <span className="text-slate-300">{status.clients_connected}</span>
           </span>
         </div>
       </div>

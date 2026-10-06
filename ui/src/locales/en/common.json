@@ -1,0 +1,106 @@
+{
+  "nav": {
+    "equipment": "Equipment",
+    "profiles": "Profiles",
+    "mount": "Mount",
+    "imaging": "Imaging",
+    "logs": "Logs",
+    "options": "Options"
+  },
+  "ws": {
+    "live": "live",
+    "reconnecting": "reconnecting…"
+  },
+  "toast": {
+    "dismiss": "Dismiss"
+  },
+  "status": {
+    "slewing": "Slewing",
+    "parked": "Parked",
+    "tracking": "Tracking",
+    "notTracking": "Not tracking",
+    "loop": "Loop {{time}}",
+    "downloading": "Downloading…",
+    "idle": "Idle",
+    "cooling": "Cooling {{temp}}°C{{power}}",
+    "moving": "Moving{{pos}}",
+    "rotating": "Rotating"
+  },
+  "state": {
+    "connected": "connected",
+    "connecting": "connecting",
+    "disconnected": "disconnected",
+    "busy": "busy",
+    "error": "error",
+    "idle": "idle",
+    "looping": "looping",
+    "exposing": "exposing"
+  },
+  "sidebar": {
+    "collapse": "Collapse sidebar",
+    "expand": "Expand sidebar"
+  },
+  "bluetooth": {
+    "loadFailed": "Could not load paired Bluetooth devices: {{error}}",
+    "nonePaired": "No paired Bluetooth devices yet — pair one from the <mono>Bluetooth Serial</mono> plugin page first.",
+    "loading": "Loading…",
+    "select": "Select a paired device…"
+  },
+  "duration": {
+    "label": "Duration",
+    "shorter": "Shorter",
+    "longer": "Longer",
+    "custom": "Click to enter a custom value"
+  },
+  "count": {
+    "fewer": "Fewer",
+    "more": "More"
+  },
+  "stretch": {
+    "colour": "Colour",
+    "rgb": "RGB",
+    "mono": "Mono",
+    "channels": "Channels",
+    "unlinked": "unlinked",
+    "linked": "linked",
+    "label": "Stretch",
+    "soft": "soft",
+    "normal": "normal",
+    "hard": "hard",
+    "advanced": "Advanced",
+    "background": "Background",
+    "shadowsClip": "Shadows clip"
+  },
+  "zoom": {
+    "preview": "Preview",
+    "reset": "reset",
+    "resetTitle": "Reset zoom (double-click image)"
+  },
+  "histogram": {
+    "bg": "Bg",
+    "bgChannels": "Sky background per channel (median, ADU)",
+    "bgTitle": "Sky background (median, ADU)",
+    "noise": "Background noise (σ, ADU)",
+    "sat": "Sat",
+    "satTitle": "Pixels at full scale"
+  },
+  "deviceProps": {
+    "set": "Set",
+    "blob": "BLOB (binary)",
+    "notIndi": "Not an INDI device.",
+    "noMessages": "No messages from driver.",
+    "title": "Device properties",
+    "close": "Close panel",
+    "loading": "Loading properties…",
+    "tabs": {
+      "properties": "properties",
+      "messages": "messages"
+    }
+  },
+  "frameType": {
+    "light": "light",
+    "dark": "dark",
+    "flat": "flat",
+    "bias": "bias"
+  }
+}

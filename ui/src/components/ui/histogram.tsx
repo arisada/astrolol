@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 import { computeStretch, mtf, type StretchParams, type StretchStats } from '@/utils/stretch'
 
 export interface HistogramChannel extends StretchStats {
@@ -49,6 +50,7 @@ export function HistogramOverlay({
   color?: boolean
   linked?: boolean
 }) {
+  const { t } = useTranslation()
   const { hist_min, hist_max } = stats
   const W = 170
   const H = 48
@@ -125,21 +127,21 @@ export function HistogramOverlay({
       {stats.median != null && (
         <div className="flex justify-between text-[9px] font-mono text-slate-400 px-0.5">
           {stats.channels?.length ? (
-            <span title="Sky background per channel (median, ADU)">
-              Bg {stats.channels.map((ch) => Math.round(ch.median)).join('/')}
+            <span title={t('histogram.bgChannels')}>
+              {t('histogram.bg')} {stats.channels.map((ch) => Math.round(ch.median)).join('/')}
             </span>
           ) : (
-            <span title="Sky background (median, ADU)">Bg {Math.round(stats.median)}</span>
+            <span title={t('histogram.bgTitle')}>{t('histogram.bg')} {Math.round(stats.median)}</span>
           )}
           {stats.noise_sigma != null && (
-            <span title="Background noise (σ, ADU)">σ {stats.noise_sigma.toFixed(1)}</span>
+            <span title={t('histogram.noise')}>σ {stats.noise_sigma.toFixed(1)}</span>
           )}
           {sat != null && (
             <span
-              title="Pixels at full scale"
+              title={t('histogram.satTitle')}
               className={sat > SATURATION_WARN_PCT ? 'text-amber-300' : undefined}
             >
-              Sat {sat < 0.01 && sat > 0 ? '<0.01' : sat.toFixed(2)}%
+              {t('histogram.sat')} {sat < 0.01 && sat > 0 ? '<0.01' : sat.toFixed(2)}%
             </span>
           )}
         </div>

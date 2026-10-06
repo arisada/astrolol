@@ -1,9 +1,11 @@
 import { NavLink } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { BookOpen, Camera, Cpu, ScrollText, Settings, Telescope, Wifi, WifiOff } from 'lucide-react'
 import { useStore } from '@/store'
 import { getPluginEntry } from '@/plugin-registry'
 
 export function Sidebar() {
+  const { t, i18n } = useTranslation()
   const wsConnected = useStore((s) => s.wsConnected)
   const hasMounts   = useStore((s) => s.connectedDevices.some((d) => d.kind === 'mount' && d.state === 'connected'))
   const hasError    = useStore((s) => s.lastError !== null)
@@ -15,7 +17,8 @@ export function Sidebar() {
   function toNavItem(p: typeof sortedPlugins[number]) {
     const entry = getPluginEntry(p.id)
     if (!entry) return null
-    return { to: entry.to, icon: entry.icon, label: entry.label }
+    // A plugin may translate its sidebar label with a top-level "label" key in its catalogue.
+    return { to: entry.to, icon: entry.icon, label: i18n.t('label', { ns: p.id, defaultValue: entry.label }) }
   }
 
   type NavItem = { to: string; icon: typeof Cpu; label: string; badge?: boolean }
@@ -36,17 +39,17 @@ export function Sidebar() {
           icon: Camera,
           label: cam.driver_name ?? cam.device_id,
         }))
-      : [{ to: '/imaging', icon: Camera, label: 'Imaging' }]
+      : [{ to: '/imaging', icon: Camera, label: t('nav.imaging') }]
 
   const navItems = [
-    { to: '/equipment', icon: Cpu,        label: 'Equipment' },
-    { to: '/profiles',  icon: BookOpen,   label: 'Profiles'  },
+    { to: '/equipment', icon: Cpu,        label: t('nav.equipment') },
+    { to: '/profiles',  icon: BookOpen,   label: t('nav.profiles') },
     ...pluginsBeforeMount,
-    ...(hasMounts ? [{ to: '/mount', icon: Telescope, label: 'Mount' }] : []),
+    ...(hasMounts ? [{ to: '/mount', icon: Telescope, label: t('nav.mount') }] : []),
     ...cameraNavItems,
     ...pluginNavItems,
-    { to: '/logs',      icon: ScrollText, label: 'Logs', badge: hasError },
-    { to: '/options',   icon: Settings,   label: 'Options'   },
+    { to: '/logs',      icon: ScrollText, label: t('nav.logs'), badge: hasError },
+    { to: '/options',   icon: Settings,   label: t('nav.options') },
   ]
 
   return (
@@ -87,7 +90,7 @@ export function Sidebar() {
           ? <Wifi size={14} className="text-status-connected shrink-0" />
           : <WifiOff size={14} className="text-status-error shrink-0" />}
         <span className="hidden lg:block text-xs text-slate-500">
-          {wsConnected ? 'live' : 'reconnecting…'}
+          {wsConnected ? t('ws.live') : t('ws.reconnecting')}
         </span>
       </div>
     </aside>

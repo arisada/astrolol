@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { Trans, useTranslation } from 'react-i18next'
 import {
   BookOpen,
   Camera,
@@ -104,6 +105,7 @@ function ItemPicker({
   onPick: (item: EquipmentItem) => void
   onClose: () => void
 }) {
+  const { t } = useTranslation('profiles')
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -119,8 +121,7 @@ function ItemPicker({
   if (candidates.length === 0) {
     return (
       <div ref={ref} className="absolute z-20 mt-1 bg-surface border border-surface-border rounded shadow-lg p-3 text-xs text-slate-500 min-w-48">
-        No matching items in inventory.<br />
-        Add them in Equipment → Inventory first.
+        <Trans t={t} i18nKey="picker.none" components={{ br: <br /> }} />
       </div>
     )
   }
@@ -142,7 +143,7 @@ function ItemPicker({
               {itemLabel(item)}
             </span>
             {alreadyUsed && (
-              <span className="ml-auto text-slate-600 text-[10px]">already in tree</span>
+              <span className="ml-auto text-slate-600 text-[10px]">{t('picker.used')}</span>
             )}
           </button>
         )
@@ -172,6 +173,7 @@ function TreeNodeRow({
   onInsert: (path: NodePath, item: EquipmentItem) => void
   onRemove: (path: NodePath) => void
 }) {
+  const { t } = useTranslation('profiles')
   const [showPicker, setShowPicker] = useState(false)
   const item = inventory.find((i) => i.id === node.item_id)
   const itemType = (item?.type ?? 'camera') as EquipmentItemType
@@ -192,7 +194,7 @@ function TreeNodeRow({
         {/* Item chip */}
         <div className="flex items-center gap-1.5 px-2 py-1 rounded bg-surface border border-surface-border text-xs text-slate-300">
           <span className="text-slate-500"><ItemTypeIcon type={itemType} /></span>
-          <span>{item ? itemLabel(item) : <span className="text-slate-600 italic">Unknown ({node.item_id.slice(0, 8)})</span>}</span>
+          <span>{item ? itemLabel(item) : <span className="text-slate-600 italic">{t('tree.unknown', { id: node.item_id.slice(0, 8) })}</span>}</span>
           {node.role && (
             <span className="text-slate-600 text-[10px] ml-1">· {node.role}</span>
           )}
@@ -205,9 +207,9 @@ function TreeNodeRow({
               className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 text-[10px] text-slate-500
                 hover:text-slate-300 px-1.5 py-0.5 rounded border border-transparent hover:border-surface-border"
               onClick={() => setShowPicker((v) => !v)}
-              title="Attach child item"
+              title={t('tree.attach')}
             >
-              <Plus size={10} /> child
+              <Plus size={10} /> {t('tree.child')}
             </button>
             {showPicker && (
               <ItemPicker
@@ -225,7 +227,7 @@ function TreeNodeRow({
         <button
           className="opacity-0 group-hover:opacity-100 transition-opacity text-slate-600 hover:text-status-error p-0.5 rounded transition-colors"
           onClick={() => onRemove(path)}
-          title="Remove from tree"
+          title={t('tree.remove')}
         >
           <Minus size={11} />
         </button>
@@ -261,6 +263,7 @@ function ProfileTreeEditor({
   inventory: EquipmentItem[]
   onSave: (roots: ProfileNode[]) => Promise<void>
 }) {
+  const { t } = useTranslation('profiles')
   const [roots, setRoots] = useState<ProfileNode[]>(profile.roots)
   const [showRootPicker, setShowRootPicker] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -304,12 +307,12 @@ function ProfileTreeEditor({
   return (
     <div>
       <div className="flex items-center justify-between mb-2">
-        <p className="text-slate-500 uppercase tracking-wider text-[10px] font-medium">Equipment tree</p>
-        {saving && <span className="text-[10px] text-slate-600">Saving…</span>}
+        <p className="text-slate-500 uppercase tracking-wider text-[10px] font-medium">{t('tree.title')}</p>
+        {saving && <span className="text-[10px] text-slate-600">{t('tree.saving')}</span>}
       </div>
 
       {roots.length === 0 && !showRootPicker && (
-        <p className="text-xs text-slate-600 mb-2">No equipment tree configured.</p>
+        <p className="text-xs text-slate-600 mb-2">{t('tree.empty')}</p>
       )}
 
       <div className="flex flex-col">
@@ -332,7 +335,7 @@ function ProfileTreeEditor({
           className="flex items-center gap-1 text-[11px] text-slate-600 hover:text-slate-400 transition-colors"
           onClick={() => setShowRootPicker((v) => !v)}
         >
-          <Plus size={11} /> Add to tree
+          <Plus size={11} /> {t('tree.add')}
         </button>
         {showRootPicker && (
           <ItemPicker
@@ -372,12 +375,13 @@ interface ProfileFormProps {
 }
 
 function ProfileForm({ initial, onSave, onCancel }: ProfileFormProps) {
+  const { t } = useTranslation('profiles')
   const [name, setName] = useState(initial?.name ?? '')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const handleSave = async () => {
-    if (!name.trim()) { setError('Name is required.'); return }
+    if (!name.trim()) { setError(t('form.nameRequired')); return }
     setSaving(true)
     setError(null)
     try {
@@ -397,16 +401,16 @@ function ProfileForm({ initial, onSave, onCancel }: ProfileFormProps) {
     <div className="flex flex-col gap-6">
       <div className="flex flex-col gap-1">
         <label className="text-xs text-slate-400">
-          Profile name <span className="text-status-error">*</span>
+          {t('form.name')} <span className="text-status-error">*</span>
         </label>
         <Input
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="e.g. Backyard rig"
+          placeholder={t('form.placeholder')}
           autoFocus
         />
         <p className="text-xs text-slate-600">
-          Equipment (telescope, camera, site…) is managed through the equipment tree after the profile is created.
+          {t('form.hint')}
         </p>
       </div>
 
@@ -416,9 +420,9 @@ function ProfileForm({ initial, onSave, onCancel }: ProfileFormProps) {
 
       <div className="flex gap-2">
         <Button onClick={handleSave} disabled={saving}>
-          {saving ? 'Saving…' : initial ? 'Save changes' : 'Create profile'}
+          {saving ? t('form.saving') : initial ? t('form.save') : t('form.create')}
         </Button>
-        <Button variant="ghost" onClick={onCancel}>Cancel</Button>
+        <Button variant="ghost" onClick={onCancel}>{t('form.cancel')}</Button>
       </div>
     </div>
   )
@@ -435,6 +439,7 @@ function ActivationBanner({
   result: ActivationResult
   onDismiss: () => void
 }) {
+  const { t } = useTranslation('profiles')
   const allOk = result.failed.length === 0
   return (
     <div
@@ -449,15 +454,15 @@ function ActivationBanner({
           ) : (
             <XCircle size={15} className="text-yellow-400" />
           )}
-          {allOk ? 'Profile activated' : 'Activated with errors'}
+          {allOk ? t('activation.ok') : t('activation.errors')}
         </div>
         <button onClick={onDismiss} className="text-slate-500 hover:text-slate-300 text-xs">
-          Dismiss
+          {t('activation.dismiss')}
         </button>
       </div>
       {result.connected.length > 0 && (
         <div className="text-xs text-slate-400">
-          Connected: {result.connected.map((d) => `${d.device_id} (${d.role})`).join(', ')}
+          {t('activation.connected', { devices: result.connected.map((d) => `${d.device_id} (${d.role})`).join(', ') })}
         </div>
       )}
       {result.failed.map((d) => (
@@ -490,13 +495,14 @@ function ProfileCard({
   onDelete: () => void
   onTreeSave: (profileId: string, roots: ProfileNode[]) => Promise<void>
 }) {
+  const { t } = useTranslation('profiles')
   const [expanded, setExpanded] = useState(isActive)
 
   const treeCount = (nodes: ProfileNode[]): number =>
     nodes.reduce((n, node) => n + 1 + treeCount(node.children), 0)
   const itemCount = treeCount(profile.roots)
   const summaryParts = [
-    itemCount > 0 ? `${itemCount} item${itemCount !== 1 ? 's' : ''} in tree` : 'Empty tree',
+    itemCount > 0 ? t('card.items', { count: itemCount }) : t('card.emptyTree'),
   ]
 
   return (
@@ -517,7 +523,7 @@ function ProfileCard({
             <span className="text-sm font-medium text-slate-200">{profile.name}</span>
             {isActive && (
               <span className="text-xs font-medium text-accent border border-accent rounded px-1.5 py-0.5">
-                active
+                {t('card.active')}
               </span>
             )}
           </div>
@@ -527,7 +533,7 @@ function ProfileCard({
         </div>
         <div className="flex items-center gap-1">
           <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={onEdit}>
-            Edit
+            {t('card.edit')}
           </Button>
           <Button
             size="sm" className="h-7 text-xs gap-1"
@@ -535,7 +541,7 @@ function ProfileCard({
             onClick={onActivate}
           >
             <Zap size={11} />
-            {isActive ? 'Reload' : 'Activate'}
+            {isActive ? t('card.reload') : t('card.activate')}
           </Button>
           <Button
             size="icon" variant="ghost"
@@ -567,6 +573,7 @@ function ProfileCard({
 type View = 'list' | 'create' | { edit: Profile }
 
 export function Profiles() {
+  const { t } = useTranslation('profiles')
   const [profiles, setProfiles] = useState<Profile[]>([])
   const [activeProfileId, setActiveProfileId] = useState<string | null>(null)
   const [view, setView] = useState<View>('list')
@@ -623,7 +630,7 @@ export function Profiles() {
   if (view === 'create') {
     return (
       <div className="p-6 max-w-2xl">
-        <h1 className="text-lg font-semibold text-slate-100 mb-6">New profile</h1>
+        <h1 className="text-lg font-semibold text-slate-100 mb-6">{t('newTitle')}</h1>
         <ProfileForm onSave={handleCreate} onCancel={() => setView('list')} />
       </div>
     )
@@ -632,7 +639,7 @@ export function Profiles() {
   if (typeof view === 'object' && 'edit' in view) {
     return (
       <div className="p-6 max-w-2xl">
-        <h1 className="text-lg font-semibold text-slate-100 mb-6">Edit profile</h1>
+        <h1 className="text-lg font-semibold text-slate-100 mb-6">{t('editTitle')}</h1>
         <ProfileForm initial={view.edit} onSave={handleUpdate} onCancel={() => setView('list')} />
       </div>
     )
@@ -642,13 +649,13 @@ export function Profiles() {
     <div className="p-6 max-w-2xl">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-lg font-semibold text-slate-100">Profiles</h1>
+          <h1 className="text-lg font-semibold text-slate-100">{t('title')}</h1>
           <p className="text-xs text-slate-500 mt-0.5">
-            A profile is a name and an equipment tree. Activate it to connect devices.
+            {t('subtitle')}
           </p>
         </div>
         <Button onClick={() => setView('create')}>
-          <Plus size={14} className="mr-2" /> New profile
+          <Plus size={14} className="mr-2" /> {t('new')}
         </Button>
       </div>
 
@@ -662,16 +669,16 @@ export function Profiles() {
       )}
 
       {loading ? (
-        <p className="text-sm text-slate-500">Loading…</p>
+        <p className="text-sm text-slate-500">{t('loading')}</p>
       ) : profiles.length === 0 ? (
         <div className="flex flex-col items-center gap-3 py-16 text-center">
           <BookOpen size={32} className="text-slate-600" />
-          <p className="text-sm text-slate-400">No profiles yet.</p>
+          <p className="text-sm text-slate-400">{t('empty.title')}</p>
           <p className="text-xs text-slate-600">
-            Create a profile to save your equipment setup.
+            {t('empty.hint')}
           </p>
           <Button className="mt-2" onClick={() => setView('create')}>
-            <Plus size={14} className="mr-2" /> Create first profile
+            <Plus size={14} className="mr-2" /> {t('empty.create')}
           </Button>
         </div>
       ) : (

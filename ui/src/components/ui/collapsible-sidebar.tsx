@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
 import { useLocalStorage } from '@/hooks/useLocalStorage'
 
@@ -13,6 +14,7 @@ export function CollapsibleSidebar({
    *  this component. Defaults to the original shared key for existing call sites. */
   storageKey?: string
 }) {
+  const { t } = useTranslation()
   const [open, setOpen] = useLocalStorage(storageKey, window.innerWidth >= BREAKPOINT)
   const prevWide = useRef(window.innerWidth >= BREAKPOINT)
 
@@ -44,7 +46,7 @@ export function CollapsibleSidebar({
           type="button"
           onClick={() => setOpen(!open)}
           className="p-1 rounded text-slate-500 hover:text-slate-300 hover:bg-surface-overlay transition-colors"
-          aria-label={open ? 'Collapse sidebar' : 'Expand sidebar'}
+          aria-label={open ? t('sidebar.collapse') : t('sidebar.expand')}
         >
           {open ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
         </button>

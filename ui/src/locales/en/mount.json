@@ -1,0 +1,94 @@
+{
+  "rates": {
+    "guide": "Guide",
+    "centering": "Center",
+    "find": "Find",
+    "max": "Max"
+  },
+  "tracking": {
+    "sidereal": "Sidereal",
+    "lunar": "Lunar",
+    "solar": "Solar"
+  },
+  "pier": {
+    "East": "East",
+    "West": "West"
+  },
+  "meridianDistance": {
+    "before": "{{time}} to meridian",
+    "after": "{{time}} past meridian"
+  },
+  "none": {
+    "title": "No mount connected.",
+    "hint": "Connect a mount in Equipment or activate a profile."
+  },
+  "slewing": "Slewing…",
+  "indiProps": "INDI properties",
+  "position": {
+    "title": "Position",
+    "ra": "RA",
+    "dec": "Dec",
+    "alt": "Alt",
+    "az": "Az",
+    "ha": "HA",
+    "lst": "LST",
+    "pier": "Pier"
+  },
+  "target": {
+    "title": "Target",
+    "set": "Set Target",
+    "slew": "Slew",
+    "sync": "Sync",
+    "stop": "Stop",
+    "live": "↺ live"
+  },
+  "trackingCard": {
+    "title": "Tracking",
+    "toggle": "Toggle tracking",
+    "on": "On",
+    "off": "Off",
+    "unpark": "Unpark the mount to enable tracking.",
+    "firmware": "Lunar / Solar rates require firmware support."
+  },
+  "park": {
+    "title": "Park",
+    "unpark": "Unpark",
+    "park": "Park",
+    "setPosition": "Set as park position",
+    "setPositionTitle": "Set current position as the park position",
+    "parked": "Mount is parked.",
+    "auto": "Park automatically at",
+    "localTime": "local time"
+  },
+  "meridian": {
+    "title": "Meridian & horizon",
+    "flip": "Meridian Flip",
+    "flipTitle": "Perform meridian flip",
+    "haUnknown": "Hour angle unknown",
+    "wrongSide": "Pier {{side}} is already the normal side for this hour angle",
+    "notCrossed": "Mount has not crossed the meridian yet",
+    "tooFar": "More than 2 h past meridian — slew to target first",
+    "noFlip": "Pier {{side}}: no flip needed",
+    "waiting": "Waiting for meridian crossing",
+    "slewFirst": "Slew to target before flipping",
+    "autoFlip": "Flip automatically when HA >",
+    "limit": "Meridian limit",
+    "limitTitle": "How far the RA axis may turn past the meridian, either way. Past it, tracking stops and slews/nudges are refused. Enforced by mounts that support it (EQMOD); INDI drivers keep their own limits.",
+    "limitUnit": "° past the meridian ({{time}} h)",
+    "horizon": "Horizon limit",
+    "horizonTitle": "Flat horizon: GOTOs to targets below it are refused. When a tracking mount sinks below it, the chosen action runs once.",
+    "horizonUnit": "° altitude, then",
+    "stopTracking": "stop tracking",
+    "park": "park",
+    "nothing": "do nothing"
+  },
+  "nudge": {
+    "title": "Nudge",
+    "rate": "Rate",
+    "hold": "Hold to move, release to stop",
+    "north": "North",
+    "south": "South",
+    "east": "East",
+    "west": "West"
+  }
+}

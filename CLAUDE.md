@@ -231,6 +231,37 @@ Good: "Advertises this astrolol server on the local network via mDNS."
 If you're tempted to write "(so that ...)" or "(no X to type/configure)" in a label or
 description, that's usually the tell — cut it, or move it to a code comment.
 
+### Internationalisation (i18n)
+
+The UI uses `i18next` + `react-i18next`. English is the source language and the fallback;
+French is the first translation. The language is a `UserSettings.language` field, chosen in
+Options. Catalogues are JSON, nested by meaning (`mount.park.title`), with `_one`/`_other`
+suffixes for plurals and `<tag>…</tag>` + `<Trans>` for inline markup.
+
+| Where | Catalogue | Namespace |
+|---|---|---|
+| Core page or area | `ui/src/locales/<lng>/<ns>.json` | `equipment`, `profiles`, `imaging`, `mount`, `logs`, `options`, `events` |
+| Shell + shared components | `ui/src/locales/<lng>/common.json` | `common` (default) |
+| A plugin | `plugins/<id>/ui/locales/<lng>.json` | the plugin id |
+
+- **Never hard-code user-visible text in TSX.** Use `const { t } = useTranslation('<ns>')`.
+  That covers labels, placeholders, `title`/`aria-label`, empty states, button text and
+  error text the UI itself writes. Backend-supplied text (driver/INDI property labels, log
+  messages, exceptions) stays as received.
+- **Changing or adding text means changing the catalogues in the same commit**: edit the
+  English value, then the French one. When you can't translate well, still add the key to
+  every language file (with the English text) so the parity test passes, and say so in the commit.
+- **Plugins translate themselves.** Add `plugins/<id>/ui/locales/{en,fr}.json`; the loader in
+  `ui/src/i18n.ts` picks them up, no core change. Two optional top-level keys are read by
+  core: `label` (sidebar entry) and `manifest.name` / `manifest.description` (Options → Plugins).
+- Non-React code (e.g. the store) uses `i18n.t(key, { ns })` — the result is fixed at call time.
+- Keep copy free of implementation detail (see above) in *both* languages. A translation must not add or drop information.
+- Numbers, RA/Dec and other astronomy formats keep their current notation (decimal point). Dates and
+  times go through `Intl` with the active language.
+- `tests/unit/test_ui_locales.py` checks every language file has exactly the English keys and the same
+  `{{placeholders}}`/tags; `tests/unit/test_ui_translation_keys.py` checks every literal `t('key')` exists.
+  Both run in the normal unit suite.
+
 ### Backend logging
 
 Use `structlog` throughout. Get a logger at module level and log with structured key-value pairs:
@@ -291,7 +322,7 @@ Plugin scopes are collected at startup and exposed via `GET /admin/log_scopes`;
 - Structlog output is captured by pytest's log system, not `capsys`. Use
   `caplog.at_level(logging.WARNING, logger="<module>")` to assert on log output.
 
-Current count: **408 unit tests**, **37 integration tests**, **682 plugin tests** (all passing).
+Current count: **624 unit tests**, **37 integration tests**, **964 plugin tests** (all passing).
 
 ### TypeScript type checking
 
@@ -459,6 +490,8 @@ ui/
 ├── src/
 │   ├── api/            # typed fetch client (core devices only) + hand-written types
 │   ├── hooks/          # useEvents (WebSocket), useLocalStorage
+│   ├── i18n.ts         # i18next setup; loads core + plugin catalogues
+│   ├── locales/        # core catalogues: <lng>/<namespace>.json
 │   ├── utils/          # formatting.ts — fmtRA, fmtDec
 │   ├── store/          # Zustand — core device state + pluginStates + registerPluginEventHandlers
 │   ├── plugin-registry.ts  # runtime map: plugin id → { route, icon, Component, StatusChip? }
@@ -470,7 +503,7 @@ ui/
 
 tests/
 ├── conftest.py         # FakeCamera (real FITS), FakeMount, FakeFocuser + fixtures
-├── unit/               # 408 tests — no hardware required
+├── unit/               # 624 tests — no hardware required
 └── integration/        # 37 tests — require indiserver (skipped if not installed)
 ```
 

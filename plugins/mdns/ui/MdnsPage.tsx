@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { PillGroup } from '@/components/ui/pill-group'
@@ -21,6 +22,7 @@ function currentPageAddress(): { host: string; port: number; scheme: 'http' | 'h
 }
 
 export function MdnsPage() {
+  const { t } = useTranslation('mdns')
   const [settings, setSettings] = useState<MdnsSettings | null>(null)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -28,7 +30,7 @@ export function MdnsPage() {
   const [restarting, setRestarting] = useState(false)
 
   useEffect(() => {
-    api.getSettings().then(setSettings).catch(() => setError('Cannot reach backend'))
+    api.getSettings().then(setSettings).catch(() => setError(t('unreachable')))
   }, [])
 
   const update = (patch: Partial<MdnsSettings>) => {
@@ -50,7 +52,7 @@ export function MdnsPage() {
       setSettings(result)
       setSaved(true)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Save failed')
+      setError(e instanceof Error ? e.message : t('saveFailed'))
     } finally {
       setSaving(false)
     }
@@ -77,13 +79,8 @@ export function MdnsPage() {
 
   return (
     <div className="p-4 md:p-6 max-w-lg space-y-4 overflow-y-auto h-full">
-      <h1 className="text-lg font-semibold text-slate-100">mDNS Discovery</h1>
-      <p className="text-xs text-slate-500">
-        Advertises this server on the local network so clients (e.g. the Android app) can
-        find it without typing an IP. astrolol cannot detect the address/port a client
-        should use on its own — especially behind a reverse proxy doing TLS — so it needs
-        to be set here explicitly. Changes take effect on next restart.
-      </p>
+      <h1 className="text-lg font-semibold text-slate-100">{t('title')}</h1>
+      <p className="text-xs text-slate-500">{t('intro')}</p>
 
       {error && (
         <div className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-300">
@@ -92,70 +89,61 @@ export function MdnsPage() {
       )}
       {saved && !error && (
         <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-300 flex items-center justify-between gap-3">
-          <span>{restarting ? 'Restarting…' : 'Saved — astrolol needs to be restarted for this to take effect.'}</span>
+          <span>{restarting ? t('restarting') : t('savedRestart')}</span>
           {!restarting && (
             <button
               onClick={handleRestart}
               className="px-2.5 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium transition-colors flex-none"
             >
-              Restart astrolol
+              {t('restart')}
             </button>
           )}
         </div>
       )}
 
-      <Card title="Advertisement" className="p-4 space-y-4">
+      <Card title={t('card')} className="p-4 space-y-4">
         <div className="flex items-center justify-between gap-2">
-          <p className="text-xs text-slate-500">
-            Fill the host/port/scheme below from the address used to load this page.
-          </p>
+          <p className="text-xs text-slate-500">{t('autofillHint')}</p>
           <button
             onClick={handleAutofill}
             className="px-2.5 py-1 rounded bg-surface-overlay hover:bg-surface-border text-slate-300 text-xs font-medium transition-colors flex-none"
           >
-            Use this page's address
+            {t('autofill')}
           </button>
         </div>
 
         <div>
-          <label className="text-xs text-slate-400 block mb-1">Instance name</label>
+          <label className="text-xs text-slate-400 block mb-1">{t('instanceName')}</label>
           <Input
             value={s.instance_name ?? ''}
-            placeholder="Defaults to this machine's hostname"
+            placeholder={t('instanceNamePlaceholder')}
             onChange={(e) => update({ instance_name: e.target.value || null })}
           />
         </div>
 
         <div>
-          <label className="text-xs text-slate-400 block mb-1">Advertised host</label>
+          <label className="text-xs text-slate-400 block mb-1">{t('host')}</label>
           <Input
             value={s.advertised_host ?? ''}
-            placeholder="Auto-detect local IP (leave blank)"
+            placeholder={t('hostPlaceholder')}
             onChange={(e) => update({ advertised_host: e.target.value || null })}
           />
-          <p className="text-xs text-slate-600 mt-1">
-            An IP or hostname. Set this when the deployment fronts astrolol with a reverse
-            proxy on a different host, or when auto-detection picks the wrong interface. Note
-            that autofill reflects the browser's address bar, so it's wrong if you're viewing
-            this through the Vite dev server rather than the deployment's real address.
-          </p>
+          <p className="text-xs text-slate-600 mt-1">{t('hostHint')}</p>
         </div>
 
         <div>
-          <label className="text-xs text-slate-400 block mb-1">Advertised port</label>
+          <label className="text-xs text-slate-400 block mb-1">{t('port')}</label>
           <Input
             type="number"
             value={s.advertised_port ?? ''}
-            placeholder="e.g. 443 behind nginx, 8000 with no proxy"
+            placeholder={t('portPlaceholder')}
             onChange={(e) => update({ advertised_port: e.target.value ? Number(e.target.value) : null })}
           />
-          <p className="text-xs text-slate-600 mt-1">
-            Required — nothing is advertised until this is set.
-          </p>
+          <p className="text-xs text-slate-600 mt-1">{t('portHint')}</p>
         </div>
 
         <PillGroup
-          label="Scheme"
+          label={t('scheme')}
           options={['http', 'https'] as const}
           value={s.scheme}
           onChange={(scheme) => update({ scheme })}
@@ -166,7 +154,7 @@ export function MdnsPage() {
           disabled={saving || !settings}
           className="px-3 py-1.5 rounded bg-accent hover:bg-accent/80 text-white text-xs font-medium disabled:opacity-50 transition-colors"
         >
-          {saving ? 'Saving…' : 'Save'}
+          {saving ? t('saving') : t('save')}
         </button>
       </Card>
     </div>

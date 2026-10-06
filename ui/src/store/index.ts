@@ -1,4 +1,5 @@
 import { create } from 'zustand'
+import i18n from '@/i18n'
 import type { AstrolollEvent, CameraStatus, ConnectedDevice, FilterWheelStatus, FocuserStatus, ImageStats, MountStatus, PluginInfo } from '@/api/types'
 
 const MAX_LOG_ENTRIES = 1000
@@ -435,49 +436,52 @@ export const useStore = create<AppState>((set, get) => ({
   },
 }))
 
+// Summaries are rendered once, when the event arrives, in the language active at that moment.
 function eventSummary(event: AstrolollEvent): string {
+  const t = (key: string, opts?: Record<string, unknown>) => i18n.t(key, { ns: 'events', ...opts })
+  const kind = (k: string) => i18n.t(`kind.${k}`, { ns: 'equipment', defaultValue: k })
   switch (event.type) {
     case 'log': return event.message
-    case 'device.connected': return `${event.device_kind} connected: ${event.device_key}`
-    case 'device.disconnected': return `${event.device_kind} disconnected: ${event.device_key}`
+    case 'device.connected': return t('deviceConnected', { kind: kind(event.device_kind), key: event.device_key })
+    case 'device.disconnected': return t('deviceDisconnected', { kind: kind(event.device_kind), key: event.device_key })
     case 'device.state_changed': return `${event.device_key} → ${event.new_state}`
-    case 'imager.exposure_started': return `Exposing ${event.duration}s`
-    case 'imager.exposure_completed': return `Exposure done (${event.duration}s, ${event.width}×${event.height})`
-    case 'imager.exposure_failed': return `Exposure failed: ${event.reason}`
-    case 'imager.loop_started': return 'Loop started'
-    case 'imager.loop_stopped': return 'Loop stopped'
-    case 'mount.slew_started': return `Slewing to RA ${event.ra.toFixed(3)}h Dec ${event.dec.toFixed(2)}°`
-    case 'mount.slew_completed': return `Slew complete`
-    case 'mount.slew_aborted': return `Slew aborted`
-    case 'mount.parked': return `Mount parked`
-    case 'mount.unparked': return `Mount unparked`
-    case 'mount.operation_failed': return `${event.operation} failed: ${event.reason}`
-    case 'mount.tracking_changed': return `Tracking ${event.tracking ? 'on' : 'off'}${event.mode ? ` (${event.mode})` : ''}`
-    case 'mount.meridian_flip_started': return `Meridian flip started`
-    case 'mount.meridian_flip_completed': return `Meridian flip complete`
-    case 'focuser.move_started': return `Focuser → ${event.target_position}`
-    case 'focuser.move_completed': return `Focuser at ${event.position}`
-    case 'focuser.halted': return `Focuser halted at ${event.position ?? '?'}`
-    case 'phd2.connected': return 'PHD2 connected'
-    case 'phd2.disconnected': return 'PHD2 disconnected'
-    case 'phd2.state_changed': return `PHD2 ${event.state}`
-    case 'phd2.guide_step': return `Guide step #${event.frame}: RA ${event.ra_dist.toFixed(3)}" Dec ${event.dec_dist.toFixed(3)}"`
-    case 'phd2.settled': return event.error ? `PHD2 settle failed: ${event.error}` : 'PHD2 settled'
+    case 'imager.exposure_started': return t('exposureStarted', { duration: event.duration })
+    case 'imager.exposure_completed': return t('exposureCompleted', { duration: event.duration, width: event.width, height: event.height })
+    case 'imager.exposure_failed': return t('exposureFailed', { reason: event.reason })
+    case 'imager.loop_started': return t('loopStarted')
+    case 'imager.loop_stopped': return t('loopStopped')
+    case 'mount.slew_started': return t('slewStarted', { ra: event.ra.toFixed(3), dec: event.dec.toFixed(2) })
+    case 'mount.slew_completed': return t('slewCompleted')
+    case 'mount.slew_aborted': return t('slewAborted')
+    case 'mount.parked': return t('parked')
+    case 'mount.unparked': return t('unparked')
+    case 'mount.operation_failed': return t('operationFailed', { operation: event.operation, reason: event.reason })
+    case 'mount.tracking_changed': return t(`${event.tracking ? 'trackingOn' : 'trackingOff'}${event.mode ? 'Mode' : ''}`, { mode: event.mode })
+    case 'mount.meridian_flip_started': return t('flipStarted')
+    case 'mount.meridian_flip_completed': return t('flipCompleted')
+    case 'focuser.move_started': return t('focuserMoveStarted', { target: event.target_position })
+    case 'focuser.move_completed': return t('focuserMoveCompleted', { position: event.position })
+    case 'focuser.halted': return t('focuserHalted', { position: event.position ?? '?' })
+    case 'phd2.connected': return t('phd2Connected')
+    case 'phd2.disconnected': return t('phd2Disconnected')
+    case 'phd2.state_changed': return t('phd2State', { state: event.state })
+    case 'phd2.guide_step': return t('guideStep', { frame: event.frame, ra: event.ra_dist.toFixed(3), dec: event.dec_dist.toFixed(3) })
+    case 'phd2.settled': return event.error ? t('phd2SettleFailed', { error: event.error }) : t('phd2Settled')
     case 'guiding.state_changed': return event.guiding
-      ? `Guiding (${event.guider})`
-      : `Guiding interrupted (${event.guider}): ${event.reason ?? 'unknown'}`
+      ? t('guiding', { guider: event.guider })
+      : t('guidingInterrupted', { guider: event.guider, reason: event.reason ?? t('unknown') })
     case 'guiding.settled': return event.error
-      ? `Settle after ${event.after} failed (${event.guider}): ${event.error}`
-      : `Settled after ${event.after} (${event.guider})`
-    case 'platesolve.started': return `Plate solve started: ${event.fits_path.split('/').pop()}`
-    case 'platesolve.completed': return `Plate solve done: RA ${(event.ra / 15).toFixed(4)}h Dec ${event.dec.toFixed(4)}° (${event.duration_ms}ms)`
-    case 'platesolve.failed': return `Plate solve failed: ${event.reason}`
-    case 'platesolve.cancelled': return `Plate solve cancelled`
-    case 'autofocus.started': return `Autofocus started (${event.total_steps} steps)`
-    case 'autofocus.data_point': return `AF step ${event.step}/${event.total_steps}: pos ${event.position}, FWHM ${event.fwhm.toFixed(2)}px (${event.star_count} stars)`
-    case 'autofocus.completed': return `Autofocus complete — optimal position: ${event.optimal_position}`
-    case 'autofocus.aborted': return `Autofocus aborted`
-    case 'autofocus.failed': return `Autofocus failed: ${event.reason}`
+      ? t('settleFailed', { after: event.after, guider: event.guider, error: event.error })
+      : t('settled', { after: event.after, guider: event.guider })
+    case 'platesolve.started': return t('solveStarted', { file: event.fits_path.split('/').pop() })
+    case 'platesolve.completed': return t('solveCompleted', { ra: (event.ra / 15).toFixed(4), dec: event.dec.toFixed(4), ms: event.duration_ms })
+    case 'platesolve.failed': return t('solveFailed', { reason: event.reason })
+    case 'platesolve.cancelled': return t('solveCancelled')
+    case 'autofocus.started': return t('afStarted', { steps: event.total_steps })
+    case 'autofocus.data_point': return t('afPoint', { step: event.step, steps: event.total_steps, position: event.position, fwhm: event.fwhm.toFixed(2), stars: event.star_count })
+    case 'autofocus.completed': return t('afCompleted', { position: event.optimal_position })
+    case 'autofocus.aborted': return t('afAborted')
+    case 'autofocus.failed': return t('afFailed', { reason: event.reason })
     default: return (event as { type: string }).type
   }
 }

@@ -1,0 +1,34 @@
+{
+  "title": "LX200 Server",
+  "unreachable": "Cannot reach backend",
+  "loading": "Loading…",
+  "running": "Running",
+  "stopped": "Stopped",
+  "start": "Start",
+  "stop": "Stop",
+  "port": "Port:",
+  "clients": "Clients connected:",
+  "setup": {
+    "title": "How to connect a planetarium app",
+    "stellarium": {
+      "step1": "Plugins → Telescope Control → enable → configure",
+      "step2": "Add telescope → type: <mono>TCP</mono>",
+      "step3": "Host: <mono>astrolol-host</mono>, Port: <mono>{{port}}</mono>"
+    },
+    "skysafari": {
+      "step1": "Settings → Telescope → Setup",
+      "step2": "Telescope type: <mono>Meade LX200 Classic</mono>",
+      "step3": "Mount type: <mono>Alt-Az</mono> or <mono>Equatorial</mono>",
+      "step4": "Connect via: <mono>WiFi</mono>, IP: astrolol-host, Port: <mono>{{port}}</mono>"
+    },
+    "cartes": {
+      "step1": "Telescope → Setup → driver: <mono>Meade LX200</mono>",
+      "step2": "Connection: <mono>TCP</mono>, host: astrolol-host, port: <mono>{{port}}</mono>"
+    },
+    "footer": "Coordinates exchanged in J2000 (ICRS). GoTo slews the mount; Sync updates the mount's pointing model. Stop/Abort halts any ongoing slew."
+  },
+  "manifest": {
+    "name": "LX200 Server",
+    "description": "Virtual LX200 telescope server. Connect Stellarium, SkySafari, Cartes du Ciel, TheSkyX, Voyager, or any LX200-compatible planetarium app to display the mount position and issue GoTo / Sync commands."
+  }
+}

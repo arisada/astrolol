@@ -1,0 +1,26 @@
+{
+  "title": "Stellarium Server",
+  "unreachable": "Cannot reach backend",
+  "loading": "Loading…",
+  "running": "Running",
+  "stopped": "Stopped",
+  "start": "Start",
+  "stop": "Stop",
+  "port": "Port:",
+  "clients": "Clients:",
+  "howto": {
+    "title": "How to connect Stellarium",
+    "step1": "Plugins → Telescope Control → enable the plugin → configure",
+    "step2": "Click <hl>Add a new telescope</hl>",
+    "step3": "Telescope controlled by: <mono>3rd party software or remote computer</mono>",
+    "step4": "Connection type: <mono>TCP</mono>",
+    "step5": "Host: <mono>astrolol-host</mono>, Port: <mono>{{port}}</mono>",
+    "step6": "Save and connect. The telescope reticle should appear on the sky.",
+    "step7": "In telescope properties, set <hl>Coordinate system: J2000</hl> (this is the default).",
+    "footer": "Right-click any object → Current object → Slew telescope to issue a GoTo. Position is pushed to Stellarium every 500 ms."
+  },
+  "manifest": {
+    "name": "Stellarium Server",
+    "description": "Stellarium telescope server. In Stellarium's Telescope Control plugin, choose \"3rd party software or remote\" → TCP and point it at this host and port. The mount's position is pushed live and GoTo commands from Stellarium slew the mount."
+  }
+}

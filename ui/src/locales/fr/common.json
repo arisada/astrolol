@@ -1,0 +1,106 @@
+{
+  "nav": {
+    "equipment": "Matériel",
+    "profiles": "Profils",
+    "mount": "Monture",
+    "imaging": "Imagerie",
+    "logs": "Journaux",
+    "options": "Options"
+  },
+  "ws": {
+    "live": "en direct",
+    "reconnecting": "reconnexion…"
+  },
+  "toast": {
+    "dismiss": "Fermer"
+  },
+  "status": {
+    "slewing": "Pointage",
+    "parked": "Parquée",
+    "tracking": "Suivi",
+    "notTracking": "Sans suivi",
+    "loop": "Boucle {{time}}",
+    "downloading": "Téléchargement…",
+    "idle": "Inactif",
+    "cooling": "Refroidissement {{temp}}°C{{power}}",
+    "moving": "Déplacement{{pos}}",
+    "rotating": "Rotation"
+  },
+  "state": {
+    "connected": "connecté",
+    "connecting": "connexion",
+    "disconnected": "déconnecté",
+    "busy": "occupé",
+    "error": "erreur",
+    "idle": "inactif",
+    "looping": "en boucle",
+    "exposing": "en pose"
+  },
+  "sidebar": {
+    "collapse": "Réduire le panneau",
+    "expand": "Développer le panneau"
+  },
+  "bluetooth": {
+    "loadFailed": "Impossible de charger les appareils Bluetooth appairés : {{error}}",
+    "nonePaired": "Aucun appareil Bluetooth appairé — appairez-en un d'abord depuis la page du module <mono>Bluetooth Serial</mono>.",
+    "loading": "Chargement…",
+    "select": "Choisir un appareil appairé…"
+  },
+  "duration": {
+    "label": "Durée",
+    "shorter": "Plus court",
+    "longer": "Plus long",
+    "custom": "Cliquez pour saisir une valeur personnalisée"
+  },
+  "count": {
+    "fewer": "Moins",
+    "more": "Plus"
+  },
+  "stretch": {
+    "colour": "Couleur",
+    "rgb": "RVB",
+    "mono": "Mono",
+    "channels": "Canaux",
+    "unlinked": "indépendants",
+    "linked": "liés",
+    "label": "Étirement",
+    "soft": "doux",
+    "normal": "normal",
+    "hard": "fort",
+    "advanced": "Avancé",
+    "background": "Fond de ciel",
+    "shadowsClip": "Écrêtage des ombres"
+  },
+  "zoom": {
+    "preview": "Aperçu",
+    "reset": "réinit.",
+    "resetTitle": "Réinitialiser le zoom (double-clic sur l'image)"
+  },
+  "histogram": {
+    "bg": "Fond",
+    "bgChannels": "Fond de ciel par canal (médiane, ADU)",
+    "bgTitle": "Fond de ciel (médiane, ADU)",
+    "noise": "Bruit de fond (σ, ADU)",
+    "sat": "Sat",
+    "satTitle": "Pixels à pleine échelle"
+  },
+  "deviceProps": {
+    "set": "Appliquer",
+    "blob": "BLOB (binaire)",
+    "notIndi": "Ce n'est pas un appareil INDI.",
+    "noMessages": "Aucun message du pilote.",
+    "title": "Propriétés de l'appareil",
+    "close": "Fermer le panneau",
+    "loading": "Chargement des propriétés…",
+    "tabs": {
+      "properties": "propriétés",
+      "messages": "messages"
+    }
+  },
+  "frameType": {
+    "light": "light",
+    "dark": "dark",
+    "flat": "flat",
+    "bias": "bias"
+  }
+}

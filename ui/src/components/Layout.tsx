@@ -1,4 +1,5 @@
 import { Outlet } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { X } from 'lucide-react'
 import { Sidebar } from './Sidebar'
 import { StatusBar } from './StatusBar'
@@ -7,6 +8,7 @@ import { useStatusPolling } from '@/hooks/useStatusPolling'
 import { useStore } from '@/store'
 
 function ErrorToast() {
+  const { t } = useTranslation()
   const lastError = useStore((s) => s.lastError)
   const clearLastError = useStore((s) => s.clearLastError)
 
@@ -27,7 +29,7 @@ function ErrorToast() {
         type="button"
         onClick={clearLastError}
         className="shrink-0 text-slate-500 hover:text-slate-200 transition-colors"
-        aria-label="Dismiss"
+        aria-label={t('toast.dismiss')}
       >
         <X size={14} />
       </button>

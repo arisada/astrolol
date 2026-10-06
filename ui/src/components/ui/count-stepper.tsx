@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { ChevronDown, ChevronUp } from 'lucide-react'
 import { Button } from './button'
 
@@ -22,6 +23,7 @@ export function CountStepper({
   label?: string
   disabled?: boolean
 }) {
+  const { t } = useTranslation()
   const [raw, setRaw] = useState(String(value))
   const [focused, setFocused] = useState(false)
 
@@ -43,7 +45,7 @@ export function CountStepper({
       {label && <span className="text-xs text-slate-400">{label}</span>}
       <div className="flex items-center gap-1">
         <Button size="icon" variant="outline" disabled={disabled || lower == null}
-          onClick={() => step(lower)} title="Fewer">
+          onClick={() => step(lower)} title={t('count.fewer')}>
           <ChevronDown size={14} />
         </Button>
         <input
@@ -60,7 +62,7 @@ export function CountStepper({
           className="w-14 text-center text-xs font-mono text-slate-200 bg-surface-overlay border border-surface-border rounded px-2 py-1.5 hover:border-slate-500 focus:border-accent focus:outline-none transition-colors disabled:opacity-50"
         />
         <Button size="icon" variant="outline" disabled={disabled || higher == null}
-          onClick={() => step(higher)} title="More">
+          onClick={() => step(higher)} title={t('count.more')}>
           <ChevronUp size={14} />
         </Button>
       </div>

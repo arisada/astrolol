@@ -1,0 +1,27 @@
+{
+  "title": "Découverte mDNS",
+  "unreachable": "Impossible de joindre le serveur",
+  "saveFailed": "Échec de l'enregistrement",
+  "intro": "Annonce ce serveur sur le réseau local pour que les clients (par ex. l'application Android) puissent le trouver sans saisir d'IP. astrolol ne peut pas détecter seul l'adresse et le port qu'un client doit utiliser — surtout derrière un reverse proxy qui gère le TLS — il faut donc les renseigner ici. Les modifications prennent effet au prochain redémarrage.",
+  "restarting": "Redémarrage…",
+  "savedRestart": "Enregistré — astrolol doit être redémarré pour que cela prenne effet.",
+  "restart": "Redémarrer astrolol",
+  "card": "Annonce",
+  "autofillHint": "Remplit l'hôte, le port et le schéma ci-dessous à partir de l'adresse utilisée pour charger cette page.",
+  "autofill": "Utiliser l'adresse de cette page",
+  "instanceName": "Nom de l'instance",
+  "instanceNamePlaceholder": "Par défaut : le nom d'hôte de cette machine",
+  "host": "Hôte annoncé",
+  "hostPlaceholder": "Détection automatique de l'IP locale (laisser vide)",
+  "hostHint": "Une IP ou un nom d'hôte. À renseigner quand astrolol est placé derrière un reverse proxy sur une autre machine, ou quand la détection automatique choisit la mauvaise interface. Le remplissage automatique reprend la barre d'adresse du navigateur : il est faux si vous consultez cette page via le serveur de développement Vite plutôt que l'adresse réelle du déploiement.",
+  "port": "Port annoncé",
+  "portPlaceholder": "ex. 443 derrière nginx, 8000 sans proxy",
+  "portHint": "Obligatoire — rien n'est annoncé tant qu'il n'est pas défini.",
+  "scheme": "Schéma",
+  "save": "Enregistrer",
+  "saving": "Enregistrement…",
+  "manifest": {
+    "name": "Découverte mDNS",
+    "description": "Annonce ce serveur astrolol sur le réseau local via mDNS."
+  }
+}

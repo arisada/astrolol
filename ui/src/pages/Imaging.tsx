@@ -1,5 +1,6 @@
 import { forwardRef, useCallback, useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import {
   Camera, ChevronDown, ChevronUp, Crosshair, Play, Settings, Square, StopCircle, Thermometer,
 } from 'lucide-react'
@@ -57,8 +58,9 @@ function Panel({
   onSettings?: (id: string) => void
   children: React.ReactNode
 }) {
+  const { t } = useTranslation('imaging')
   const action = deviceId && onSettings ? (
-    <button onClick={() => onSettings(deviceId)} title="INDI properties"
+    <button onClick={() => onSettings(deviceId)} title={t('indiProps')}
       className="text-slate-600 hover:text-slate-400 transition-colors">
       <Settings size={12} />
     </button>
@@ -88,6 +90,7 @@ function Foldable({ label, children }: { label: string; children: React.ReactNod
 }
 
 function TogglePill({ label, value, onChange }: { label: string; value: boolean; onChange: (v: boolean) => void }) {
+  const { t } = useTranslation('imaging')
   return (
     <button
       type="button"
@@ -99,7 +102,7 @@ function TogglePill({ label, value, onChange }: { label: string; value: boolean;
         }`}
     >
       <span>{label}</span>
-      <span className="text-slate-500">{value ? 'ON' : 'OFF'}</span>
+      <span className="text-slate-500">{value ? t('on') : t('off')}</span>
     </button>
   )
 }
@@ -118,6 +121,7 @@ export interface PreviewParams {
 
 const ImageViewer = forwardRef<ImageViewerHandle, { deviceId: string | undefined; histoAuto: boolean; previewParams: PreviewParams }>(
 function ImageViewer({ deviceId, histoAuto, previewParams }, ref) {
+  const { t } = useTranslation('imaging')
   const image = useStore((s) => deviceId ? (s.latestImages[deviceId] ?? null) : null)
   const stats = useStore((s) => deviceId ? (s.imageStats[deviceId] ?? null) : null)
   // Re-rendered on demand from the current stretch/quality settings (not the static
@@ -138,12 +142,12 @@ function ImageViewer({ deviceId, histoAuto, previewParams }, ref) {
       ref={ref}
       className="flex-1"
       src={previewUrl}
-      alt="Latest exposure"
+      alt={t('latest')}
       resetKey={deviceId}
       empty={
         <div className="text-slate-600 text-sm flex flex-col items-center gap-2">
           <Camera size={32} />
-          <span>No image yet</span>
+          <span>{t('noImage')}</span>
         </div>
       }
     >
@@ -160,7 +164,7 @@ function ImageViewer({ deviceId, histoAuto, previewParams }, ref) {
               {image.width}×{image.height} · {image.duration}s
               {stats && stats.star_count > 0 && stats.fwhm != null && (
                 <span className="ml-2 text-emerald-400">
-                  FWHM {stats.fwhm.toFixed(1)}px · {stats.star_count}★
+                  {t('fwhm', { fwhm: stats.fwhm.toFixed(1), stars: stats.star_count })}
                 </span>
               )}
             </div>
@@ -202,6 +206,8 @@ function CameraPanel({
   onZoomFit: () => void
   onZoomNative: () => void
 }) {
+  const { t } = useTranslation('imaging')
+  const { t: tc } = useTranslation()
   const imagerBusy = useStore((s) => s.imagerBusy)
   const busy = imagerBusy[deviceId] ?? false
   // Colour options only apply to one-shot-colour (Bayer) frames, which carry per-channel stats.
@@ -311,7 +317,7 @@ function CameraPanel({
     try {
       await api.devices.setProperty(deviceId, gainPropName, { values: { [gainElemName]: value } })
     } catch (e) {
-      setError(`Gain: ${(e as Error).message}`)
+      setError(t('gainError', { error: (e as Error).message }))
     }
   }
 
@@ -391,18 +397,18 @@ function CameraPanel({
                     : 'border-surface-border text-slate-500'
                 }`}
               >
-                {cameraStatus!.cooler_on ? 'Cooler ON' : 'Cooler OFF'}
+                {cameraStatus!.cooler_on ? t('cooler.on') : t('cooler.off')}
               </button>
             </div>
             {cameraStatus!.cooler_on && (
               <div className="flex gap-1.5">
                 <Input
-                  type="number" step="0.5" placeholder="Target °C"
+                  type="number" step="0.5" placeholder={t('cooler.target')}
                   value={settings.target_temp}
                   onChange={(e) => patchSettings({ target_temp: e.target.value })}
                   className="flex-1 text-xs"
                 />
-                <Button size="sm" variant="outline" onClick={applyTemp} disabled={!settings.target_temp}>Set</Button>
+                <Button size="sm" variant="outline" onClick={applyTemp} disabled={!settings.target_temp}>{t('cooler.set')}</Button>
               </div>
             )}
           </div>
@@ -411,9 +417,10 @@ function CameraPanel({
         {/* Frame type */}
         <PillGroup
           options={FRAME_TYPES}
+          formatLabel={(v) => tc(`frameType.${v}`)}
           value={settings.frame_type as FrameType}
           onChange={(v) => patchSettings({ frame_type: v })}
-          label="Frame type"
+          label={t('frameType')}
         />
 
         {/* Duration stepper */}
@@ -422,7 +429,7 @@ function CameraPanel({
         {/* Gain */}
         <div className="flex flex-col gap-1">
           <div className="flex items-center justify-between">
-            <span className="text-xs text-slate-400">Gain</span>
+            <span className="text-xs text-slate-400">{t('gain')}</span>
             <span className="text-xs text-slate-600">{gainMin}–{gainMax}</span>
           </div>
           <Input
@@ -438,30 +445,30 @@ function CameraPanel({
           options={BINNINGS}
           value={settings.binning}
           onChange={(v) => patchSettings({ binning: v })}
-          label="Binning"
+          label={t('binning')}
           formatLabel={(b) => `${b}×${b}`}
         />
 
         {/* Save subs + stretch mode */}
         <div className="flex flex-col gap-1.5">
-          <TogglePill label="Save subs" value={settings.save_subs}
+          <TogglePill label={t('saveSubs')} value={settings.save_subs}
             onChange={(v) => patchSettings({ save_subs: v })} />
-          <TogglePill label="Auto stretch" value={settings.histo_auto}
+          <TogglePill label={t('autoStretch')} value={settings.histo_auto}
             onChange={(v) => { patchSettings({ histo_auto: v }); onHistoAutoChange(v) }} />
         </div>
 
         {/* Preview: JPEG quality + auto-stretch strength */}
-        <Foldable label="Preview settings">
+        <Foldable label={t('preview.title')}>
           <div className="flex gap-1.5">
-            <Button size="sm" variant="outline" className="flex-1" onClick={onZoomFit} title="Fit the image to the window">
-              Fit
+            <Button size="sm" variant="outline" className="flex-1" onClick={onZoomFit} title={t('preview.fitTitle')}>
+              {t('preview.fit')}
             </Button>
-            <Button size="sm" variant="outline" className="flex-1" onClick={onZoomNative} title="Zoom to the image's own resolution (1 image pixel = 1 screen pixel)">
-              1x
+            <Button size="sm" variant="outline" className="flex-1" onClick={onZoomNative} title={t('preview.nativeTitle')}>
+              {t('preview.native')}
             </Button>
           </div>
           <LabeledSlider
-            label="JPEG quality" value={settings.jpeg_quality} min={10} max={100} step={5}
+            label={t('preview.quality')} value={settings.jpeg_quality} min={10} max={100} step={5}
             format={(v) => String(v)}
             onChange={(v) => patchLocal({ jpeg_quality: v })}
             onCommit={(v) => patchSettings({ jpeg_quality: v })}
@@ -486,11 +493,11 @@ function CameraPanel({
         <div className="border-t border-surface-border pt-2 flex flex-col gap-2">
           <div className="flex items-center gap-1.5">
             <Crosshair size={12} className="text-slate-500" />
-            <span className="text-xs text-slate-500 uppercase tracking-wider">Guiding / Dither</span>
+            <span className="text-xs text-slate-500 uppercase tracking-wider">{t('dither.title')}</span>
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div className="flex flex-col gap-1">
-              <span className="text-xs text-slate-400">Every N frames</span>
+              <span className="text-xs text-slate-400">{t('dither.frames')}</span>
               <Input
                 type="number" min="1" step="1" placeholder="—"
                 value={settings.dither_frames}
@@ -499,7 +506,7 @@ function CameraPanel({
               />
             </div>
             <div className="flex flex-col gap-1">
-              <span className="text-xs text-slate-400">Every N minutes</span>
+              <span className="text-xs text-slate-400">{t('dither.minutes')}</span>
               <Input
                 type="number" min="0.1" step="0.5" placeholder="—"
                 value={settings.dither_minutes}
@@ -513,13 +520,13 @@ function CameraPanel({
         {/* Actions */}
         <div className="flex gap-2">
           <Button size="sm" onClick={expose} disabled={busy}>
-            <Camera size={12} className="mr-1" /> Expose
+            <Camera size={12} className="mr-1" /> {t('expose')}
           </Button>
           <Button size="sm" variant={looping ? 'danger' : 'outline'} onClick={toggleLoop} disabled={!looping && busy}>
-            {looping ? <><Square size={12} className="mr-1" /> Stop</> : <><Play size={12} className="mr-1" /> Loop</>}
+            {looping ? <><Square size={12} className="mr-1" /> {t('stop')}</> : <><Play size={12} className="mr-1" /> {t('loop')}</>}
           </Button>
-          <Button size="sm" variant="danger" onClick={halt} title="Abort exposure and cancel loop immediately">
-            <StopCircle size={12} className="mr-1" /> Halt
+          <Button size="sm" variant="danger" onClick={halt} title={t('haltTitle')}>
+            <StopCircle size={12} className="mr-1" /> {t('halt')}
           </Button>
         </div>
         {error && <p className="text-xs text-status-error">{error}</p>}
@@ -536,6 +543,7 @@ function FocuserPanel({
   deviceId: string
   onSettings: (id: string) => void
 }) {
+  const { t } = useTranslation('imaging')
   const focuserStatuses = useStore((s) => s.focuserStatuses)
   const setFocuserStatus = useStore((s) => s.setFocuserStatus)
   const position = focuserStatuses[deviceId]?.position
@@ -560,16 +568,16 @@ function FocuserPanel({
   }
 
   return (
-    <Panel title="Focuser" deviceId={deviceId} onSettings={onSettings}>
+    <Panel title={t('focuser.title')} deviceId={deviceId} onSettings={onSettings}>
       <div className="flex flex-col gap-2">
         <div className="flex items-center gap-2">
-          <span className="text-xs text-slate-400">Position</span>
+          <span className="text-xs text-slate-400">{t('focuser.position')}</span>
           <span className="text-sm font-mono text-slate-200">{position ?? '—'}</span>
         </div>
 
         <div className="flex items-center gap-2">
           <Button size="icon" variant="outline"
-            onClick={() => act(() => api.focuser.moveBy(deviceId, -parseInt(step)))} title="Move in">
+            onClick={() => act(() => api.focuser.moveBy(deviceId, -parseInt(step)))} title={t('focuser.in')}>
             <ChevronDown size={14} />
           </Button>
           <Input className="w-20 text-center" type="number" min="1" value={step}
@@ -580,22 +588,22 @@ function FocuserPanel({
               api.focuser.putSettings(deviceId, { step: n }).catch(() => {})
             }} />
           <Button size="icon" variant="outline"
-            onClick={() => act(() => api.focuser.moveBy(deviceId, parseInt(step)))} title="Move out">
+            onClick={() => act(() => api.focuser.moveBy(deviceId, parseInt(step)))} title={t('focuser.out')}>
             <ChevronUp size={14} />
           </Button>
-          <span className="text-xs text-slate-500">steps</span>
+          <span className="text-xs text-slate-500">{t('focuser.steps')}</span>
         </div>
 
         <div className="flex gap-2">
-          <Input type="number" min="0" placeholder="Absolute position"
+          <Input type="number" min="0" placeholder={t('focuser.absolute')}
             value={target} onChange={(e) => setTarget(e.target.value)} />
           <Button size="sm"
             onClick={() => act(() => api.focuser.moveTo(deviceId, parseInt(target)))}
-            disabled={!target}>Go</Button>
+            disabled={!target}>{t('focuser.go')}</Button>
         </div>
 
         <Button size="sm" variant="danger" onClick={() => act(() => api.focuser.halt(deviceId))}>
-          <StopCircle size={12} className="mr-1" /> Halt
+          <StopCircle size={12} className="mr-1" /> {t('focuser.halt')}
         </Button>
         {error && <p className="text-xs text-status-error">{error}</p>}
       </div>
@@ -611,6 +619,7 @@ function FilterWheelPanel({
   deviceId: string
   onSettings: (id: string) => void
 }) {
+  const { t } = useTranslation('imaging')
   const filterWheelStatuses = useStore((s) => s.filterWheelStatuses)
   const setFilterWheelStatus = useStore((s) => s.setFilterWheelStatus)
   const status: FilterWheelStatus | undefined = filterWheelStatuses[deviceId]
@@ -635,7 +644,7 @@ function FilterWheelPanel({
   const slots = Array.from({ length: count }, (_, i) => i + 1)
 
   return (
-    <Panel title="Filter Wheel" deviceId={deviceId} onSettings={onSettings}>
+    <Panel title={t('filterWheel.title')} deviceId={deviceId} onSettings={onSettings}>
       <div className="flex flex-col gap-2">
         <select
           value={status?.current_slot ?? ''}
@@ -645,11 +654,11 @@ function FilterWheelPanel({
         >
           {slots.map((slot) => (
             <option key={slot} value={slot}>
-              {slot}. {names[slot - 1] ?? `Filter ${slot}`}
+              {slot}. {names[slot - 1] ?? t('filterWheel.filter', { slot })}
             </option>
           ))}
         </select>
-        {status?.is_moving && <p className="text-xs text-slate-500">Moving…</p>}
+        {status?.is_moving && <p className="text-xs text-slate-500">{t('filterWheel.moving')}</p>}
         {error && <p className="text-xs text-status-error">{error}</p>}
       </div>
     </Panel>
@@ -659,6 +668,7 @@ function FilterWheelPanel({
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export function Imaging() {
+  const { t } = useTranslation('imaging')
   const { deviceId } = useParams<{ deviceId?: string }>()
   const connectedDevices = useStore((s) => s.connectedDevices)
 
@@ -735,7 +745,7 @@ export function Imaging() {
       {/* Right sidebar */}
       <CollapsibleSidebar>
         {camera === null ? (
-          <div className="p-4 text-xs text-slate-500">No camera connected.</div>
+          <div className="p-4 text-xs text-slate-500">{t('noCamera')}</div>
         ) : (
           <>
             <CameraPanel

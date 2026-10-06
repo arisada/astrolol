@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Settings } from 'lucide-react'
+import { Trans, useTranslation } from 'react-i18next'
 import { useStore } from '@/store'
 import type { LogEntry } from '@/store'
 import { api } from '@/api/client'
@@ -106,6 +107,7 @@ function VerbosityPanel({
   onToggle: (key: string, current: 'debug' | 'info') => void
   onClose: () => void
 }) {
+  const { t } = useTranslation('logs')
   const ref = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -122,8 +124,8 @@ function VerbosityPanel({
       className="absolute right-4 top-full mt-1 z-50 w-64 rounded-lg border border-surface-border bg-surface shadow-xl"
     >
       <div className="px-3 py-2 border-b border-surface-border flex items-center justify-between">
-        <span className="text-xs font-semibold text-slate-300">Verbosity</span>
-        <span className="text-xs text-slate-600">resets on restart</span>
+        <span className="text-xs font-semibold text-slate-300">{t('verbosity')}</span>
+        <span className="text-xs text-slate-600">{t('resets')}</span>
       </div>
       <div className="py-1 max-h-72 overflow-y-auto">
         {scopes.map((scope) => (
@@ -136,7 +138,7 @@ function VerbosityPanel({
             </span>
             <div className="flex items-center gap-2">
               {scope.level === 'debug' && (
-                <span className="text-xs text-amber-500/70">debug</span>
+                <span className="text-xs text-amber-500/70">{t('debug')}</span>
               )}
               <DebugToggle
                 active={scope.level === 'debug'}
@@ -153,6 +155,7 @@ function VerbosityPanel({
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export function Logs() {
+  const { t } = useTranslation('logs')
   const log = useStore((s) => s.log)
   const [active, setActive] = useState<Set<string>>(new Set())
   const [scopes, setScopes] = useState<LogScopeEntry[]>([])
@@ -182,7 +185,7 @@ export function Logs() {
   // Filter pills: one per scope + special Errors filter
   const filterItems = [
     ...scopes.map((s) => ({ key: s.key, label: s.label })),
-    { key: '__errors__', label: 'Errors' },
+    { key: '__errors__', label: t('errors') },
   ]
 
   const filtered = log.filter((e) => matchesFilters(e, active))
@@ -191,7 +194,7 @@ export function Logs() {
     <div className="flex flex-col h-full">
       {/* Header */}
       <div className="relative flex items-center gap-3 px-4 py-3 border-b border-surface-border shrink-0 flex-wrap">
-        <h1 className="text-sm font-semibold text-slate-300 shrink-0">Event Log</h1>
+        <h1 className="text-sm font-semibold text-slate-300 shrink-0">{t('title')}</h1>
 
         {/* Dynamic filter pills */}
         <div className="flex items-center gap-1 flex-wrap flex-1">
@@ -201,7 +204,7 @@ export function Logs() {
               onClick={() => setActive(new Set())}
               className="px-2 py-0.5 text-xs rounded border border-surface-border text-slate-500 hover:text-slate-300 hover:border-slate-500 transition-colors"
             >
-              All
+              {t('all')}
             </button>
           )}
           {filterItems.map(({ key, label }) => {
@@ -238,7 +241,7 @@ export function Logs() {
                 ? 'text-amber-400 bg-amber-500/10'
                 : 'text-slate-500 hover:text-slate-300'
             }`}
-            title="Log verbosity"
+            title={t('verbosityTitle')}
           >
             <Settings size={14} />
           </button>
@@ -257,7 +260,7 @@ export function Logs() {
       <div className="flex-1 overflow-y-auto font-mono">
         {filtered.length === 0 ? (
           <div className="flex items-center justify-center h-32 text-slate-600 text-sm">
-            {log.length === 0 ? 'No events yet.' : 'No events match the selected filters.'}
+            {log.length === 0 ? t('empty') : t('noMatch')}
           </div>
         ) : (
           filtered.map((e) => <LogRow key={e.id} entry={e} />)
@@ -265,7 +268,7 @@ export function Logs() {
       </div>
 
       <div className="shrink-0 px-4 py-2 border-t border-surface-border text-xs text-slate-600">
-        Last {log.length} events in memory · Full history in <code>astrolol.log</code>
+        <Trans t={t} i18nKey="footer" count={log.length} components={{ code: <code /> }} />
       </div>
     </div>
   )

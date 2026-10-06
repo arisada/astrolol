@@ -1,0 +1,54 @@
+{
+  "indiProps": "Propriétés INDI",
+  "on": "OUI",
+  "off": "NON",
+  "latest": "Dernière pose",
+  "noImage": "Pas encore d'image",
+  "fwhm": "FWHM {{fwhm}}px · {{stars}}★",
+  "cooler": {
+    "on": "Refroid. OUI",
+    "off": "Refroid. NON",
+    "target": "Cible °C",
+    "set": "Appliquer"
+  },
+  "frameType": "Type d'image",
+  "gain": "Gain",
+  "gainError": "Gain : {{error}}",
+  "binning": "Binning",
+  "saveSubs": "Enregistrer les poses",
+  "autoStretch": "Étirement auto",
+  "preview": {
+    "title": "Réglages de l'aperçu",
+    "fit": "Ajuster",
+    "fitTitle": "Ajuster l'image à la fenêtre",
+    "native": "1x",
+    "nativeTitle": "Zoomer à la résolution native de l'image (1 pixel image = 1 pixel écran)",
+    "quality": "Qualité JPEG"
+  },
+  "dither": {
+    "title": "Guidage / Dither",
+    "frames": "Toutes les N images",
+    "minutes": "Toutes les N minutes"
+  },
+  "expose": "Poser",
+  "stop": "Stop",
+  "loop": "Boucle",
+  "halt": "Arrêt",
+  "haltTitle": "Interrompre la pose et annuler la boucle immédiatement",
+  "focuser": {
+    "title": "Focuser",
+    "position": "Position",
+    "in": "Rentrer",
+    "out": "Sortir",
+    "steps": "pas",
+    "absolute": "Position absolue",
+    "go": "Aller",
+    "halt": "Arrêt"
+  },
+  "filterWheel": {
+    "title": "Roue à filtres",
+    "filter": "Filtre {{slot}}",
+    "moving": "Déplacement…"
+  },
+  "noCamera": "Aucune caméra connectée."
+}

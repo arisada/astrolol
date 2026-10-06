@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { ChevronDown, ChevronRight } from 'lucide-react'
 import { PillGroup } from '@/components/ui/pill-group'
 import { LabeledSlider } from '@/components/ui/labeled-slider'
@@ -31,21 +32,23 @@ export function ColorControls({
   onChange: (p: ColorParams) => void
   showLinked: boolean
 }) {
+  const { t } = useTranslation()
   return (
     <div className="flex flex-col gap-1.5">
       <PillGroup
-        label="Colour"
+        label={t('stretch.colour')}
         options={['rgb', 'mono'] as const}
         value={value.color ? 'rgb' : 'mono'}
-        formatLabel={(v) => (v === 'rgb' ? 'RGB' : 'Mono')}
+        formatLabel={(v) => (v === 'rgb' ? t('stretch.rgb') : t('stretch.mono'))}
         onChange={(v) => onChange({ ...value, color: v === 'rgb' })}
         stretch
       />
       {showLinked && value.color && (
         <PillGroup
-          label="Channels"
+          label={t('stretch.channels')}
           options={['unlinked', 'linked'] as const}
           value={value.linked ? 'linked' : 'unlinked'}
+          formatLabel={(v) => t(`stretch.${v}`)}
           onChange={(v) => onChange({ ...value, linked: v === 'linked' })}
           stretch
         />
@@ -67,13 +70,15 @@ export function StretchControls({
   onChange: (p: StretchParams) => void
   onCommit: (p: StretchParams) => void
 }) {
+  const { t } = useTranslation()
   const [advanced, setAdvanced] = useState(false)
 
   return (
     <div className="flex flex-col gap-1.5">
       <PillGroup<Preset | ''>
-        label="Stretch"
+        label={t('stretch.label')}
         options={PRESET_NAMES}
+        formatLabel={(p) => (p ? t(`stretch.${p}`) : '')}
         value={matchingPreset(value.target_bg)}
         onChange={(p) => {
           if (!p) return
@@ -89,18 +94,18 @@ export function StretchControls({
         className="flex items-center gap-1 text-xs text-slate-500 hover:text-slate-300 self-start"
       >
         {advanced ? <ChevronDown size={12} /> : <ChevronRight size={12} />}
-        Advanced
+        {t('stretch.advanced')}
       </button>
       {advanced && (
         <>
           <LabeledSlider
-            label="Background" value={value.target_bg} min={0.05} max={0.5} step={0.01}
+            label={t('stretch.background')} value={value.target_bg} min={0.05} max={0.5} step={0.01}
             format={(v) => v.toFixed(2)}
             onChange={(v) => onChange({ ...value, target_bg: v })}
             onCommit={(v) => onCommit({ ...value, target_bg: v })}
           />
           <LabeledSlider
-            label="Shadows clip" value={value.shadows_sigma} min={-5} max={-0.5} step={0.1}
+            label={t('stretch.shadowsClip')} value={value.shadows_sigma} min={-5} max={-0.5} step={0.1}
             format={(v) => `${v.toFixed(1)}σ`}
             onChange={(v) => onChange({ ...value, shadows_sigma: v })}
             onCommit={(v) => onCommit({ ...value, shadows_sigma: v })}

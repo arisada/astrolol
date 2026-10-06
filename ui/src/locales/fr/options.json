@@ -1,0 +1,76 @@
+{
+  "tokens": {
+    "D": "Date ISO (AAAA-MM-JJ)",
+    "T": "Heure (HHMMSS)",
+    "U": "Dossier personnel",
+    "O": "Nom de l'objet / de la cible",
+    "F": "Type d'image (light/dark/flat/bias)",
+    "N": "Compteur (6 chiffres, complété par des zéros, par caméra)",
+    "C": "Nom de la caméra (ID de l'appareil)",
+    "f": "Nom du filtre (vide sans roue à filtres)",
+    "E": "Temps de pose (secondes)",
+    "G": "Gain"
+  },
+  "tokenRef": {
+    "hide": "Masquer la liste des jetons",
+    "show": "Afficher la liste des jetons"
+  },
+  "language": {
+    "title": "Langue",
+    "label": "Langue de l'interface"
+  },
+  "saving": {
+    "title": "Enregistrement des images",
+    "dir": "Dossier d'enregistrement",
+    "dirHint": "Modèle de dossier pour les images enregistrées. Accepte les jetons %.",
+    "filename": "Modèle de nom de fichier",
+    "filenameHint": "Sans extension — <code>.fits</code> est ajouté automatiquement.",
+    "example": "Exemple :",
+    "saving": "Enregistrement…",
+    "saved": "Enregistré.",
+    "error": "Échec de l'enregistrement des réglages."
+  },
+  "indi": {
+    "title": "Serveur INDI",
+    "manage": "Gérer indiserver automatiquement",
+    "manageHint": "astrolol démarrera et arrêtera indiserver selon les besoins",
+    "runDir": "Dossier d'exécution",
+    "runDirHint": "Dossier du FIFO INDI et du fichier d'état (conservé)",
+    "localUpload": "Transfert d'images local",
+    "localUploadHint": "Le pilote écrit les FITS directement sur le disque — évite l'encodage base64 sur TCP.",
+    "uploadDir": "Dossier de dépôt",
+    "uploadDirHint": "Dossier partagé où le pilote enregistre les images",
+    "hideAdvanced": "Masquer les réglages avancés",
+    "showAdvanced": "Afficher les réglages avancés",
+    "host": "Hôte du serveur INDI",
+    "hostHint": "Utilisé uniquement quand la gestion automatique est désactivée",
+    "port": "Port du serveur INDI",
+    "portHint": "Par défaut : 7624",
+    "logging": "Journal du protocole INDI",
+    "loggingHint": "Journalise le trafic XML dans la console et le fichier de log. Revient à Désactivé au redémarrage.",
+    "logOff": "Désactivé",
+    "logTags": "Balises seulement",
+    "logFull": "XML complet",
+    "lowMemory": "Mode faible mémoire",
+    "lowMemoryHint": "Traite séquentiellement le traitement d'image et la résolution astrométrique. À utiliser sur Raspberry Pi ou tout matériel à mémoire limitée pour éviter les arrêts par manque de mémoire."
+  },
+  "plugins": {
+    "title": "Modules",
+    "restartPending": "Redémarrage nécessaire pour prendre effet",
+    "saved": "Enregistré.",
+    "saveError": "Échec de l'enregistrement des réglages des modules.",
+    "restarting": "Redémarrage…",
+    "restartNeeded": "Redémarrage nécessaire pour que les changements prennent effet.",
+    "restartNow": "Redémarrer maintenant"
+  },
+  "server": {
+    "title": "Serveur",
+    "restart": "Redémarrer astrolol",
+    "restarting": "Redémarrage…",
+    "stopIndi": "Arrêter le serveur INDI",
+    "stopping": "Arrêt…",
+    "indiStopped": "Serveur INDI arrêté.",
+    "indiStopFailed": "Échec de l'arrêt du serveur INDI."
+  },
+  "title": "Options"
+}

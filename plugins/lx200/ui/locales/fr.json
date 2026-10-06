@@ -1,0 +1,34 @@
+{
+  "title": "Serveur LX200",
+  "unreachable": "Impossible de joindre le serveur",
+  "loading": "Chargement…",
+  "running": "En marche",
+  "stopped": "Arrêté",
+  "start": "Démarrer",
+  "stop": "Arrêter",
+  "port": "Port :",
+  "clients": "Clients connectés :",
+  "setup": {
+    "title": "Connecter une application de planétarium",
+    "stellarium": {
+      "step1": "Modules d'extension → Contrôle des télescopes → activer → configurer",
+      "step2": "Ajouter un télescope → type : <mono>TCP</mono>",
+      "step3": "Hôte : <mono>astrolol-host</mono>, Port : <mono>{{port}}</mono>"
+    },
+    "skysafari": {
+      "step1": "Réglages → Télescope → Configuration",
+      "step2": "Type de télescope : <mono>Meade LX200 Classic</mono>",
+      "step3": "Type de monture : <mono>Alt-Az</mono> ou <mono>Équatoriale</mono>",
+      "step4": "Connexion via : <mono>WiFi</mono>, IP : astrolol-host, Port : <mono>{{port}}</mono>"
+    },
+    "cartes": {
+      "step1": "Télescope → Configuration → pilote : <mono>Meade LX200</mono>",
+      "step2": "Connexion : <mono>TCP</mono>, hôte : astrolol-host, port : <mono>{{port}}</mono>"
+    },
+    "footer": "Les coordonnées sont échangées en J2000 (ICRS). GoTo fait pointer la monture ; Sync met à jour son modèle de pointage. Stop/Abort interrompt tout pointage en cours."
+  },
+  "manifest": {
+    "name": "Serveur LX200",
+    "description": "Serveur de télescope LX200 virtuel. Connectez Stellarium, SkySafari, Cartes du Ciel, TheSkyX, Voyager ou toute application de planétarium compatible LX200 pour afficher la position de la monture et envoyer des commandes GoTo / Sync."
+  }
+}

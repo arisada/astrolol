@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next'
 // ── Device state badge (dot + text, used in Equipment/Mount) ──────────────────
 
 type DeviceState = 'connected' | 'connecting' | 'disconnected' | 'busy' | 'error' | string
@@ -14,11 +15,12 @@ const stateClass: Record<string, string> = {
 }
 
 export function StateBadge({ state }: { state: DeviceState }) {
+  const { t } = useTranslation()
   const cls = stateClass[state] ?? 'bg-surface-overlay text-status-idle'
   return (
     <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${cls}`}>
       <span className="w-1.5 h-1.5 rounded-full bg-current" />
-      {state}
+      {t(`state.${state}`, { defaultValue: state })}
     </span>
   )
 }

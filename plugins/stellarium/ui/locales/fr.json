@@ -1,0 +1,26 @@
+{
+  "title": "Serveur Stellarium",
+  "unreachable": "Impossible de joindre le serveur",
+  "loading": "Chargement…",
+  "running": "En marche",
+  "stopped": "Arrêté",
+  "start": "Démarrer",
+  "stop": "Arrêter",
+  "port": "Port :",
+  "clients": "Clients :",
+  "howto": {
+    "title": "Connecter Stellarium",
+    "step1": "Modules d'extension → Contrôle des télescopes → activer le module → configurer",
+    "step2": "Cliquez sur <hl>Ajouter un nouveau télescope</hl>",
+    "step3": "Télescope contrôlé par : <mono>logiciel tiers ou ordinateur distant</mono>",
+    "step4": "Type de connexion : <mono>TCP</mono>",
+    "step5": "Hôte : <mono>astrolol-host</mono>, Port : <mono>{{port}}</mono>",
+    "step6": "Enregistrez et connectez-vous. Le réticule du télescope doit apparaître sur le ciel.",
+    "step7": "Dans les propriétés du télescope, choisissez <hl>Système de coordonnées : J2000</hl> (c'est la valeur par défaut).",
+    "footer": "Clic droit sur un objet → Objet courant → Pointer le télescope pour lancer un GoTo. La position est envoyée à Stellarium toutes les 500 ms."
+  },
+  "manifest": {
+    "name": "Serveur Stellarium",
+    "description": "Serveur de télescope pour Stellarium. Dans le module Contrôle des télescopes de Stellarium, choisissez « logiciel tiers ou distant » → TCP et indiquez cet hôte et ce port. La position de la monture est envoyée en direct et les commandes GoTo de Stellarium font pointer la monture."
+  }
+}

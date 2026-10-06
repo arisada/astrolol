@@ -1,4 +1,5 @@
 import { useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { ChevronDown, ChevronUp } from 'lucide-react'
 import { Button } from './button'
 
@@ -10,12 +11,13 @@ export function fmtDuration(s: number): string {
   return rem === 0 ? `${m} m` : `${m} m ${rem} s`
 }
 
-export function DurationStepper({ steps, value, onChange, label = 'Duration' }: {
+export function DurationStepper({ steps, value, onChange, label }: {
   steps: number[]
   value: number
   onChange: (v: number) => void
   label?: string
 }) {
+  const { t } = useTranslation()
   const [editing, setEditing] = useState(false)
   const [raw, setRaw] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
@@ -38,10 +40,10 @@ export function DurationStepper({ steps, value, onChange, label = 'Duration' }: 
 
   return (
     <div className="flex flex-col gap-1">
-      <span className="text-xs text-slate-400">{label}</span>
+      <span className="text-xs text-slate-400">{label ?? t('duration.label')}</span>
       <div className="flex items-center gap-1">
         <Button size="icon" variant="outline" disabled={idx === 0}
-          onClick={() => { setEditing(false); onChange(steps[idx - 1]) }} title="Shorter">
+          onClick={() => { setEditing(false); onChange(steps[idx - 1]) }} title={t('duration.shorter')}>
           <ChevronDown size={14} />
         </Button>
         {editing ? (
@@ -54,13 +56,13 @@ export function DurationStepper({ steps, value, onChange, label = 'Duration' }: 
             className="flex-1 text-center text-xs font-mono text-slate-200 bg-surface-overlay border border-accent rounded px-2 py-1.5 min-w-[5rem] focus:outline-none"
           />
         ) : (
-          <button type="button" onClick={startEdit} title="Click to enter a custom value"
+          <button type="button" onClick={startEdit} title={t('duration.custom')}
             className="flex-1 text-center text-xs font-mono text-slate-200 bg-surface-overlay border border-surface-border rounded px-2 py-1.5 min-w-[5rem] hover:border-slate-500 transition-colors">
             {fmtDuration(value)}
           </button>
         )}
         <Button size="icon" variant="outline" disabled={idx === steps.length - 1}
-          onClick={() => { setEditing(false); onChange(steps[idx + 1]) }} title="Longer">
+          onClick={() => { setEditing(false); onChange(steps[idx + 1]) }} title={t('duration.longer')}>
           <ChevronUp size={14} />
         </Button>
       </div>

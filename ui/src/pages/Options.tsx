@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react'
+import { Trans, useTranslation } from 'react-i18next'
 import { api } from '@/api/client'
 import type { PluginInfo } from '@/api/types'
 import { useStore } from '@/store'
 import { ToggleSwitch } from '@/components/ui/toggle-switch'
 import { Input } from '@/components/ui/input'
+import { PillGroup } from '@/components/ui/pill-group'
+import { SUPPORTED_LANGUAGES, setLanguage } from '@/i18n'
 
 interface IndiSettings {
   manageServer: boolean
@@ -37,20 +40,10 @@ function Row({ label, hint, children }: { label: string; hint?: string; children
 }
 
 // Token reference for the save template fields
-const TOKEN_REFERENCE = [
-  { token: '%D', desc: 'ISO date (YYYY-MM-DD)' },
-  { token: '%T', desc: 'Time (HHMMSS)' },
-  { token: '%U', desc: 'Home directory' },
-  { token: '%O', desc: 'Object / target name' },
-  { token: '%F', desc: 'Frame type (light/dark/flat/bias)' },
-  { token: '%N', desc: 'Counter (6-digit, zero-padded, per camera)' },
-  { token: '%C', desc: 'Camera name (device ID)' },
-  { token: '%f', desc: 'Filter name (empty if no filter wheel)' },
-  { token: '%E', desc: 'Exposure time (seconds)' },
-  { token: '%G', desc: 'Gain' },
-]
+const TOKEN_KEYS = ['D', 'T', 'U', 'O', 'F', 'N', 'C', 'f', 'E', 'G']
 
 function TokenReference() {
+  const { t } = useTranslation('options')
   const [open, setOpen] = useState(false)
   return (
     <div className="mt-1">
@@ -59,15 +52,15 @@ function TokenReference() {
         onClick={() => setOpen((v) => !v)}
         className="text-xs text-slate-500 hover:text-slate-300 underline underline-offset-2"
       >
-        {open ? 'Hide token reference' : 'Show token reference'}
+        {open ? t('tokenRef.hide') : t('tokenRef.show')}
       </button>
       {open && (
         <table className="mt-2 text-xs w-full border-collapse">
           <tbody>
-            {TOKEN_REFERENCE.map(({ token, desc }) => (
-              <tr key={token} className="border-t border-slate-700">
-                <td className="py-1 pr-4 font-mono text-accent">{token}</td>
-                <td className="py-1 text-slate-400">{desc}</td>
+            {TOKEN_KEYS.map((k) => (
+              <tr key={k} className="border-t border-slate-700">
+                <td className="py-1 pr-4 font-mono text-accent">%{k}</td>
+                <td className="py-1 text-slate-400">{t(`tokens.${k}`)}</td>
               </tr>
             ))}
           </tbody>
@@ -78,6 +71,7 @@ function TokenReference() {
 }
 
 export function Options() {
+  const { t, i18n } = useTranslation('options')
   const [indi, setIndi] = useState<IndiSettings>({
     manageServer: true,
     host: 'localhost',
@@ -137,6 +131,19 @@ export function Options() {
         indi_local_upload_dir: indiLocalUploadDir,
         low_memory_mode: lowMemoryMode,
       })
+      setSaveStatus('saved')
+      setTimeout(() => setSaveStatus('idle'), 2000)
+    } catch {
+      setSaveStatus('error')
+    }
+  }
+
+  const persistLanguage = async (code: string) => {
+    setLanguage(code)
+    setSaveStatus('saving')
+    try {
+      const current = await api.settings.get()
+      await api.settings.put({ ...current, language: code })
       setSaveStatus('saved')
       setTimeout(() => setSaveStatus('idle'), 2000)
     } catch {
@@ -223,13 +230,24 @@ export function Options() {
 
   return (
     <div className="p-6 max-w-xl">
-      <h1 className="text-lg font-semibold text-slate-100 mb-6">Options</h1>
+      <h1 className="text-lg font-semibold text-slate-100 mb-6">{t('title')}</h1>
 
-      <Section title="Image Saving">
+      <Section title={t('language.title')}>
+        <Row label={t('language.label')}>
+          <PillGroup
+            options={SUPPORTED_LANGUAGES.map((l) => l.code)}
+            value={i18n.resolvedLanguage as string}
+            onChange={persistLanguage}
+            formatLabel={(code) => SUPPORTED_LANGUAGES.find((l) => l.code === code)?.label ?? code}
+          />
+        </Row>
+      </Section>
+
+      <Section title={t('saving.title')}>
         <div className="flex flex-col gap-3">
           <div className="flex flex-col gap-1">
-            <label className="text-sm text-slate-200">Save directory</label>
-            <p className="text-xs text-slate-500">Directory template for saved subs. Supports % tokens.</p>
+            <label className="text-sm text-slate-200">{t('saving.dir')}</label>
+            <p className="text-xs text-slate-500">{t('saving.dirHint')}</p>
             <Input
               inputSize="sm"
               value={saveDir}
@@ -238,8 +256,8 @@ export function Options() {
             />
           </div>
           <div className="flex flex-col gap-1">
-            <label className="text-sm text-slate-200">Filename template</label>
-            <p className="text-xs text-slate-500">Without extension — <code className="text-slate-400">.fits</code> is appended automatically.</p>
+            <label className="text-sm text-slate-200">{t('saving.filename')}</label>
+            <p className="text-xs text-slate-500"><Trans t={t} i18nKey="saving.filenameHint" components={{ code: <code className="text-slate-400" /> }} /></p>
             <Input
               inputSize="sm"
               value={saveFilename}
@@ -248,29 +266,29 @@ export function Options() {
             />
           </div>
           <div className="text-xs text-slate-500 bg-surface-overlay border border-surface-border rounded p-2 font-mono break-all">
-            Example: <span className="text-slate-300">{saveDir.replace('%D', '2026-04-13').replace('%T', '210530').replace('%U', '~').replace('%O', 'M42').replace('%F', 'light').replace('%N', '000001').replace('%C', 'zwo_asi294').replace('%f', 'L').replace('%E', '60.0').replace('%G', '100')}/{saveFilename.replace('%D', '2026-04-13').replace('%T', '210530').replace('%U', '~').replace('%O', 'M42').replace('%F', 'light').replace('%N', '000001').replace('%C', 'zwo_asi294').replace('%f', 'L').replace('%E', '60.0').replace('%G', '100')}.fits</span>
+            {t('saving.example')} <span className="text-slate-300">{saveDir.replace('%D', '2026-04-13').replace('%T', '210530').replace('%U', '~').replace('%O', 'M42').replace('%F', 'light').replace('%N', '000001').replace('%C', 'zwo_asi294').replace('%f', 'L').replace('%E', '60.0').replace('%G', '100')}/{saveFilename.replace('%D', '2026-04-13').replace('%T', '210530').replace('%U', '~').replace('%O', 'M42').replace('%F', 'light').replace('%N', '000001').replace('%C', 'zwo_asi294').replace('%f', 'L').replace('%E', '60.0').replace('%G', '100')}.fits</span>
           </div>
           <TokenReference />
-          {saveStatus === 'saving' && <p className="text-xs text-slate-500">Saving…</p>}
-          {saveStatus === 'saved' && <p className="text-xs text-status-connected">Saved.</p>}
-          {saveStatus === 'error' && <p className="text-xs text-status-error">Failed to save settings.</p>}
+          {saveStatus === 'saving' && <p className="text-xs text-slate-500">{t('saving.saving')}</p>}
+          {saveStatus === 'saved' && <p className="text-xs text-status-connected">{t('saving.saved')}</p>}
+          {saveStatus === 'error' && <p className="text-xs text-status-error">{t('saving.error')}</p>}
         </div>
       </Section>
 
-      <Section title="INDI Server">
+      <Section title={t('indi.title')}>
         <Row
-          label="Manage indiserver automatically"
-          hint="astrolol will start and stop indiserver as needed"
+          label={t('indi.manage')}
+          hint={t('indi.manageHint')}
         >
           <ToggleSwitch
             checked={indi.manageServer}
             onChange={() => setIndi((s) => ({ ...s, manageServer: !s.manageServer }))}
-            label="Manage indiserver automatically"
+            label={t('indi.manage')}
           />
         </Row>
         <Row
-          label="Run directory"
-          hint="Directory for the INDI FIFO and state file (persisted)"
+          label={t('indi.runDir')}
+          hint={t('indi.runDirHint')}
         >
           <Input
             inputSize="sm"
@@ -281,15 +299,15 @@ export function Options() {
           />
         </Row>
         <Row
-          label="Local image transfer"
-          hint="Driver writes FITS directly to disk — eliminates base64 encoding over TCP."
+          label={t('indi.localUpload')}
+          hint={t('indi.localUploadHint')}
         >
-          <ToggleSwitch checked={indiLocalUpload} onChange={() => persistIndiLocalUpload(!indiLocalUpload)} label="Local image transfer" />
+          <ToggleSwitch checked={indiLocalUpload} onChange={() => persistIndiLocalUpload(!indiLocalUpload)} label={t('indi.localUpload')} />
         </Row>
         {indiLocalUpload && (
           <Row
-            label="Upload directory"
-            hint="Shared directory where the driver saves images"
+            label={t('indi.uploadDir')}
+            hint={t('indi.uploadDirHint')}
           >
             <Input
               inputSize="sm"
@@ -308,14 +326,14 @@ export function Options() {
             onClick={() => setShowAdvanced((v) => !v)}
             className="text-xs text-slate-500 hover:text-slate-300 underline underline-offset-2"
           >
-            {showAdvanced ? 'Hide advanced settings' : 'Show advanced settings'}
+            {showAdvanced ? t('indi.hideAdvanced') : t('indi.showAdvanced')}
           </button>
 
           {showAdvanced && (
             <div className="mt-4 space-y-4 border-t border-slate-700 pt-4">
               <Row
-                label="INDI server host"
-                hint="Only used when automatic management is disabled"
+                label={t('indi.host')}
+                hint={t('indi.hostHint')}
               >
                 <Input
                   value={indi.host}
@@ -325,8 +343,8 @@ export function Options() {
                 />
               </Row>
               <Row
-                label="INDI server port"
-                hint="Default: 7624"
+                label={t('indi.port')}
+                hint={t('indi.portHint')}
               >
                 <Input
                   type="number"
@@ -340,8 +358,8 @@ export function Options() {
                 />
               </Row>
               <Row
-                label="INDI protocol logging"
-                hint="Log XML traffic to console and log file. Resets to Off on restart."
+                label={t('indi.logging')}
+                hint={t('indi.loggingHint')}
               >
                 <select
                   value={indiDebugLevel}
@@ -352,16 +370,16 @@ export function Options() {
                   }}
                   className="bg-surface border border-surface-border rounded px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-accent"
                 >
-                  <option value={0}>Off</option>
-                  <option value={1}>Tags only</option>
-                  <option value={2}>Full XML</option>
+                  <option value={0}>{t('indi.logOff')}</option>
+                  <option value={1}>{t('indi.logTags')}</option>
+                  <option value={2}>{t('indi.logFull')}</option>
                 </select>
               </Row>
               <Row
-                label="Low memory mode"
-                hint="Serialise image processing and plate solving. Use on Raspberry Pi or other memory-constrained hardware to avoid OOM kills."
+                label={t('indi.lowMemory')}
+                hint={t('indi.lowMemoryHint')}
               >
-                <ToggleSwitch checked={lowMemoryMode} onChange={() => persistLowMemoryMode(!lowMemoryMode)} label="Low memory mode" />
+                <ToggleSwitch checked={lowMemoryMode} onChange={() => persistLowMemoryMode(!lowMemoryMode)} label={t('indi.lowMemory')} />
               </Row>
             </div>
           )}
@@ -369,32 +387,32 @@ export function Options() {
       </Section>
 
       {pluginInfos.length > 0 && (
-        <Section title="Plugins">
+        <Section title={t('plugins.title')}>
           <div className="space-y-3">
             {pluginInfos.map((plugin) => (
               <Row
                 key={plugin.id}
-                label={plugin.name}
+                label={i18n.t('manifest.name', { ns: plugin.id, defaultValue: plugin.name })}
                 hint={
                   plugin.pending_restart
-                    ? 'Restart required to take effect'
-                    : plugin.description || undefined
+                    ? t('plugins.restartPending')
+                    : i18n.t('manifest.description', { ns: plugin.id, defaultValue: plugin.description }) || undefined
                 }
               >
-                <ToggleSwitch checked={plugin.enabled} onChange={() => togglePlugin(plugin)} label={plugin.name} />
+                <ToggleSwitch checked={plugin.enabled} onChange={() => togglePlugin(plugin)} label={i18n.t('manifest.name', { ns: plugin.id, defaultValue: plugin.name })} />
               </Row>
             ))}
           </div>
           {pluginSaveStatus === 'saved' && (
-            <p className="text-xs text-status-connected mt-2">Saved.</p>
+            <p className="text-xs text-status-connected mt-2">{t('plugins.saved')}</p>
           )}
           {pluginSaveStatus === 'error' && (
-            <p className="text-xs text-status-error mt-2">Failed to save plugin settings.</p>
+            <p className="text-xs text-status-error mt-2">{t('plugins.saveError')}</p>
           )}
           {restartNeeded && (
             <div className="flex items-center gap-3 mt-2">
               <p className="text-xs text-slate-400">
-                {restarting ? 'Restarting…' : 'Restart required for changes to take effect.'}
+                {restarting ? t('plugins.restarting') : t('plugins.restartNeeded')}
               </p>
               {!restarting && (
                 <button
@@ -402,7 +420,7 @@ export function Options() {
                   onClick={restartNow}
                   className="text-xs px-2 py-1 rounded bg-accent text-white hover:bg-accent/80 transition-colors"
                 >
-                  Restart now
+                  {t('plugins.restartNow')}
                 </button>
               )}
             </div>
@@ -410,7 +428,7 @@ export function Options() {
         </Section>
       )}
 
-      <Section title="Server">
+      <Section title={t('server.title')}>
         <div className="flex flex-wrap gap-3">
           <button
             type="button"
@@ -418,7 +436,7 @@ export function Options() {
             disabled={restarting}
             className="px-3 py-1.5 rounded text-sm font-medium bg-red-700 hover:bg-red-600 text-white disabled:opacity-50 transition-colors"
           >
-            {restarting ? 'Restarting…' : 'Restart astrolol'}
+            {restarting ? t('server.restarting') : t('server.restart')}
           </button>
           <button
             type="button"
@@ -426,14 +444,14 @@ export function Options() {
             disabled={indiStopStatus === 'stopping'}
             className="px-3 py-1.5 rounded text-sm font-medium bg-slate-600 hover:bg-slate-500 text-white disabled:opacity-50 transition-colors"
           >
-            {indiStopStatus === 'stopping' ? 'Stopping…' : 'Stop INDI server'}
+            {indiStopStatus === 'stopping' ? t('server.stopping') : t('server.stopIndi')}
           </button>
         </div>
         {indiStopStatus === 'stopped' && (
-          <p className="text-xs text-status-connected mt-2">INDI server stopped.</p>
+          <p className="text-xs text-status-connected mt-2">{t('server.indiStopped')}</p>
         )}
         {indiStopStatus === 'error' && (
-          <p className="text-xs text-status-error mt-2">Failed to stop INDI server.</p>
+          <p className="text-xs text-status-error mt-2">{t('server.indiStopFailed')}</p>
         )}
       </Section>
     </div>

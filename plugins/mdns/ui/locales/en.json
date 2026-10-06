@@ -1,0 +1,27 @@
+{
+  "title": "mDNS Discovery",
+  "unreachable": "Cannot reach backend",
+  "saveFailed": "Save failed",
+  "intro": "Advertises this server on the local network so clients (e.g. the Android app) can find it without typing an IP. astrolol cannot detect the address/port a client should use on its own — especially behind a reverse proxy doing TLS — so it needs to be set here explicitly. Changes take effect on next restart.",
+  "restarting": "Restarting…",
+  "savedRestart": "Saved — astrolol needs to be restarted for this to take effect.",
+  "restart": "Restart astrolol",
+  "card": "Advertisement",
+  "autofillHint": "Fill the host/port/scheme below from the address used to load this page.",
+  "autofill": "Use this page's address",
+  "instanceName": "Instance name",
+  "instanceNamePlaceholder": "Defaults to this machine's hostname",
+  "host": "Advertised host",
+  "hostPlaceholder": "Auto-detect local IP (leave blank)",
+  "hostHint": "An IP or hostname. Set this when the deployment fronts astrolol with a reverse proxy on a different host, or when auto-detection picks the wrong interface. Note that autofill reflects the browser's address bar, so it's wrong if you're viewing this through the Vite dev server rather than the deployment's real address.",
+  "port": "Advertised port",
+  "portPlaceholder": "e.g. 443 behind nginx, 8000 with no proxy",
+  "portHint": "Required — nothing is advertised until this is set.",
+  "scheme": "Scheme",
+  "save": "Save",
+  "saving": "Saving…",
+  "manifest": {
+    "name": "mDNS Discovery",
+    "description": "Advertises this astrolol server on the local network via mDNS."
+  }
+}

@@ -1,0 +1,54 @@
+{
+  "indiProps": "INDI properties",
+  "on": "ON",
+  "off": "OFF",
+  "latest": "Latest exposure",
+  "noImage": "No image yet",
+  "fwhm": "FWHM {{fwhm}}px · {{stars}}★",
+  "cooler": {
+    "on": "Cooler ON",
+    "off": "Cooler OFF",
+    "target": "Target °C",
+    "set": "Set"
+  },
+  "frameType": "Frame type",
+  "gain": "Gain",
+  "gainError": "Gain: {{error}}",
+  "binning": "Binning",
+  "saveSubs": "Save subs",
+  "autoStretch": "Auto stretch",
+  "preview": {
+    "title": "Preview settings",
+    "fit": "Fit",
+    "fitTitle": "Fit the image to the window",
+    "native": "1x",
+    "nativeTitle": "Zoom to the image's own resolution (1 image pixel = 1 screen pixel)",
+    "quality": "JPEG quality"
+  },
+  "dither": {
+    "title": "Guiding / Dither",
+    "frames": "Every N frames",
+    "minutes": "Every N minutes"
+  },
+  "expose": "Expose",
+  "stop": "Stop",
+  "loop": "Loop",
+  "halt": "Halt",
+  "haltTitle": "Abort exposure and cancel loop immediately",
+  "focuser": {
+    "title": "Focuser",
+    "position": "Position",
+    "in": "Move in",
+    "out": "Move out",
+    "steps": "steps",
+    "absolute": "Absolute position",
+    "go": "Go",
+    "halt": "Halt"
+  },
+  "filterWheel": {
+    "title": "Filter Wheel",
+    "filter": "Filter {{slot}}",
+    "moving": "Moving…"
+  },
+  "noCamera": "No camera connected."
+}
