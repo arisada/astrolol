@@ -84,6 +84,13 @@ sudo apt-get install indi-full
 sudo apt-get install astap-cli gsc
 ```
 
+**Optional: Bluetooth serial devices** (`bluetooth_serial` plugin):
+```bash
+sudo apt-get install bluez bluez-tools
+```
+The user running astrolol needs D-Bus access to `org.bluez` (normally granted
+via membership in the `bluetooth` group).
+
 **Optional: PHD2 guiding**
 
 astrolol can connect to local or remote PHD2 instances.

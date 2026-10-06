@@ -46,6 +46,9 @@ async def scan(request: Request, timeout: float = DEFAULT_SCAN_TIMEOUT) -> list[
         return await _manager(request).scan(timeout=timeout)
     except BlueZUnavailableError as exc:
         raise HTTPException(status_code=503, detail=str(exc)) from exc
+    except Exception as exc:
+        logger.error("bluetooth_serial.scan_failed", error=str(exc), exc_info=True)
+        raise HTTPException(status_code=503, detail=f"Bluetooth scan failed: {exc}") from exc
 
 
 @router.post("/pair", response_model=PairedSerialDevice)

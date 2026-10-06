@@ -236,28 +236,31 @@ def _build_pairing_agent(pending_pins: dict[str, str]):
             pin = pending_pins.get(_mac_from_device_path(device), "0000")
             return int(pin) if pin.isdigit() else 0
 
+        # dbus_next infers the D-Bus signature from the annotation and rejects
+        # anything that isn't a type-string constant — including "-> None" for a
+        # void method. These must be left unannotated, not annotated as None.
         @method()
-        def RequestConfirmation(self, device: "o", passkey: "u") -> None:  # noqa: N802, F821
+        def RequestConfirmation(self, device: "o", passkey: "u"):  # noqa: N802, F821
             return None  # auto-confirm; SSP "just works" devices need no PIN
 
         @method()
-        def DisplayPasskey(self, device: "o", passkey: "u", entered: "q") -> None:  # noqa: N802, F821
+        def DisplayPasskey(self, device: "o", passkey: "u", entered: "q"):  # noqa: N802, F821
             pass
 
         @method()
-        def DisplayPinCode(self, device: "o", pincode: "s") -> None:  # noqa: N802, F821
+        def DisplayPinCode(self, device: "o", pincode: "s"):  # noqa: N802, F821
             pass
 
         @method()
-        def AuthorizeService(self, device: "o", uuid: "s") -> None:  # noqa: N802, F821
+        def AuthorizeService(self, device: "o", uuid: "s"):  # noqa: N802, F821
             return None
 
         @method()
-        def Cancel(self) -> None:  # noqa: N802
+        def Cancel(self):  # noqa: N802
             pass
 
         @method()
-        def Release(self) -> None:  # noqa: N802
+        def Release(self):  # noqa: N802
             pass
 
     return _Agent()
