@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { api } from '@/api/client'
@@ -6,6 +7,7 @@ import type { PairedSerialDevice } from '@/api/types'
 import { type DiscoveredDevice, forget, pair, rename, scan } from './api'
 
 function PairedRow({ device, onChanged }: { device: PairedSerialDevice; onChanged: () => void }) {
+  const { t } = useTranslation('bluetooth_serial')
   const [editing, setEditing] = useState(false)
   const [name, setName] = useState(device.name)
   const [busy, setBusy] = useState(false)
@@ -22,7 +24,7 @@ function PairedRow({ device, onChanged }: { device: PairedSerialDevice; onChange
   }
 
   const remove = async () => {
-    if (!confirm(`Forget "${device.name}"? Any device configured to use it will need re-pairing.`)) return
+    if (!confirm(t('confirmForget', { name: device.name }))) return
     setBusy(true)
     try {
       await forget(device.id)
@@ -41,16 +43,17 @@ function PairedRow({ device, onChanged }: { device: PairedSerialDevice; onChange
       )}
       <span className="text-xs text-slate-500 font-mono">{device.mac}</span>
       {editing ? (
-        <Button size="sm" variant="outline" disabled={busy} onClick={save}>Save</Button>
+        <Button size="sm" variant="outline" disabled={busy} onClick={save}>{t('save')}</Button>
       ) : (
-        <Button size="sm" variant="ghost" disabled={busy} onClick={() => setEditing(true)}>Rename</Button>
+        <Button size="sm" variant="ghost" disabled={busy} onClick={() => setEditing(true)}>{t('rename')}</Button>
       )}
-      <Button size="sm" variant="danger" disabled={busy} onClick={remove}>Forget</Button>
+      <Button size="sm" variant="danger" disabled={busy} onClick={remove}>{t('forget')}</Button>
     </div>
   )
 }
 
 function ScanPanel({ onPaired }: { onPaired: () => void }) {
+  const { t } = useTranslation('bluetooth_serial')
   const [devices, setDevices] = useState<DiscoveredDevice[] | null>(null)
   const [scanning, setScanning] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -84,14 +87,14 @@ function ScanPanel({ onPaired }: { onPaired: () => void }) {
   return (
     <div className="bg-surface-raised border border-surface-border rounded p-4 flex flex-col gap-3">
       <div className="flex items-center justify-between">
-        <p className="text-sm text-slate-300 font-medium">Nearby devices</p>
+        <p className="text-sm text-slate-300 font-medium">{t('nearby')}</p>
         <Button size="sm" disabled={scanning} onClick={runScan}>
-          {scanning ? 'Scanning…' : 'Scan'}
+          {scanning ? t('scanning') : t('scan')}
         </Button>
       </div>
       {error && <p className="text-xs text-status-error">{error}</p>}
       {devices === null && !scanning && (
-        <p className="text-xs text-slate-500">Scan to find a nearby Bluetooth serial device (e.g. an EQMOD cable replacement).</p>
+        <p className="text-xs text-slate-500">{t('scanHint')}</p>
       )}
       <div className="flex flex-col gap-2">
         {devices?.map((d) => (
@@ -101,14 +104,14 @@ function ScanPanel({ onPaired }: { onPaired: () => void }) {
               <span className="text-xs text-slate-500 font-mono">{d.mac}</span>
               {d.rssi != null && <span className="text-xs text-slate-500">{d.rssi} dBm</span>}
               {d.paired ? (
-                <span className="text-xs text-emerald-400">paired</span>
+                <span className="text-xs text-emerald-400">{t('pairedBadge')}</span>
               ) : pairing === d.mac ? null : (
-                <Button size="sm" variant="outline" onClick={() => setPairing(d.mac)}>Pair</Button>
+                <Button size="sm" variant="outline" onClick={() => setPairing(d.mac)}>{t('pair')}</Button>
               )}
             </div>
             {pairing === d.mac && (
               <div className="flex items-center gap-2 pl-1">
-                <span className="text-xs text-slate-500">PIN</span>
+                <span className="text-xs text-slate-500">{t('pin')}</span>
                 <Input
                   value={pin}
                   onChange={(e) => setPin(e.target.value)}
@@ -116,8 +119,8 @@ function ScanPanel({ onPaired }: { onPaired: () => void }) {
                   className="w-24"
                   placeholder="0000"
                 />
-                <Button size="sm" onClick={() => doPair(d.mac)}>Confirm</Button>
-                <Button size="sm" variant="ghost" onClick={() => setPairing(null)}>Cancel</Button>
+                <Button size="sm" onClick={() => doPair(d.mac)}>{t('confirm')}</Button>
+                <Button size="sm" variant="ghost" onClick={() => setPairing(null)}>{t('cancel')}</Button>
               </div>
             )}
           </div>
@@ -128,6 +131,7 @@ function ScanPanel({ onPaired }: { onPaired: () => void }) {
 }
 
 export function BluetoothSerialPage() {
+  const { t } = useTranslation('bluetooth_serial')
   const [paired, setPaired] = useState<PairedSerialDevice[] | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -143,16 +147,15 @@ export function BluetoothSerialPage() {
 
   return (
     <div className="p-6 max-w-2xl flex flex-col gap-4">
-      <h1 className="text-lg font-semibold text-slate-100">Bluetooth Serial</h1>
+      <h1 className="text-lg font-semibold text-slate-100">{t('title')}</h1>
       <p className="text-xs text-slate-500">
-        Pair a Bluetooth serial adapter once here, then pick it by name from any device that
-        supports a Bluetooth connection (e.g. the EQMOD mount driver).
+        {t('intro')}
       </p>
       {error && <p className="text-xs text-status-error">{error}</p>}
       <div className="flex flex-col gap-2">
-        <p className="text-sm text-slate-300 font-medium">Paired devices</p>
+        <p className="text-sm text-slate-300 font-medium">{t('paired')}</p>
         {paired !== null && paired.length === 0 && (
-          <p className="text-xs text-slate-500">None paired yet.</p>
+          <p className="text-xs text-slate-500">{t('nonePaired')}</p>
         )}
         {paired?.map((d) => (
           <PairedRow key={d.id} device={d} onChanged={load} />

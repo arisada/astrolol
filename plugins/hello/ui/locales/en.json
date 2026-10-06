@@ -1,0 +1,12 @@
+{
+  "manifest": {
+    "name": "Hello World",
+    "description": "Proof-of-concept plugin with a single toggle property."
+  },
+  "title": "Hello World",
+  "property": "Hello property",
+  "saving": "Saving…",
+  "failed": "Failed to save.",
+  "about": "This checkbox calls <code>POST /plugins/hello/property</code> on the backend. It demonstrates a self-contained plugin with its own API and UI.",
+  "label": "Hello"
+}

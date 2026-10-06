@@ -1,0 +1,72 @@
+{
+  "label": "Guide Simulator",
+  "manifest": {
+    "name": "Guide Simulator",
+    "description": "Simulated guider (instead of PHD2) for testing without hardware: noisy guide steps, settling, dithering, and injectable faults — star loss, guiding that stops, settle failures, disconnection. Don't enable it together with PHD2."
+  },
+  "title": "Guide Simulator",
+  "intro": "A guider without hardware. It stands in for PHD2 as the application's guider (sequencer, loop dithering); use the faults below to rehearse a cloudy night.",
+  "chip": {
+    "label": "Guide sim",
+    "guiding": "guiding",
+    "lost": "lost"
+  },
+  "state": {
+    "disconnected": "Disconnected",
+    "stopped": "Stopped",
+    "paused": "Paused",
+    "star_lost": "Star lost",
+    "settling": "Settling",
+    "guiding": "Guiding"
+  },
+  "reason": {
+    "not_guiding": "not guiding",
+    "star_lost": "star lost",
+    "stopped": "stopped",
+    "disconnected": "disconnected"
+  },
+  "status": {
+    "title": "Status",
+    "state": "State",
+    "guidingFor": "Guiding for",
+    "unguidedFor": "Unguided for",
+    "rms": "RMS, last minute",
+    "losses": "Losses / unguided (1 min)",
+    "reason": "Reason: {{reason}}"
+  },
+  "guiding": {
+    "title": "Guiding",
+    "disconnect": "Disconnect",
+    "connect": "Connect",
+    "start": "Start guiding",
+    "stop": "Stop",
+    "dither": "Dither"
+  },
+  "faults": {
+    "title": "Faults",
+    "lose10": "Lose star 10 s",
+    "lose120": "Lose star 2 min",
+    "loseUntil": "Lose star until cleared",
+    "stops": "Guiding stops",
+    "failOne": "Fail next settle",
+    "failThree": "Fail next 3 settles",
+    "clear": "Clear faults",
+    "starLostUntil": "Star lost until cleared.",
+    "starBack": "Star back in {{seconds}} s.",
+    "settlePending": "{{count}} settle failure(s) pending.",
+    "hint": "\"Lose star\" keeps guiding trying (it recovers when the star is back); \"Guiding stops\" is PHD2 giving up — guiding must be started again."
+  },
+  "settings": {
+    "title": "Settings",
+    "rms": "Guiding RMS",
+    "interval": "Guide exposure every",
+    "settleExtra": "Extra settling time",
+    "pixelScale": "Pixel scale",
+    "timeScale": "Time scale",
+    "loseOnSlew": "A slew while guiding loses the star (guiding stops)",
+    "atStartup": "Connected at startup",
+    "save": "Save settings",
+    "invalid": "Invalid {{field}}",
+    "saved": "Saved"
+  }
+}

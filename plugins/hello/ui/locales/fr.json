@@ -1,0 +1,12 @@
+{
+  "manifest": {
+    "name": "Bonjour le monde",
+    "description": "Module de démonstration avec une seule propriété à bascule."
+  },
+  "title": "Bonjour le monde",
+  "property": "Propriété Hello",
+  "saving": "Enregistrement…",
+  "failed": "Échec de l'enregistrement.",
+  "about": "Cette case appelle <code>POST /plugins/hello/property</code> sur le serveur. Elle montre un module autonome, avec sa propre API et sa propre interface.",
+  "label": "Bonjour"
+}

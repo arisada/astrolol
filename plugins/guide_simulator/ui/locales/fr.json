@@ -1,0 +1,72 @@
+{
+  "label": "Simulateur de guidage",
+  "manifest": {
+    "name": "Simulateur de guidage",
+    "description": "Guideur simulé (à la place de PHD2) pour tester sans matériel : pas de guidage bruités, stabilisation, dithering et pannes injectables — perte d'étoile, arrêt du guidage, échecs de stabilisation, déconnexion. Ne l'activez pas en même temps que PHD2."
+  },
+  "title": "Simulateur de guidage",
+  "intro": "Un guideur sans matériel. Il remplace PHD2 comme guideur de l'application (séquenceur, dithering en boucle) ; utilisez les pannes ci-dessous pour répéter une nuit nuageuse.",
+  "chip": {
+    "label": "Guid. sim",
+    "guiding": "guidage",
+    "lost": "perdu"
+  },
+  "state": {
+    "disconnected": "Déconnecté",
+    "stopped": "Arrêté",
+    "paused": "En pause",
+    "star_lost": "Étoile perdue",
+    "settling": "Stabilisation",
+    "guiding": "Guidage"
+  },
+  "reason": {
+    "not_guiding": "pas de guidage",
+    "star_lost": "étoile perdue",
+    "stopped": "arrêté",
+    "disconnected": "déconnecté"
+  },
+  "status": {
+    "title": "État",
+    "state": "État",
+    "guidingFor": "Guidage depuis",
+    "unguidedFor": "Sans guidage depuis",
+    "rms": "RMS, dernière minute",
+    "losses": "Pertes / sans guidage (1 min)",
+    "reason": "Raison : {{reason}}"
+  },
+  "guiding": {
+    "title": "Guidage",
+    "disconnect": "Déconnecter",
+    "connect": "Connecter",
+    "start": "Démarrer le guidage",
+    "stop": "Stop",
+    "dither": "Dither"
+  },
+  "faults": {
+    "title": "Pannes",
+    "lose10": "Perdre l'étoile 10 s",
+    "lose120": "Perdre l'étoile 2 min",
+    "loseUntil": "Perdre l'étoile jusqu'à annulation",
+    "stops": "Arrêt du guidage",
+    "failOne": "Échec de la prochaine stabilisation",
+    "failThree": "Échec des 3 prochaines stabilisations",
+    "clear": "Effacer les pannes",
+    "starLostUntil": "Étoile perdue jusqu'à annulation.",
+    "starBack": "Étoile de retour dans {{seconds}} s.",
+    "settlePending": "{{count}} échec(s) de stabilisation en attente.",
+    "hint": "« Perdre l'étoile » laisse le guidage continuer d'essayer (il reprend quand l'étoile revient) ; « Arrêt du guidage » correspond à PHD2 qui abandonne — il faut relancer le guidage."
+  },
+  "settings": {
+    "title": "Réglages",
+    "rms": "RMS du guidage",
+    "interval": "Pose de guidage toutes les",
+    "settleExtra": "Temps de stabilisation supplémentaire",
+    "pixelScale": "Échelle de pixel",
+    "timeScale": "Échelle de temps",
+    "loseOnSlew": "Un pointage pendant le guidage fait perdre l'étoile (le guidage s'arrête)",
+    "atStartup": "Connecté au démarrage",
+    "save": "Enregistrer les réglages",
+    "invalid": "{{field}} invalide",
+    "saved": "Enregistré"
+  }
+}

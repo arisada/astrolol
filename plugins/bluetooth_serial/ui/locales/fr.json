@@ -1,0 +1,24 @@
+{
+  "manifest": {
+    "name": "Bluetooth série",
+    "description": "Appairez des appareils Bluetooth série, comme un remplacement de câble EQMOD."
+  },
+  "title": "Bluetooth série",
+  "intro": "Appairez un adaptateur Bluetooth série une fois ici, puis choisissez-le par son nom dans tout appareil compatible Bluetooth (par ex. le pilote de monture EQMOD).",
+  "paired": "Appareils appairés",
+  "nonePaired": "Aucun appareil appairé pour l'instant.",
+  "save": "Enregistrer",
+  "rename": "Renommer",
+  "forget": "Oublier",
+  "confirmForget": "Oublier « {{name}} » ? Tout appareil configuré pour l'utiliser devra être appairé à nouveau.",
+  "nearby": "Appareils à proximité",
+  "scan": "Rechercher",
+  "scanning": "Recherche…",
+  "scanHint": "Lancez une recherche pour trouver un appareil Bluetooth série à proximité (par ex. un remplacement de câble EQMOD).",
+  "pairedBadge": "appairé",
+  "pair": "Appairer",
+  "pin": "PIN",
+  "confirm": "Valider",
+  "cancel": "Annuler",
+  "label": "Bluetooth série"
+}

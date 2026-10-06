@@ -1,0 +1,24 @@
+{
+  "manifest": {
+    "name": "Bluetooth Serial",
+    "description": "Pair Bluetooth serial devices, such as an EQMOD cable replacement."
+  },
+  "title": "Bluetooth Serial",
+  "intro": "Pair a Bluetooth serial adapter once here, then pick it by name from any device that supports a Bluetooth connection (e.g. the EQMOD mount driver).",
+  "paired": "Paired devices",
+  "nonePaired": "None paired yet.",
+  "save": "Save",
+  "rename": "Rename",
+  "forget": "Forget",
+  "confirmForget": "Forget \"{{name}}\"? Any device configured to use it will need re-pairing.",
+  "nearby": "Nearby devices",
+  "scan": "Scan",
+  "scanning": "Scanning…",
+  "scanHint": "Scan to find a nearby Bluetooth serial device (e.g. an EQMOD cable replacement).",
+  "pairedBadge": "paired",
+  "pair": "Pair",
+  "pin": "PIN",
+  "confirm": "Confirm",
+  "cancel": "Cancel",
+  "label": "Bluetooth Serial"
+}
