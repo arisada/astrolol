@@ -26,11 +26,7 @@ class BluetoothSerialPlugin:
         id="bluetooth_serial",
         name="Bluetooth Serial",
         version="0.1.0",
-        description=(
-            "Pair and trust classic Bluetooth serial (SPP) devices — e.g. an EQMOD "
-            "cable replacement — so device adapters can use them like any other "
-            "serial port, with no MAC address or channel number to configure."
-        ),
+        description="Pair Bluetooth serial devices, such as an EQMOD cable replacement.",
         log_scopes=[LogScope(key="bluetooth", label="Bluetooth", logger="plugins.bluetooth_serial")],
         hot_reloadable=True,
     )

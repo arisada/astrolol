@@ -213,6 +213,24 @@ colouring:
 
 Add `animate-pulse` for states that are actively progressing.
 
+### User-facing copy
+
+Plugin manifest `description`, page headers/body text, button labels, and tooltips are
+read by a user deciding what a feature does for them — not by a reviewer checking how it's
+built. Say what the feature does and, if useful, why it matters to them. Leave out the
+implementation detail that justified a design decision (a protocol name, a format, "so no
+MAC address is needed", "stored in a dict keyed by plugin id") — that belongs in a code
+comment or commit message, not in copy the user reads.
+
+```
+Bad:  "Advertises this astrolol server on the local network via mDNS (_astrolol._tcp.local.)
+       so clients can find it without a typed-in IP."
+Good: "Advertises this astrolol server on the local network via mDNS."
+```
+
+If you're tempted to write "(so that ...)" or "(no X to type/configure)" in a label or
+description, that's usually the tell — cut it, or move it to a code comment.
+
 ### Backend logging
 
 Use `structlog` throughout. Get a logger at module level and log with structured key-value pairs:

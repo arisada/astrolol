@@ -145,9 +145,8 @@ export function BluetoothSerialPage() {
     <div className="p-6 max-w-2xl flex flex-col gap-4">
       <h1 className="text-lg font-semibold text-slate-100">Bluetooth Serial</h1>
       <p className="text-xs text-slate-500">
-        Pair a classic Bluetooth serial adapter once here — any device that supports a Bluetooth
-        connection (e.g. the EQMOD mount driver) can then pick it by name from its own connection
-        settings, with no MAC address or channel number to type in.
+        Pair a Bluetooth serial adapter once here, then pick it by name from any device that
+        supports a Bluetooth connection (e.g. the EQMOD mount driver).
       </p>
       {error && <p className="text-xs text-status-error">{error}</p>}
       <div className="flex flex-col gap-2">

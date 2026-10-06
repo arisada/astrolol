@@ -264,8 +264,7 @@ function BluetoothConnectHelper() {
       <p className="text-slate-300 font-medium">Connect over Bluetooth</p>
       <p className="text-xs text-slate-500">
         Pair the mount's Bluetooth serial adapter first on the{' '}
-        <span className="font-mono">Bluetooth Serial</span> plugin page, then apply it directly to the
-        mount's inventory entry below (no MAC address or channel to type in).
+        <span className="font-mono">Bluetooth Serial</span> plugin page, then apply it below.
       </p>
       {error && <p className="text-xs text-status-error">{error}</p>}
       {mountItems !== null && mountItems.length === 0 && (
