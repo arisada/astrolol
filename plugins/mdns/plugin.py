@@ -18,10 +18,7 @@ class MdnsPlugin:
         id="mdns",
         name="mDNS Discovery",
         version="0.1.0",
-        description=(
-            "Advertises this astrolol server on the local network via mDNS "
-            "(_astrolol._tcp.local.) so clients can find it without a typed-in IP."
-        ),
+        description="Advertises this astrolol server on the local network via mDNS.",
         nav_order=95,
     )
 
