@@ -1,8 +1,9 @@
 // One queue entry: name, status, progress, per-group bars, issues, and its actions menu.
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { AlertTriangle, ChevronDown, ChevronRight, GripVertical } from 'lucide-react'
 import type { SequencerPreflightIssue, SequencerQueueEntry, SequencerRunState } from '@/api/types'
-import { fmtSeconds, groupLabel, STATUS_STYLE, taskName, taskProgress } from './format'
+import { activityLabel, fmtSeconds, groupLabel, STATUS_STYLE, taskName, taskProgress } from './format'
 import { MoreMenu, type MenuItem } from './Menu'
 
 export interface TaskActions {
@@ -35,6 +36,7 @@ export function TaskCard({
   actions: TaskActions
   dragProps: React.HTMLAttributes<HTMLDivElement> & { draggable: boolean }
 }) {
+  const { t } = useTranslation('sequencer')
   const [expanded, setExpanded] = useState(isCurrent)
   const { task, runtime } = entry
   const status = runtime.status
@@ -48,20 +50,20 @@ export function TaskCard({
   const hasErrors = issues.some((i) => i.severity === 'error')
 
   const menu: MenuItem[] = [
-    { label: 'Edit', onSelect: actions.edit, disabled: running },
-    { label: 'Duplicate', onSelect: actions.duplicate },
-    { label: 'Download as a file', onSelect: actions.download, hint: 'Its definition, to add back later or elsewhere' },
+    { label: t('card.edit'), onSelect: actions.edit, disabled: running },
+    { label: t('card.duplicate'), onSelect: actions.duplicate },
+    { label: t('card.download'), onSelect: actions.download, hint: t('card.downloadHint') },
     idle
-      ? { label: 'Start from here', onSelect: actions.startFrom, disabled: !runnable,
-          hint: 'Earlier pending tasks are left for later' }
-      : { label: 'Switch to this task', onSelect: actions.switchTo, disabled: !switchable || isCurrent,
-          hint: 'After the current frame; the current task keeps its progress' },
+      ? { label: t('card.startFrom'), onSelect: actions.startFrom, disabled: !runnable,
+          hint: t('card.startFromHint') }
+      : { label: t('card.switchTo'), onSelect: actions.switchTo, disabled: !switchable || isCurrent,
+          hint: t('card.switchHint') },
     status === 'skipped'
-      ? { label: 'Unskip', onSelect: actions.unskip }
-      : { label: running ? 'Skip (after this frame)' : 'Skip', onSelect: actions.skip,
+      ? { label: t('card.unskip'), onSelect: actions.unskip }
+      : { label: running ? t('card.skipAfter') : t('card.skip'), onSelect: actions.skip,
           disabled: status === 'completed' },
-    { label: 'Reset progress', onSelect: actions.resetProgress, disabled: running || p.done === 0 },
-    { label: 'Delete', onSelect: actions.remove, disabled: running, danger: true },
+    { label: t('card.reset'), onSelect: actions.resetProgress, disabled: running || p.done === 0 },
+    { label: t('card.delete'), onSelect: actions.remove, disabled: running, danger: true },
   ]
 
   return (
@@ -87,18 +89,18 @@ export function TaskCard({
           <div className="flex items-center gap-2 mt-1">
             <ProgressBar value={p.total ? p.done / p.total : 0} className="w-32 shrink-0" />
             <span className="text-xs text-slate-500 truncate">
-              {p.done}/{p.total} frames · {fmtSeconds(p.doneS)} / {fmtSeconds(p.totalS)}
+              {t('card.progress', { done: p.done, total: p.total, doneTime: fmtSeconds(p.doneS), totalTime: fmtSeconds(p.totalS) })}
               {' · '}{lane.groups.map(groupLabel).join(', ')}
             </span>
           </div>
         </div>
-        <span className={`text-xs px-2 py-0.5 rounded-full shrink-0 ${STATUS_STYLE[status]}`}>{status}</span>
+        <span className={`text-xs px-2 py-0.5 rounded-full shrink-0 ${STATUS_STYLE[status]}`}>{t(`taskStatus.${status}`)}</span>
         <MoreMenu items={menu} />
       </div>
 
       {runtime.stall && (
         <p className="text-xs text-amber-300 mt-1 ml-10">
-          {runtime.stall.kind} stalled · {runtime.stall.attempts} attempt(s)
+          {t('card.stalled', { kind: t(`control.stall.${runtime.stall.kind}`, { defaultValue: runtime.stall.kind }), count: runtime.stall.attempts })}
           {runtime.stall.last_error ? ` — ${runtime.stall.last_error}` : ''}
         </p>
       )}
@@ -107,7 +109,7 @@ export function TaskCard({
       )}
       {status === 'interrupted' && lastInterruption && (
         <p className="text-xs text-amber-300/80 mt-1 ml-10">
-          {lastInterruption.kind} by {lastInterruption.actor}
+          {t('card.interruption', { kind: lastInterruption.kind, actor: lastInterruption.actor })}
           {lastInterruption.reason ? ` — ${lastInterruption.reason}` : ''}
         </p>
       )}
@@ -129,8 +131,8 @@ export function TaskCard({
               <div key={ln.id ?? li} className="flex flex-col gap-1">
                 {task.lanes.length > 1 && (
                   <span className="text-[11px] text-slate-400">
-                    {li === 0 ? 'Primary' : 'Camera'} · {ln.camera_id ?? 'main camera'}
-                    {isCurrent && lr?.activity ? ` · ${lr.activity.replace(/_/g, ' ')}` : ''}
+                    {li === 0 ? t('card.primary') : t('card.camera')} · {ln.camera_id ?? t('card.mainCamera')}
+                    {isCurrent && lr?.activity ? ` · ${activityLabel(lr.activity).toLowerCase()}` : ''}
                   </span>
                 )}
                 {ln.groups.map((g, i) => {
@@ -149,13 +151,13 @@ export function TaskCard({
           })}
           <p className="text-[11px] text-slate-500">
             {[
-              task.target.kind === 'current' ? 'no slew' : [task.slew && 'slew', task.center && 'center'].filter(Boolean).join(' + '),
-              task.start_guiding && 'guide',
-              task.autofocus_at_start && 'autofocus',
-              lane.autofocus_on_filter_change && 'refocus per filter',
-              task.dither_every ? `dither every ${task.dither_every}` : 'no dither',
-              lane.order === 'round_robin' && `round robin ×${lane.round_robin_batch}`,
-              `on error: ${task.on_error}`,
+              task.target.kind === 'current' ? t('card.plan.noSlew') : [task.slew && t('card.plan.slew'), task.center && t('card.plan.center')].filter(Boolean).join(' + '),
+              task.start_guiding && t('card.plan.guide'),
+              task.autofocus_at_start && t('card.plan.autofocus'),
+              lane.autofocus_on_filter_change && t('card.plan.refocus'),
+              task.dither_every ? t('card.plan.ditherEvery', { n: task.dither_every }) : t('card.plan.noDither'),
+              lane.order === 'round_robin' && t('card.plan.roundRobin', { n: lane.round_robin_batch }),
+              t('card.plan.onError', { action: task.on_error }),
             ].filter(Boolean).join(' · ')}
           </p>
         </div>

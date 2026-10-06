@@ -230,7 +230,7 @@ export function FlatWizardPage() {
       <div className="flex items-center justify-between px-4 py-3 border-b border-surface-border">
         <div className="flex items-center gap-2 text-slate-200">
           <Sun size={16} />
-          <h2 className="text-sm font-medium">Flat Wizard</h2>
+          <h2 className="text-sm font-medium">{t('title')}</h2>
           {run && <StatusPill variant={RUN_PILL_VARIANT[run.status]} status={t(`status.${run.status}`)} />}
         </div>
         {busy ? (

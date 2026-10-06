@@ -1,0 +1,530 @@
+{
+  "label": "Séquenceur",
+  "manifest": {
+    "name": "Séquenceur",
+    "description": "Séquenceur d'imagerie à file de tâches — plans de poses ordonnés par cible avec pointage, centrage, guidage, dithering et retournements au méridien, reprenable à tout moment."
+  },
+  "loading": "Chargement…",
+  "activity": {
+    "unparking": "Déparcage",
+    "slewing": "Pointage",
+    "centering": "Centrage",
+    "starting_guiding": "Démarrage du guidage",
+    "focusing": "Mise au point",
+    "changing_filter": "Changement de filtre",
+    "exposing": "Pose",
+    "dithering": "Dithering",
+    "waiting_for_primary": "Attente de la caméra principale",
+    "waiting_for_guiding": "Attente du guidage",
+    "meridian_flip": "Retournement au méridien",
+    "parking": "Parcage",
+    "waiting": "Attente"
+  },
+  "runState": {
+    "idle": "inactif",
+    "starting": "démarrage",
+    "running": "en cours",
+    "pausing": "mise en pause",
+    "paused": "en pause",
+    "stopping": "arrêt"
+  },
+  "taskStatus": {
+    "pending": "en attente",
+    "running": "en cours",
+    "interrupted": "interrompue",
+    "completed": "terminée",
+    "failed": "échec",
+    "skipped": "ignorée"
+  },
+  "chip": {
+    "label": "Séquenceur",
+    "pausedError": "Pause — erreur",
+    "paused": "En pause",
+    "pausing": "Mise en pause…",
+    "stopping": "Arrêt…",
+    "running": "En cours"
+  },
+  "menu": {
+    "more": "Plus",
+    "moreOptions": "Plus d'options"
+  },
+  "page": {
+    "title": "Séquenceur",
+    "tabs": {
+      "queue": "file",
+      "journal": "journal",
+      "settings": "réglages"
+    },
+    "empty": "La file est vide. Ajoutez une tâche : une cible et les images à prendre dessus.",
+    "confirmDelete": "Supprimer « {{name}} » ? Son suivi de progression est perdu (les images sur disque sont conservées).",
+    "add": "Ajouter une tâche",
+    "sequences": "Séquences…",
+    "clearDone": "Effacer les terminées ({{count}})",
+    "drag": "Faites glisser les tâches pour les réordonner"
+  },
+  "control": {
+    "request": {
+      "pause@frame": "Pause après cette image…",
+      "pause@task": "Pause après cette tâche…",
+      "stop@frame": "Arrêt après cette image…",
+      "stop@task": "Arrêt après cette tâche…",
+      "skip@frame": "Passage à la tâche suivante après cette image…",
+      "switch@frame": "Changement de tâche après cette image…",
+      "switch@task": "Changement de tâche après celle-ci…"
+    },
+    "boundary": {
+      "pause": {
+        "frame": "Pause après cette image",
+        "task": "Pause après cette tâche",
+        "now": "Pause immédiate"
+      },
+      "stop": {
+        "frame": "Arrêt après cette image",
+        "task": "Arrêt après cette tâche",
+        "now": "Arrêt immédiat"
+      },
+      "skip": {
+        "frame": "Passer après cette image",
+        "task": "Passer après cette tâche",
+        "now": "Passer immédiatement"
+      },
+      "abortHint": "Interrompt la pose en cours (image abandonnée)"
+    },
+    "stall": {
+      "guiding": "Le guidage est interrompu",
+      "centering": "Le centrage ne trouve aucune étoile",
+      "autofocus": "L'autofocus échoue",
+      "title": "{{what}} — bloqué {{since}}",
+      "attempts_one": ", {{count}} tentative",
+      "attempts_other": ", {{count}} tentatives",
+      "retrying": "Nouvelle tentative automatique{{next}}.",
+      "next": " (prochaine {{when}})",
+      "keepsImaging": " L'imagerie continue à la dernière bonne mise au point.",
+      "waits": " Les nouvelles images attendent ; passez à une autre tâche ou arrêtez si le ciel ne se dégage pas."
+    },
+    "since": {
+      "in": "dans {{text}}",
+      "for": "depuis {{text}}",
+      "seconds": "{{n}} s",
+      "minutes": "{{n}} min"
+    },
+    "tasksDone": "{{done}}/{{total}} tâches terminées",
+    "etaLeft": " · {{time}} de pose restantes",
+    "task": "Tâche",
+    "cameraN": "Caméra {{n}}",
+    "idle": "inactif",
+    "exposure": "Pose",
+    "pauseNow": "Pause immédiate",
+    "stopNow": "Arrêt immédiat",
+    "errorPause": "En pause à cause d'une erreur",
+    "errorHint": "Reprendre relance l'étape en échec ; Passer continue avec la tâche suivante.",
+    "lastRun": "Dernière exécution : {{outcome}}{{error}}",
+    "problems_one": "{{count}} problème à corriger avant de démarrer (voir les tâches ci-dessous).",
+    "problems_other": "{{count}} problèmes à corriger avant de démarrer (voir les tâches ci-dessous).",
+    "start": "Démarrer",
+    "startResume": "Démarrer / reprendre",
+    "pause": "Pause",
+    "cancelPause": "Annuler la pause",
+    "resume": "Reprendre",
+    "resumeRetry": "Reprendre (réessayer)",
+    "stop": "Arrêter",
+    "skipTask": "Passer la tâche"
+  },
+  "card": {
+    "edit": "Modifier",
+    "duplicate": "Dupliquer",
+    "download": "Télécharger comme fichier",
+    "downloadHint": "Sa définition, à rajouter plus tard ou ailleurs",
+    "startFrom": "Démarrer d'ici",
+    "startFromHint": "Les tâches en attente précédentes sont laissées pour plus tard",
+    "switchTo": "Passer à cette tâche",
+    "switchHint": "Après l'image en cours ; la tâche actuelle garde sa progression",
+    "unskip": "Ne plus ignorer",
+    "skip": "Ignorer",
+    "skipAfter": "Ignorer (après cette image)",
+    "reset": "Réinitialiser la progression",
+    "delete": "Supprimer",
+    "progress": "{{done}}/{{total}} images · {{doneTime}} / {{totalTime}}",
+    "stalled": "{{kind}} bloqué · {{count}} tentative(s)",
+    "interruption": "{{kind}} par {{actor}}",
+    "primary": "Principale",
+    "camera": "Caméra",
+    "mainCamera": "caméra principale",
+    "plan": {
+      "noSlew": "sans pointage",
+      "slew": "pointage",
+      "center": "centrage",
+      "guide": "guidage",
+      "autofocus": "autofocus",
+      "refocus": "refocus à chaque filtre",
+      "ditherEvery": "dither toutes les {{n}}",
+      "noDither": "sans dither",
+      "roundRobin": "alternance ×{{n}}",
+      "onError": "en cas d'erreur : {{action}}"
+    }
+  },
+  "settings": {
+    "groups": {
+      "mount": "Monture",
+      "meridian": "Retournement au méridien",
+      "guiding": "Guidage",
+      "dither": "Dither",
+      "centering": "Centrage",
+      "cameras": "Plusieurs caméras",
+      "stalls": "Perte de guidage et blocages",
+      "autofocus": "Autofocus",
+      "journal": "Journal de session",
+      "resume": "Reprise et délais"
+    },
+    "fields": {
+      "unpark_on_start": {
+        "label": "Déparquer au démarrage d'une exécution"
+      },
+      "park_on_complete": {
+        "label": "Parquer quand la file est terminée"
+      },
+      "meridian_flip_enabled": {
+        "label": "Retourner entre les images"
+      },
+      "center_after_flip": {
+        "label": "Centrer après le retournement"
+      },
+      "meridian_flip_ha_hours": {
+        "label": "Retourner à l'angle horaire",
+        "unit": "h après le méridien"
+      },
+      "guide_settle_pixels": {
+        "label": "Seuil de stabilisation",
+        "unit": "px"
+      },
+      "guide_settle_time_s": {
+        "label": "Durée de stabilisation",
+        "unit": "s"
+      },
+      "guide_settle_timeout_s": {
+        "label": "Délai max de stabilisation",
+        "unit": "s"
+      },
+      "dither_ra_only": {
+        "label": "AD seulement"
+      },
+      "dither_pixels": {
+        "label": "Amplitude",
+        "unit": "px"
+      },
+      "center_tolerance_arcsec": {
+        "label": "Tolérance",
+        "unit": "arcsec"
+      },
+      "center_max_attempts": {
+        "label": "Essais max",
+        "unit": ""
+      },
+      "center_exposure_s": {
+        "label": "Pose",
+        "unit": "s"
+      },
+      "center_binning": {
+        "label": "Binning",
+        "unit": ""
+      },
+      "download_margin_s": {
+        "label": "Marge après une image secondaire",
+        "unit": "s"
+      },
+      "secondary_efficiency_warn": {
+        "label": "Avertir quand une secondaire pose moins de",
+        "unit": "(0–1)"
+      },
+      "guide_healthy_after_s": {
+        "label": "Le guidage doit être stable pendant",
+        "unit": "s avant une image"
+      },
+      "guide_retry_interval_s": {
+        "label": "Relancer le démarrage du guidage toutes les",
+        "unit": "s"
+      },
+      "recenter_after_guide_loss_min": {
+        "label": "Recentrer une fois après une perte de guidage de",
+        "unit": "min"
+      },
+      "center_retry_interval_s": {
+        "label": "Relancer le centrage (sans étoiles) toutes les",
+        "unit": "s"
+      },
+      "stall_timeout_min": {
+        "label": "Abandonner un blocage après",
+        "unit": "min (vide = jamais)"
+      },
+      "uncount_if_unguided_s": {
+        "label": "Reprendre les images non guidées pendant plus de",
+        "unit": "s (vide = tout garder)"
+      },
+      "refocus_after_flip": {
+        "label": "Refaire la mise au point après un retournement"
+      },
+      "autofocus_on_temp_delta": {
+        "label": "Refaire la mise au point quand la température a varié de",
+        "unit": "°C (vide = désactivé)"
+      },
+      "autofocus_every_min": {
+        "label": "Refaire la mise au point toutes les",
+        "unit": "min (vide = désactivé)"
+      },
+      "autofocus_retry_interval_s": {
+        "label": "Relancer un autofocus échoué (sans étoiles) toutes les",
+        "unit": "s"
+      },
+      "journal_dir": {
+        "label": "Dossier du journal",
+        "hint": "vide = « journal » à côté des images enregistrées"
+      },
+      "recenter_after_pause_min": {
+        "label": "Recentrer après une pause de plus de",
+        "unit": "min"
+      },
+      "slew_timeout_s": {
+        "label": "Délai max de pointage",
+        "unit": "s"
+      },
+      "flip_timeout_s": {
+        "label": "Délai max de retournement",
+        "unit": "s"
+      },
+      "park_timeout_s": {
+        "label": "Délai max de parcage",
+        "unit": "s"
+      },
+      "exposure_timeout_margin_s": {
+        "label": "Marge du délai de pose",
+        "unit": "s"
+      }
+    },
+    "invalid": "Valeur invalide pour {{field}}",
+    "saved": "Enregistré",
+    "save": "Enregistrer les réglages"
+  },
+  "sequences": {
+    "title": "Séquences",
+    "close": "Fermer",
+    "saveTitle": "Enregistrer la file comme séquence",
+    "saveHint": "Enregistre la définition des tâches (cibles, caméras, poses, options), pas leur progression. La charger plus tard ajoute des copies neuves à la file.",
+    "namePlaceholder": "Nom, ex. Galaxies d'automne LRVB",
+    "descPlaceholder": "Description (facultative)",
+    "leaveOut": "Exclure les tâches terminées",
+    "save": "Enregistrer",
+    "saved": "« {{name}} » enregistrée ({{tasks}})",
+    "tasks_one": "{{count}} tâche",
+    "tasks_other": "{{count}} tâches",
+    "confirmReplace": "{{message}}. La remplacer ?",
+    "replaced": "« {{name}} » remplacée",
+    "added": "{{tasks}} ajoutée(s) depuis « {{name}} » à la file",
+    "confirmDelete": "Supprimer la séquence enregistrée « {{name}} » ? Les tâches déjà dans la file ne sont pas affectées.",
+    "deleted": "« {{name}} » supprimée",
+    "notJson": "{{file}} n'est pas un fichier JSON",
+    "notSequence": "{{file}} n'est pas un fichier de séquence astrolol",
+    "addedFile": "{{tasks}} ajoutée(s) depuis {{file}} à la file",
+    "savedLibrary": "« {{name}} » enregistrée dans la bibliothèque",
+    "library": "Séquences enregistrées",
+    "loading": "Chargement…",
+    "none": "Aucune pour l'instant.",
+    "summary": "{{tasks}} · {{targets}} · {{time}} de pose",
+    "savedOn": "enregistrée le {{date}}",
+    "load": "Charger",
+    "loadTitle": "Ajouter ces tâches à la file",
+    "download": "Télécharger comme fichier",
+    "delete": "Supprimer",
+    "files": "Fichiers",
+    "downloadQueue": "Télécharger la file",
+    "addQueue": "Ajouter un fichier à la file",
+    "addLibrary": "Ajouter un fichier aux séquences enregistrées"
+  },
+  "journal": {
+    "groups": {
+      "imaging": "Imagerie",
+      "setup": "Pointage / centrage / retournement",
+      "guiding": "Guidage / dither",
+      "focusing": "Mise au point",
+      "paused": "En pause",
+      "other": "Attente / autre"
+    },
+    "notFinished": "non terminée",
+    "none": "Aucune session pour l'instant — un journal est écrit à chaque exécution.",
+    "cols": {
+      "started": "Début",
+      "duration": "Durée",
+      "outcome": "Résultat",
+      "targets": "Cibles",
+      "frames": "Images",
+      "integration": "Intégration"
+    },
+    "noOutcome": "aucun résultat enregistré",
+    "startedBy": " · démarrée par {{actor}}",
+    "reportMd": "Rapport (Markdown)",
+    "framesCsv": "Images (CSV)",
+    "stats": {
+      "integration": "Intégration",
+      "saved": "Images enregistrées",
+      "notCounted": "{{count}} non comptées",
+      "interruptions": "Interruptions / blocages",
+      "failed": "Étapes en échec",
+      "discarded": "{{count}} images abandonnées"
+    },
+    "where": "Répartition du temps",
+    "captured": "Capturé",
+    "capturedCols": {
+      "target": "Cible",
+      "camera": "Caméra",
+      "filter": "Filtre",
+      "frames": "Images",
+      "time": "Durée",
+      "uncounted": "Non comptées"
+    },
+    "events": "Événements",
+    "framesTitle": "Images",
+    "frameCols": {
+      "time": "Heure",
+      "target": "Cible",
+      "camera": "Caméra",
+      "filter": "Filtre",
+      "exp": "Pose",
+      "rms": "RMS guidage",
+      "unguided": "Non guidée",
+      "alt": "Haut.",
+      "focus": "Foc.",
+      "sensor": "Capteur"
+    },
+    "describe": {
+      "guidingStarted": "guidage (re)démarré",
+      "guidingInterrupted": "guidage interrompu : {{reason}}",
+      "autofocus": "autofocus ({{reason}}) → position {{position}}",
+      "center": "centré en {{attempts}} essai(s), à {{error}}″",
+      "flip": "retournement au méridien ({{before}} → {{after}})",
+      "interruption": "{{kind}} par {{actor}}{{reason}}",
+      "resumed": "reprise après {{time}}{{rerun}}",
+      "setupRerun": " (préparation relancée)",
+      "stalled": "{{kind}} bloqué : {{error}}",
+      "unstalled": "{{kind}} rétabli après {{time}} ({{attempts}} tentatives)",
+      "stepFailed": "{{step}} en échec ({{handling}}) : {{error}}",
+      "taskFinished": "tâche {{status}}{{error}}"
+    }
+  },
+  "picker": {
+    "tabs": {
+      "search": "Recherche",
+      "favorites": "Favoris",
+      "current": "Pointage de la monture",
+      "coordinates": "Coordonnées"
+    },
+    "kind": {
+      "catalog": "catalogue",
+      "favorite": "favori",
+      "current": "sans pointage",
+      "coordinates": "coordonnées"
+    },
+    "none": "Aucune cible sélectionnée.",
+    "searchPlaceholder": "M 42, NGC 7000, Nébuleuse du Cœur, Jupiter…",
+    "searching": "Recherche…",
+    "solarHint": "Les objets du système solaire sont recalculés au démarrage de la tâche.",
+    "favUnavailable": "Favoris indisponibles : {{error}}",
+    "favNone": "Aucun favori pour l'instant — ajoutez-en depuis la page Cible.",
+    "currentHint": "Pas de pointage ni de centrage : la tâche photographie là où la monture pointe à son démarrage. Le nom étiquette les images (OBJECT du FITS, noms de fichiers).",
+    "framesName": "Nom pour les images",
+    "use": "Utiliser",
+    "coordsHint": "ICRS (J2000). AD en heures (5 35 17 ou 5.588), Dec en degrés (-5 23 28 ou -5.39).",
+    "name": "Nom",
+    "raPlaceholder": "AD  hh mm ss",
+    "decPlaceholder": "Dec  ±dd mm ss",
+    "useCoords": "Utiliser ces coordonnées"
+  },
+  "editor": {
+    "onError": {
+      "pause": "Met toute l'exécution en pause ; Reprendre relance l'étape en échec.",
+      "skip": "Marque cette tâche en échec et passe à la suivante.",
+      "defer": "Met cette tâche de côté (reprenable plus tard) et passe à la suivante.",
+      "abort": "Arrête toute l'exécution.",
+      "labels": {
+        "pause": "pause",
+        "skip": "ignorer",
+        "defer": "reporter",
+        "abort": "arrêter"
+      }
+    },
+    "errors": {
+      "duration": "La durée doit être un nombre de secondes positif",
+      "count": "Le nombre doit être un entier ≥ 1",
+      "gain": "Le gain doit être un entier ≥ 0 (ou vide)",
+      "group": "groupe {{n}} : {{error}}",
+      "batch": "images par tour : un entier ≥ 1",
+      "pickTarget": "Choisissez d'abord une cible",
+      "laneError": "{{who}} : {{error}}",
+      "primary": "Caméra principale",
+      "camera": "Caméra {{n}}",
+      "dither": "Dither toutes les : un entier ≥ 1",
+      "delay": "Délai entre les images : secondes ≥ 0"
+    },
+    "newTask": "Nouvelle tâche",
+    "editTask": "Modifier la tâche",
+    "close": "Fermer",
+    "kept": "Les images déjà prises sont conservées pour les groupes dont le filtre, la durée, le gain, le binning et le type restent identiques ; modifier l'un d'eux relance ce groupe à zéro.",
+    "target": "Cible",
+    "taskName": "Nom de la tâche (facultatif)",
+    "cameras": "Caméras",
+    "cameraExposures": "Caméra et poses",
+    "multi": "La tâche suit la caméra <b>principale</b> : elle fait le dither après ses images et le retournement au méridien. Les autres caméras ne déplacent jamais la monture — elles ne démarrent une image que si elle se termine avant le prochain dither ou retournement de la principale, sinon elles attendent.",
+    "addCamera": "Ajouter une caméra ({{id}})",
+    "before": "Avant l'imagerie",
+    "slew": "Pointer la cible",
+    "center": "Centrer par résolution astrométrique",
+    "guide": "Démarrer le guidage (attendre la stabilisation)",
+    "autofocus": "Autofocus",
+    "autofocusAll": "Autofocus (chaque caméra)",
+    "currentHint": "Les cibles « Pointage de la monture » ne pointent ni ne centrent jamais.",
+    "while": "Pendant l'imagerie",
+    "dither": "Dither",
+    "ditherEvery": "Dither toutes les",
+    "primaryFrames": "image(s) de la principale",
+    "frames": "image(s)",
+    "delayLabel": "Délai entre les images",
+    "seconds": "s",
+    "fails": "Si une étape échoue",
+    "cancel": "Annuler",
+    "saveChanges": "Enregistrer les modifications",
+    "addToQueue": "Ajouter à la file",
+    "lane": {
+      "primary": "Principale",
+      "exposureTotal": "{{time}} de pose",
+      "makePrimary": "Définir comme principale",
+      "remove": "Retirer cette caméra",
+      "main": "Caméra principale",
+      "mainNamed": "Caméra principale ({{id}})",
+      "noWheel": "pas de roue à filtres",
+      "filter": "Filtre",
+      "exposure": "Pose (s)",
+      "count": "Nombre",
+      "gain": "Gain",
+      "bin": "Bin",
+      "type": "Type",
+      "total": "Total",
+      "badFilter": "Pas un nom de position de la roue à filtres de cette caméra",
+      "moveUp": "Monter",
+      "moveDown": "Descendre",
+      "removeRow": "Retirer",
+      "addGroup": "Ajouter un groupe",
+      "order": "Ordre",
+      "sequential": "Groupe par groupe",
+      "roundRobin": "Alternance",
+      "perTurn": "Images par tour",
+      "afFilter": "Autofocus après chaque changement de filtre"
+    },
+    "efficiency": {
+      "cannotStart": "Une pose de {{longest}} s est plus longue que le temps entre deux dithers de la principale{{interval}} : elle ne pourrait jamais démarrer. Raccourcissez-la, ou faites dithérer la principale moins souvent.",
+      "approx": " (~{{time}})",
+      "exposes": "Pose {{pct}} % du temps",
+      "fitted": " — les images sont placées entre les dithers de la principale (toutes les ~{{time}})",
+      "shorter": ". Des poses plus courtes gaspilleraient moins.",
+      "end": ".",
+      "total": " Environ {{time}} au total."
+    }
+  }
+}

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { FolderOpen, Plus, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { EventLog } from '@/components/ui/event-log'
@@ -20,6 +21,7 @@ import { patchSequencerState, useSequencer } from './state'
 type Tab = 'queue' | 'journal' | 'settings'
 
 export function SequencerPage() {
+  const { t } = useTranslation('sequencer')
   const { status, entries } = useSequencer()
   const wsConnected = useStore((s) => s.wsConnected)
   const [tab, setTab] = useState<Tab>('queue')
@@ -51,10 +53,10 @@ export function SequencerPage() {
       setIssues([])
       return
     }
-    const t = setTimeout(() => {
+    const timer = setTimeout(() => {
       seq.preflight().then((r) => setIssues(r.issues)).catch(() => setIssues([]))
     }, 400)
-    return () => clearTimeout(t)
+    return () => clearTimeout(timer)
   }, [idle, entries])
 
   const act = async (fn: () => Promise<unknown>) => {
@@ -73,7 +75,7 @@ export function SequencerPage() {
   }
 
   if (!status || !entries) {
-    return <div className="p-6 text-sm text-slate-500">{error ?? 'Loading…'}</div>
+    return <div className="p-6 text-sm text-slate-500">{error ?? t('loading')}</div>
   }
 
   const done = entries.filter((e) => e.runtime.status === 'completed' || e.runtime.status === 'skipped')
@@ -92,12 +94,12 @@ export function SequencerPage() {
       <div className="flex-1 overflow-y-auto p-6">
         <div className="max-w-4xl flex flex-col gap-4">
           <div className="flex items-center gap-4">
-            <h1 className="text-lg font-semibold text-slate-100">Sequencer</h1>
+            <h1 className="text-lg font-semibold text-slate-100">{t('page.title')}</h1>
             <div className="flex gap-1">
-              {(['queue', 'journal', 'settings'] as const).map((t) => (
-                <button key={t} type="button" onClick={() => setTab(t)}
-                  className={`px-3 py-1 text-xs rounded capitalize ${tab === t ? 'bg-surface-overlay text-slate-100' : 'text-slate-400 hover:text-slate-200'}`}>
-                  {t}
+              {(['queue', 'journal', 'settings'] as const).map((name) => (
+                <button key={name} type="button" onClick={() => setTab(name)}
+                  className={`px-3 py-1 text-xs rounded capitalize ${tab === name ? 'bg-surface-overlay text-slate-100' : 'text-slate-400 hover:text-slate-200'}`}>
+                  {t(`page.tabs.${name}`)}
                 </button>
               ))}
             </div>
@@ -124,7 +126,7 @@ export function SequencerPage() {
               <section className="flex flex-col gap-2">
                 {entries.length === 0 && (
                   <p className="text-sm text-slate-500 py-6 text-center">
-                    The queue is empty. Add a task: a target and the frames to take on it.
+                    {t('page.empty')}
                   </p>
                 )}
                 {entries.map((entry) => {
@@ -154,7 +156,7 @@ export function SequencerPage() {
                         unskip: () => act(() => seq.unskipTask(id)),
                         remove: () => {
                           if (entry.runtime.lanes[0]?.groups.some((g) => g.frames_done > 0)
-                            && !window.confirm(`Delete "${entry.task.name || entry.task.target.name}"? Its progress record is lost (frames on disk are kept).`)) return
+                            && !window.confirm(t('page.confirmDelete', { name: entry.task.name || entry.task.target.name }))) return
                           void act(() => seq.removeTask(id))
                         },
                       }}
@@ -163,17 +165,17 @@ export function SequencerPage() {
                 })}
                 <div className="flex gap-2 mt-1">
                   <Button size="sm" onClick={() => setEditing('new')}>
-                    <Plus size={13} className="mr-1" /> Add task
+                    <Plus size={13} className="mr-1" /> {t('page.add')}
                   </Button>
                   <Button size="sm" variant="ghost" onClick={() => setShowSequences(true)}>
-                    <FolderOpen size={13} className="mr-1" /> Sequences…
+                    <FolderOpen size={13} className="mr-1" /> {t('page.sequences')}
                   </Button>
                   {done.length > 0 && (
                     <Button size="sm" variant="ghost" onClick={() => act(() => seq.clearQueue(['completed', 'skipped']))}>
-                      <Trash2 size={13} className="mr-1" /> Clear done ({done.length})
+                      <Trash2 size={13} className="mr-1" /> {t('page.clearDone', { count: done.length })}
                     </Button>
                   )}
-                  {entries.length > 1 && <span className="ml-auto self-center text-xs text-slate-500">Drag tasks to reorder</span>}
+                  {entries.length > 1 && <span className="ml-auto self-center text-xs text-slate-500">{t('page.drag')}</span>}
                 </div>
               </section>
             </>

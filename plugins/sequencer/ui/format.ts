@@ -1,4 +1,5 @@
 // Small display helpers shared by the sequencer components.
+import i18n from '@/i18n'
 import type {
   SequencerActivity,
   SequencerExposureGroup,
@@ -19,7 +20,7 @@ export function taskName(entry: SequencerQueueEntry): string {
 }
 
 export function groupLabel(g: SequencerExposureGroup): string {
-  const f = g.filter_name ?? (g.frame_type === 'light' ? '' : g.frame_type)
+  const f = g.filter_name ?? (g.frame_type === 'light' ? '' : i18n.t(`frameType.${g.frame_type}`, { ns: 'common', defaultValue: g.frame_type }))
   return `${f ? `${f} ` : ''}${g.count}×${g.duration}s`
 }
 
@@ -45,18 +46,7 @@ export const STATUS_STYLE: Record<SequencerTaskStatus, string> = {
   skipped:     'text-slate-500 bg-slate-600/20',
 }
 
-export const ACTIVITY_LABEL: Record<SequencerActivity, string> = {
-  unparking: 'Unparking',
-  slewing: 'Slewing',
-  centering: 'Centering',
-  starting_guiding: 'Starting guiding',
-  focusing: 'Focusing',
-  changing_filter: 'Changing filter',
-  exposing: 'Exposing',
-  dithering: 'Dithering',
-  waiting_for_primary: 'Waiting for primary',
-  waiting_for_guiding: 'Waiting for guiding',
-  meridian_flip: 'Meridian flip',
-  parking: 'Parking',
-  waiting: 'Waiting',
+/** Translated name of a sequencer activity (the backend sends the key). */
+export function activityLabel(a: SequencerActivity): string {
+  return i18n.t(`activity.${a}`, { ns: 'sequencer', defaultValue: a })
 }

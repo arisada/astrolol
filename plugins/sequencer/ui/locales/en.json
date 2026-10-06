@@ -1,0 +1,530 @@
+{
+  "label": "Sequencer",
+  "manifest": {
+    "name": "Sequencer",
+    "description": "Task-queue imaging sequencer — ordered exposure plans per target with slew, centering, guiding, dithering and meridian flips, resumable at any point."
+  },
+  "loading": "Loading…",
+  "activity": {
+    "unparking": "Unparking",
+    "slewing": "Slewing",
+    "centering": "Centering",
+    "starting_guiding": "Starting guiding",
+    "focusing": "Focusing",
+    "changing_filter": "Changing filter",
+    "exposing": "Exposing",
+    "dithering": "Dithering",
+    "waiting_for_primary": "Waiting for primary",
+    "waiting_for_guiding": "Waiting for guiding",
+    "meridian_flip": "Meridian flip",
+    "parking": "Parking",
+    "waiting": "Waiting"
+  },
+  "runState": {
+    "idle": "idle",
+    "starting": "starting",
+    "running": "running",
+    "pausing": "pausing",
+    "paused": "paused",
+    "stopping": "stopping"
+  },
+  "taskStatus": {
+    "pending": "pending",
+    "running": "running",
+    "interrupted": "interrupted",
+    "completed": "completed",
+    "failed": "failed",
+    "skipped": "skipped"
+  },
+  "chip": {
+    "label": "Sequencer",
+    "pausedError": "Paused — error",
+    "paused": "Paused",
+    "pausing": "Pausing…",
+    "stopping": "Stopping…",
+    "running": "Running"
+  },
+  "menu": {
+    "more": "More",
+    "moreOptions": "More options"
+  },
+  "page": {
+    "title": "Sequencer",
+    "tabs": {
+      "queue": "queue",
+      "journal": "journal",
+      "settings": "settings"
+    },
+    "empty": "The queue is empty. Add a task: a target and the frames to take on it.",
+    "confirmDelete": "Delete \"{{name}}\"? Its progress record is lost (frames on disk are kept).",
+    "add": "Add task",
+    "sequences": "Sequences…",
+    "clearDone": "Clear done ({{count}})",
+    "drag": "Drag tasks to reorder"
+  },
+  "control": {
+    "request": {
+      "pause@frame": "Pausing after this frame…",
+      "pause@task": "Pausing after this task…",
+      "stop@frame": "Stopping after this frame…",
+      "stop@task": "Stopping after this task…",
+      "skip@frame": "Skipping to the next task after this frame…",
+      "switch@frame": "Switching task after this frame…",
+      "switch@task": "Switching task after this one…"
+    },
+    "boundary": {
+      "pause": {
+        "frame": "Pause after this frame",
+        "task": "Pause after this task",
+        "now": "Pause now"
+      },
+      "stop": {
+        "frame": "Stop after this frame",
+        "task": "Stop after this task",
+        "now": "Stop now"
+      },
+      "skip": {
+        "frame": "Skip after this frame",
+        "task": "Skip after this task",
+        "now": "Skip now"
+      },
+      "abortHint": "Aborts the exposure in progress (frame discarded)"
+    },
+    "stall": {
+      "guiding": "Guiding is down",
+      "centering": "Centering finds no stars",
+      "autofocus": "Autofocus is failing",
+      "title": "{{what}} — stalled {{since}}",
+      "attempts_one": ", {{count}} attempt",
+      "attempts_other": ", {{count}} attempts",
+      "retrying": "Retrying automatically{{next}}.",
+      "next": " (next {{when}})",
+      "keepsImaging": " Imaging continues at the last good focus.",
+      "waits": " New frames wait; switch to another task or stop if the sky won't clear."
+    },
+    "since": {
+      "in": "in {{text}}",
+      "for": "for {{text}}",
+      "seconds": "{{n}} s",
+      "minutes": "{{n}} min"
+    },
+    "tasksDone": "{{done}}/{{total}} tasks done",
+    "etaLeft": " · {{time}} of exposure left",
+    "task": "Task",
+    "cameraN": "Camera {{n}}",
+    "idle": "idle",
+    "exposure": "Exposure",
+    "pauseNow": "Pause now",
+    "stopNow": "Stop now",
+    "errorPause": "Paused on an error",
+    "errorHint": "Resume retries the failed step; Skip moves on to the next task.",
+    "lastRun": "Last run {{outcome}}{{error}}",
+    "problems_one": "{{count}} problem to fix before starting (see the tasks below).",
+    "problems_other": "{{count}} problems to fix before starting (see the tasks below).",
+    "start": "Start",
+    "startResume": "Start / resume",
+    "pause": "Pause",
+    "cancelPause": "Cancel pause",
+    "resume": "Resume",
+    "resumeRetry": "Resume (retry)",
+    "stop": "Stop",
+    "skipTask": "Skip task"
+  },
+  "card": {
+    "edit": "Edit",
+    "duplicate": "Duplicate",
+    "download": "Download as a file",
+    "downloadHint": "Its definition, to add back later or elsewhere",
+    "startFrom": "Start from here",
+    "startFromHint": "Earlier pending tasks are left for later",
+    "switchTo": "Switch to this task",
+    "switchHint": "After the current frame; the current task keeps its progress",
+    "unskip": "Unskip",
+    "skip": "Skip",
+    "skipAfter": "Skip (after this frame)",
+    "reset": "Reset progress",
+    "delete": "Delete",
+    "progress": "{{done}}/{{total}} frames · {{doneTime}} / {{totalTime}}",
+    "stalled": "{{kind}} stalled · {{count}} attempt(s)",
+    "interruption": "{{kind}} by {{actor}}",
+    "primary": "Primary",
+    "camera": "Camera",
+    "mainCamera": "main camera",
+    "plan": {
+      "noSlew": "no slew",
+      "slew": "slew",
+      "center": "center",
+      "guide": "guide",
+      "autofocus": "autofocus",
+      "refocus": "refocus per filter",
+      "ditherEvery": "dither every {{n}}",
+      "noDither": "no dither",
+      "roundRobin": "round robin ×{{n}}",
+      "onError": "on error: {{action}}"
+    }
+  },
+  "settings": {
+    "groups": {
+      "mount": "Mount",
+      "meridian": "Meridian flip",
+      "guiding": "Guiding",
+      "dither": "Dither",
+      "centering": "Centering",
+      "cameras": "Several cameras",
+      "stalls": "Guiding loss and stalls",
+      "autofocus": "Autofocus",
+      "journal": "Session journal",
+      "resume": "Resume and timeouts"
+    },
+    "fields": {
+      "unpark_on_start": {
+        "label": "Unpark when a run starts"
+      },
+      "park_on_complete": {
+        "label": "Park when the queue is done"
+      },
+      "meridian_flip_enabled": {
+        "label": "Flip at frame boundaries"
+      },
+      "center_after_flip": {
+        "label": "Center after the flip"
+      },
+      "meridian_flip_ha_hours": {
+        "label": "Flip at hour angle",
+        "unit": "h past meridian"
+      },
+      "guide_settle_pixels": {
+        "label": "Settle threshold",
+        "unit": "px"
+      },
+      "guide_settle_time_s": {
+        "label": "Settle time",
+        "unit": "s"
+      },
+      "guide_settle_timeout_s": {
+        "label": "Settle timeout",
+        "unit": "s"
+      },
+      "dither_ra_only": {
+        "label": "RA only"
+      },
+      "dither_pixels": {
+        "label": "Amount",
+        "unit": "px"
+      },
+      "center_tolerance_arcsec": {
+        "label": "Tolerance",
+        "unit": "arcsec"
+      },
+      "center_max_attempts": {
+        "label": "Max attempts",
+        "unit": ""
+      },
+      "center_exposure_s": {
+        "label": "Exposure",
+        "unit": "s"
+      },
+      "center_binning": {
+        "label": "Binning",
+        "unit": ""
+      },
+      "download_margin_s": {
+        "label": "Allowance after a secondary frame",
+        "unit": "s"
+      },
+      "secondary_efficiency_warn": {
+        "label": "Warn when a secondary exposes less than",
+        "unit": "(0–1)"
+      },
+      "guide_healthy_after_s": {
+        "label": "Guiding must be steady for",
+        "unit": "s before a frame"
+      },
+      "guide_retry_interval_s": {
+        "label": "Retry starting guiding every",
+        "unit": "s"
+      },
+      "recenter_after_guide_loss_min": {
+        "label": "Re-centre once after guiding is down for",
+        "unit": "min"
+      },
+      "center_retry_interval_s": {
+        "label": "Retry centering (no stars) every",
+        "unit": "s"
+      },
+      "stall_timeout_min": {
+        "label": "Give up on a stall after",
+        "unit": "min (empty = never)"
+      },
+      "uncount_if_unguided_s": {
+        "label": "Retake frames unguided for more than",
+        "unit": "s (empty = keep all)"
+      },
+      "refocus_after_flip": {
+        "label": "Refocus after a meridian flip"
+      },
+      "autofocus_on_temp_delta": {
+        "label": "Refocus when the temperature moved",
+        "unit": "°C (empty = off)"
+      },
+      "autofocus_every_min": {
+        "label": "Refocus every",
+        "unit": "min (empty = off)"
+      },
+      "autofocus_retry_interval_s": {
+        "label": "Retry a failed autofocus (no stars) every",
+        "unit": "s"
+      },
+      "journal_dir": {
+        "label": "Journal folder",
+        "hint": "empty = \"journal\" next to the saved images"
+      },
+      "recenter_after_pause_min": {
+        "label": "Re-center after a pause longer than",
+        "unit": "min"
+      },
+      "slew_timeout_s": {
+        "label": "Slew timeout",
+        "unit": "s"
+      },
+      "flip_timeout_s": {
+        "label": "Flip timeout",
+        "unit": "s"
+      },
+      "park_timeout_s": {
+        "label": "Park timeout",
+        "unit": "s"
+      },
+      "exposure_timeout_margin_s": {
+        "label": "Exposure timeout margin",
+        "unit": "s"
+      }
+    },
+    "invalid": "Invalid value for {{field}}",
+    "saved": "Saved",
+    "save": "Save settings"
+  },
+  "sequences": {
+    "title": "Sequences",
+    "close": "Close",
+    "saveTitle": "Save the queue as a sequence",
+    "saveHint": "Saves the task definitions (targets, cameras, exposures, options), not their progress. Loading it later adds fresh copies to the queue.",
+    "namePlaceholder": "Name, e.g. Autumn galaxies LRGB",
+    "descPlaceholder": "Description (optional)",
+    "leaveOut": "Leave out completed tasks",
+    "save": "Save",
+    "saved": "Saved \"{{name}}\" ({{tasks}})",
+    "tasks_one": "{{count}} task",
+    "tasks_other": "{{count}} tasks",
+    "confirmReplace": "{{message}}. Replace it?",
+    "replaced": "Replaced \"{{name}}\"",
+    "added": "Added {{tasks}} from \"{{name}}\" to the queue",
+    "confirmDelete": "Delete the saved sequence \"{{name}}\"? Tasks already in the queue are not affected.",
+    "deleted": "Deleted \"{{name}}\"",
+    "notJson": "{{file}} is not a JSON file",
+    "notSequence": "{{file}} is not an astrolol sequence file",
+    "addedFile": "Added {{tasks}} from {{file}} to the queue",
+    "savedLibrary": "Saved \"{{name}}\" in the library",
+    "library": "Saved sequences",
+    "loading": "Loading…",
+    "none": "None yet.",
+    "summary": "{{tasks}} · {{targets}} · {{time}} of exposure",
+    "savedOn": "saved {{date}}",
+    "load": "Load",
+    "loadTitle": "Add these tasks to the queue",
+    "download": "Download as a file",
+    "delete": "Delete",
+    "files": "Files",
+    "downloadQueue": "Download the queue",
+    "addQueue": "Add a file to the queue",
+    "addLibrary": "Add a file to the saved sequences"
+  },
+  "journal": {
+    "groups": {
+      "imaging": "Imaging",
+      "setup": "Slew / center / flip",
+      "guiding": "Guiding / dither",
+      "focusing": "Focusing",
+      "paused": "Paused",
+      "other": "Waiting / other"
+    },
+    "notFinished": "not finished",
+    "none": "No sessions yet — a journal is written for every run.",
+    "cols": {
+      "started": "Started",
+      "duration": "Duration",
+      "outcome": "Outcome",
+      "targets": "Targets",
+      "frames": "Frames",
+      "integration": "Integration"
+    },
+    "noOutcome": "no outcome recorded",
+    "startedBy": " · started by {{actor}}",
+    "reportMd": "Report (Markdown)",
+    "framesCsv": "Frames (CSV)",
+    "stats": {
+      "integration": "Integration",
+      "saved": "Frames saved",
+      "notCounted": "{{count}} not counted",
+      "interruptions": "Interruptions / stalls",
+      "failed": "Failed steps",
+      "discarded": "{{count}} frames discarded"
+    },
+    "where": "Where the time went",
+    "captured": "Captured",
+    "capturedCols": {
+      "target": "Target",
+      "camera": "Camera",
+      "filter": "Filter",
+      "frames": "Frames",
+      "time": "Time",
+      "uncounted": "Not counted"
+    },
+    "events": "Events",
+    "framesTitle": "Frames",
+    "frameCols": {
+      "time": "Time",
+      "target": "Target",
+      "camera": "Camera",
+      "filter": "Filter",
+      "exp": "Exp.",
+      "rms": "Guide RMS",
+      "unguided": "Unguided",
+      "alt": "Alt.",
+      "focus": "Focus",
+      "sensor": "Sensor"
+    },
+    "describe": {
+      "guidingStarted": "guiding (re)started",
+      "guidingInterrupted": "guiding interrupted: {{reason}}",
+      "autofocus": "autofocus ({{reason}}) → position {{position}}",
+      "center": "centered in {{attempts}} attempt(s), {{error}}″ off",
+      "flip": "meridian flip ({{before}} → {{after}})",
+      "interruption": "{{kind}} by {{actor}}{{reason}}",
+      "resumed": "resumed after {{time}}{{rerun}}",
+      "setupRerun": " (setup re-run)",
+      "stalled": "{{kind}} stalled: {{error}}",
+      "unstalled": "{{kind}} recovered after {{time}} ({{attempts}} attempts)",
+      "stepFailed": "{{step}} failed ({{handling}}): {{error}}",
+      "taskFinished": "task {{status}}{{error}}"
+    }
+  },
+  "picker": {
+    "tabs": {
+      "search": "Search",
+      "favorites": "Favorites",
+      "current": "Mount pointing",
+      "coordinates": "Coordinates"
+    },
+    "kind": {
+      "catalog": "catalog",
+      "favorite": "favorite",
+      "current": "no slew",
+      "coordinates": "coordinates"
+    },
+    "none": "No target selected.",
+    "searchPlaceholder": "M 42, NGC 7000, Heart Nebula, Jupiter…",
+    "searching": "Searching…",
+    "solarHint": "Solar-system objects are re-resolved when the task starts.",
+    "favUnavailable": "Favorites unavailable: {{error}}",
+    "favNone": "No favorites yet — add some from the Target page.",
+    "currentHint": "No slew and no centering: the task images wherever the mount points when it starts. The name labels the frames (FITS OBJECT, file names).",
+    "framesName": "Name for the frames",
+    "use": "Use",
+    "coordsHint": "ICRS (J2000). RA in hours (5 35 17 or 5.588), Dec in degrees (-5 23 28 or -5.39).",
+    "name": "Name",
+    "raPlaceholder": "RA  hh mm ss",
+    "decPlaceholder": "Dec  ±dd mm ss",
+    "useCoords": "Use these coordinates"
+  },
+  "editor": {
+    "onError": {
+      "pause": "Pause the whole run; Resume retries the failed step.",
+      "skip": "Mark this task failed and go on with the next one.",
+      "defer": "Set this task aside (resumable later) and go on with the next one.",
+      "abort": "Stop the whole run.",
+      "labels": {
+        "pause": "pause",
+        "skip": "skip",
+        "defer": "defer",
+        "abort": "abort"
+      }
+    },
+    "errors": {
+      "duration": "Duration must be a positive number of seconds",
+      "count": "Count must be a whole number ≥ 1",
+      "gain": "Gain must be a whole number ≥ 0 (or empty)",
+      "group": "group {{n}}: {{error}}",
+      "batch": "frames per turn: a whole number ≥ 1",
+      "pickTarget": "Pick a target first",
+      "laneError": "{{who}}: {{error}}",
+      "primary": "Primary camera",
+      "camera": "Camera {{n}}",
+      "dither": "Dither every: a whole number ≥ 1",
+      "delay": "Delay between frames: seconds ≥ 0"
+    },
+    "newTask": "New task",
+    "editTask": "Edit task",
+    "close": "Close",
+    "kept": "Frames already taken are kept for groups whose filter, duration, gain, binning and type stay the same; changing any of those restarts that group from zero.",
+    "target": "Target",
+    "taskName": "Task name (optional)",
+    "cameras": "Cameras",
+    "cameraExposures": "Camera and exposures",
+    "multi": "The task follows the <b>primary</b> camera: it dithers after its frames and does the meridian flip. The other cameras never move the mount — they only start a frame that ends before the primary's next dither or flip, and otherwise wait for it.",
+    "addCamera": "Add a camera ({{id}})",
+    "before": "Before imaging",
+    "slew": "Slew to the target",
+    "center": "Center with plate solving",
+    "guide": "Start guiding (wait for settle)",
+    "autofocus": "Autofocus",
+    "autofocusAll": "Autofocus (every camera)",
+    "currentHint": "\"Mount pointing\" targets never slew or center.",
+    "while": "While imaging",
+    "dither": "Dither",
+    "ditherEvery": "Dither every",
+    "primaryFrames": "primary frame(s)",
+    "frames": "frame(s)",
+    "delayLabel": "Delay between frames",
+    "seconds": "s",
+    "fails": "If a step fails",
+    "cancel": "Cancel",
+    "saveChanges": "Save changes",
+    "addToQueue": "Add to queue",
+    "lane": {
+      "primary": "Primary",
+      "exposureTotal": "{{time}} of exposure",
+      "makePrimary": "Make primary",
+      "remove": "Remove this camera",
+      "main": "Main camera",
+      "mainNamed": "Main camera ({{id}})",
+      "noWheel": "no filter wheel",
+      "filter": "Filter",
+      "exposure": "Exposure (s)",
+      "count": "Count",
+      "gain": "Gain",
+      "bin": "Bin",
+      "type": "Type",
+      "total": "Total",
+      "badFilter": "Not a slot name of this camera's filter wheel",
+      "moveUp": "Move up",
+      "moveDown": "Move down",
+      "removeRow": "Remove",
+      "addGroup": "Add group",
+      "order": "Order",
+      "sequential": "Group by group",
+      "roundRobin": "Round robin",
+      "perTurn": "Frames per turn",
+      "afFilter": "Autofocus after each filter change"
+    },
+    "efficiency": {
+      "cannotStart": "A {{longest}} s exposure is longer than the time between two of the primary's dithers{{interval}}: it could never start. Shorten it, or make the primary dither less often.",
+      "approx": " (~{{time}})",
+      "exposes": "Exposes {{pct}} % of the time",
+      "fitted": " — frames are fitted between the primary's dithers (every ~{{time}})",
+      "shorter": ". Shorter exposures would waste less.",
+      "end": ".",
+      "total": " About {{time}} in total."
+    }
+  }
+}

@@ -1,5 +1,6 @@
 // Minimal popover menu + split button used by the control bar and task cards.
 import { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { ChevronDown, MoreHorizontal } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
@@ -45,11 +46,12 @@ function Popover({ items, onClose, align = 'right' }: {
 }
 
 /** "⋯" button opening a menu. */
-export function MoreMenu({ items, title = 'More' }: { items: MenuItem[]; title?: string }) {
+export function MoreMenu({ items, title }: { items: MenuItem[]; title?: string }) {
+  const { t } = useTranslation('sequencer')
   const [open, setOpen] = useState(false)
   return (
     <div className="relative">
-      <Button variant="ghost" size="icon" title={title} onClick={() => setOpen((o) => !o)}>
+      <Button variant="ghost" size="icon" title={title ?? t('menu.more')} onClick={() => setOpen((o) => !o)}>
         <MoreHorizontal size={14} />
       </Button>
       {open && <Popover items={items} onClose={() => setOpen(false)} />}
@@ -66,6 +68,7 @@ export function SplitButton({ label, icon, onClick, items, variant = 'outline', 
   variant?: 'default' | 'outline' | 'danger'
   disabled?: boolean
 }) {
+  const { t } = useTranslation('sequencer')
   const [open, setOpen] = useState(false)
   return (
     <div className="relative inline-flex">
@@ -73,7 +76,7 @@ export function SplitButton({ label, icon, onClick, items, variant = 'outline', 
         {icon}{label}
       </Button>
       <Button variant={variant} size="sm" disabled={disabled} className="rounded-l-none border-l-0 px-1"
-        onClick={() => setOpen((o) => !o)} title="More options">
+        onClick={() => setOpen((o) => !o)} title={t('menu.moreOptions')}>
         <ChevronDown size={12} />
       </Button>
       {open && <Popover items={items} onClose={() => setOpen(false)} align="left" />}

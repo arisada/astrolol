@@ -1,25 +1,27 @@
+import { useTranslation } from 'react-i18next'
 import { Chip, type ChipVariant } from '@/components/ui/badge'
 import { useSequencer } from './state'
-import { ACTIVITY_LABEL } from './format'
+import { activityLabel } from './format'
 
 export function SequencerChip() {
+  const { t } = useTranslation('sequencer')
   const { status, entries } = useSequencer()
   if (!status || status.run_state === 'idle') return null
 
   const current = entries?.find((e) => e.task.id === status.current_task_id)
-  const label = current ? current.task.name || current.task.target.name : 'Sequencer'
+  const label = current ? current.task.name || current.task.target.name : t('chip.label')
 
   let text: string
   let variant: ChipVariant
   let pulse = false
   switch (status.run_state) {
     case 'paused':
-      text = status.pause_reason && status.pause_reason !== 'user' ? 'Paused — error' : 'Paused'
+      text = status.pause_reason && status.pause_reason !== 'user' ? t('chip.pausedError') : t('chip.paused')
       variant = status.pause_reason && status.pause_reason !== 'user' ? 'red' : 'amber'
       break
     case 'pausing':
     case 'stopping':
-      text = status.run_state === 'pausing' ? 'Pausing…' : 'Stopping…'
+      text = status.run_state === 'pausing' ? t('chip.pausing') : t('chip.stopping')
       variant = 'amber'
       pulse = true
       break
@@ -32,7 +34,7 @@ export function SequencerChip() {
         text = `${g.filter_name ? `${g.filter_name} ` : ''}${done + 1}/${g.count}`
         variant = 'blue'
       } else {
-        text = activity ? ACTIVITY_LABEL[activity] : 'Running'
+        text = activity ? activityLabel(activity) : t('chip.running')
         variant = activity === 'centering' ? 'violet' : 'amber'
       }
       pulse = true
