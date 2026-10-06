@@ -38,6 +38,7 @@ function ZoomableImage({ src, alt = 'Preview', empty, children, className, reset
   const [zoom, setZoom] = useState(1)
   const [pan, setPan] = useState({ x: 0, y: 0 })
   const [dragging, setDragging] = useState(false)
+  const [loaded, setLoaded] = useState(false)
   // Mouse-drag anchor — kept in a ref (not state) since window listeners read it live.
   const dragRef = useRef<{ startX: number; startY: number; panX: number; panY: number } | null>(null)
   // Two-finger pinch anchor: fixed at gesture start so zoom/pan stay anchored to the
@@ -51,6 +52,7 @@ function ZoomableImage({ src, alt = 'Preview', empty, children, className, reset
   useEffect(() => {
     setZoom(1)
     setPan({ x: 0, y: 0 })
+    setLoaded(false)
   }, [src, resetKey])
 
   const zoomAt = useCallback((cx: number, cy: number, factor: number) => {
@@ -201,12 +203,20 @@ function ZoomableImage({ src, alt = 'Preview', empty, children, className, reset
             src={src}
             alt={alt}
             draggable={false}
+            onLoad={() => setLoaded(true)}
             className="max-w-full max-h-full object-contain select-none"
             style={{
               transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
               cursor: dragging ? 'grabbing' : 'grab',
+              opacity: loaded ? 1 : 0,
+              transition: 'opacity 0.15s ease-in',
             }}
           />
+          {!loaded && (
+            <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+              <div className="h-8 w-8 rounded-full border-2 border-slate-600 border-t-slate-300 animate-spin" />
+            </div>
+          )}
           {/* Zoom controls */}
           <div className="absolute top-2 right-2 flex items-center gap-1 bg-black/60 rounded px-1.5 py-1">
             <span className="text-xs text-slate-400 font-mono w-10 text-center">{zoom.toFixed(1)}×</span>

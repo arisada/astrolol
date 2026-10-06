@@ -296,7 +296,11 @@ function MountControls({ deviceId }: { deviceId: string }) {
             }}>
               <Crosshair size={12} className="mr-1" /> Set Target
             </Button>
-            <Button size="sm" onClick={() => act(() => api.mount.slew(deviceId))}>
+            <Button size="sm" onClick={() => act(async () => {
+              const frame: CoordFrame = targetJnow ? 'jnow' : 'icrs'
+              await api.mount.setTarget(deviceId, slewRa * 15, slewDec, undefined, undefined, frame)
+              await api.mount.slew(deviceId)
+            })}>
               Slew
             </Button>
             <Button size="sm" variant="outline" onClick={() => act(() => api.mount.sync(deviceId, slewRa * 15, slewDec))}>
@@ -387,7 +391,7 @@ function MountControls({ deviceId }: { deviceId: string }) {
             <input
               type="time"
               disabled={!mountSettings.auto_park_enabled}
-              value={mountSettings.auto_park_time ?? '23:00'}
+              value={mountSettings.auto_park_time ?? '06:00'}
               onChange={(e) => saveMountSettings({ ...mountSettings, auto_park_time: e.target.value })}
               className="rounded border border-surface-border bg-surface-overlay px-2 py-0.5 text-xs text-slate-200 font-mono
                 focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-40 disabled:cursor-not-allowed"

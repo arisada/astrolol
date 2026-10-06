@@ -7,6 +7,28 @@ Items designed for but not yet built. Ordered roughly by priority.
 - **INDI items connected from the tree are untested on real indiserver** — the mapping
   (`indi_<kind>` + `{device_name, executable}`) matches what the wizard sends and the INDI
   adapters load the driver themselves, but only non-INDI items were verified end to end.
+- ~~PHD2 guides the wrong way in Dec after a meridian flip~~ — **root-caused via the
+  2026-10-05 PHD2 guide/debug logs, not an astrolol bug.** PHD2's mount is correctly set to
+  "INDI Mount [astrolol Mount Proxy]", and that proxy reports `TELESCOPE_PIER_SIDE` correctly
+  throughout (confirmed in code and in the logs). At 19:55:37 PHD2 detected the flip
+  ("Guiding starts on opposite side of pier: calibration data side is West, current side is
+  East") and auto-adjusted calibration, but only flipped the RA angle (71.6° → -108.4°) and
+  left Dec unchanged (164.7° → 164.7°, logged as `decFlipRequired=0`) — hence the inverted Dec
+  guiding and the "PHD2 is not able to make sufficient corrections in Dec" alerts a few minutes
+  later. A manual recalibration on the East side measured the true Dec angle at -15.3°, which
+  is exactly 164.7° − 180°, proving Dec genuinely needed the flip that PHD2 skipped.
+  **Fix: enable "Reverse Dec output after meridian flip" in PHD2's own Advanced Settings →
+  Guiding tab.** This is a one-time PHD2-side setting, not an astrolol code change — nothing
+  here needs patching.
+- **Reconnecting a device after a USB glitch doesn't show up for freshly opened clients** —
+  observed after a USB disconnect/reconnect mid-session: the already-open window keeps
+  showing the mount (stale, pre-refresh state), but a *new* browser window/tab never shows
+  the mount panel at all, even though `DeviceManager.list_connected()` /
+  `GET /devices/connected` return the reconnected device correctly on the backend. Likely
+  culprit is whatever UI hook fetches the device list on initial mount of a new window/tab
+  (not yet located — check `ui/src/hooks` and the WS `device.connected`/`device.disconnected`
+  handling in `ui/src/store/index.ts`) silently keeping a device filtered out, or a race with
+  the WS event ordering. Needs reproduction + a known device id to trace through the store.
 
 ## EQMOD native driver — assumptions & deferred items
 
