@@ -175,7 +175,7 @@ export function ImageDetail({
 
         {connectedMounts.length > 1 && (
           <select value={mountId} onChange={(e) => setMountId(e.target.value)}
-            className="rounded bg-surface-overlay border border-surface-border px-2 py-1 text-slate-200">
+            className="rounded-lg bg-surface border border-surface-border px-2 py-1 text-slate-200">
             <option value="">{t('detail.selectMount')}</option>
             {connectedMounts.map((m) => <option key={m.device_id} value={m.device_id}>{m.driver_name ?? m.device_id}</option>)}
           </select>

@@ -367,7 +367,7 @@ export function Phd2Page() {
           <div className="flex items-center justify-between">
             <span className="text-xs text-slate-400">{t('settings.scale')}</span>
             <select
-              className="rounded bg-surface-overlay border border-surface-border px-2 py-1 text-xs text-slate-200 focus:outline-none"
+              className="rounded-lg bg-surface border border-surface-border px-2 py-1 text-xs text-slate-200 focus:outline-none focus:border-accent"
               value={graphRange}
               onChange={(e) => handleGraphRangeChange(parseFloat(e.target.value))}
             >
@@ -379,7 +379,7 @@ export function Phd2Page() {
           <div className="flex items-center justify-between">
             <span className="text-xs text-slate-400">{t('settings.samples')}</span>
             <select
-              className="rounded bg-surface-overlay border border-surface-border px-2 py-1 text-xs text-slate-200 focus:outline-none"
+              className="rounded-lg bg-surface border border-surface-border px-2 py-1 text-xs text-slate-200 focus:outline-none focus:border-accent"
               value={maxSamples}
               onChange={(e) => handleMaxSamplesChange(parseInt(e.target.value, 10))}
             >

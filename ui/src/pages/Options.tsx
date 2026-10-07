@@ -254,7 +254,7 @@ export function Options() {
             value={i18n.resolvedLanguage}
             onChange={(e) => persistLanguage(e.target.value)}
             aria-label={t('language.label')}
-            className="bg-surface border border-surface-border rounded px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-accent"
+            className="bg-surface border border-surface-border rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent"
           >
             {SUPPORTED_LANGUAGES.map((l) => (
               <option key={l.code} value={l.code}>{l.label}</option>
@@ -269,7 +269,7 @@ export function Options() {
             value={themeId}
             onChange={(e) => persistTheme(e.target.value)}
             aria-label={t('palette.label')}
-            className="bg-surface border border-surface-border rounded px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-accent"
+            className="bg-surface border border-surface-border rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent"
           >
             {THEMES.map((th) => (
               <option key={th.id} value={th.id}>{t(`palette.names.${th.id}`)}</option>
@@ -403,7 +403,7 @@ export function Options() {
                     setIndiDebugLevel(level)
                     api.indi.setDebugLevel(level).catch(() => {})
                   }}
-                  className="bg-surface border border-surface-border rounded px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-accent"
+                  className="bg-surface border border-surface-border rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent"
                 >
                   <option value={0}>{t('indi.logOff')}</option>
                   <option value={1}>{t('indi.logTags')}</option>
@@ -453,7 +453,7 @@ export function Options() {
                 <button
                   type="button"
                   onClick={restartNow}
-                  className="text-xs px-2 py-1 rounded bg-accent text-accent-fg hover:bg-accent/80 transition-colors"
+                  className="text-xs px-2 py-1 rounded-lg bg-accent text-accent-fg hover:bg-accent/80 transition-colors"
                 >
                   {t('plugins.restartNow')}
                 </button>

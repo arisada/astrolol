@@ -167,13 +167,13 @@ function WifiRow({
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             onKeyDown={(e) => { if (e.key === 'Enter' && password) onConnect(password) }}
-            className="flex-1 rounded bg-surface-overlay border border-surface-border px-2 py-1.5 text-xs text-slate-200 placeholder:text-slate-600 focus:outline-none focus:ring-1 focus:ring-accent"
+            className="flex-1 rounded-lg bg-surface border border-surface-border px-2 py-1.5 text-xs text-slate-200 placeholder:text-slate-600 focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent"
             autoFocus
           />
           <button
             onClick={() => onConnect(password)}
             disabled={connecting || !password}
-            className="px-3 py-1.5 rounded bg-accent hover:bg-accent/80 text-accent-fg text-xs font-medium disabled:opacity-50 transition-colors"
+            className="px-3 py-1.5 rounded-lg bg-accent hover:bg-accent/80 text-accent-fg text-xs font-medium disabled:opacity-50 transition-colors"
           >
             {connecting ? '…' : t('connect')}
           </button>
@@ -807,7 +807,7 @@ export function SystemPage() {
                 <input
                   value={draftSettings.hotspot_ssid}
                   onChange={(e) => setDraftSettings({ ...draftSettings, hotspot_ssid: e.target.value })}
-                  className="rounded bg-surface-overlay border border-surface-border px-2 py-1 text-slate-200 focus:outline-none focus:ring-1 focus:ring-accent"
+                  className="rounded-lg bg-surface border border-surface-border px-2 py-1 text-slate-200 focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent"
                 />
               ) : <span className="text-slate-200 font-mono">{draftSettings.hotspot_ssid}</span>}
 
@@ -817,7 +817,7 @@ export function SystemPage() {
                   type="text"
                   value={draftSettings.hotspot_password}
                   onChange={(e) => setDraftSettings({ ...draftSettings, hotspot_password: e.target.value })}
-                  className="rounded bg-surface-overlay border border-surface-border px-2 py-1 text-slate-200 focus:outline-none focus:ring-1 focus:ring-accent"
+                  className="rounded-lg bg-surface border border-surface-border px-2 py-1 text-slate-200 focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent"
                 />
               ) : <span className="text-slate-200 font-mono">{'•'.repeat(Math.min(draftSettings.hotspot_password.length, 12))}</span>}
 
@@ -826,7 +826,7 @@ export function SystemPage() {
                 <input
                   value={draftSettings.hotspot_interface}
                   onChange={(e) => setDraftSettings({ ...draftSettings, hotspot_interface: e.target.value })}
-                  className="rounded bg-surface-overlay border border-surface-border px-2 py-1 text-slate-200 font-mono focus:outline-none focus:ring-1 focus:ring-accent"
+                  className="rounded-lg bg-surface border border-surface-border px-2 py-1 text-slate-200 font-mono focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent"
                 />
               ) : <span className="text-slate-200 font-mono">{draftSettings.hotspot_interface}</span>}
             </div>
@@ -834,7 +834,7 @@ export function SystemPage() {
             <div className="flex gap-2 pt-1">
               {editingSettings ? (
                 <>
-                  <button onClick={handleSaveSettings} className="px-3 py-1.5 rounded bg-accent hover:bg-accent/80 text-accent-fg text-xs font-medium transition-colors">{t('hotspot.save')}</button>
+                  <button onClick={handleSaveSettings} className="px-3 py-1.5 rounded-lg bg-accent hover:bg-accent/80 text-accent-fg text-xs font-medium transition-colors">{t('hotspot.save')}</button>
                   <button onClick={() => { setDraftSettings(settings); setEditingSettings(false) }} className="px-3 py-1.5 rounded bg-surface-overlay hover:bg-surface-border text-slate-300 text-xs font-medium transition-colors">{t('hotspot.cancel')}</button>
                 </>
               ) : (
@@ -855,7 +855,7 @@ export function SystemPage() {
                 <input
                   value={draftHostname}
                   onChange={(e) => setDraftHostname(e.target.value)}
-                  className="rounded bg-surface-overlay border border-surface-border px-2 py-1 text-slate-200 font-mono focus:outline-none focus:ring-1 focus:ring-accent"
+                  className="rounded-lg bg-surface border border-surface-border px-2 py-1 text-slate-200 font-mono focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent"
                   placeholder={t('hostname.placeholder')}
                 />
               ) : <span className="text-slate-200 font-mono">{hostnameInfo.hostname}</span>}
@@ -872,7 +872,7 @@ export function SystemPage() {
                   <button
                     onClick={handleSaveHostname}
                     disabled={savingHostname || !draftHostname}
-                    className="px-3 py-1.5 rounded bg-accent hover:bg-accent/80 text-accent-fg text-xs font-medium disabled:opacity-50 transition-colors"
+                    className="px-3 py-1.5 rounded-lg bg-accent hover:bg-accent/80 text-accent-fg text-xs font-medium disabled:opacity-50 transition-colors"
                   >
                     {savingHostname ? t('hostname.saving') : t('hotspot.save')}
                   </button>
@@ -911,7 +911,7 @@ export function SystemPage() {
                   value={selectedTz}
                   onChange={(e) => setSelectedTz(e.target.value)}
                   onFocus={handleLoadTimezones}
-                  className="w-full rounded bg-surface-overlay border border-surface-border px-2 py-1.5 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-accent"
+                  className="w-full rounded-lg bg-surface border border-surface-border px-2 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent"
                 >
                   {timezones === null ? (
                     <option value={selectedTz}>{selectedTz}</option>
@@ -925,7 +925,7 @@ export function SystemPage() {
               <button
                 onClick={handleSaveTimezone}
                 disabled={savingTz || selectedTz === timeInfo.timezone}
-                className="px-3 py-1.5 rounded bg-accent hover:bg-accent/80 text-accent-fg text-xs font-medium disabled:opacity-50 transition-colors"
+                className="px-3 py-1.5 rounded-lg bg-accent hover:bg-accent/80 text-accent-fg text-xs font-medium disabled:opacity-50 transition-colors"
               >
                 {savingTz ? t('time.saving') : t('time.apply')}
               </button>

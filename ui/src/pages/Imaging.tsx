@@ -649,7 +649,7 @@ function FilterWheelPanel({
         <select
           value={status?.current_slot ?? ''}
           onChange={(e) => selectFilter(parseInt(e.target.value))}
-          className="rounded bg-surface-overlay border border-surface-border px-2 py-1.5 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-accent"
+          className="rounded-lg bg-surface border border-surface-border px-2 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent"
           disabled={status?.is_moving}
         >
           {slots.map((slot) => (

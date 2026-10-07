@@ -16,16 +16,17 @@ export function PillGroup<T extends string | number>({
   return (
     <div className="flex flex-col gap-1">
       {label && <span className="text-xs text-slate-400">{label}</span>}
-      <div className="flex gap-1 flex-wrap">
+      <div className="flex max-w-full overflow-x-auto border border-surface-border rounded-lg bg-surface">
         {options.map((o) => (
           <button
             key={String(o)}
             type="button"
             onClick={() => onChange(o)}
-            className={`${stretch ? 'flex-1' : 'px-2'} py-0.5 text-xs rounded border capitalize transition-colors
+            className={`${stretch ? 'flex-1' : 'px-3'} min-w-[34px] py-1.5 font-mono text-xs capitalize whitespace-nowrap
+              border-l border-surface-border first:border-l-0 transition-colors
               ${value === o
-                ? 'border-accent text-accent bg-accent/10'
-                : 'border-surface-border text-slate-400 hover:border-slate-500 hover:text-slate-300'
+                ? 'bg-accent text-accent-fg'
+                : 'text-slate-400 hover:bg-surface-overlay hover:text-slate-200'
               }`}
           >
             {formatLabel ? formatLabel(o) : String(o)}

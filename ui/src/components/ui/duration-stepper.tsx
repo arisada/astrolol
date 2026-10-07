@@ -57,7 +57,7 @@ export function DurationStepper({ steps, value, onChange, label }: {
           />
         ) : (
           <button type="button" onClick={startEdit} title={t('duration.custom')}
-            className="flex-1 text-center text-xs font-mono text-slate-200 bg-surface-overlay border border-surface-border rounded px-2 py-1.5 min-w-[5rem] hover:border-slate-500 transition-colors">
+            className="flex-1 text-center text-xs font-mono text-slate-200 bg-surface border border-surface-border rounded-lg px-2 py-1.5 min-w-[5rem] hover:border-slate-500 transition-colors">
             {fmtDuration(value)}
           </button>
         )}

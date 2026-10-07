@@ -159,7 +159,8 @@ function SettingsCard() {
           value={settings?.led_brightness ?? 0}
           disabled={settings === null}
           onChange={(e) => settings && setSettings({ ...settings, led_brightness: Number(e.target.value) })}
-          className="flex-1"
+          className="range-thin flex-1"
+          style={{ ['--v' as string]: `${settings?.led_brightness ?? 0}%` }}
         />
         <span className="font-mono text-slate-200 w-10 text-right">{settings?.led_brightness ?? '—'}%</span>
       </div>
@@ -265,7 +266,7 @@ function BluetoothConnectHelper() {
             <select
               value={itemId ?? ''}
               onChange={(e) => setItemId(e.target.value)}
-              className="w-full rounded bg-surface-overlay border border-surface-border px-3 py-1.5 text-sm text-slate-200"
+              className="w-full rounded-lg bg-surface border border-surface-border px-3 py-1.5 text-sm text-slate-200"
             >
               {mountItems.map((i) => (
                 <option key={i.id} value={i.id}>{i.name}</option>

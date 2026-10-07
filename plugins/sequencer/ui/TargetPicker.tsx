@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { fmtDec, fmtRA } from '@/utils/formatting'
 import type { SequencerTargetRef } from '@/api/types'
 import { getFavorites, searchObjects, type Favorite, type ObjectMatch } from './api'
+import { Tabs } from '@/components/ui/tabs'
 
 type Tab = 'search' | 'favorites' | 'current' | 'coordinates'
 
@@ -71,21 +72,11 @@ export function TargetPicker({ value, onChange }: {
       <div className="rounded border border-surface-border bg-surface px-3 py-2">
         <TargetSummary target={value} />
       </div>
-      <div className="flex gap-1 flex-wrap">
-        {TABS.map(({ id, icon: Icon }) => (
-          <button
-            key={id}
-            type="button"
-            onClick={() => setTab(id)}
-            className={`inline-flex items-center gap-1 px-2 py-1 text-xs rounded border transition-colors
-              ${tab === id
-                ? 'border-accent text-accent bg-accent/10'
-                : 'border-surface-border text-slate-400 hover:border-slate-500 hover:text-slate-300'}`}
-          >
-            <Icon size={12} /> {t(`picker.tabs.${id}`)}
-          </button>
-        ))}
-      </div>
+      <Tabs
+        tabs={TABS.map(({ id, icon: Icon }) => ({ id, label: t(`picker.tabs.${id}`), icon: <Icon size={12} /> }))}
+        value={tab}
+        onChange={setTab}
+      />
       {tab === 'search' && <SearchTab onChange={onChange} />}
       {tab === 'favorites' && <FavoritesTab onChange={onChange} />}
       {tab === 'current' && <CurrentTab value={value} onChange={onChange} />}

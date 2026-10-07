@@ -369,7 +369,7 @@ function LaneEditor({
       <select
         value={draft.cameraId}
         onChange={(e) => onChange({ cameraId: e.target.value })}
-        className="bg-surface-overlay border border-surface-border rounded px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-accent"
+        className="bg-surface border border-surface-border rounded-lg px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent"
       >
         {primary && <option value="">{mainCamera ? t('editor.lane.mainNamed', { id: mainCamera }) : t('editor.lane.main')}</option>}
         {cameras.map((c) => <option key={c.device_id} value={c.device_id}>{c.device_id}</option>)}
@@ -414,13 +414,13 @@ function LaneEditor({
                   <td className="pr-2 py-1 w-20"><Input inputSize="sm" placeholder="—" value={r.gain} onChange={(e) => patchRow(i, { gain: e.target.value })} /></td>
                   <td className="pr-2 py-1">
                     <select value={r.binning} onChange={(e) => patchRow(i, { binning: Number(e.target.value) })}
-                      className="bg-surface-overlay border border-surface-border rounded px-1 py-1 text-xs text-slate-200">
+                      className="bg-surface border border-surface-border rounded-lg px-1 py-1 text-xs text-slate-200">
                       {[1, 2, 3, 4].map((b) => <option key={b} value={b}>{b}×{b}</option>)}
                     </select>
                   </td>
                   <td className="pr-2 py-1">
                     <select value={r.frame_type} onChange={(e) => patchRow(i, { frame_type: e.target.value as GroupRow['frame_type'] })}
-                      className="bg-surface-overlay border border-surface-border rounded px-1 py-1 text-xs text-slate-200">
+                      className="bg-surface border border-surface-border rounded-lg px-1 py-1 text-xs text-slate-200">
                       {(['light', 'dark', 'flat', 'bias'] as const).map((ft) => <option key={ft} value={ft}>{tc(`frameType.${ft}`)}</option>)}
                     </select>
                   </td>

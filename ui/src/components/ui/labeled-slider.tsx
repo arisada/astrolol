@@ -21,7 +21,8 @@ export function LabeledSlider({
         onChange={(e) => onChange(parseFloat(e.target.value))}
         onMouseUp={(e) => onCommit(parseFloat((e.target as HTMLInputElement).value))}
         onTouchEnd={(e) => onCommit(parseFloat((e.target as HTMLInputElement).value))}
-        className="w-full accent-accent"
+        className="range-thin w-full"
+        style={{ ['--v' as string]: `${((value - min) / (max - min)) * 100}%` }}
       />
     </div>
   )

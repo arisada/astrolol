@@ -98,8 +98,8 @@ function DegreesInput({ value, min, max, onCommit }: {
       onChange={(e) => setRaw(e.target.value)}
       onBlur={commit}
       onKeyDown={(e) => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') setRaw(null) }}
-      className="w-16 rounded border border-surface-border bg-surface-overlay px-2 py-0.5 text-xs text-slate-200 font-mono
-        focus:outline-none focus:ring-1 focus:ring-accent"
+      className="w-16 rounded-lg border border-surface-border bg-surface px-2 py-0.5 text-xs text-slate-200 font-mono
+        focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent"
     />
   )
 }
@@ -336,7 +336,7 @@ function MountControls({ deviceId }: { deviceId: string }) {
             <span className="text-sm text-slate-300 w-6">{isTracking ? t('trackingCard.on') : t('trackingCard.off')}</span>
             <select
               disabled={isParked}
-              className="ml-auto rounded bg-surface-overlay border border-surface-border px-2 py-1 text-xs text-slate-200 focus:outline-none disabled:opacity-40 disabled:cursor-not-allowed"
+              className="ml-auto rounded-lg bg-surface border border-surface-border px-2 py-1 text-xs text-slate-200 focus:outline-none focus:border-accent disabled:opacity-40 disabled:cursor-not-allowed"
               value={trackingMode}
               onChange={(e) => {
                 const m = e.target.value as TrackingMode
@@ -390,8 +390,8 @@ function MountControls({ deviceId }: { deviceId: string }) {
               disabled={!mountSettings.auto_park_enabled}
               value={mountSettings.auto_park_time ?? '06:00'}
               onChange={(e) => saveMountSettings({ ...mountSettings, auto_park_time: e.target.value })}
-              className="rounded border border-surface-border bg-surface-overlay px-2 py-0.5 text-xs text-slate-200 font-mono
-                focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-40 disabled:cursor-not-allowed"
+              className="rounded-lg border border-surface-border bg-surface px-2 py-0.5 text-xs text-slate-200 font-mono
+                focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent disabled:opacity-40 disabled:cursor-not-allowed"
             />
             <span className="text-xs text-slate-600">{t('park.localTime')}</span>
           </label>
@@ -443,8 +443,8 @@ function MountControls({ deviceId }: { deviceId: string }) {
               disabled={!mountSettings.auto_flip_enabled}
               value={hoursToHHMM(mountSettings.auto_flip_ha_hours)}
               onChange={(e) => saveMountSettings({ ...mountSettings, auto_flip_ha_hours: hhmmToHours(e.target.value) })}
-              className="rounded border border-surface-border bg-surface-overlay px-2 py-0.5 text-xs text-slate-200 font-mono
-                focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-40 disabled:cursor-not-allowed"
+              className="rounded-lg border border-surface-border bg-surface px-2 py-0.5 text-xs text-slate-200 font-mono
+                focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent disabled:opacity-40 disabled:cursor-not-allowed"
             />
           </label>
           <div
@@ -471,7 +471,7 @@ function MountControls({ deviceId }: { deviceId: string }) {
             />
             <span className="text-xs text-slate-600">{t('meridian.horizonUnit')}</span>
             <select
-              className="rounded bg-surface-overlay border border-surface-border px-2 py-0.5 text-xs text-slate-200 focus:outline-none"
+              className="rounded-lg bg-surface border border-surface-border px-2 py-0.5 text-xs text-slate-200 focus:outline-none focus:border-accent"
               value={mountSettings.horizon_action}
               onChange={(e) => saveMountSettings({
                 ...mountSettings, horizon_action: e.target.value as MountDeviceSettings['horizon_action'],
@@ -489,7 +489,7 @@ function MountControls({ deviceId }: { deviceId: string }) {
           <div className="flex items-center gap-2">
             <span className="text-xs text-slate-500">{t('nudge.rate')}</span>
             <select
-              className="rounded bg-surface-overlay border border-surface-border px-2 py-1 text-xs text-slate-200 focus:outline-none"
+              className="rounded-lg bg-surface border border-surface-border px-2 py-1 text-xs text-slate-200 focus:outline-none focus:border-accent"
               value={rateIdx}
               onChange={(e) => setRateIdx(parseInt(e.target.value))}
             >

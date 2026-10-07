@@ -183,7 +183,7 @@ function NumericInput({ value, onChange, placeholder, allowNull }: {
       placeholder={placeholder}
       onChange={(e) => setRaw(e.target.value)}
       onBlur={commit}
-      className="rounded border border-surface-border bg-surface-overlay px-2 py-1.5 text-xs text-slate-200 font-mono focus:outline-none focus:ring-1 focus:ring-accent w-full"
+      className="rounded-lg border border-surface-border bg-surface px-2 py-1.5 text-xs text-slate-200 font-mono focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent w-full"
     />
   )
 }
@@ -202,7 +202,7 @@ function SettingsPanel({ settings, onChange }: { settings: PlatesolveSettings; o
   const inp = (value: string, fn: (v: string) => void, placeholder?: string) => (
     <input value={value} placeholder={placeholder}
       onChange={(e) => fn(e.target.value)}
-      className="rounded border border-surface-border bg-surface-overlay px-2 py-1.5 text-xs text-slate-200 font-mono focus:outline-none focus:ring-1 focus:ring-accent w-full"
+      className="rounded-lg border border-surface-border bg-surface px-2 py-1.5 text-xs text-slate-200 font-mono focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent w-full"
     />
   )
 
@@ -582,7 +582,7 @@ export function PlatesolvePage() {
             <span className="text-xs text-slate-300 font-mono">{cameras[0].device_id}</span>
           ) : (
             <select value={camera?.device_id ?? ''} onChange={(e) => patchSettings({ camera_id: e.target.value })}
-              className="w-full rounded bg-surface-overlay border border-surface-border px-2 py-1.5 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-accent">
+              className="w-full rounded-lg bg-surface border border-surface-border px-2 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent">
               {cameras.map((d) => <option key={d.device_id} value={d.device_id}>{d.device_id}</option>)}
             </select>
           )}

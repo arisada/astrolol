@@ -238,7 +238,7 @@ export function PolarAlignPage() {
             <span className="text-slate-300 font-mono">{mounts[0].device_id}</span>
           ) : (
             <select value={mountId} onChange={(e) => setMountId(e.target.value)}
-              className="rounded bg-surface-overlay border border-surface-border px-2 py-1 text-slate-200 focus:outline-none focus:ring-1 focus:ring-accent">
+              className="rounded-lg bg-surface border border-surface-border px-2 py-1 text-slate-200 focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent">
               {mounts.map((d) => <option key={d.device_id} value={d.device_id}>{d.device_id}</option>)}
             </select>
           )}
@@ -285,7 +285,7 @@ export function PolarAlignPage() {
                   <span className="text-xs text-slate-300 font-mono">{cameras[0].device_id}</span>
                 ) : (
                   <select value={cameraId} onChange={(e) => setCameraId(e.target.value)}
-                    className="rounded bg-surface-overlay border border-surface-border px-2 py-1.5 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-accent">
+                    className="rounded-lg bg-surface border border-surface-border px-2 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent">
                     {cameras.map((d) => <option key={d.device_id} value={d.device_id}>{d.device_id}</option>)}
                   </select>
                 )}

@@ -46,8 +46,8 @@ export function BluetoothDevicePicker({
       value={value ?? ''}
       disabled={disabled || devices === null}
       onChange={(e) => onChange(e.target.value || null)}
-      className="w-full rounded bg-surface-overlay border border-surface-border px-3 py-1.5 text-sm
-        text-slate-200 focus:outline-none focus:ring-1 focus:ring-accent disabled:opacity-40"
+      className="w-full rounded-lg bg-surface border border-surface-border px-3 py-1.5 text-sm
+        text-slate-200 focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent disabled:opacity-40"
     >
       <option value="">{devices === null ? t('bluetooth.loading') : t('bluetooth.select')}</option>
       {devices?.map((d) => (

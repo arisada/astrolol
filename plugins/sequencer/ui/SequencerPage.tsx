@@ -17,6 +17,7 @@ import { SettingsPanel } from './SettingsPanel'
 import { TaskCard } from './TaskCard'
 import { TaskEditor } from './TaskEditor'
 import { patchSequencerState, useSequencer } from './state'
+import { Tabs } from '@/components/ui/tabs'
 
 type Tab = 'queue' | 'journal' | 'settings'
 
@@ -95,14 +96,11 @@ export function SequencerPage() {
         <div className="max-w-4xl flex flex-col gap-4">
           <div className="flex items-center gap-4">
             <h1 className="text-lg font-semibold text-slate-100">{t('page.title')}</h1>
-            <div className="flex gap-1">
-              {(['queue', 'journal', 'settings'] as const).map((name) => (
-                <button key={name} type="button" onClick={() => setTab(name)}
-                  className={`px-3 py-1 text-xs rounded capitalize ${tab === name ? 'bg-surface-overlay text-slate-100' : 'text-slate-400 hover:text-slate-200'}`}>
-                  {t(`page.tabs.${name}`)}
-                </button>
-              ))}
-            </div>
+            <Tabs
+              tabs={(['queue', 'journal', 'settings'] as const).map((name) => ({ id: name, label: t(`page.tabs.${name}`) }))}
+              value={tab}
+              onChange={setTab}
+            />
           </div>
 
           {error && (

@@ -39,3 +39,33 @@ body {
     font-size: 0.65625rem; /* 10.5px */
   }
 }
+
+/* Thin-track slider; the filled part follows the --v custom property (value as a percentage). */
+.range-thin {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 20px;
+  margin: 0;
+  background: none;
+  cursor: pointer;
+  --v: 0%;
+}
+.range-thin:disabled { opacity: 0.4; cursor: not-allowed; }
+.range-thin::-webkit-slider-runnable-track {
+  height: 3px;
+  border-radius: 2px;
+  background: linear-gradient(to right, rgb(var(--c-accent)) var(--v), rgb(var(--c-surface-border)) var(--v));
+}
+.range-thin::-moz-range-track { height: 3px; border-radius: 2px; background: rgb(var(--c-surface-border)); }
+.range-thin::-moz-range-progress { height: 3px; border-radius: 2px; background: rgb(var(--c-accent)); }
+.range-thin::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  margin-top: -5.5px;
+  border: 0;
+  border-radius: 50%;
+  background: rgb(var(--c-accent));
+}
+.range-thin::-moz-range-thumb { width: 14px; height: 14px; border: 0; border-radius: 50%; background: rgb(var(--c-accent)); }

@@ -59,7 +59,7 @@ export function CountStepper({
           }}
           onBlur={() => { setFocused(false); setRaw(String(value)) }}
           onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
-          className="w-14 text-center text-xs font-mono text-slate-200 bg-surface-overlay border border-surface-border rounded px-2 py-1.5 hover:border-slate-500 focus:border-accent focus:outline-none transition-colors disabled:opacity-50"
+          className="w-14 text-center text-xs font-mono text-slate-200 bg-surface border border-surface-border rounded-lg px-2 py-1.5 hover:border-slate-500 focus:border-accent focus:outline-none transition-colors disabled:opacity-50"
         />
         <Button size="icon" variant="outline" disabled={disabled || higher == null}
           onClick={() => step(higher)} title={t('count.more')}>

@@ -275,7 +275,7 @@ export function FlatWizardPage() {
                         <select
                           value={p.choice.manualWheelId} disabled={busy || !p.choice.enabled}
                           onChange={(e) => patchCamera(p.cameraId, { manualWheelId: e.target.value })}
-                          className="rounded bg-surface-overlay border border-surface-border px-1.5 py-0.5 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-accent">
+                          className="rounded-lg bg-surface border border-surface-border px-1.5 py-0.5 text-xs text-slate-200 focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent">
                           <option value="">{t('noWheel')}</option>
                           {filterWheels.map((d) => <option key={d.device_id} value={d.device_id}>{d.device_id}</option>)}
                         </select>

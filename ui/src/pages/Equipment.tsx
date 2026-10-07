@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { StateBadge } from '@/components/ui/badge'
 import { DevicePropertiesPanel } from '@/components/DevicePropertiesPanel'
+import { Tabs } from '@/components/ui/tabs'
 
 // ---------------------------------------------------------------------------
 // Types & constants
@@ -389,8 +390,8 @@ function GenericAdapterStep({
           <select
             value={adapterKey}
             onChange={(e) => setAdapterKey(e.target.value)}
-            className="bg-surface border border-surface-border rounded px-3 py-1.5 text-sm text-slate-200
-              focus:outline-none focus:ring-1 focus:ring-accent"
+            className="bg-surface border border-surface-border rounded-lg px-3 py-1.5 text-sm text-slate-200
+              focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent"
           >
             {adapterKeys.map((k) => (
               <option key={k} value={k}>{k}</option>
@@ -425,8 +426,8 @@ function GenericAdapterStep({
             value={paramsText}
             onChange={(e) => setParamsText(e.target.value)}
             rows={4}
-            className="bg-surface border border-surface-border rounded px-3 py-1.5 text-sm text-slate-200
-              font-mono focus:outline-none focus:ring-1 focus:ring-accent"
+            className="bg-surface border border-surface-border rounded-lg px-3 py-1.5 text-sm text-slate-200
+              font-mono focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent"
           />
           {paramsError && <p className="text-xs text-status-error">{paramsError}</p>}
         </div>
@@ -476,8 +477,8 @@ function PropEditor({
         <select
           value={selected}
           onChange={(e) => onChange({ on_elements: e.target.value ? [e.target.value] : [] })}
-          className="bg-surface border border-surface-border rounded px-3 py-1.5 text-sm text-slate-200
-            focus:outline-none focus:ring-1 focus:ring-accent"
+          className="bg-surface border border-surface-border rounded-lg px-3 py-1.5 text-sm text-slate-200
+            focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent"
         >
           {rule === 'atmost1' && <option value="">{t('wizard.none')}</option>}
           {prop.widgets.map((w) => (
@@ -635,15 +636,15 @@ function ConfigureStep({
             <select
               value={selectedDeviceName}
               onChange={(e) => onSelectDeviceName(e.target.value)}
-              className="bg-surface border border-surface-border rounded px-3 py-1.5 text-sm text-slate-200
-                focus:outline-none focus:ring-1 focus:ring-accent"
+              className="bg-surface border border-surface-border rounded-lg px-3 py-1.5 text-sm text-slate-200
+                focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent"
             >
               {discoveredDeviceNames.map((n) => (
                 <option key={n} value={n}>{n}</option>
               ))}
             </select>
           ) : (
-            <p className="text-sm text-slate-200 bg-surface border border-surface-border rounded px-3 py-1.5">
+            <p className="text-sm text-slate-200 bg-surface border border-surface-border rounded-lg px-3 py-1.5">
               {selectedDeviceName || <span className="text-slate-600 italic">{t('wizard.discovering')}</span>}
             </p>
           )}
@@ -855,8 +856,8 @@ function TimezoneSelect({ value, onChange }: { value: string; onChange: (v: stri
     <select
       value={value}
       onChange={(e) => onChange(e.target.value)}
-      className="bg-surface border border-surface-border rounded px-3 py-1.5 text-sm text-slate-200
-        focus:outline-none focus:ring-1 focus:ring-accent w-full"
+      className="bg-surface border border-surface-border rounded-lg px-3 py-1.5 text-sm text-slate-200
+        focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent w-full"
     >
       {zones.length === 0 && <option value={value}>{value || 'UTC'}</option>}
       {zones.map((z) => (
@@ -975,8 +976,8 @@ function ItemForm({
           value={(form as {name: string}).name}
           onChange={(e) => set('name', e.target.value)}
           placeholder={t('form.eg', { example: type === 'site' ? t('form.exampleSite') : ITEM_EXAMPLE_NAMES[type] })}
-          className="bg-surface border border-surface-border rounded px-3 py-1.5 text-sm text-slate-200
-            focus:outline-none focus:ring-1 focus:ring-accent w-full"
+          className="bg-surface border border-surface-border rounded-lg px-3 py-1.5 text-sm text-slate-200
+            focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent w-full"
         />
       </FieldRow>
 
@@ -988,8 +989,8 @@ function ItemForm({
               value={(form as { indi_driver: string | null }).indi_driver ?? ''}
               onChange={(e) => set('indi_driver', e.target.value || null)}
               placeholder={t('form.indiDriverPlaceholder')}
-              className="bg-surface border border-surface-border rounded px-3 py-1.5 text-sm text-slate-200
-                focus:outline-none focus:ring-1 focus:ring-accent w-full"
+              className="bg-surface border border-surface-border rounded-lg px-3 py-1.5 text-sm text-slate-200
+                focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent w-full"
             />
           </FieldRow>
           <FieldRow label={t('form.indiDeviceName')}>
@@ -997,8 +998,8 @@ function ItemForm({
               value={(form as { indi_device_name: string | null }).indi_device_name ?? ''}
               onChange={(e) => set('indi_device_name', e.target.value || null)}
               placeholder={t('form.indiDeviceNamePlaceholder')}
-              className="bg-surface border border-surface-border rounded px-3 py-1.5 text-sm text-slate-200
-                focus:outline-none focus:ring-1 focus:ring-accent w-full"
+              className="bg-surface border border-surface-border rounded-lg px-3 py-1.5 text-sm text-slate-200
+                focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent w-full"
             />
           </FieldRow>
 
@@ -1010,8 +1011,8 @@ function ItemForm({
               value={(form as { adapter_key: string | null }).adapter_key ?? ''}
               onChange={(e) => set('adapter_key', e.target.value || null)}
               placeholder={t('form.adapterKeyPlaceholder')}
-              className="bg-surface border border-surface-border rounded px-3 py-1.5 text-sm text-slate-200
-                focus:outline-none focus:ring-1 focus:ring-accent w-full"
+              className="bg-surface border border-surface-border rounded-lg px-3 py-1.5 text-sm text-slate-200
+                focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent w-full"
             />
           </FieldRow>
           <FieldRow label={t('form.params')}>
@@ -1020,8 +1021,8 @@ function ItemForm({
               onChange={(e) => setConnectParamsText(e.target.value)}
               rows={3}
               placeholder={t('form.paramsPlaceholder')}
-              className="bg-surface border border-surface-border rounded px-3 py-1.5 text-sm text-slate-200
-                font-mono focus:outline-none focus:ring-1 focus:ring-accent w-full"
+              className="bg-surface border border-surface-border rounded-lg px-3 py-1.5 text-sm text-slate-200
+                font-mono focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent w-full"
             />
             {connectParamsError && <p className="text-xs text-status-error mt-1">{connectParamsError}</p>}
           </FieldRow>
@@ -1051,8 +1052,8 @@ function ItemForm({
                 type="number" step="1"
                 value={(form as { altitude: number }).altitude}
                 onChange={(e) => set('altitude', parseFloat(e.target.value) || 0)}
-                className="bg-surface border border-surface-border rounded px-3 py-1.5 text-sm text-slate-200
-                  focus:outline-none focus:ring-1 focus:ring-accent w-full"
+                className="bg-surface border border-surface-border rounded-lg px-3 py-1.5 text-sm text-slate-200
+                  focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent w-full"
               />
             </FieldRow>
             <FieldRow label={t('form.timezone')}>
@@ -1073,8 +1074,8 @@ function ItemForm({
               type="number" step="1" min="0"
               value={(form as { focal_length: number }).focal_length}
               onChange={(e) => set('focal_length', parseFloat(e.target.value) || 0)}
-              className="bg-surface border border-surface-border rounded px-3 py-1.5 text-sm text-slate-200
-                focus:outline-none focus:ring-1 focus:ring-accent w-full"
+              className="bg-surface border border-surface-border rounded-lg px-3 py-1.5 text-sm text-slate-200
+                focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent w-full"
             />
           </FieldRow>
           <FieldRow label={t('form.aperture')}>
@@ -1082,8 +1083,8 @@ function ItemForm({
               type="number" step="1" min="0"
               value={(form as { aperture: number }).aperture}
               onChange={(e) => set('aperture', parseFloat(e.target.value) || 0)}
-              className="bg-surface border border-surface-border rounded px-3 py-1.5 text-sm text-slate-200
-                focus:outline-none focus:ring-1 focus:ring-accent w-full"
+              className="bg-surface border border-surface-border rounded-lg px-3 py-1.5 text-sm text-slate-200
+                focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent w-full"
             />
           </FieldRow>
         </div>
@@ -1098,8 +1099,8 @@ function ItemForm({
               value={(form as { pixel_size_um: number | null }).pixel_size_um ?? ''}
               onChange={(e) => set('pixel_size_um', e.target.value ? parseFloat(e.target.value) : null)}
               placeholder={t('form.pixelSizePlaceholder')}
-              className="bg-surface border border-surface-border rounded px-3 py-1.5 text-sm text-slate-200
-                focus:outline-none focus:ring-1 focus:ring-accent w-40"
+              className="bg-surface border border-surface-border rounded-lg px-3 py-1.5 text-sm text-slate-200
+                focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent w-40"
             />
           </FieldRow>
           <FieldRow label={t('form.defaultGain')}>
@@ -1108,8 +1109,8 @@ function ItemForm({
               value={(form as { default_gain: number | null }).default_gain ?? ''}
               onChange={(e) => set('default_gain', e.target.value ? parseInt(e.target.value, 10) : null)}
               placeholder={t('form.defaultGainPlaceholder')}
-              className="bg-surface border border-surface-border rounded px-3 py-1.5 text-sm text-slate-200
-                focus:outline-none focus:ring-1 focus:ring-accent w-56"
+              className="bg-surface border border-surface-border rounded-lg px-3 py-1.5 text-sm text-slate-200
+                focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent w-56"
             />
           </FieldRow>
         </div>
@@ -1125,8 +1126,8 @@ function ItemForm({
               set('filter_names', e.target.value.split(',').map((s) => s.trim()).filter(Boolean))
             }}
             placeholder="L, R, G, B, Ha, OIII, SII"
-            className="bg-surface border border-surface-border rounded px-3 py-1.5 text-sm text-slate-200
-              focus:outline-none focus:ring-1 focus:ring-accent w-full"
+            className="bg-surface border border-surface-border rounded-lg px-3 py-1.5 text-sm text-slate-200
+              focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent w-full"
           />
         </FieldRow>
       )}
@@ -1577,22 +1578,12 @@ export function Equipment() {
       </div>
 
       {/* Tab switcher */}
-      <div className="flex gap-1 mb-6 border-b border-surface-border">
-        {(['connections', 'inventory'] as const).map((tab) => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className={[
-              'px-4 py-2 text-sm capitalize transition-colors border-b-2 -mb-px',
-              activeTab === tab
-                ? 'border-accent text-slate-100'
-                : 'border-transparent text-slate-500 hover:text-slate-300',
-            ].join(' ')}
-          >
-            {t(`tabs.${tab}`)}
-          </button>
-        ))}
-      </div>
+      <Tabs
+        className="mb-6"
+        tabs={(['connections', 'inventory'] as const).map((tab) => ({ id: tab, label: t(`tabs.${tab}`) }))}
+        value={activeTab}
+        onChange={setActiveTab}
+      />
 
       {/* Inventory tab */}
       {activeTab === 'inventory' && (

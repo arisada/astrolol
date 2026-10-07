@@ -87,7 +87,7 @@ function IntegerStepper({
             if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
             if (e.key === 'Escape') { setRaw(String(value)); editingRef.current = false; (e.target as HTMLInputElement).blur() }
           }}
-          className="flex-1 min-w-0 text-center text-xs font-mono text-slate-200 bg-surface-overlay border border-surface-border rounded px-2 py-1.5 focus:outline-none focus:ring-1 focus:ring-accent"
+          className="flex-1 min-w-0 text-center text-xs font-mono text-slate-200 bg-surface border border-surface-border rounded-lg px-2 py-1.5 focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent"
         />
         <Button size="icon" variant="outline" onClick={stepUp} title={t('increase')}>
           <ChevronUp size={14} />
@@ -459,7 +459,7 @@ export function AutofocusPage() {
             <span className="text-xs text-slate-300 font-mono">{cameras[0].device_id}</span>
           ) : (
             <select value={cameraId} onChange={(e) => setCameraId(e.target.value)}
-              className="w-full rounded bg-surface-overlay border border-surface-border px-2 py-1.5 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-accent">
+              className="w-full rounded-lg bg-surface border border-surface-border px-2 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent">
               {cameras.map((d) => <option key={d.device_id} value={d.device_id}>{d.device_id}</option>)}
             </select>
           )}
@@ -473,7 +473,7 @@ export function AutofocusPage() {
             <span className="text-xs text-slate-300 font-mono">{focuserCandidates[0].device_id}</span>
           ) : (
             <select value={focuserId} onChange={(e) => setFocuserId(e.target.value)}
-              className="w-full rounded bg-surface-overlay border border-surface-border px-2 py-1.5 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-accent">
+              className="w-full rounded-lg bg-surface border border-surface-border px-2 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent">
               {focuserCandidates.map((d) => <option key={d.device_id} value={d.device_id}>{d.device_id}</option>)}
             </select>
           )}
@@ -522,7 +522,8 @@ export function AutofocusPage() {
                 <input
                   type="range" min={3} max={15} value={settings.num_steps}
                   onChange={(e) => patchSettings('num_steps', parseInt(e.target.value, 10))}
-                  className="flex-1 accent-accent h-1"
+                  className="range-thin flex-1"
+                  style={{ ['--v' as string]: `${((settings.num_steps - 3) / 12) * 100}%` }}
                 />
                 <span className="text-xs text-slate-300 w-4 text-center">{settings.num_steps}</span>
               </div>
@@ -600,7 +601,7 @@ export function AutofocusPage() {
                 <select
                   value={settings.filter_slot ?? ''}
                   onChange={(e) => patchSettings('filter_slot', e.target.value ? parseInt(e.target.value, 10) : null)}
-                  className="w-full rounded bg-surface-overlay border border-surface-border px-2 py-1.5 text-xs text-slate-200 focus:outline-none focus:ring-1 focus:ring-accent"
+                  className="w-full rounded-lg bg-surface border border-surface-border px-2 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent"
                 >
                   <option value="">{t('exposure.keep')}</option>
                   {filterWheelStatus?.filter_names.length
