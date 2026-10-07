@@ -25,33 +25,35 @@ export function StateBadge({ state }: { state: DeviceState }) {
   )
 }
 
-// ── Status-bar chip (label · status, with border — for the global status bar) ─
+// ── Status-bar chip: telemetry readout "LABEL value", hairline-separated ─────────
+// The value is coloured by state; the text always says the state too, so nothing depends on colour alone.
 
 export type ChipVariant = 'green' | 'amber' | 'red' | 'blue' | 'violet' | 'slate'
 
-const chipClasses: Record<ChipVariant, string> = {
-  green:  'bg-emerald-500/20 text-emerald-300 border-emerald-500/30',
-  amber:  'bg-amber-500/20  text-amber-300  border-amber-500/30',
-  red:    'bg-rose-500/20   text-rose-300   border-rose-500/30',
-  blue:   'bg-sky-500/20    text-sky-300    border-sky-500/30',
-  violet: 'bg-violet-500/20 text-violet-300 border-violet-500/30',
-  slate:  'bg-slate-700/50  text-slate-400  border-slate-600/40',
+const chipValueClasses: Record<ChipVariant, string> = {
+  green:  'text-emerald-400',
+  amber:  'text-amber-400',
+  red:    'text-rose-400',
+  blue:   'text-sky-400',
+  violet: 'text-violet-400',
+  slate:  'text-slate-400',
 }
 
-export function Chip({ label, status, variant, pulse = false }: {
-  label: string
+export function Chip({ label, status, variant, pulse = false, icon }: {
+  label?: string
   status: string
   variant: ChipVariant
   pulse?: boolean
+  icon?: React.ReactNode
 }) {
   return (
     <span
-      className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded border text-xs font-medium whitespace-nowrap
-        ${chipClasses[variant]} ${pulse ? 'animate-pulse' : ''}`}
+      className={`inline-flex items-center gap-1.5 h-5 px-2.5 border-l border-surface-border first:border-l-0 first:pl-0
+        font-mono text-xs whitespace-nowrap ${pulse ? 'animate-pulse' : ''}`}
     >
-      <span className="text-slate-400 truncate max-w-[10rem]">{label}</span>
-      <span className="opacity-40">·</span>
-      <span>{status}</span>
+      {icon}
+      {label && <span className="label-caps text-slate-500 truncate max-w-[10rem]">{label}</span>}
+      <span className={chipValueClasses[variant]}>{status}</span>
     </span>
   )
 }

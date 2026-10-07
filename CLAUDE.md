@@ -210,20 +210,19 @@ If a plugin has activity worth surfacing globally (an ongoing run, a background 
 `StatusChip` component from `index.ts`. The `StatusBar` renders all plugin chips automatically —
 no changes to `StatusBar.tsx` are needed.
 
-The chip is responsible for its own full rendering, including deciding when to return `null`
-(when the plugin is idle). Keep chips compact: a label, a separator dot, and a short status
-string. Use the inline Tailwind classes from the existing chips as a reference for consistent
-colouring:
+The chip is responsible for deciding when to return `null` (when the plugin is idle). Render it with
+the shared `Chip` (`@/components/ui/badge`) — never hand-roll the markup, the status bar styles
+it as a hairline-separated telemetry readout (`LABEL value`):
 
 ```tsx
-// bg-amber-500/20 text-amber-300 border-amber-500/30   ← in-progress / moving
-// bg-emerald-500/20 text-emerald-300 border-emerald-500/30  ← done / tracking
-// bg-sky-500/20 text-sky-300 border-sky-500/30         ← exposing / busy
-// bg-violet-500/20 text-violet-300 border-violet-500/30← solving / computing
-// bg-slate-700/50 text-slate-400 border-slate-600/40   ← idle / connected
+<Chip label={t('chip.guiding')} status={t('chip.settling')} variant="amber" pulse />
+// variant: amber ← in progress / moving · green ← done / tracking · blue ← exposing / busy
+//          violet ← solving / computing · red ← fault · slate ← idle
+// optional: icon={<Crosshair …/>}; omit label for an icon + value chip
 ```
 
-Add `animate-pulse` for states that are actively progressing.
+The status text always states the state in words; the colour is only a second cue. Add `pulse`
+for states that are actively progressing.
 
 ### User-facing copy
 

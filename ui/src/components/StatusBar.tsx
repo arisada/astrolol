@@ -132,7 +132,7 @@ export function StatusBar() {
   const filterWheels = connected('filter_wheel')
 
   return (
-    <div className="flex items-center gap-2 px-3 h-8 shrink-0 bg-surface-raised border-b border-surface-border overflow-x-auto">
+    <div className="flex items-center px-3 h-8 shrink-0 bg-surface-raised border-b border-surface-border overflow-x-auto">
       {/* Device chips */}
       {mounts.map((d)       => <MountChip       key={d.device_id} device={d} />)}
       {cameras.map((d)      => <ImagerChip      key={d.device_id} device={d} />)}
@@ -147,12 +147,12 @@ export function StatusBar() {
       <div className="flex-1" />
 
       {/* WebSocket connection indicator */}
-      <span className={`inline-flex items-center gap-1.5 text-xs shrink-0
+      <span className={`inline-flex items-center gap-1.5 pl-2.5 font-mono text-xs shrink-0
         ${wsConnected ? 'text-emerald-400' : 'text-rose-400'}`}>
         {wsConnected
           ? <Wifi size={12} />
           : <WifiOff size={12} />}
-        <span className="hidden sm:inline">
+        <span className="hidden sm:inline label-caps">
           {wsConnected ? t('ws.live') : t('ws.reconnecting')}
         </span>
       </span>
