@@ -2,7 +2,7 @@ import { forwardRef, useCallback, useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import {
-  Camera, ChevronDown, ChevronUp, Crosshair, Play, Settings, Square, StopCircle, Thermometer,
+  Camera, ChevronDown, ChevronUp, Crosshair, Play, Settings, Square, StopCircle,
 } from 'lucide-react'
 import { api } from '@/api/client'
 import { useStore } from '@/store'
@@ -395,28 +395,20 @@ function CameraPanel({
         {/* Temperature */}
         {hasCooler && (
           <div className="flex flex-col gap-2 pb-2 border-b border-surface-border">
-            <div className="mx-auto w-full max-w-[130px]">
-              <CoolingGauge
-                temperature={cameraStatus!.temperature!}
-                setPoint={cameraStatus!.cooler_on && Number.isFinite(parseFloat(settings.target_temp)) ? parseFloat(settings.target_temp) : null}
-                power={cameraStatus!.cooler_on ? cameraStatus!.cooler_power : null}
-                min={Math.min(-30, Math.floor(cameraStatus!.temperature! / 10) * 10)}
-                max={Math.max(20, Math.ceil(cameraStatus!.temperature! / 10) * 10)}
-                label={t('cooler.gauge')}
-              />
-            </div>
-            <div className="flex items-center justify-between">
-              <Thermometer size={12} className="text-slate-500" />
-              <button
-                onClick={() => setCooler(!cameraStatus!.cooler_on)}
-                className={`text-xs px-2 py-0.5 rounded border transition-colors ${
-                  cameraStatus!.cooler_on
-                    ? 'border-accent text-accent bg-accent/10'
-                    : 'border-surface-border text-slate-500'
-                }`}
-              >
+            <div className="flex items-center justify-between gap-3">
+              <div className="w-[130px] shrink-0">
+                <CoolingGauge
+                  temperature={cameraStatus!.temperature!}
+                  setPoint={cameraStatus!.cooler_on && Number.isFinite(parseFloat(settings.target_temp)) ? parseFloat(settings.target_temp) : null}
+                  power={cameraStatus!.cooler_on ? cameraStatus!.cooler_power : null}
+                  min={Math.min(-30, Math.floor(cameraStatus!.temperature! / 10) * 10)}
+                  max={Math.max(20, Math.ceil(cameraStatus!.temperature! / 10) * 10)}
+                  label={t('cooler.gauge')}
+                />
+              </div>
+              <Button size="sm" variant={cameraStatus!.cooler_on ? 'default' : 'outline'} onClick={() => setCooler(!cameraStatus!.cooler_on)}>
                 {cameraStatus!.cooler_on ? t('cooler.on') : t('cooler.off')}
-              </button>
+              </Button>
             </div>
             {cameraStatus!.cooler_on && (
               <div className="flex flex-wrap items-end gap-2">
@@ -624,16 +616,16 @@ function FocuserPanel({
           </Button>
         </div>
 
-        <div className="flex flex-wrap items-end gap-2">
-          <NumberStepper
-            label={t('focuser.absolute')} min={0} step={step} value={target ?? 0} valueClassName="w-20"
-            onChange={(v) => { setTarget(v); setEdited(true) }}
-          />
-          <Button size="sm" disabled={target == null}
+        <NumberStepper
+          label={t('focuser.absolute')} min={0} step={step} value={target ?? 0} valueClassName="w-20"
+          onChange={(v) => { setTarget(v); setEdited(true) }}
+        />
+        <div className="flex gap-2">
+          <Button size="sm" className="flex-1" disabled={target == null}
             onClick={() => act(async () => { setMoveTarget(target); setEdited(false); await api.focuser.moveTo(deviceId, target!) })}>
             {t('focuser.go')}
           </Button>
-          <Button size="sm" variant="danger" onClick={() => act(() => api.focuser.halt(deviceId))}>
+          <Button size="sm" variant="danger" className="flex-1" onClick={() => act(() => api.focuser.halt(deviceId))}>
             <StopCircle size={12} className="mr-1" /> {t('focuser.halt')}
           </Button>
         </div>
