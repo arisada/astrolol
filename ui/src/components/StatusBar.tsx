@@ -118,7 +118,7 @@ function FilterWheelChip({ device }: { device: ConnectedDevice }) {
 // Status bar
 // ---------------------------------------------------------------------------
 
-export function StatusBar() {
+export function StatusBar({ showLogo = false }: { showLogo?: boolean }) {
   const { t } = useTranslation()
   const wsConnected    = useStore((s) => s.wsConnected)
   const devices        = useStore((s) => s.connectedDevices)
@@ -133,6 +133,7 @@ export function StatusBar() {
 
   return (
     <div className="flex items-center px-3 h-8 shrink-0 bg-surface-raised border-b border-surface-border overflow-x-auto">
+      {showLogo && <img src="/favicon-32x32.png" alt="astrolol" className="h-5 w-5 shrink-0 mr-2.5" />}
       {/* Device chips */}
       {mounts.map((d)       => <MountChip       key={d.device_id} device={d} />)}
       {cameras.map((d)      => <ImagerChip      key={d.device_id} device={d} />)}

@@ -1,11 +1,12 @@
 import { Outlet } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { X } from 'lucide-react'
-import { Sidebar } from './Sidebar'
+import { Sidebar, TopNav } from './Sidebar'
 import { StatusBar } from './StatusBar'
 import { useEvents } from '@/hooks/useEvents'
 import { useStatusPolling } from '@/hooks/useStatusPolling'
 import { useStore } from '@/store'
+import { PORTRAIT_NARROW, useMediaQuery } from '@/hooks/useMediaQuery'
 
 function ErrorToast() {
   const { t } = useTranslation()
@@ -40,12 +41,14 @@ function ErrorToast() {
 export function Layout() {
   useEvents()         // connect WebSocket once at the top level
   useStatusPolling()  // poll device statuses globally
+  const portrait = useMediaQuery(PORTRAIT_NARROW)
 
   return (
     <div className="flex flex-col h-dvh bg-surface text-slate-200 overflow-hidden">
-      <StatusBar />
+      <StatusBar showLogo={portrait} />
+      {portrait && <TopNav />}
       <div className="flex flex-1 min-h-0">
-        <Sidebar />
+        {!portrait && <Sidebar />}
         <main className="flex-1 overflow-auto">
           <Outlet />
         </main>
