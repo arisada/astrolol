@@ -69,11 +69,14 @@ export function Sidebar() {
   return (
     <aside className={`flex flex-col shrink-0 bg-surface-raised border-r border-surface-border h-full transition-[width]
       ${folded ? 'w-14' : 'w-48'}`}>
-      <div className="flex items-center justify-center px-3 py-3.5 border-b border-surface-border">
-        <img src="/favicon-32x32.png" alt="astrolol" className="h-6 w-6 shrink-0" />
-      </div>
-
       <nav className="flex flex-col gap-1 p-2 flex-1 min-h-0 overflow-y-auto">
+        {/* The logo is the first row of the list, aligned with the icons below it. */}
+        <div className="flex items-center gap-3 px-2 py-2.5 text-sm">
+          <div className="flex w-[18px] shrink-0 justify-center">
+            <img src="/favicon-32x32.png" alt="" className="h-5 w-5 max-w-none" />
+          </div>
+          {!folded && <span className="font-semibold tracking-wide text-slate-200">astrolol</span>}
+        </div>
         {items.map(({ to, icon: Icon, label, badge }) => (
           <NavLink key={to} to={to} className={navLinkClass} title={folded ? label : undefined}>
             <div className="relative shrink-0">
