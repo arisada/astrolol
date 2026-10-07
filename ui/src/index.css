@@ -120,3 +120,6 @@ input[type='checkbox']:focus-visible,
 input[type='radio']:focus-visible { outline: 2px solid rgb(var(--c-accent)); outline-offset: 2px; }
 input[type='checkbox']:disabled,
 input[type='radio']:disabled { opacity: 0.4; cursor: not-allowed; }
+
+/* Icon weight: 1.5px strokes everywhere (lucide defaults to 2). */
+svg[class*='lucide-'] { stroke-width: 1.5; }

@@ -38,12 +38,12 @@ export function taskProgress(entry: SequencerQueueEntry, laneIndex = 0) {
 }
 
 export const STATUS_STYLE: Record<SequencerTaskStatus, string> = {
-  pending:     'text-slate-400 bg-slate-500/15',
-  running:     'text-accent bg-accent/20',
-  interrupted: 'text-amber-300 bg-amber-500/15',
-  completed:   'text-emerald-300 bg-emerald-500/15',
-  failed:      'text-rose-300 bg-rose-500/15',
-  skipped:     'text-slate-500 bg-slate-600/20',
+  pending:     'text-slate-400',
+  running:     'text-accent',
+  interrupted: 'text-amber-300',
+  completed:   'text-emerald-300',
+  failed:      'text-rose-300',
+  skipped:     'text-slate-500',
 }
 
 /** Translated name of a sequencer activity (the backend sends the key). */

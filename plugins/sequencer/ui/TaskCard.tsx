@@ -69,8 +69,8 @@ export function TaskCard({
   return (
     <div
       {...dragProps}
-      className={`rounded border px-3 py-2 transition-colors
-        ${isCurrent ? 'border-accent/60 bg-surface-overlay' : 'border-surface-border bg-surface-raised'}
+      className={`rounded-[10px] border bg-surface-raised px-3 py-2 transition-colors
+        ${isCurrent || running ? 'border-accent' : status === 'failed' ? 'border-status-error/70' : 'border-surface-border'}
         ${status === 'completed' || status === 'skipped' ? 'opacity-70' : ''}`}
     >
       <div className="flex items-center gap-2">
@@ -94,7 +94,7 @@ export function TaskCard({
             </span>
           </div>
         </div>
-        <span className={`text-xs px-2 py-0.5 rounded-full shrink-0 ${STATUS_STYLE[status]}`}>{t(`taskStatus.${status}`)}</span>
+        <span className={`label-caps font-mono shrink-0 ${STATUS_STYLE[status]}`}>{t(`taskStatus.${status}`)}</span>
         <MoreMenu items={menu} />
       </div>
 
