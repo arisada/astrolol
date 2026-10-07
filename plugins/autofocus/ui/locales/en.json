@@ -14,8 +14,6 @@
     "failed": "failed",
     "aborted": "aborted"
   },
-  "decrease": "Decrease",
-  "increase": "Increase",
   "noData": "No data yet",
   "hfdAxis": "HFD px",
   "fwhmAxis": "FWHM px",

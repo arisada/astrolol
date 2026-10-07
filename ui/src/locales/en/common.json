@@ -106,5 +106,9 @@
   "dms": {
     "increase": "Increase {{unit}}",
     "decrease": "Decrease {{unit}}"
+  },
+  "number": {
+    "less": "Decrease",
+    "more": "Increase"
   }
 }

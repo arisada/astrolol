@@ -44,7 +44,8 @@
     "steps": "steps",
     "absolute": "Absolute position",
     "go": "Go",
-    "halt": "Halt"
+    "halt": "Halt",
+    "stepSize": "Step size"
   },
   "filterWheel": {
     "title": "Filter Wheel",

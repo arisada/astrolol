@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ChevronDown, ChevronUp, Contrast, Focus, StopCircle } from 'lucide-react'
+import { Contrast, Focus, StopCircle } from 'lucide-react'
 import { api } from '@/api/client'
 import * as autofocusApi from './api'
 import { useStore } from '@/store'
 import { CollapsibleSidebar } from '@/components/ui/collapsible-sidebar'
 import { Button } from '@/components/ui/button'
 import { SidebarSection } from '@/components/ui/card'
+import { CountStepper } from '@/components/ui/count-stepper'
 import { DurationStepper } from '@/components/ui/duration-stepper'
 import { FocuserRuler } from '@/components/ui/focuser-ruler'
 import { Input } from '@/components/ui/input'
@@ -30,74 +31,7 @@ import type {
 
 const AUTOFOCUS_EXPOSURE_STEPS = [0.5, 1, 1.5, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20, 30]
 
-const STEP_SIZE_PROGRESSION = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000, 20000, 50000]
-
-// ── Integer field with progression up/down buttons ────────────────────────────
-// Plain <input type=number> can't be cleared to retype a leading digit (parseInt('')
-// falls back to the min and instantly repopulates the field), and its native
-// spinner only ever does +/-1. This keeps a local editable string that commits on
-// blur/Enter, and steps through `progression` instead of +/-1.
-
-function IntegerStepper({
-  label, unit, value, onChange, progression, min = 0,
-}: {
-  label: string
-  unit?: string
-  value: number
-  onChange: (v: number) => void
-  progression: number[]
-  min?: number
-}) {
-  const { t } = useTranslation('autofocus')
-  const [raw, setRaw] = useState(String(value))
-  const editingRef = useRef(false)
-
-  useEffect(() => {
-    if (!editingRef.current) setRaw(String(value))
-  }, [value])
-
-  const commit = () => {
-    editingRef.current = false
-    const n = parseInt(raw, 10)
-    if (!isNaN(n)) onChange(Math.max(min, n))
-    else setRaw(String(value))
-  }
-
-  const stepDown = () => {
-    const lower = progression.filter((v) => v < value)
-    onChange(lower.length ? lower[lower.length - 1] : progression[0])
-  }
-  const stepUp = () => {
-    const higher = progression.filter((v) => v > value)
-    onChange(higher.length ? higher[0] : progression[progression.length - 1])
-  }
-
-  return (
-    <div className="flex flex-col gap-1">
-      <label className="text-xs text-slate-400">{label}</label>
-      <div className="flex items-center gap-1">
-        <Button size="icon" variant="outline" onClick={stepDown} title={t('decrease')}>
-          <ChevronDown size={14} />
-        </Button>
-        <input
-          type="text" inputMode="numeric" value={raw}
-          onFocus={() => { editingRef.current = true }}
-          onChange={(e) => { editingRef.current = true; setRaw(e.target.value.replace(/[^0-9]/g, '')) }}
-          onBlur={commit}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
-            if (e.key === 'Escape') { setRaw(String(value)); editingRef.current = false; (e.target as HTMLInputElement).blur() }
-          }}
-          className="flex-1 min-w-0 text-center text-xs font-mono text-slate-200 bg-surface border border-surface-border rounded-lg px-2 py-1.5 focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent"
-        />
-        <Button size="icon" variant="outline" onClick={stepUp} title={t('increase')}>
-          <ChevronUp size={14} />
-        </Button>
-        {unit && <span className="text-xs text-slate-500">{unit}</span>}
-      </div>
-    </div>
-  )
-}
+const STEP_SIZE_PROGRESSION = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000]
 
 // ── U-curve SVG chart ─────────────────────────────────────────────────────────
 
@@ -510,12 +444,11 @@ export function AutofocusPage() {
             />
 
             {/* Step size */}
-            <IntegerStepper
-              label={t('vcurve.stepSize')}
-              unit={t('vcurve.steps')}
+            <CountStepper
+              label={`${t('vcurve.stepSize')} (${t('vcurve.steps')})`}
               value={settings.step_size}
               onChange={(v) => patchSettings('step_size', Math.max(1, v))}
-              progression={STEP_SIZE_PROGRESSION}
+              steps={STEP_SIZE_PROGRESSION}
               min={1}
             />
 

@@ -5,7 +5,7 @@ import { fmtRA, fmtDec } from '@/utils/formatting'
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Crosshair, RefreshCw, RotateCw, Settings, StopCircle } from 'lucide-react'
 import { api } from '@/api/client'
 import { useStore } from '@/store'
-import type { CoordFrame, DeviceProperty, MountDeviceSettings, OpticalPath, TrackingMode } from '@/api/types'
+import type { CoordFrame, DeviceProperty, EquipmentItem, MountDeviceSettings, ProfileNode, SiteEquipmentItem, TrackingMode } from '@/api/types'
 import { Button } from '@/components/ui/button'
 import { DmsInput } from '@/components/ui/dms-input'
 import { StateBadge } from '@/components/ui/badge'
@@ -136,10 +136,29 @@ function MountControls({ deviceId }: { deviceId: string }) {
   const status = useStore((s) => s.mountStatuses[deviceId] ?? null)
   const [showIndiPanel, setShowIndiPanel] = useState(false)
   // The observing site this mount is attached to (from the active profile's equipment tree).
-  const [opticalPaths, setOpticalPaths] = useState<OpticalPath[]>([])
+  // Falls back to the first site in the profile when the mount is not under a camera.
+  const [site, setSite] = useState<SiteEquipmentItem | null>(null)
   useEffect(() => {
-    api.profiles.activeOpticalPaths().then(setOpticalPaths).catch(() => setOpticalPaths([]))
-  }, [])
+    Promise.all([
+      api.profiles.activeOpticalPaths().catch(() => []),
+      api.profiles.active().catch(() => null),
+      api.inventory.list().catch(() => [] as EquipmentItem[]),
+    ]).then(([paths, profile, items]) => {
+      const viaPath = paths.find((p) => p.mount_device_id === deviceId)?.site
+      if (viaPath) { setSite(viaPath); return }
+      const byId = new Map(items.map((i) => [i.id, i]))
+      const firstSite = (nodes: ProfileNode[]): SiteEquipmentItem | null => {
+        for (const n of nodes) {
+          const item = byId.get(n.item_id)
+          if (item?.type === 'site') return item as SiteEquipmentItem
+          const inner = firstSite(n.children)
+          if (inner) return inner
+        }
+        return null
+      }
+      setSite(firstSite(profile?.roots ?? []))
+    })
+  }, [deviceId])
   const [skyView, setSkyView] = useLocalStorage<'equatorial' | 'horizontal'>('astrolol.mountSky', 'equatorial')
 
   const [slewRa, setSlewRa] = useState(0)
@@ -212,7 +231,6 @@ function MountControls({ deviceId }: { deviceId: string }) {
   const isSlewing  = status?.is_slewing  ?? false
   const ha         = status?.hour_angle ?? null
   const lst        = status?.lst ?? null
-  const site       = opticalPaths.find((p) => p.mount_device_id === deviceId)?.site ?? null
   // The sidereal time is apparent (of date), so pair it with the JNow position.
   const skyRa      = status?.ra_jnow ?? status?.ra ?? null
   const skyDec     = status?.dec_jnow ?? status?.dec ?? null
@@ -315,7 +333,7 @@ function MountControls({ deviceId }: { deviceId: string }) {
 
         {/* Target */}
         <Card title={t('target.title')} action={<FrameToggle jnow={targetJnow} onChange={setTargetJnow} />} className="p-4 flex flex-col gap-3">
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-wrap gap-x-6 gap-y-2">
             <div className="flex items-center gap-2">
               <span className="text-xs text-slate-500 w-8 shrink-0">{t('position.ra')}</span>
               <DmsInput value={slewRa} onChange={(v) => { slewEdited.current = true; setSlewRa(v) }} mode="ra" />
@@ -342,7 +360,7 @@ function MountControls({ deviceId }: { deviceId: string }) {
             <Button size="sm" variant="outline" onClick={() => act(() => api.mount.sync(deviceId, slewRa * 15, slewDec))}>
               <RotateCw size={12} className="mr-1" /> {t('target.sync')}
             </Button>
-            <Button size="sm" variant="ghost" onClick={() => act(() => api.mount.stop(deviceId))}>
+            <Button size="sm" variant="danger" onClick={() => act(() => api.mount.stop(deviceId))}>
               <StopCircle size={12} className="mr-1" /> {t('target.stop')}
             </Button>
             {slewEdited.current && (

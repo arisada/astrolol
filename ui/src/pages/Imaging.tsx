@@ -11,6 +11,9 @@ import type {
 } from '@/api/types'
 import { Button } from '@/components/ui/button'
 import { CoolingGauge } from '@/components/ui/cooling-gauge'
+import { CountStepper } from '@/components/ui/count-stepper'
+import { FocuserRuler } from '@/components/ui/focuser-ruler'
+import { NumberStepper } from '@/components/ui/number-stepper'
 import { Input } from '@/components/ui/input'
 import { SidebarSection } from '@/components/ui/card'
 import { DurationStepper } from '@/components/ui/duration-stepper'
@@ -22,6 +25,13 @@ import { LabeledSlider } from '@/components/ui/labeled-slider'
 import { HistogramOverlay } from '@/components/ui/histogram'
 import { ColorControls, StretchControls } from '@/components/ui/stretch-controls'
 import { ZoomableImage, type ZoomableImageHandle } from '@/components/ui/zoomable-image'
+
+// Dither cadence: 0 switches it off; setting one cadence clears the other.
+const DITHER_FRAME_STEPS = [0, 1, 2, 3, 4, 5, 6, 8, 10, 15, 20, 30]
+const DITHER_MINUTE_STEPS = [0, 1, 2, 3, 5, 10, 15, 20, 30, 45, 60]
+
+// Focuser move sizes, 1 to 10000 steps.
+const FOCUSER_STEP_SIZES = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000]
 
 const DEFAULT_IMAGER_SETTINGS: ImagerDeviceSettings = {
   duration: 5,
@@ -365,9 +375,12 @@ function CameraPanel({
     } catch (e) { setError((e as Error).message) }
   }
 
+  // The set point shown in the stepper: what was typed, else the current sensor temperature.
+  const parsedTarget = parseFloat(settings.target_temp)
+  const targetTemp = Number.isFinite(parsedTarget) ? parsedTarget : Math.round(cameraStatus?.temperature ?? 0)
+
   const applyTemp = async () => {
-    const temp = parseFloat(settings.target_temp)
-    if (isNaN(temp)) return
+    const temp = targetTemp
     try {
       await api.imager.setCooler(deviceId, cameraStatus?.cooler_on ?? true, temp)
     } catch (e) { setError((e as Error).message) }
@@ -382,7 +395,7 @@ function CameraPanel({
         {/* Temperature */}
         {hasCooler && (
           <div className="flex flex-col gap-2 pb-2 border-b border-surface-border">
-            <div className="mx-auto w-full max-w-[220px]">
+            <div className="mx-auto w-full max-w-[130px]">
               <CoolingGauge
                 temperature={cameraStatus!.temperature!}
                 setPoint={cameraStatus!.cooler_on && Number.isFinite(parseFloat(settings.target_temp)) ? parseFloat(settings.target_temp) : null}
@@ -406,14 +419,12 @@ function CameraPanel({
               </button>
             </div>
             {cameraStatus!.cooler_on && (
-              <div className="flex gap-1.5">
-                <Input
-                  type="number" step="0.5" placeholder={t('cooler.target')}
-                  value={settings.target_temp}
-                  onChange={(e) => patchSettings({ target_temp: e.target.value })}
-                  className="flex-1 text-xs"
+              <div className="flex flex-wrap items-end gap-2">
+                <NumberStepper
+                  label={t('cooler.target')} unit="°C" value={targetTemp} step={1} min={-60} max={40}
+                  onChange={(v) => patchSettings({ target_temp: String(v) })}
                 />
-                <Button size="sm" variant="outline" onClick={applyTemp} disabled={!settings.target_temp}>{t('cooler.set')}</Button>
+                <Button size="sm" variant="outline" onClick={applyTemp}>{t('cooler.set')}</Button>
               </div>
             )}
           </div>
@@ -500,25 +511,17 @@ function CameraPanel({
             <Crosshair size={12} className="text-slate-500" />
             <span className="text-slate-500 label-caps">{t('dither.title')}</span>
           </div>
-          <div className="grid grid-cols-2 gap-2">
-            <div className="flex flex-col gap-1">
-              <span className="text-xs text-slate-400">{t('dither.frames')}</span>
-              <Input
-                type="number" min="1" step="1" placeholder="—"
-                value={settings.dither_frames}
-                onChange={(e) => patchSettings({ dither_frames: e.target.value, dither_minutes: e.target.value ? '' : settings.dither_minutes })}
-                className="text-xs text-center"
-              />
-            </div>
-            <div className="flex flex-col gap-1">
-              <span className="text-xs text-slate-400">{t('dither.minutes')}</span>
-              <Input
-                type="number" min="0.1" step="0.5" placeholder="—"
-                value={settings.dither_minutes}
-                onChange={(e) => patchSettings({ dither_minutes: e.target.value, dither_frames: e.target.value ? '' : settings.dither_frames })}
-                className="text-xs text-center"
-              />
-            </div>
+          <div className="flex flex-wrap gap-3">
+            <CountStepper
+              label={t('dither.frames')} steps={DITHER_FRAME_STEPS}
+              value={Number.isFinite(parseInt(settings.dither_frames)) ? parseInt(settings.dither_frames) : 0}
+              onChange={(v) => patchSettings({ dither_frames: v > 0 ? String(v) : '', dither_minutes: v > 0 ? '' : settings.dither_minutes })}
+            />
+            <CountStepper
+              label={t('dither.minutes')} steps={DITHER_MINUTE_STEPS}
+              value={Number.isFinite(parseFloat(settings.dither_minutes)) ? Math.round(parseFloat(settings.dither_minutes)) : 0}
+              onChange={(v) => patchSettings({ dither_minutes: v > 0 ? String(v) : '', dither_frames: v > 0 ? '' : settings.dither_frames })}
+            />
           </div>
         </div>
 
@@ -553,9 +556,16 @@ function FocuserPanel({
   const setFocuserStatus = useStore((s) => s.setFocuserStatus)
   const position = focuserStatuses[deviceId]?.position
 
-  const [target, setTarget] = useState('')
-  const [step, setStep] = useState('100')
+  const moving = focuserStatuses[deviceId]?.is_moving ?? false
+  // Absolute position: follows the focuser until the user types or steps it.
+  const [target, setTarget] = useState<number | null>(null)
+  const [edited, setEdited] = useState(false)
+  const [moveTarget, setMoveTarget] = useState<number | null>(null)
+  const [step, setStep] = useState(100)
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => { if (!edited && position != null) setTarget(position) }, [position, edited])
+  useEffect(() => { if (!moving) setMoveTarget(null) }, [moving])
 
   // Fetch initial position and persisted step on mount
   useEffect(() => {
@@ -563,53 +573,70 @@ function FocuserPanel({
       .then((s) => setFocuserStatus(deviceId, s))
       .catch(() => {})
     api.focuser.getSettings(deviceId)
-      .then((s) => setStep(String(s.step)))
+      .then((s) => setStep(Math.max(1, s.step)))
       .catch(() => {})
   }, [deviceId, setFocuserStatus])
+
+  // Ruler window: kept still while the position stays inside it, re-centred when it leaves.
+  const span = Math.max(500, step * 10)
+  const [centre, setCentre] = useState<number | null>(null)
+  useEffect(() => {
+    if (position == null) return
+    setCentre((c) => (c == null || Math.abs(position - c) > span * 0.8 ? position : c))
+  }, [position, span])
 
   const act = async (fn: () => Promise<unknown>) => {
     setError(null)
     try { await fn() } catch (e) { setError((e as Error).message) }
   }
 
+  const changeStep = (n: number) => {
+    setStep(n)
+    api.focuser.putSettings(deviceId, { step: n }).catch(() => {})
+  }
+
   return (
     <Panel title={t('focuser.title')} deviceId={deviceId} onSettings={onSettings}>
-      <div className="flex flex-col gap-2">
-        <div className="flex items-center gap-2">
-          <span className="text-xs text-slate-400">{t('focuser.position')}</span>
-          <span className="text-sm font-mono text-slate-200">{position ?? '—'}</span>
+      <div className="flex flex-col gap-3">
+        <div className="flex flex-col gap-1">
+          <div className="flex items-baseline gap-2">
+            <span className="text-xs text-slate-400">{t('focuser.position')}</span>
+            <span className="text-sm font-mono text-slate-200">{position ?? '—'}</span>
+          </div>
+          {position != null && centre != null && (
+            <FocuserRuler
+              position={position}
+              target={moveTarget}
+              min={Math.max(0, Math.round(centre - span))}
+              max={Math.round(centre + span)}
+              label={t('focuser.title')}
+            />
+          )}
         </div>
 
-        <div className="flex items-center gap-2">
-          <Button size="icon" variant="outline"
-            onClick={() => act(() => api.focuser.moveBy(deviceId, -parseInt(step)))} title={t('focuser.in')}>
-            <ChevronDown size={14} />
-          </Button>
-          <Input className="w-20 text-center" type="number" min="1" value={step}
-            onChange={(e) => setStep(e.target.value)}
-            onBlur={(e) => {
-              const n = Math.max(1, parseInt(e.target.value) || 1)
-              setStep(String(n))
-              api.focuser.putSettings(deviceId, { step: n }).catch(() => {})
-            }} />
-          <Button size="icon" variant="outline"
-            onClick={() => act(() => api.focuser.moveBy(deviceId, parseInt(step)))} title={t('focuser.out')}>
-            <ChevronUp size={14} />
-          </Button>
-          <span className="text-xs text-slate-500">{t('focuser.steps')}</span>
-        </div>
-
+        <CountStepper label={t('focuser.stepSize')} steps={FOCUSER_STEP_SIZES} min={1} value={step} onChange={changeStep} />
         <div className="flex gap-2">
-          <Input type="number" min="0" placeholder={t('focuser.absolute')}
-            value={target} onChange={(e) => setTarget(e.target.value)} />
-          <Button size="sm"
-            onClick={() => act(() => api.focuser.moveTo(deviceId, parseInt(target)))}
-            disabled={!target}>{t('focuser.go')}</Button>
+          <Button size="sm" variant="outline" className="flex-1" onClick={() => act(() => api.focuser.moveBy(deviceId, -step))}>
+            <ChevronDown size={14} className="mr-1" /> {t('focuser.in')}
+          </Button>
+          <Button size="sm" variant="outline" className="flex-1" onClick={() => act(() => api.focuser.moveBy(deviceId, step))}>
+            <ChevronUp size={14} className="mr-1" /> {t('focuser.out')}
+          </Button>
         </div>
 
-        <Button size="sm" variant="danger" onClick={() => act(() => api.focuser.halt(deviceId))}>
-          <StopCircle size={12} className="mr-1" /> {t('focuser.halt')}
-        </Button>
+        <div className="flex flex-wrap items-end gap-2">
+          <NumberStepper
+            label={t('focuser.absolute')} min={0} step={step} value={target ?? 0} valueClassName="w-20"
+            onChange={(v) => { setTarget(v); setEdited(true) }}
+          />
+          <Button size="sm" disabled={target == null}
+            onClick={() => act(async () => { setMoveTarget(target); setEdited(false); await api.focuser.moveTo(deviceId, target!) })}>
+            {t('focuser.go')}
+          </Button>
+          <Button size="sm" variant="danger" onClick={() => act(() => api.focuser.halt(deviceId))}>
+            <StopCircle size={12} className="mr-1" /> {t('focuser.halt')}
+          </Button>
+        </div>
         {error && <p className="text-xs text-status-error">{error}</p>}
       </div>
     </Panel>
