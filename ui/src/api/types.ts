@@ -112,6 +112,7 @@ export interface UserSettings {
   indi_local_upload_dir: string
   low_memory_mode: boolean
   language: string
+  theme: string
   plugin_settings: Record<string, Record<string, unknown>>
   imager_settings: Record<string, Record<string, unknown>>
 }

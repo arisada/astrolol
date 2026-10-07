@@ -11,6 +11,7 @@ import { api } from '@/api/client'
 import { useStore } from '@/store'
 import { getPluginEntry } from '@/plugin-registry'
 import { setLanguage } from '@/i18n'
+import { setTheme } from '@/theme'
 
 export function App() {
   const setPluginInfos = useStore((s) => s.setPluginInfos)
@@ -24,7 +25,10 @@ export function App() {
 
   useEffect(() => {
     api.settings.get()
-      .then((s) => setLanguage(s.language ?? 'en'))
+      .then((s) => {
+        setLanguage(s.language ?? 'en')
+        setTheme(s.theme ?? 'midnight')
+      })
       .catch(() => {})
   }, [])
 

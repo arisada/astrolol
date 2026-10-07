@@ -186,16 +186,16 @@ export function AltitudeChart({ ephemeris, minAlt }: Props) {
       </defs>
 
       {/* Background: full chart = daytime colour */}
-      <rect x={PAD.left} y={PAD.top} width={CHART_W} height={CHART_H} fill="rgba(251,191,36,0.04)" />
+      <rect x={PAD.left} y={PAD.top} width={CHART_W} height={CHART_H} fill="rgb(var(--c-amber-400) / 0.04)" />
 
       {/* Civil twilight: civil_dusk → civil_dawn */}
-      {band(twilight.civil_dusk, twilight.civil_dawn, 'rgba(30,41,59,0.55)', 'civil')}
+      {band(twilight.civil_dusk, twilight.civil_dawn, 'rgb(var(--c-slate-800) / 0.55)', 'civil')}
 
       {/* Nautical twilight */}
-      {band(twilight.nautical_dusk, twilight.nautical_dawn, 'rgba(15,23,42,0.55)', 'nautical')}
+      {band(twilight.nautical_dusk, twilight.nautical_dawn, 'rgb(var(--c-slate-900) / 0.55)', 'nautical')}
 
       {/* Astronomical night */}
-      {band(twilight.astronomical_dusk, twilight.astronomical_dawn, 'rgba(2,6,23,0.65)', 'astro')}
+      {band(twilight.astronomical_dusk, twilight.astronomical_dawn, 'rgb(var(--c-surface) / 0.65)', 'astro')}
 
       {/* Y-axis grid */}
       {yGridAlts.map((alt) => (
@@ -203,9 +203,9 @@ export function AltitudeChart({ ephemeris, minAlt }: Props) {
           <line
             x1={PAD.left} y1={toY(alt)}
             x2={PAD.left + CHART_W} y2={toY(alt)}
-            stroke="rgba(100,116,139,0.2)" strokeWidth={1}
+            stroke="rgb(var(--c-slate-500) / 0.2)" strokeWidth={1}
           />
-          <text x={PAD.left - 4} y={toY(alt) + 3} fill="rgba(148,163,184,0.55)" fontSize={8} textAnchor="end">{alt}°</text>
+          <text x={PAD.left - 4} y={toY(alt) + 3} fill="rgb(var(--c-slate-400) / 0.55)" fontSize={8} textAnchor="end">{alt}°</text>
         </g>
       ))}
 
@@ -218,20 +218,20 @@ export function AltitudeChart({ ephemeris, minAlt }: Props) {
 
       {/* Horizon line — drawn on top of the grey zone so it's the clear boundary */}
       <line x1={PAD.left} y1={y0} x2={PAD.left + CHART_W} y2={y0}
-        stroke="rgba(148,163,184,0.6)" strokeWidth={1} />
+        stroke="rgb(var(--c-slate-400) / 0.6)" strokeWidth={1} />
 
       {/* Min-altitude dashed line */}
       <line x1={PAD.left} y1={yMin} x2={PAD.left + CHART_W} y2={yMin}
-        stroke="rgba(251,146,60,0.5)" strokeWidth={1} strokeDasharray="4 3" />
+        stroke="rgb(var(--c-orange-400) / 0.5)" strokeWidth={1} strokeDasharray="4 3" />
 
       {/* Moon altitude fill + curve — behind target curve */}
       {visibleMoonPoints.length > 1 && (
         <g clipPath={`url(#${clipId})`}>
-          <polygon points={moonAreaPoints} fill="rgba(148,163,184,0.13)" />
+          <polygon points={moonAreaPoints} fill="rgb(var(--c-slate-400) / 0.13)" />
           <polyline
             points={moonLinePoints}
             fill="none"
-            stroke="rgba(148,163,184,0.38)"
+            stroke="rgb(var(--c-slate-400) / 0.38)"
             strokeWidth={1.5}
             strokeLinejoin="round"
           />
@@ -240,12 +240,12 @@ export function AltitudeChart({ ephemeris, minAlt }: Props) {
 
       {/* Filled area + curve — clipped to chart bounds */}
       <g clipPath={`url(#${clipId})`}>
-        <polygon points={areaPoints} fill="rgba(99,102,241,0.12)" />
+        <polygon points={areaPoints} fill="rgb(var(--c-indigo-500) / 0.12)" />
         {visiblePoints.length > 1 && (
           <polyline
             points={points}
             fill="none"
-            stroke="rgb(99,102,241)"
+            stroke="rgb(var(--c-indigo-500))"
             strokeWidth={2}
             strokeLinejoin="round"
           />
@@ -254,9 +254,9 @@ export function AltitudeChart({ ephemeris, minAlt }: Props) {
 
       {/* Rise / transit / set markers — clipped so labels stay inside */}
       <g clipPath={`url(#${clipId})`}>
-        {vMarker(rise,                domain, 'rgb(74,222,128)',  t('card.rise'),    'rise')}
-        {vMarker(transit ?? peak_time, domain, 'rgb(250,204,21)', t('card.transit'), 'transit')}
-        {vMarker(set,                 domain, 'rgb(248,113,113)', t('card.set'),     'set')}
+        {vMarker(rise,                domain, 'rgb(var(--c-green-400))',  t('card.rise'),    'rise')}
+        {vMarker(transit ?? peak_time, domain, 'rgb(var(--c-yellow-400))', t('card.transit'), 'transit')}
+        {vMarker(set,                 domain, 'rgb(var(--c-red-400))', t('card.set'),     'set')}
       </g>
 
       {/* X-axis ticks */}
@@ -267,14 +267,14 @@ export function AltitudeChart({ ephemeris, minAlt }: Props) {
         return (
           <g key={ms}>
             <line x1={x} y1={PAD.top + CHART_H} x2={x} y2={PAD.top + CHART_H + (midnight ? 5 : 3)}
-              stroke={midnight ? 'rgba(148,163,184,0.55)' : 'rgba(100,116,139,0.4)'} strokeWidth={1} />
+              stroke={midnight ? 'rgb(var(--c-slate-400) / 0.55)' : 'rgb(var(--c-slate-500) / 0.4)'} strokeWidth={1} />
             {showTimeLabel && (
-              <text x={x} y={PAD.top + CHART_H + 12} fill={midnight ? 'rgba(203,213,225,0.7)' : 'rgba(148,163,184,0.55)'} fontSize={8} textAnchor="middle">
+              <text x={x} y={PAD.top + CHART_H + 12} fill={midnight ? 'rgb(var(--c-slate-300) / 0.7)' : 'rgb(var(--c-slate-400) / 0.55)'} fontSize={8} textAnchor="middle">
                 {formatHour(ms)}
               </text>
             )}
             {midnight && (
-              <text x={x} y={PAD.top + CHART_H + 22} fill="rgba(203,213,225,0.55)" fontSize={8} textAnchor="middle">
+              <text x={x} y={PAD.top + CHART_H + 22} fill="rgb(var(--c-slate-300) / 0.55)" fontSize={8} textAnchor="middle">
                 {formatDate(ms, i18n.language)}
               </text>
             )}
@@ -284,7 +284,7 @@ export function AltitudeChart({ ephemeris, minAlt }: Props) {
 
       {/* Chart border */}
       <rect x={PAD.left} y={PAD.top} width={CHART_W} height={CHART_H}
-        fill="none" stroke="rgba(100,116,139,0.2)" strokeWidth={1} />
+        fill="none" stroke="rgb(var(--c-slate-500) / 0.2)" strokeWidth={1} />
     </svg>
   )
 }

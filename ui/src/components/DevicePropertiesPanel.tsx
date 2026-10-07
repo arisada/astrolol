@@ -73,7 +73,7 @@ function SwitchProperty({
           className={[
             'px-2 py-0.5 rounded text-xs border transition-colors',
             w.value
-              ? 'bg-accent border-accent text-white'
+              ? 'bg-accent border-accent text-accent-fg'
               : 'border-surface-border text-slate-400 hover:border-slate-500',
             isReadOnly ? 'cursor-default opacity-60' : 'cursor-pointer',
           ].join(' ')}
@@ -454,7 +454,7 @@ export function DevicePropertiesPanel({ deviceId, onClose }: Props) {
                     onClick={() => setOpenGroup(isOpen ? null : group)}
                     className="w-full flex items-center justify-between px-4 py-2.5 bg-surface hover:bg-surface-overlay transition-colors sticky top-0 z-10"
                   >
-                    <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">
+                    <span className="font-medium text-slate-400 label-caps">
                       {group}
                     </span>
                     <ChevronRight

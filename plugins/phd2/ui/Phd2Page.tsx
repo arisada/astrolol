@@ -128,7 +128,7 @@ function GuideGraph({ points, range, rmsTotal }: {
           return (
             <line key={v}
               x1={MARGIN_L} y1={y} x2={W} y2={y}
-              stroke={isZero ? '#334155' : '#1e293b'}
+              className={isZero ? 'stroke-slate-700' : 'stroke-slate-800'}
               strokeWidth={isZero ? 1 : 0.5}
               strokeDasharray={isZero ? '4 4' : undefined}
             />
@@ -137,7 +137,7 @@ function GuideGraph({ points, range, rmsTotal }: {
 
         {/* Y-axis labels inside the left margin */}
         {gridLines.filter(v => Math.abs(v) > 0.001).map(v => (
-          <text key={v} x={MARGIN_L - 4} y={toY(v) + 3} fontSize="8" fill="#475569" textAnchor="end">
+          <text key={v} x={MARGIN_L - 4} y={toY(v) + 3} fontSize="8" className="fill-slate-600" textAnchor="end">
             {v > 0 ? `+${v}` : `${v}`}
           </text>
         ))}
@@ -146,31 +146,31 @@ function GuideGraph({ points, range, rmsTotal }: {
         {rmsY != null && rmsYNeg != null && (
           <>
             <line x1={MARGIN_L} y1={rmsY} x2={W} y2={rmsY}
-              stroke="#94a3b8" strokeWidth={1} strokeDasharray="4 4" />
+              className="stroke-slate-400" strokeWidth={1} strokeDasharray="4 4" />
             <line x1={MARGIN_L} y1={rmsYNeg} x2={W} y2={rmsYNeg}
-              stroke="#94a3b8" strokeWidth={1} strokeDasharray="4 4" />
-            <text x={W - 2} y={rmsY - 3} fontSize="8" fill="#94a3b8" textAnchor="end">
+              className="stroke-slate-400" strokeWidth={1} strokeDasharray="4 4" />
+            <text x={W - 2} y={rmsY - 3} fontSize="8" className="fill-slate-400" textAnchor="end">
               ±{rmsTotal!.toFixed(2)}&quot;
             </text>
           </>
         )}
 
         {/* RA (blue) and Dec (red) data paths */}
-        <path d={raPath}  fill="none" stroke="#60a5fa" strokeWidth={1.5} />
-        <path d={decPath} fill="none" stroke="#f87171" strokeWidth={1.5} />
+        <path d={raPath}  fill="none" className="stroke-series-1" strokeWidth={1.5} />
+        <path d={decPath} fill="none" className="stroke-series-2" strokeWidth={1.5} />
 
         {/* X-axis temporal labels — keyed by index so DOM nodes are stable */}
         {xTicks.map(({ x, label }, idx) => (
-          <text key={idx} x={x} y={GRAPH_H + 11} fontSize="8" fill="#475569" textAnchor="middle">
+          <text key={idx} x={x} y={GRAPH_H + 11} fontSize="8" className="fill-slate-600" textAnchor="middle">
             {label}
           </text>
         ))}
 
         {/* Legend */}
-        <text x={MARGIN_L + 4}  y={10} fontSize="9" fill="#60a5fa">{t('graph.ra')}</text>
-        <text x={MARGIN_L + 22} y={10} fontSize="9" fill="#f87171">{t('graph.dec')}</text>
+        <text x={MARGIN_L + 4}  y={10} fontSize="9" className="fill-series-1">{t('graph.ra')}</text>
+        <text x={MARGIN_L + 22} y={10} fontSize="9" className="fill-series-2">{t('graph.dec')}</text>
         {rmsY != null && (
-          <text x={MARGIN_L + 44} y={10} fontSize="9" fill="#94a3b8">{t('graph.rms')}</text>
+          <text x={MARGIN_L + 44} y={10} fontSize="9" className="fill-slate-400">{t('graph.rms')}</text>
         )}
       </svg>
     </div>

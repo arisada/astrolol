@@ -173,7 +173,7 @@ function WifiRow({
           <button
             onClick={() => onConnect(password)}
             disabled={connecting || !password}
-            className="px-3 py-1.5 rounded bg-accent hover:bg-accent/80 text-white text-xs font-medium disabled:opacity-50 transition-colors"
+            className="px-3 py-1.5 rounded bg-accent hover:bg-accent/80 text-accent-fg text-xs font-medium disabled:opacity-50 transition-colors"
           >
             {connecting ? '…' : t('connect')}
           </button>
@@ -194,7 +194,7 @@ function Section({ title, icon: Icon, children }: {
     <div className="rounded-xl border border-surface-border bg-surface-raised overflow-hidden">
       <div className="flex items-center gap-2 px-4 py-3 border-b border-surface-border">
         <Icon size={14} className="text-slate-400" />
-        <h2 className="text-xs font-medium text-slate-400 uppercase tracking-wider">{title}</h2>
+        <h2 className="font-medium text-slate-400 label-caps">{title}</h2>
       </div>
       <div className="p-4">{children}</div>
     </div>
@@ -834,7 +834,7 @@ export function SystemPage() {
             <div className="flex gap-2 pt-1">
               {editingSettings ? (
                 <>
-                  <button onClick={handleSaveSettings} className="px-3 py-1.5 rounded bg-accent hover:bg-accent/80 text-white text-xs font-medium transition-colors">{t('hotspot.save')}</button>
+                  <button onClick={handleSaveSettings} className="px-3 py-1.5 rounded bg-accent hover:bg-accent/80 text-accent-fg text-xs font-medium transition-colors">{t('hotspot.save')}</button>
                   <button onClick={() => { setDraftSettings(settings); setEditingSettings(false) }} className="px-3 py-1.5 rounded bg-surface-overlay hover:bg-surface-border text-slate-300 text-xs font-medium transition-colors">{t('hotspot.cancel')}</button>
                 </>
               ) : (
@@ -872,7 +872,7 @@ export function SystemPage() {
                   <button
                     onClick={handleSaveHostname}
                     disabled={savingHostname || !draftHostname}
-                    className="px-3 py-1.5 rounded bg-accent hover:bg-accent/80 text-white text-xs font-medium disabled:opacity-50 transition-colors"
+                    className="px-3 py-1.5 rounded bg-accent hover:bg-accent/80 text-accent-fg text-xs font-medium disabled:opacity-50 transition-colors"
                   >
                     {savingHostname ? t('hostname.saving') : t('hotspot.save')}
                   </button>
@@ -925,7 +925,7 @@ export function SystemPage() {
               <button
                 onClick={handleSaveTimezone}
                 disabled={savingTz || selectedTz === timeInfo.timezone}
-                className="px-3 py-1.5 rounded bg-accent hover:bg-accent/80 text-white text-xs font-medium disabled:opacity-50 transition-colors"
+                className="px-3 py-1.5 rounded bg-accent hover:bg-accent/80 text-accent-fg text-xs font-medium disabled:opacity-50 transition-colors"
               >
                 {savingTz ? t('time.saving') : t('time.apply')}
               </button>

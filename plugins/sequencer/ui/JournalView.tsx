@@ -7,21 +7,21 @@ import type { SequencerSessionSummary } from '@/api/types'
 import { getSessionRecords, getSessions, sessionExportUrl, type JournalRecord } from './api'
 import { activityLabel, fmtSeconds } from './format'
 
-// Activities folded into six groups (categorical slots 1–5 of the reference palette,
-// validated on the app's dark surface; "other" is neutral).
+// Activities folded into six groups (categorical colours cat-1…cat-5 of the active palette;
+// "other" is neutral).
 const GROUPS = [
-  { key: 'imaging', color: '#3987e5', activities: ['exposing'] },
+  { key: 'imaging', color: 'rgb(var(--c-cat-1))', activities: ['exposing'] },
   {
-    key: 'setup', color: '#d95926',
+    key: 'setup', color: 'rgb(var(--c-cat-2))',
     activities: ['slewing', 'centering', 'unparking', 'parking', 'meridian_flip', 'changing_filter'],
   },
   {
-    key: 'guiding', color: '#199e70',
+    key: 'guiding', color: 'rgb(var(--c-cat-3))',
     activities: ['starting_guiding', 'dithering', 'waiting_for_guiding'],
   },
-  { key: 'focusing', color: '#c98500', activities: ['focusing'] },
-  { key: 'paused', color: '#d55181', activities: ['paused'] },
-  { key: 'other', color: '#64748b', activities: [] as string[] },
+  { key: 'focusing', color: 'rgb(var(--c-cat-4))', activities: ['focusing'] },
+  { key: 'paused', color: 'rgb(var(--c-cat-5))', activities: ['paused'] },
+  { key: 'other', color: 'rgb(var(--c-cat-6))', activities: [] as string[] },
 ] as const
 
 function groupOf(activity: string) {
@@ -148,7 +148,7 @@ function SessionDetail({ summary }: { summary: SequencerSessionSummary }) {
 
       {grouped.length > 0 && (
         <section>
-          <h3 className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">{t('journal.where')}</h3>
+          <h3 className="font-medium text-slate-500 label-caps mb-2">{t('journal.where')}</h3>
           <div className="flex h-4 w-full gap-[2px] rounded overflow-hidden" role="img"
             aria-label={grouped.map((g) => `${t(`journal.groups.${g.key}`)} ${Math.round((100 * g.seconds) / total)}%`).join(', ')}>
             {grouped.map((g) => (
@@ -173,7 +173,7 @@ function SessionDetail({ summary }: { summary: SequencerSessionSummary }) {
 
       {summary.integration.length > 0 && (
         <section>
-          <h3 className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">{t('journal.captured')}</h3>
+          <h3 className="font-medium text-slate-500 label-caps mb-2">{t('journal.captured')}</h3>
           <table className="w-full text-xs">
             <thead className="text-slate-500 text-left">
               <tr>
@@ -200,7 +200,7 @@ function SessionDetail({ summary }: { summary: SequencerSessionSummary }) {
 
       {notable.length > 0 && (
         <section>
-          <h3 className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">{t('journal.events')}</h3>
+          <h3 className="font-medium text-slate-500 label-caps mb-2">{t('journal.events')}</h3>
           <ul className="text-xs flex flex-col gap-1">
             {notable.map((r, i) => (
               <li key={i} className="flex gap-3">
@@ -214,7 +214,7 @@ function SessionDetail({ summary }: { summary: SequencerSessionSummary }) {
 
       {frames.length > 0 && (
         <section>
-          <h3 className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">{t('journal.framesTitle')}</h3>
+          <h3 className="font-medium text-slate-500 label-caps mb-2">{t('journal.framesTitle')}</h3>
           <div className="max-h-72 overflow-y-auto">
             <table className="w-full text-xs">
               <thead className="text-slate-500 text-left sticky top-0 bg-surface">

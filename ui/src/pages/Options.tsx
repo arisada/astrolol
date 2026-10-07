@@ -6,6 +6,7 @@ import { useStore } from '@/store'
 import { ToggleSwitch } from '@/components/ui/toggle-switch'
 import { Input } from '@/components/ui/input'
 import { SUPPORTED_LANGUAGES, setLanguage } from '@/i18n'
+import { THEMES, setTheme } from '@/theme'
 
 interface IndiSettings {
   manageServer: boolean
@@ -16,7 +17,7 @@ interface IndiSettings {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <div className="mb-8">
-      <h2 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-3">
+      <h2 className="label-caps font-semibold text-slate-400 mb-3">
         {title}
       </h2>
       <div className="bg-surface-raised rounded-lg p-4 space-y-4">
@@ -93,6 +94,7 @@ export function Options() {
 
   // Low memory mode
   const [lowMemoryMode, setLowMemoryMode] = useState(false)
+  const [themeId, setThemeId] = useState<string>(document.documentElement.dataset.theme ?? 'midnight')
 
   // Stop INDI status
   const [indiStopStatus, setIndiStopStatus] = useState<'idle' | 'stopping' | 'stopped' | 'error'>('idle')
@@ -113,6 +115,7 @@ export function Options() {
         setIndiLocalUpload(s.indi_local_upload ?? false)
         setIndiLocalUploadDir(s.indi_local_upload_dir ?? '/tmp/astrolol_upload')
         setLowMemoryMode(s.low_memory_mode ?? false)
+        setThemeId(s.theme ?? 'midnight')
       })
       .catch(() => { /* backend may not be running */ })
   }, [])
@@ -143,6 +146,20 @@ export function Options() {
     try {
       const current = await api.settings.get()
       await api.settings.put({ ...current, language: code })
+      setSaveStatus('saved')
+      setTimeout(() => setSaveStatus('idle'), 2000)
+    } catch {
+      setSaveStatus('error')
+    }
+  }
+
+  const persistTheme = async (id: string) => {
+    setTheme(id)
+    setThemeId(id)
+    setSaveStatus('saving')
+    try {
+      const current = await api.settings.get()
+      await api.settings.put({ ...current, theme: id })
       setSaveStatus('saved')
       setTimeout(() => setSaveStatus('idle'), 2000)
     } catch {
@@ -241,6 +258,21 @@ export function Options() {
           >
             {SUPPORTED_LANGUAGES.map((l) => (
               <option key={l.code} value={l.code}>{l.label}</option>
+            ))}
+          </select>
+        </Row>
+      </Section>
+
+      <Section title={t('palette.title')}>
+        <Row label={t('palette.label')}>
+          <select
+            value={themeId}
+            onChange={(e) => persistTheme(e.target.value)}
+            aria-label={t('palette.label')}
+            className="bg-surface border border-surface-border rounded px-3 py-1.5 text-sm text-slate-200 focus:outline-none focus:ring-1 focus:ring-accent"
+          >
+            {THEMES.map((th) => (
+              <option key={th.id} value={th.id}>{t(`palette.names.${th.id}`)}</option>
             ))}
           </select>
         </Row>
@@ -421,7 +453,7 @@ export function Options() {
                 <button
                   type="button"
                   onClick={restartNow}
-                  className="text-xs px-2 py-1 rounded bg-accent text-white hover:bg-accent/80 transition-colors"
+                  className="text-xs px-2 py-1 rounded bg-accent text-accent-fg hover:bg-accent/80 transition-colors"
                 >
                   {t('plugins.restartNow')}
                 </button>

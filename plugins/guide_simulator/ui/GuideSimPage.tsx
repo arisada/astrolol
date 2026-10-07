@@ -157,7 +157,7 @@ export function GuideSimPage() {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section>
-      <h2 className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">{title}</h2>
+      <h2 className="font-medium text-slate-500 label-caps mb-2">{title}</h2>
       {children}
     </section>
   )

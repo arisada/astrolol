@@ -23,7 +23,7 @@ function Section({ label, children, defaultOpen = false }: { label: string; chil
     <div className="border-b border-surface-border">
       <button
         onClick={() => setOpen((o) => !o)}
-        className="w-full flex items-center justify-between px-3 py-2 text-xs font-medium text-slate-400 uppercase tracking-wider hover:text-slate-300"
+        className="w-full flex items-center justify-between px-3 py-2 font-medium text-slate-400 label-caps hover:text-slate-300"
       >
         {label}
         {open ? <ChevronUp size={12} /> : <ChevronDown size={12} />}

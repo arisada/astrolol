@@ -88,7 +88,7 @@ function ResultPanel({ job }: { job: SolveJob }) {
 
   return (
     <div className="mx-4 mb-3 rounded-lg border border-green-500/30 bg-green-500/5 p-3">
-      <div className="text-xs font-medium text-green-400 uppercase tracking-wider mb-2">{t('result.solved')}</div>
+      <div className="font-medium text-green-400 label-caps mb-2">{t('result.solved')}</div>
       <div className="grid grid-cols-1 gap-y-1 text-xs">
         <div><span className="text-slate-500">{t('result.ra')}</span>
           <span className="ml-2 font-mono text-slate-200">{fmtRA(result.ra / 15)}</span></div>
@@ -106,7 +106,7 @@ function ResultPanel({ job }: { job: SolveJob }) {
       {totalArcsec != null && deltaRaArcsec != null && deltaDecArcsec != null && (
         <>
           <div className="mt-2 mb-1 border-t border-green-500/20" />
-          <div className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-1">{t('result.offset')}</div>
+          <div className="font-medium text-slate-500 label-caps mb-1">{t('result.offset')}</div>
           <div className="grid grid-cols-1 gap-y-1 text-xs">
             <div><span className="text-slate-500">{t('result.dRa')}</span>
               <span className="ml-2 font-mono text-slate-300">{fmtOffset(deltaRaArcsec)}</span></div>
@@ -136,7 +136,7 @@ function JobRow({ job, onCancel }: { job: SolveJob; onCancel: (id: string) => vo
       <div className="flex-1 min-w-0">
         <div className="text-xs text-slate-300 truncate font-mono">{filename}</div>
         {job.status === 'completed' && job.result && (
-          <div className="text-xs text-slate-500 mt-0.5">
+          <div className="text-xs font-mono text-slate-500 mt-0.5">
             {fmtRA(job.result.ra / 15)} {fmtDec(job.result.dec)}
             {' · '}{(job.result.duration_ms / 1000).toFixed(1)}s
           </div>
@@ -208,7 +208,7 @@ function SettingsPanel({ settings, onChange }: { settings: PlatesolveSettings; o
 
   return (
     <div className="border-b border-surface-border p-4 flex flex-col gap-3">
-      <h3 className="text-xs font-medium text-slate-500 uppercase tracking-wider">{t('settings.title')}</h3>
+      <h3 className="font-medium text-slate-500 label-caps">{t('settings.title')}</h3>
       <div className="flex flex-col gap-1">
         <span className="text-xs text-slate-400">{t('settings.bin')}</span>
         {inp(local.astap_bin, (v) => setLocal({ ...local, astap_bin: v }))}

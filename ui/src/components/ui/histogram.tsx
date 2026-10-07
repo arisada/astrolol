@@ -84,7 +84,7 @@ export function HistogramOverlay({
   // Colour curves only differ when unlinked (and never in linear mode).
   const curves = channels && !linked && !linear
     ? series.map((s) => ({ points: curvePoints(s.stretch), stroke: `rgba(${s.rgb},0.9)`, low: s.stretch.low }))
-    : [{ points: curvePoints(series[0].stretch), stroke: 'rgba(251,191,36,0.85)', low: series[0].stretch.low }]
+    : [{ points: curvePoints(series[0].stretch), stroke: 'rgb(var(--c-amber-400) / 0.85)', low: series[0].stretch.low }]
 
   const sat = stats.saturated_pct
   return (
@@ -111,16 +111,16 @@ export function HistogramOverlay({
         {!linear && curves.map((c, i) => (
           <line
             key={`bp-${i}`} x1={toX(c.low)} y1={0} x2={toX(c.low)} y2={H}
-            stroke={curves.length > 1 ? c.stroke : 'rgba(96,165,250,0.8)'} strokeWidth={1}
+            stroke={curves.length > 1 ? c.stroke : 'rgb(var(--c-series-1) / 0.8)'} strokeWidth={1}
           />
         ))}
         {/* Box so the frame's ADU range (full sensor scale, not this shot's own min/max)
             reads clearly — a spike hard against the right edge means real clipping. */}
-        <rect x={0.5} y={0.5} width={W - 1} height={H - 1} fill="none" stroke="rgba(148,163,184,0.5)" strokeWidth={1} />
-        <text x={0} y={H + PAD - 1} fontSize={9} fill="rgba(148,163,184,0.9)" textAnchor="start">
+        <rect x={0.5} y={0.5} width={W - 1} height={H - 1} fill="none" stroke="rgb(var(--c-slate-400) / 0.5)" strokeWidth={1} />
+        <text x={0} y={H + PAD - 1} fontSize={9} fill="rgb(var(--c-slate-400) / 0.9)" textAnchor="start">
           {Math.round(hist_min)}
         </text>
-        <text x={W} y={H + PAD - 1} fontSize={9} fill="rgba(148,163,184,0.9)" textAnchor="end">
+        <text x={W} y={H + PAD - 1} fontSize={9} fill="rgb(var(--c-slate-400) / 0.9)" textAnchor="end">
           {Math.round(hist_max)}
         </text>
       </svg>

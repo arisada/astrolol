@@ -20,7 +20,7 @@ function ErrorToast() {
                     rounded-lg shadow-lg px-4 py-3 max-w-lg w-full mx-4">
       <span className="text-status-error shrink-0 mt-0.5">✕</span>
       <div className="flex-1 min-w-0">
-        <p className="text-xs font-semibold text-status-error uppercase tracking-wide mb-0.5">
+        <p className="font-semibold text-status-error label-caps mb-0.5">
           {lastError.eventType.replace('.', ' ')}
         </p>
         <p className="text-sm text-slate-300 break-words">{lastError.message}</p>

@@ -111,7 +111,7 @@ export function SequencesDialog({ queueSize, hasCompleted, onClose }: {
 
         <div className="flex-1 overflow-y-auto px-5 py-4 flex flex-col gap-6">
           <section>
-            <h3 className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">{t('sequences.saveTitle')}</h3>
+            <h3 className="font-medium text-slate-500 label-caps mb-2">{t('sequences.saveTitle')}</h3>
             <p className="text-xs text-slate-500 mb-2">
               {t('sequences.saveHint')}
             </p>
@@ -133,7 +133,7 @@ export function SequencesDialog({ queueSize, hasCompleted, onClose }: {
           </section>
 
           <section>
-            <h3 className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">{t('sequences.library')}</h3>
+            <h3 className="font-medium text-slate-500 label-caps mb-2">{t('sequences.library')}</h3>
             {library === null ? <p className="text-xs text-slate-500">{t('sequences.loading')}</p>
               : library.length === 0 ? <p className="text-xs text-slate-500">{t('sequences.none')}</p>
               : (
@@ -166,7 +166,7 @@ export function SequencesDialog({ queueSize, hasCompleted, onClose }: {
           </section>
 
           <section>
-            <h3 className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">{t('sequences.files')}</h3>
+            <h3 className="font-medium text-slate-500 label-caps mb-2">{t('sequences.files')}</h3>
             <div className="flex gap-2 flex-wrap">
               <a href={queueSize ? seq.exportUrl() : undefined} download
                 className={`inline-flex items-center gap-1 px-2 py-1 text-xs rounded border border-surface-border

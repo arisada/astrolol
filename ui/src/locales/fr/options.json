@@ -19,6 +19,21 @@
     "title": "Langue",
     "label": "Langue de l'interface"
   },
+  "palette": {
+    "title": "Palette",
+    "label": "Palette de couleurs",
+    "names": {
+      "midnight": "Minuit",
+      "atlas": "Atlas",
+      "graphite": "Graphite",
+      "void": "Vide",
+      "nebula": "Nébuleuse",
+      "mono": "Mono",
+      "ember": "Braise",
+      "night": "Rouge nuit",
+      "crimson": "Cramoisi nuit"
+    }
+  },
   "saving": {
     "title": "Enregistrement des images",
     "dir": "Dossier d'enregistrement",

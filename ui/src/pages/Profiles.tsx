@@ -307,7 +307,7 @@ function ProfileTreeEditor({
   return (
     <div>
       <div className="flex items-center justify-between mb-2">
-        <p className="text-slate-500 uppercase tracking-wider text-[10px] font-medium">{t('tree.title')}</p>
+        <p className="text-slate-500 label-caps font-medium">{t('tree.title')}</p>
         {saving && <span className="text-[10px] text-slate-600">{t('tree.saving')}</span>}
       </div>
 

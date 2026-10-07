@@ -675,7 +675,7 @@ function ConfigureStep({
           {Object.entries(groups).map(([group, props]) => (
             <div key={group}>
               {group && (
-                <p className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">
+                <p className="font-medium text-slate-500 label-caps mb-2">
                   {group}
                 </p>
               )}
@@ -963,7 +963,7 @@ function ItemForm({
       onSubmit={handleSubmit}
       className="bg-surface-raised border border-surface-border rounded p-4 flex flex-col gap-4"
     >
-      <div className="flex items-center gap-2 text-xs font-medium text-slate-400 uppercase tracking-wider">
+      <div className="flex items-center gap-2 font-medium text-slate-400 label-caps">
         <ItemTypeIcon type={type} size={13} />
         {t(`itemType.${type}`)}
       </div>
@@ -1254,7 +1254,7 @@ function InventorySection({ importItem, onImportDone }: {
         if (!group?.length) return null
         return (
           <div key={type}>
-            <h3 className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2 flex items-center gap-1.5">
+            <h3 className="font-medium text-slate-500 label-caps mb-2 flex items-center gap-1.5">
               <ItemTypeIcon type={type} size={11} />
               {t(`itemType.${type}`)}
             </h3>
@@ -1607,7 +1607,7 @@ export function Equipment() {
 
       {/* Connected devices */}
       <section className="mb-8">
-        <h2 className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-3">
+        <h2 className="font-medium text-slate-500 label-caps mb-3">
           {t('connected')}
         </h2>
         {connectedDevices.length === 0 ? (
@@ -1658,7 +1658,7 @@ export function Equipment() {
 
       {/* Connect wizard */}
       <section>
-        <h2 className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-3">
+        <h2 className="font-medium text-slate-500 label-caps mb-3">
           {t('loadDriver')}
         </h2>
         <div className="bg-surface-raised border border-surface-border rounded p-4">

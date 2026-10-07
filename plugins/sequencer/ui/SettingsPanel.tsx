@@ -84,7 +84,7 @@ export function SettingsPanel() {
     <div className="flex flex-col gap-5 max-w-xl">
       {GROUPS.map((g) => (
         <section key={g.id}>
-          <h3 className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">{t(`settings.groups.${g.id}`)}</h3>
+          <h3 className="font-medium text-slate-500 label-caps mb-2">{t(`settings.groups.${g.id}`)}</h3>
           {g.bools?.map((key) => (
             <div key={key} className="flex items-center gap-3 py-1">
               <ToggleSwitch label={t(`settings.fields.${key}.label`)} checked={settings[key]}

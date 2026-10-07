@@ -192,6 +192,18 @@ Tailwind design tokens are defined in `ui/tailwind.config.js`. Use only tokens d
 undefined tokens silently render as transparent without any build error.
 Valid surface tokens: `bg-surface` · `bg-surface-raised` · `bg-surface-overlay` · `bg-surface-border`.
 
+**Colours are palette-driven.** The palette is a user setting (Options → Palette, `UserSettings.theme`).
+Every Tailwind colour is a CSS variable defined in `ui/src/themes.css`, which is *generated* by
+`ui/scripts/gen-themes.mjs` (`npm run gen:themes`) — edit the script, never the CSS. The stock names
+(`slate`, `sky`, `emerald`, `amber`, `rose`, `red`, `violet`, …; shades 100–900 only) are redirected to the
+active palette, so the chip recipes below keep working. Rules:
+- Never hard-code a hex/rgb colour in TSX. In SVG use classes (`stroke-slate-700`, `fill-surface`,
+  `stroke-series-1`) or `rgb(var(--c-slate-400) / 0.5)`.
+- Two chart series that stay distinguishable in every palette: `series-1` / `series-2`. Six categorical
+  colours: `cat-1` … `cat-6`.
+- Text on an accent background is `text-accent-fg`, not `text-white`.
+- Never convey state by colour alone — the red night palettes make hues indistinguishable.
+
 ### Status-bar chips
 
 If a plugin has activity worth surfacing globally (an ongoing run, a background task), export a

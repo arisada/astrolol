@@ -161,18 +161,18 @@ function UCurveChart({
 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} className="block">
-      <rect x={pad.l} y={pad.t} width={cw} height={ch} fill="#0f1623" stroke="#1e293b" strokeWidth={0.5} />
+      <rect x={pad.l} y={pad.t} width={cw} height={ch} className="fill-surface stroke-slate-800" strokeWidth={0.5} />
 
       {yLabels.map((fwhm, i) => (
         <g key={i}>
-          <line x1={pad.l} y1={toY(fwhm)} x2={pad.l + cw} y2={toY(fwhm)} stroke="#1e293b" strokeWidth={0.5} />
-          <text x={pad.l - 3} y={toY(fwhm) + 3} textAnchor="end" fill="#475569" fontSize={7}>
+          <line x1={pad.l} y1={toY(fwhm)} x2={pad.l + cw} y2={toY(fwhm)} className="stroke-slate-800" strokeWidth={0.5} />
+          <text x={pad.l - 3} y={toY(fwhm) + 3} textAnchor="end" className="fill-slate-600" fontSize={7}>
             {fwhm === 0 ? '0' : fwhm.toFixed(1)}
           </text>
         </g>
       ))}
 
-      <text x={7} y={pad.t + ch / 2} textAnchor="middle" fill="#475569" fontSize={7}
+      <text x={7} y={pad.t + ch / 2} textAnchor="middle" className="fill-slate-600" fontSize={7}
         transform={`rotate(-90 7 ${pad.t + ch / 2})`}>{metric === 'hfd' ? t('hfdAxis') : t('fwhmAxis')}</text>
 
       {Array.from({ length: Math.min(5, positions.length) }, (_, i) => {
@@ -181,24 +181,24 @@ function UCurveChart({
           : Math.round(minX + (i / (Math.min(5, positions.length) - 1 || 1)) * rangeX)
         return (
           <g key={i}>
-            <line x1={toX(pos)} y1={pad.t + ch} x2={toX(pos)} y2={pad.t + ch + 3} stroke="#334155" strokeWidth={0.5} />
-            <text x={toX(pos)} y={H - 4} textAnchor="middle" fill="#475569" fontSize={6.5}>{pos}</text>
+            <line x1={toX(pos)} y1={pad.t + ch} x2={toX(pos)} y2={pad.t + ch + 3} className="stroke-slate-700" strokeWidth={0.5} />
+            <text x={toX(pos)} y={H - 4} textAnchor="middle" className="fill-slate-600" fontSize={6.5}>{pos}</text>
           </g>
         )
       })}
 
       {curvePath && (
-        <path d={curvePath} stroke="#f87171" fill="none" strokeWidth={1.5} strokeLinejoin="round" />
+        <path d={curvePath} className="stroke-series-2" fill="none" strokeWidth={1.5} strokeLinejoin="round" />
       )}
 
       {showOptimal && (
         <line x1={toX(optimal!)} y1={pad.t} x2={toX(optimal!)} y2={pad.t + ch}
-          stroke="#4ade80" strokeWidth={1} strokeDasharray="3,2" />
+          className="stroke-green-400" strokeWidth={1} strokeDasharray="3,2" />
       )}
 
       {dataPoints.filter((dp) => dp.fwhm > 0).map((dp, i) => (
         <circle key={i} cx={toX(dp.position)} cy={toY(dp.fwhm)}
-          r={3} fill="#60a5fa" stroke="#1d4ed8" strokeWidth={0.5} />
+          r={3} className="fill-series-1 stroke-sky-700" strokeWidth={0.5} />
       ))}
     </svg>
   )
@@ -432,7 +432,7 @@ export function AutofocusPage() {
                 title={t('stepTitle', { step: dp.step, position: dp.position, metric: (run.config.metric ?? 'fwhm').toUpperCase(), value: dp.fwhm.toFixed(2) })}
                 className={`flex-none text-[10px] px-1.5 py-0.5 rounded transition-colors ${
                   (previewStep ?? run.current_step) === dp.step
-                    ? 'bg-accent text-white'
+                    ? 'bg-accent text-accent-fg'
                     : 'bg-white/10 text-slate-300 hover:bg-white/20'
                 }`}
               >

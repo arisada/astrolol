@@ -45,7 +45,7 @@ export function TargetSummary({ target }: { target: SequencerTargetRef | null })
   return (
     <div className="flex items-center gap-2 min-w-0">
       <span className="text-sm font-medium text-slate-100 truncate">{target.name}</span>
-      <span className="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-surface-overlay text-slate-400 shrink-0">
+      <span className="label-caps px-1.5 py-0.5 rounded bg-surface-overlay text-slate-400 shrink-0">
         {t(`picker.kind.${target.kind}`)}
       </span>
       {target.ra != null && target.dec != null && (

@@ -493,7 +493,7 @@ function CameraPanel({
         <div className="border-t border-surface-border pt-2 flex flex-col gap-2">
           <div className="flex items-center gap-1.5">
             <Crosshair size={12} className="text-slate-500" />
-            <span className="text-xs text-slate-500 uppercase tracking-wider">{t('dither.title')}</span>
+            <span className="text-slate-500 label-caps">{t('dither.title')}</span>
           </div>
           <div className="grid grid-cols-2 gap-2">
             <div className="flex flex-col gap-1">

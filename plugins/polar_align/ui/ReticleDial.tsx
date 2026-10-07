@@ -26,9 +26,9 @@ export function ReticleDial({ state }: { state: ReticleState | null }) {
     <div className="flex flex-col items-center gap-2">
       <svg viewBox={`0 0 ${SIZE} ${SIZE}`} width={SIZE} height={SIZE} className="block">
         {/* Bezel */}
-        <circle cx={C} cy={C} r={C - 2} fill="#0f1623" stroke="#1e293b" strokeWidth={1} />
+        <circle cx={C} cy={C} r={C - 2} className="fill-surface stroke-slate-800" strokeWidth={1} />
         {/* Engraved circle Polaris should trace */}
-        <circle cx={C} cy={C} r={R} fill="none" stroke="#334155" strokeWidth={1} strokeDasharray="2,3" />
+        <circle cx={C} cy={C} r={R} fill="none" className="stroke-slate-700" strokeWidth={1} strokeDasharray="2,3" />
         {/* Clock ticks every 30deg, larger every 90deg */}
         {Array.from({ length: 12 }, (_, i) => {
           const deg = i * 30
@@ -37,15 +37,15 @@ export function ReticleDial({ state }: { state: ReticleState | null }) {
           const outer = clockToXY(deg, R + (major ? 4 : 2), C, C)
           return (
             <line key={i} x1={inner.x} y1={inner.y} x2={outer.x} y2={outer.y}
-              stroke={major ? '#475569' : '#334155'} strokeWidth={major ? 1.2 : 0.8} />
+              className={major ? 'stroke-slate-600' : 'stroke-slate-700'} strokeWidth={major ? 1.2 : 0.8} />
           )
         })}
         {/* True pole: dead centre */}
-        <line x1={C - 5} y1={C} x2={C + 5} y2={C} stroke="#64748b" strokeWidth={0.8} />
-        <line x1={C} y1={C - 5} x2={C} y2={C + 5} stroke="#64748b" strokeWidth={0.8} />
+        <line x1={C - 5} y1={C} x2={C + 5} y2={C} className="stroke-slate-500" strokeWidth={0.8} />
+        <line x1={C} y1={C - 5} x2={C} y2={C + 5} className="stroke-slate-500" strokeWidth={0.8} />
 
         {dot && (
-          <circle cx={dot.x} cy={dot.y} r={5} fill="#fbbf24" stroke="#0f1623" strokeWidth={1.5} />
+          <circle cx={dot.x} cy={dot.y} r={5} className="fill-amber-400 stroke-surface" strokeWidth={1.5} />
         )}
       </svg>
 

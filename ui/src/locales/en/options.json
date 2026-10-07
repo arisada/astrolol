@@ -19,6 +19,21 @@
     "title": "Language",
     "label": "Interface language"
   },
+  "palette": {
+    "title": "Palette",
+    "label": "Colour palette",
+    "names": {
+      "midnight": "Midnight",
+      "atlas": "Atlas",
+      "graphite": "Graphite",
+      "void": "Void",
+      "nebula": "Nebula",
+      "mono": "Mono",
+      "ember": "Ember",
+      "night": "Night red",
+      "crimson": "Night crimson"
+    }
+  },
   "saving": {
     "title": "Image Saving",
     "dir": "Save directory",

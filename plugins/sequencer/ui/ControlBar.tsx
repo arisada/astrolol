@@ -79,7 +79,7 @@ export function ControlBar({
   return (
     <section className="rounded-lg border border-surface-border bg-surface-raised p-4 flex flex-col gap-3">
       <div className="flex items-center gap-3 flex-wrap">
-        <span className={`text-xs font-medium uppercase tracking-wide px-2 py-0.5 rounded ${STATE_STYLE[rs]}`}>{t(`runState.${rs}`)}</span>
+        <span className={`font-medium label-caps px-2 py-0.5 rounded ${STATE_STYLE[rs]}`}>{t(`runState.${rs}`)}</span>
         <span className="text-sm text-slate-200 truncate">
           {status.message ?? (status.activity ? activityLabel(status.activity) : rs === 'idle' ? '' : '…')}
         </span>

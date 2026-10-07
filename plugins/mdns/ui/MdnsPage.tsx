@@ -152,7 +152,7 @@ export function MdnsPage() {
         <button
           onClick={handleSave}
           disabled={saving || !settings}
-          className="px-3 py-1.5 rounded bg-accent hover:bg-accent/80 text-white text-xs font-medium disabled:opacity-50 transition-colors"
+          className="px-3 py-1.5 rounded bg-accent hover:bg-accent/80 text-accent-fg text-xs font-medium disabled:opacity-50 transition-colors"
         >
           {saving ? t('saving') : t('save')}
         </button>

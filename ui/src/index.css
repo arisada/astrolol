@@ -1,11 +1,14 @@
+@import './themes.css';
+@import './fonts.css';
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
 /* Force dark background; prevent any flash of white */
 html, body, #root {
-  background-color: #0f1117;
-  color: #e2e8f0;
+  background-color: rgb(var(--c-surface));
+  color: rgb(var(--c-slate-200));
   height: 100%;
 }
 
@@ -20,5 +23,19 @@ body {
 /* Scrollbar styling */
 * {
   scrollbar-width: thin;
-  scrollbar-color: #2e3347 transparent;
+  scrollbar-color: rgb(var(--c-surface-border)) transparent;
+}
+
+/* Digits line up in columns everywhere; readouts additionally use the mono face (font-mono). */
+body {
+  font-variant-numeric: tabular-nums;
+}
+
+@layer components {
+  /* Section labels and small captions. */
+  .label-caps {
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    font-size: 0.65625rem; /* 10.5px */
+  }
 }

@@ -34,6 +34,7 @@ class UserSettings(BaseModel):
     indi_local_upload_dir: str = "/tmp/astrolol_upload"
     low_memory_mode: bool = False
     language: str = "en"                      # UI language (BCP-47 code, e.g. "en", "fr")
+    theme: str = Field(default="midnight", pattern=r"^[a-z0-9_-]{1,32}$")  # UI palette id (ui/scripts/gen-themes.mjs)
     plugin_settings: dict[str, dict] = {}     # opaque per-plugin settings, keyed by plugin id
     imager_settings: dict[str, dict] = {}     # per-device imager settings, keyed by device_id
     mount_settings: dict[str, dict] = {}      # per-device mount settings, keyed by device_id

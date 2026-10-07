@@ -488,7 +488,7 @@ function EfficiencyNote({ estimate, primaryInterval }: {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="flex flex-col">
-      <h3 className="text-xs font-medium text-slate-500 uppercase tracking-wider mb-2">{title}</h3>
+      <h3 className="font-medium text-slate-500 label-caps mb-2">{title}</h3>
       {children}
     </section>
   )
