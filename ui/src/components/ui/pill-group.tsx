@@ -15,7 +15,7 @@ export function PillGroup<T extends string | number>({
 }) {
   return (
     <div className="flex flex-col gap-1">
-      {label && <span className="text-xs text-slate-400">{label}</span>}
+      {label && <span className="label-caps text-slate-400">{label}</span>}
       <div className="flex max-w-full overflow-x-auto border border-surface-border rounded-lg bg-surface">
         {options.map((o) => (
           <button

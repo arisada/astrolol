@@ -339,6 +339,12 @@ Plugin scopes are collected at startup and exposed via `GET /admin/log_scopes`;
 
 Current count: **637 unit tests**, **37 integration tests**, **964 plugin tests** (all passing).
 
+### UI unit tests
+
+Pure UI logic (formatting, coordinate arithmetic, …) lives in plain `.ts` modules and is tested with
+vitest: `cd ui && npm run test`. Put tests next to the module (`src/utils/dms.test.ts`). Keep logic
+that needs testing out of components. There is no DOM test environment.
+
 ### TypeScript type checking
 
 `ui/tsconfig.json` covers both `src/` and `plugins/**/*.tsx` — all plugin UI files are

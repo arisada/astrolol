@@ -1,7 +1,6 @@
 import { useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ChevronDown, ChevronUp } from 'lucide-react'
-import { Button } from './button'
+import { StepperShell, stepperValueClass } from './stepper-shell'
 
 export function fmtDuration(s: number): string {
   if (s < 1) return `${Math.round(s * 1000)} ms`
@@ -39,33 +38,29 @@ export function DurationStepper({ steps, value, onChange, label }: {
   }
 
   return (
-    <div className="flex flex-col gap-1">
-      <span className="text-xs text-slate-400">{label ?? t('duration.label')}</span>
-      <div className="flex items-center gap-1">
-        <Button size="icon" variant="outline" disabled={idx === 0}
-          onClick={() => { setEditing(false); onChange(steps[idx - 1]) }} title={t('duration.shorter')}>
-          <ChevronDown size={14} />
-        </Button>
-        {editing ? (
-          <input
-            ref={inputRef}
-            type="number" min="0.001" step="any" value={raw}
-            onChange={(e) => setRaw(e.target.value)}
-            onBlur={commitEdit}
-            onKeyDown={(e) => { if (e.key === 'Enter') commitEdit(); if (e.key === 'Escape') setEditing(false) }}
-            className="flex-1 text-center text-xs font-mono text-slate-200 bg-surface-overlay border border-accent rounded px-2 py-1.5 min-w-[5rem] focus:outline-none"
-          />
-        ) : (
-          <button type="button" onClick={startEdit} title={t('duration.custom')}
-            className="flex-1 text-center text-xs font-mono text-slate-200 bg-surface border border-surface-border rounded-lg px-2 py-1.5 min-w-[5rem] hover:border-slate-500 transition-colors">
-            {fmtDuration(value)}
-          </button>
-        )}
-        <Button size="icon" variant="outline" disabled={idx === steps.length - 1}
-          onClick={() => { setEditing(false); onChange(steps[idx + 1]) }} title={t('duration.longer')}>
-          <ChevronUp size={14} />
-        </Button>
-      </div>
-    </div>
+    <StepperShell
+      label={label ?? t('duration.label')}
+      decDisabled={idx === 0}
+      incDisabled={idx === steps.length - 1}
+      decTitle={t('duration.shorter')}
+      incTitle={t('duration.longer')}
+      onDec={() => { setEditing(false); onChange(steps[idx - 1]) }}
+      onInc={() => { setEditing(false); onChange(steps[idx + 1]) }}
+    >
+      {editing ? (
+        <input
+          ref={inputRef}
+          type="number" min="0.001" step="any" value={raw}
+          onChange={(e) => setRaw(e.target.value)}
+          onBlur={commitEdit}
+          onKeyDown={(e) => { if (e.key === 'Enter') commitEdit(); if (e.key === 'Escape') setEditing(false) }}
+          className={stepperValueClass}
+        />
+      ) : (
+        <button type="button" onClick={startEdit} title={t('duration.custom')} className={`${stepperValueClass} hover:text-slate-50`}>
+          {fmtDuration(value)}
+        </button>
+      )}
+    </StepperShell>
   )
 }

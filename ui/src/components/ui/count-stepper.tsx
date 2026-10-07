@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ChevronDown, ChevronUp } from 'lucide-react'
-import { Button } from './button'
+import { StepperShell, stepperValueClass } from './stepper-shell'
 
 /** Frame counts people actually pick for calibration and light sets. */
 export const FRAME_COUNT_STEPS = [0, 1, 2, 3, 5, 10, 15, 20, 25, 30, 40, 50, 60, 80, 100, 150, 200]
@@ -41,31 +40,28 @@ export function CountStepper({
   }
 
   return (
-    <div className="flex flex-col gap-1">
-      {label && <span className="text-xs text-slate-400">{label}</span>}
-      <div className="flex items-center gap-1">
-        <Button size="icon" variant="outline" disabled={disabled || lower == null}
-          onClick={() => step(lower)} title={t('count.fewer')}>
-          <ChevronDown size={14} />
-        </Button>
-        <input
-          type="text" inputMode="numeric" value={raw} disabled={disabled}
-          onFocus={(e) => { setFocused(true); e.target.select() }}
-          onChange={(e) => {
-            const text = e.target.value
-            if (text !== '' && !/^\d+$/.test(text)) return
-            setRaw(text)
-            if (text !== '') onChange(clamp(parseInt(text, 10)))
-          }}
-          onBlur={() => { setFocused(false); setRaw(String(value)) }}
-          onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
-          className="w-14 text-center text-xs font-mono text-slate-200 bg-surface border border-surface-border rounded-lg px-2 py-1.5 hover:border-slate-500 focus:border-accent focus:outline-none transition-colors disabled:opacity-50"
-        />
-        <Button size="icon" variant="outline" disabled={disabled || higher == null}
-          onClick={() => step(higher)} title={t('count.more')}>
-          <ChevronUp size={14} />
-        </Button>
-      </div>
-    </div>
+    <StepperShell
+      label={label}
+      decDisabled={disabled || lower == null}
+      incDisabled={disabled || higher == null}
+      decTitle={t('count.fewer')}
+      incTitle={t('count.more')}
+      onDec={() => step(lower)}
+      onInc={() => step(higher)}
+    >
+      <input
+        type="text" inputMode="numeric" value={raw} disabled={disabled}
+        onFocus={(e) => { setFocused(true); e.target.select() }}
+        onChange={(e) => {
+          const text = e.target.value
+          if (text !== '' && !/^\d+$/.test(text)) return
+          setRaw(text)
+          if (text !== '') onChange(clamp(parseInt(text, 10)))
+        }}
+        onBlur={() => { setFocused(false); setRaw(String(value)) }}
+        onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
+        className={`${stepperValueClass} w-16`}
+      />
+    </StepperShell>
   )
 }

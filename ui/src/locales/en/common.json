@@ -102,5 +102,9 @@
     "dark": "dark",
     "flat": "flat",
     "bias": "bias"
+  },
+  "dms": {
+    "increase": "Increase {{unit}}",
+    "decrease": "Decrease {{unit}}"
   }
 }

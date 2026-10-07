@@ -12,9 +12,9 @@ export function LabeledSlider({
 }) {
   return (
     <div className="flex flex-col gap-0.5">
-      <div className="flex items-center justify-between text-xs">
-        <span className="text-slate-400">{label}</span>
-        <span className="text-slate-500 font-mono">{format(value)}</span>
+      <div className="flex items-center justify-between">
+        <span className="label-caps text-slate-400">{label}</span>
+        <span className="text-xs text-slate-400 font-mono">{format(value)}</span>
       </div>
       <input
         type="range" min={min} max={max} step={step} value={value}
