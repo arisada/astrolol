@@ -261,7 +261,7 @@ export function TargetPage() {
               <button
                 onClick={handleSaveMountPosition}
                 disabled={!mountSaveName.trim()}
-                className="text-xs px-3 py-1.5 rounded bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white transition-colors"
+                className="text-xs px-3 py-1.5 rounded bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-slate-100 transition-colors"
               >
                 {t('favorites.save')}
               </button>

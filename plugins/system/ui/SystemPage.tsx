@@ -231,8 +231,8 @@ function ConfirmButton({
 
   const cls = confirming
     ? variant === 'danger'
-      ? 'bg-rose-600 hover:bg-rose-500 text-white border-rose-500'
-      : 'bg-amber-600 hover:bg-amber-500 text-white border-amber-500'
+      ? 'bg-rose-600 hover:bg-rose-500 text-slate-100 border-rose-500'
+      : 'bg-amber-600 hover:bg-amber-500 text-slate-100 border-amber-500'
     : 'bg-surface-overlay hover:bg-surface-border text-slate-300 border-surface-border'
 
   return (

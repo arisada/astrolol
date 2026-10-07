@@ -252,7 +252,7 @@ export function ObjectCard({
           <button
             onClick={() => onSetAndSlew(selectedMount)}
             disabled={!hasMounts}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-indigo-600 hover:bg-indigo-500 text-white disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-indigo-600 hover:bg-indigo-500 text-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
           >
             <Navigation className="h-3.5 w-3.5" />
             {t('card.slew')}

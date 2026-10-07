@@ -75,7 +75,7 @@ function DebugToggle({ active, onToggle }: { active: boolean; onToggle: () => vo
       }`}
       aria-pressed={active}
     >
-      <span className={`absolute top-0.5 w-3 h-3 rounded-full bg-white shadow transition-transform ${
+      <span className={`absolute top-0.5 w-3 h-3 rounded-full bg-slate-100 shadow transition-transform ${
         active ? 'translate-x-4' : 'translate-x-0.5'
       }`} />
     </button>

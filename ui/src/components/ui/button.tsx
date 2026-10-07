@@ -13,7 +13,7 @@ const variantClass: Record<Variant, string> = {
   default: 'bg-accent border border-accent hover:bg-accent-dim hover:border-accent-dim text-accent-fg font-semibold',
   outline: 'bg-surface-overlay border border-surface-border hover:border-slate-500 text-slate-200',
   ghost: 'border border-transparent hover:bg-surface-overlay text-slate-400 hover:text-slate-200',
-  danger: 'bg-status-error border border-status-error hover:brightness-110 text-white font-semibold',
+  danger: 'bg-status-error border border-status-error hover:brightness-110 text-slate-100 font-semibold',
 }
 
 const sizeClass: Record<Size, string> = {

@@ -469,7 +469,7 @@ export function Options() {
             type="button"
             onClick={restartNow}
             disabled={restarting}
-            className="px-3 py-1.5 rounded text-sm font-medium bg-red-700 hover:bg-red-600 text-white disabled:opacity-50 transition-colors"
+            className="px-3 py-1.5 rounded text-sm font-medium bg-red-700 hover:bg-red-600 text-slate-100 disabled:opacity-50 transition-colors"
           >
             {restarting ? t('server.restarting') : t('server.restart')}
           </button>
@@ -477,7 +477,7 @@ export function Options() {
             type="button"
             onClick={stopIndi}
             disabled={indiStopStatus === 'stopping'}
-            className="px-3 py-1.5 rounded text-sm font-medium bg-slate-600 hover:bg-slate-500 text-white disabled:opacity-50 transition-colors"
+            className="px-3 py-1.5 rounded text-sm font-medium bg-slate-600 hover:bg-slate-500 text-slate-100 disabled:opacity-50 transition-colors"
           >
             {indiStopStatus === 'stopping' ? t('server.stopping') : t('server.stopIndi')}
           </button>

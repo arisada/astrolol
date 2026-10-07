@@ -71,7 +71,7 @@ export function StellariumPage() {
             disabled={busy}
             className={`px-3 py-1.5 rounded text-sm font-medium transition-colors disabled:opacity-50
               ${status.running
-                ? 'bg-slate-600 hover:bg-slate-500 text-white'
+                ? 'bg-slate-600 hover:bg-slate-500 text-slate-100'
                 : 'bg-accent hover:bg-accent/80 text-accent-fg'}`}
           >
             {busy ? '…' : status.running ? t('stop') : t('start')}

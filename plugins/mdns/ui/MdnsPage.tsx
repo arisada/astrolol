@@ -93,7 +93,7 @@ export function MdnsPage() {
           {!restarting && (
             <button
               onClick={handleRestart}
-              className="px-2.5 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-medium transition-colors flex-none"
+              className="px-2.5 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-slate-100 text-xs font-medium transition-colors flex-none"
             >
               {t('restart')}
             </button>
