@@ -179,6 +179,11 @@ Use components from `ui/src/components/ui/` rather than re-implementing them per
 | `ToggleSwitch` | `@/components/ui/toggle-switch` | Labelled boolean toggle |
 | `Card`, `SidebarSection` | `@/components/ui/card` | Container variants |
 | `Badge`, `Chip`, `StatusPill` | `@/components/ui/badge` | Status indicators |
+| `Tabs` | `@/components/ui/tabs` | Segmented tab switcher |
+| `DmsInput` | `@/components/ui/dms-input` | Dec/RA/lat/lon entry: joined DMS/HMS block, up/down per field, carry and clamping |
+| `EquatorialSky`, `HorizontalSky` | `@/components/ui/mount-equatorial`, `mount-horizontal` | Mount position on the sky (centred on the pole, or on the zenith); take `latitude`, `lst`, `ra`, `dec` |
+| `CoolingGauge` | `@/components/ui/cooling-gauge` | Sensor temperature, set point and cooler power as two half circles |
+| `FocuserRuler` | `@/components/ui/focuser-ruler` | Graduated focuser position with target and optional initial marker |
 
 ```tsx
 import { EventLog } from '@/components/ui/event-log'
