@@ -388,7 +388,7 @@ export function PolarAlignPage() {
             {run.status === 'converging' && (
               <div className="space-y-2">
                 {run.live_offset ? (
-                  <div className="rounded border border-amber-500/30 bg-amber-500/10 p-2.5 space-y-1">
+                  <div className="rounded-lg border border-surface-border border-l-2 border-l-amber-400 bg-surface-raised p-2.5 space-y-1">
                     <div className="flex items-center justify-between">
                       <p className="text-xs text-amber-300">{t('wizard.latest')}</p>
                       <QualityBadge altArcmin={run.live_offset.alt_error_arcmin} azArcmin={run.live_offset.az_error_arcmin} />

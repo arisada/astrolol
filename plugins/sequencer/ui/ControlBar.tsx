@@ -123,7 +123,7 @@ export function ControlBar({
       )}
 
       {status.pending_request && t(`control.request.${status.pending_request}`, { defaultValue: '' }) && (
-        <div className="flex items-center gap-2 text-xs text-amber-300 bg-amber-500/10 rounded px-2 py-1">
+        <div className="flex items-center gap-2 text-xs text-amber-300 bg-surface-raised border border-surface-border border-l-2 border-l-amber-400 rounded-lg px-2 py-1">
           {t(`control.request.${status.pending_request}`)}
           {status.pending_request.startsWith('pause') && (
             <button className="underline ml-auto" onClick={() => onPause('now')}>{t('control.pauseNow')}</button>
@@ -135,7 +135,7 @@ export function ControlBar({
       )}
 
       {status.stall && (
-        <div className="text-xs text-amber-200 bg-amber-500/10 border border-amber-500/30 rounded px-3 py-2">
+        <div className="text-xs text-amber-200 bg-surface-raised border border-surface-border border-l-2 border-l-amber-400 rounded-lg px-3 py-2">
           <p className="font-medium">
             {t('control.stall.title', { what: t(`control.stall.${status.stall.kind}`), since: sinceLabel(t, status.stall.since, now) })}
             {status.stall.attempts > 0 && t('control.stall.attempts', { count: status.stall.attempts })}
@@ -149,7 +149,7 @@ export function ControlBar({
       )}
 
       {errorPause && (
-        <div className="text-xs text-rose-200 bg-rose-500/15 border border-rose-500/30 rounded px-3 py-2">
+        <div className="text-xs text-rose-200 bg-surface-raised border border-surface-border border-l-2 border-l-rose-400 rounded-lg px-3 py-2">
           <p className="font-medium mb-1">{t('control.errorPause')}</p>
           <p className="text-rose-300/90">{status.pause_reason}</p>
           <p className="text-rose-300/60 mt-1">{t('control.errorHint')}</p>

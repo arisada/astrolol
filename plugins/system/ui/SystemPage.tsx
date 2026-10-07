@@ -493,12 +493,12 @@ export function SystemPage() {
       </div>
 
       {error && (
-        <div className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-300 flex items-center gap-2">
+        <div className="rounded-lg border border-surface-border border-l-2 border-l-rose-400 bg-surface-raised px-3 py-2 text-sm text-rose-300 flex items-center gap-2">
           <XCircle size={14} className="flex-none" /> {error}
         </div>
       )}
       {successMsg && (
-        <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-300 flex items-center gap-2">
+        <div className="rounded-lg border border-surface-border border-l-2 border-l-emerald-400 bg-surface-raised px-3 py-2 text-sm text-emerald-300 flex items-center gap-2">
           <CheckCircle size={14} className="flex-none" /> {successMsg}
         </div>
       )}
@@ -549,7 +549,7 @@ export function SystemPage() {
           throttleStatus.available ? (
             <div className="space-y-3">
               {throttleStatus.underpowered ? (
-                <div className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-300 flex items-center gap-2">
+                <div className="rounded-lg border border-surface-border border-l-2 border-l-rose-400 bg-surface-raised px-3 py-2 text-xs text-rose-300 flex items-center gap-2">
                   <Zap size={14} className="flex-none" /> {t('power.underpowered')}
                 </div>
               ) : (

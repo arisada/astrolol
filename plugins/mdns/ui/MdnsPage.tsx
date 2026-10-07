@@ -83,12 +83,12 @@ export function MdnsPage() {
       <p className="text-xs text-slate-500">{t('intro')}</p>
 
       {error && (
-        <div className="rounded-lg border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-sm text-rose-300">
+        <div className="rounded-lg border border-surface-border border-l-2 border-l-rose-400 bg-surface-raised px-3 py-2 text-sm text-rose-300">
           {error}
         </div>
       )}
       {saved && !error && (
-        <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-sm text-emerald-300 flex items-center justify-between gap-3">
+        <div className="rounded-lg border border-surface-border border-l-2 border-l-emerald-400 bg-surface-raised px-3 py-2 text-sm text-emerald-300 flex items-center justify-between gap-3">
           <span>{restarting ? t('restarting') : t('savedRestart')}</span>
           {!restarting && (
             <button

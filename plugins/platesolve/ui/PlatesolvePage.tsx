@@ -249,7 +249,7 @@ function DbWarningBanner({ dbPath, onInstall, installing }: {
 }) {
   const { t } = useTranslation('platesolve')
   return (
-    <div className="mx-4 mb-3 flex items-start gap-3 rounded-lg border border-yellow-600/40 bg-yellow-500/10 px-3 py-2">
+    <div className="mx-4 mb-3 flex items-start gap-3 rounded-lg border border-surface-border border-l-2 border-l-yellow-400 bg-surface-raised px-3 py-2">
       <AlertTriangle size={14} className="text-yellow-500 shrink-0 mt-0.5" />
       <div className="flex-1 min-w-0">
         <p className="text-xs text-yellow-300 font-medium">{t('db.missing')}</p>
