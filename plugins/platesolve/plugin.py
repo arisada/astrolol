@@ -17,11 +17,7 @@ class PlatesolvePlugin:
         id="platesolve",
         name="Plate Solving",
         version="0.1.0",
-        description=(
-            "Astrometric plate solving via astap_cli. Solves FITS images to determine "
-            "pointing coordinates (RA/Dec), field rotation, and pixel scale. "
-            "Supports concurrent solves and cancellation."
-        ),
+        description="Astrometric plate solving via ASTAP",
         nav_order=20,
         log_scopes=[LogScope(key="platesolve", label="Plate Solving", logger="plugins.platesolve")],
         hot_reloadable=True,

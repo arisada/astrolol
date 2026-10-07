@@ -28,10 +28,8 @@ class EqmodPlugin:
         name="EQMOD Mount",
         version="0.3.0",
         description=(
-            "Native (non-INDI) driver for Sky-Watcher mounts over the motor controller "
-            "protocol (EQMOD cable or built-in USB): GoTo, sync, tracking, parking and "
-            "pulse guiding. Includes a mount emulator ('eqmod_sim') and an INDI mount "
-            "proxy so PHD2 and other INDI clients can use the mount through indiserver."
+            "Native driver for Sky-Watcher mounts (UART, USB, Bluetooth), with a mount "
+            "simulator and an INDI mount proxy for PHD2 and other INDI clients."
         ),
         log_scopes=[LogScope(key="eqmod", label="EQMOD", logger="plugins.eqmod")],
     )

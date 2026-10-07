@@ -2,7 +2,7 @@
   "label": "Résolution astrométrique",
   "manifest": {
     "name": "Résolution astrométrique",
-    "description": "Résolution astrométrique via astap_cli. Résout des images FITS pour déterminer les coordonnées de pointage (AD/Dec), la rotation du champ et l'échelle de pixel. Gère les résolutions simultanées et l'annulation."
+    "description": "Résolution astrométrique via ASTAP"
   },
   "chip": {
     "label": "Résolution",

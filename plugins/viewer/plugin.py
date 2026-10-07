@@ -161,11 +161,7 @@ class ViewerPlugin:
         id="viewer",
         name="Viewer",
         version="0.1.0",
-        description=(
-            "Browse every FITS frame astrolol has captured, filter by frame type / date / "
-            "coordinates, inspect metadata, preview with adjustable stretch, and set a "
-            "past frame's coordinates as the mount target."
-        ),
+        description="Browse and preview every FITS frame astrolol has captured",
         nav_order=30,
         log_scopes=[LogScope(key="viewer", label="Viewer", logger="plugins.viewer")],
         hot_reloadable=True,

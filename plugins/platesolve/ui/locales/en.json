@@ -2,7 +2,7 @@
   "label": "Plate Solving",
   "manifest": {
     "name": "Plate Solving",
-    "description": "Astrometric plate solving via astap_cli. Solves FITS images to determine pointing coordinates (RA/Dec), field rotation, and pixel scale. Supports concurrent solves and cancellation."
+    "description": "Astrometric plate solving via ASTAP"
   },
   "chip": {
     "label": "Plate Solve",

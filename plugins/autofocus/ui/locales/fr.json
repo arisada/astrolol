@@ -2,7 +2,7 @@
   "label": "Autofocus",
   "manifest": {
     "name": "Autofocus",
-    "description": "Optimisation automatique du focuser par la méthode de la courbe en V (FWHM en fonction de la position) : prend des poses à plusieurs positions du focuser, ajuste une parabole sur la taille mesurée des étoiles et se déplace vers la position de mise au point optimale calculée."
+    "description": "Mise au point automatique des images"
   },
   "chip": {
     "label": "Autofocus",

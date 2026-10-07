@@ -2,7 +2,7 @@
   "label": "Flat Wizard",
   "manifest": {
     "name": "Assistant de flats",
-    "description": "Détermine par essais successifs la durée de pose correcte des images de calibration flat (courtes poses de test non enregistrées, convergeant vers un pourcentage cible du puits de potentiel du capteur sans pixel saturé), un filtre à la fois, puis met les flats obtenus en file d'attente dans le séquenceur."
+    "description": "Détermine la durée de pose correcte pour la calibration par flats."
   },
   "chip": {
     "label": "Flats",

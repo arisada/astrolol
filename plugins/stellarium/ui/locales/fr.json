@@ -21,6 +21,6 @@
   },
   "manifest": {
     "name": "Serveur Stellarium",
-    "description": "Serveur de télescope pour Stellarium. Dans le module Contrôle des télescopes de Stellarium, choisissez « logiciel tiers ou distant » → TCP et indiquez cet hôte et ce port. La position de la monture est envoyée en direct et les commandes GoTo de Stellarium font pointer la monture."
+    "description": "Serveur de télescope Stellarium, pour suivre la position de la monture depuis Stellarium"
   }
 }

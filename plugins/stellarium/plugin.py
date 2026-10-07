@@ -18,10 +18,7 @@ class StellariumPlugin:
         name="Stellarium Server",
         version="0.1.0",
         description=(
-            "Stellarium telescope server. In Stellarium's Telescope Control "
-            "plugin, choose \"3rd party software or remote\" → TCP and point "
-            "it at this host and port. The mount's position is pushed live "
-            "and GoTo commands from Stellarium slew the mount."
+            "Stellarium telescope server, watch the mount's position from Stellarium"
         ),
         log_scopes=[LogScope(key="stellarium", label="Stellarium Server", logger="plugins.stellarium")],
         # Not hot_reloadable: startup() binds a TCP server socket and setup()

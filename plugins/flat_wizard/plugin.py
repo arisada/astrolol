@@ -14,12 +14,7 @@ class FlatWizardPlugin:
         id="flat_wizard",
         name="Flat Wizard",
         version="0.1.0",
-        description=(
-            "Solves the correct exposure duration for flat calibration frames by trial and "
-            "error (short unsaved test exposures, converging on a target percentage of the "
-            "sensor's full well with no saturated pixels), one filter at a time, then queues "
-            "the resulting flats on the sequencer."
-        ),
+        description="Solves the correct exposure duration for flat calibration.",
         requires=["sequencer"],
         nav_order=22,
         log_scopes=[LogScope(key="flat_wizard", label="Flat Wizard", logger="plugins.flat_wizard")],

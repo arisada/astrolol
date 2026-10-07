@@ -2,7 +2,7 @@
   "label": "EQMOD",
   "manifest": {
     "name": "Monture EQMOD",
-    "description": "Pilote natif (non INDI) pour les montures Sky-Watcher via le protocole des contrôleurs moteur (câble EQMOD ou USB intégré) : GoTo, synchronisation, suivi, parcage et guidage par impulsions. Inclut un émulateur de monture ('eqmod_sim') et un proxy de monture INDI permettant à PHD2 et aux autres clients INDI d'utiliser la monture via indiserver."
+    "description": "Pilote natif pour montures Sky-Watcher (UART, USB, Bluetooth), avec un simulateur de monture et un proxy de monture INDI pour PHD2 et les autres clients INDI."
   },
   "flags": {
     "running": "en marche",

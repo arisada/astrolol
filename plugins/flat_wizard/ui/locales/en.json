@@ -2,7 +2,7 @@
   "label": "Flat Wizard",
   "manifest": {
     "name": "Flat Wizard",
-    "description": "Solves the correct exposure duration for flat calibration frames by trial and error (short unsaved test exposures, converging on a target percentage of the sensor's full well with no saturated pixels), one filter at a time, then queues the resulting flats on the sequencer."
+    "description": "Solves the correct exposure duration for flat calibration."
   },
   "chip": {
     "label": "Flats",

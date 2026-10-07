@@ -2,7 +2,7 @@
   "label": "Visionneuse",
   "manifest": {
     "name": "Visionneuse",
-    "description": "Parcourez toutes les images FITS capturées par astrolol, filtrez par type d'image / date / coordonnées, consultez les métadonnées, prévisualisez avec un étirement réglable et définissez les coordonnées d'une ancienne image comme cible de la monture."
+    "description": "Parcourez et prévisualisez toutes les images FITS capturées par astrolol"
   },
   "loading": "Chargement…",
   "sections": {

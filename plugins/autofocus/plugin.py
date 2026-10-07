@@ -14,11 +14,7 @@ class AutofocusPlugin:
         id="autofocus",
         name="Autofocus",
         version="0.1.0",
-        description=(
-            "Automated focuser optimisation using the V-curve (FWHM vs. position) method: "
-            "takes exposures at several focuser positions, fits a parabola to the measured "
-            "star size, and moves to the computed optimal focus position."
-        ),
+        description="Automated image focusing",
         nav_order=21,
         log_scopes=[LogScope(key="autofocus", label="Autofocus", logger="plugins.autofocus")],
         hot_reloadable=True,

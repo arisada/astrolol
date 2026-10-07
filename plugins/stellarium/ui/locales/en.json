@@ -21,6 +21,6 @@
   },
   "manifest": {
     "name": "Stellarium Server",
-    "description": "Stellarium telescope server. In Stellarium's Telescope Control plugin, choose \"3rd party software or remote\" → TCP and point it at this host and port. The mount's position is pushed live and GoTo commands from Stellarium slew the mount."
+    "description": "Stellarium telescope server, watch the mount's position from Stellarium"
   }
 }
