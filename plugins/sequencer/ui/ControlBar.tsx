@@ -199,7 +199,7 @@ export function ControlBar({
 
 function Bar({ value, tone = 'accent' }: { value: number; tone?: 'accent' | 'sky' }) {
   return (
-    <div className="flex-1 h-1.5 rounded-full bg-surface-border overflow-hidden">
+    <div className="flex-1 h-[3px] rounded bg-surface-border overflow-hidden">
       <div className={`h-full transition-all ${tone === 'sky' ? 'bg-sky-400' : 'bg-accent'}`}
         style={{ width: `${Math.min(100, Math.max(0, value * 100))}%` }} />
     </div>

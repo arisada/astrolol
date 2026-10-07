@@ -20,7 +20,7 @@ export interface TaskActions {
 
 function ProgressBar({ value, className = '' }: { value: number; className?: string }) {
   return (
-    <div className={`h-1.5 rounded-full bg-surface-border overflow-hidden ${className}`}>
+    <div className={`h-[3px] rounded bg-surface-border overflow-hidden ${className}`}>
       <div className="h-full bg-accent transition-all" style={{ width: `${Math.min(100, Math.max(0, value * 100))}%` }} />
     </div>
   )

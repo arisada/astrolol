@@ -53,7 +53,7 @@ export function JournalView() {
 
   return (
     <div className="flex flex-col gap-4">
-      <table className="w-full text-xs">
+      <table className="tbl w-full text-xs">
         <thead className="text-slate-500 text-left">
           <tr>
             <th className="font-normal py-1">{t('journal.cols.started')}</th>
@@ -174,7 +174,7 @@ function SessionDetail({ summary }: { summary: SequencerSessionSummary }) {
       {summary.integration.length > 0 && (
         <section>
           <h3 className="font-medium text-slate-500 label-caps mb-2">{t('journal.captured')}</h3>
-          <table className="w-full text-xs">
+          <table className="tbl w-full text-xs">
             <thead className="text-slate-500 text-left">
               <tr>
                 <th className="font-normal py-1">{t('journal.capturedCols.target')}</th><th className="font-normal">{t('journal.capturedCols.camera')}</th>
@@ -216,7 +216,7 @@ function SessionDetail({ summary }: { summary: SequencerSessionSummary }) {
         <section>
           <h3 className="font-medium text-slate-500 label-caps mb-2">{t('journal.framesTitle')}</h3>
           <div className="max-h-72 overflow-y-auto">
-            <table className="w-full text-xs">
+            <table className="tbl w-full text-xs">
               <thead className="text-slate-500 text-left sticky top-0 bg-surface">
                 <tr>
                   <th className="font-normal py-1">{t('journal.frameCols.time')}</th><th className="font-normal">{t('journal.frameCols.target')}</th>

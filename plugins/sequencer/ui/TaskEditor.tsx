@@ -203,7 +203,7 @@ export function TaskEditor({ entry, onClose }: {
   }, [lanes, ditherOn, every, t])
 
   return (
-    <div className="fixed inset-0 z-40 flex justify-end bg-black/60" onClick={onClose}>
+    <div className="fixed inset-0 z-40 flex justify-end bg-black/55" onClick={onClose}>
       <div
         className="w-full max-w-3xl h-full bg-surface-raised border-l border-surface-border flex flex-col"
         onClick={(e) => e.stopPropagation()}
@@ -381,7 +381,7 @@ function LaneEditor({
       )}
 
       <div className="overflow-x-auto mt-2">
-        <table className="w-full text-xs">
+        <table className="tbl w-full text-xs">
           <thead className="text-slate-500">
             <tr className="text-left">
               <th className="font-normal pb-1 pr-2">{t('editor.lane.filter')}</th>

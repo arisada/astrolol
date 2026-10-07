@@ -18,7 +18,7 @@ export function RollupPanel() {
 
   return (
     <div className="flex flex-col gap-1 p-3 text-xs">
-      <table className="w-full">
+      <table className="tbl w-full">
         <thead>
           <tr className="text-slate-500 border-b border-surface-border">
             <th className="text-left py-1">{t('rollup.object')}</th>

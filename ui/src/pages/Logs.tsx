@@ -34,22 +34,10 @@ function levelColor(entry: LogEntry): string {
   return 'text-slate-400'
 }
 
-function componentBadge(component: string): string {
-  const map: Record<string, string> = {
-    imager:     'bg-blue-900/40 text-blue-300',
-    mount:      'bg-purple-900/40 text-purple-300',
-    focuser:    'bg-yellow-900/40 text-yellow-300',
-    device:     'bg-green-900/40 text-green-300',
-    app:        'bg-slate-700 text-slate-300',
-    api:        'bg-slate-700 text-slate-300',
-    profiles:   'bg-slate-700 text-slate-300',
-    indi:       'bg-orange-900/40 text-orange-300',
-    phd2:       'bg-cyan-900/40 text-cyan-300',
-    platesolve: 'bg-violet-900/40 text-violet-300',
-    autofocus:  'bg-teal-900/40 text-teal-300',
-    sequencer:  'bg-rose-900/40 text-rose-300',
-  }
-  return map[component] ?? 'bg-slate-700 text-slate-300'
+/** Left edge of a log row: coloured for faults and warnings, invisible otherwise. */
+function severityEdge(entry: LogEntry): string {
+  const c = levelColor(entry)
+  return c === 'text-status-error' ? 'border-l-status-error' : c === 'text-status-busy' ? 'border-l-status-busy' : 'border-l-transparent'
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -67,11 +55,9 @@ function fmtTime(ts: string): string {
 
 function LogRow({ entry }: { entry: LogEntry }) {
   return (
-    <div className="flex items-start gap-3 py-1.5 border-b border-surface-border/50 hover:bg-surface-raised/30 px-4">
-      <span className="shrink-0 font-mono text-xs text-slate-600 w-44 tabular-nums">{fmtTime(entry.timestamp)}</span>
-      <span className={`shrink-0 text-xs rounded px-1.5 py-0.5 font-mono ${componentBadge(entry.component)}`}>
-        {entry.component}
-      </span>
+    <div className={`flex items-start gap-3 py-1.5 border-b border-surface-border/50 hover:bg-surface-raised/30 pl-3 pr-4 border-l-2 ${severityEdge(entry)}`}>
+      <span className="shrink-0 font-mono text-xs text-slate-500 w-44 tabular-nums">{fmtTime(entry.timestamp)}</span>
+      <span className="shrink-0 w-24 truncate font-mono text-xs text-slate-400">{entry.component}</span>
       <span className={`text-xs flex-1 min-w-0 break-words ${levelColor(entry)}`}>
         {entry.message}
       </span>

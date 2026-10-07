@@ -25,7 +25,7 @@ function Popover({ items, onClose, align = 'right' }: {
   return (
     <>
       <div className="fixed inset-0 z-20" onClick={onClose} />
-      <div className={`absolute z-30 mt-1 min-w-[12rem] rounded border border-surface-border bg-surface-overlay shadow-lg py-1
+      <div className={`absolute z-30 mt-1 min-w-[12rem] rounded-lg border border-surface-border bg-surface-overlay shadow-lg py-1
         ${align === 'right' ? 'right-0' : 'left-0'}`}>
         {items.map((item) => (
           <button

@@ -352,7 +352,7 @@ export function PolarAlignPage() {
             </div>
 
             {run.status === 'running' && (
-              <div className="h-1.5 bg-surface-overlay rounded-full overflow-hidden">
+              <div className="h-[3px] bg-surface-overlay rounded overflow-hidden">
                 <div className="h-full rounded-full bg-accent transition-all duration-500"
                   style={{ width: `${(run.points.length / 3) * 100}%` }} />
               </div>

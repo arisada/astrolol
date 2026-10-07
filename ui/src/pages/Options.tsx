@@ -55,7 +55,7 @@ function TokenReference() {
         {open ? t('tokenRef.hide') : t('tokenRef.show')}
       </button>
       {open && (
-        <table className="mt-2 text-xs w-full border-collapse">
+        <table className="tbl mt-2 text-xs w-full border-collapse">
           <tbody>
             {TOKEN_KEYS.map((k) => (
               <tr key={k} className="border-t border-slate-700">

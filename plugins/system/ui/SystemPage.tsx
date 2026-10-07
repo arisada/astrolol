@@ -75,7 +75,7 @@ function Gauge({ value, label, sublabel, warn = 80, danger = 90 }: {
         <span className="text-slate-400">{label}</span>
         <span className="text-slate-200 font-mono font-medium">{value.toFixed(0)}%</span>
       </div>
-      <div className="h-1.5 bg-surface-overlay rounded-full overflow-hidden">
+      <div className="h-[3px] bg-surface-overlay rounded overflow-hidden">
         <div
           className={`h-full rounded-full transition-all duration-700 ${color}`}
           style={{ width: `${Math.min(100, value)}%` }}
@@ -625,7 +625,7 @@ export function SystemPage() {
                     {t('storage.free', { free: disk.free_gb.toFixed(1), total: disk.total_gb.toFixed(1) })}
                   </span>
                 </div>
-                <div className="h-1.5 bg-surface-overlay rounded-full overflow-hidden">
+                <div className="h-[3px] bg-surface-overlay rounded overflow-hidden">
                   <div
                     className={`h-full rounded-full ${
                       disk.percent >= 90 ? 'bg-rose-500' :

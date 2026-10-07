@@ -81,7 +81,7 @@ export function FrameTable({
   return (
     <div className="flex flex-col gap-2">
       {error && <p className="text-xs text-status-error">{error}</p>}
-      <table className="w-full text-xs">
+      <table className="tbl w-full text-xs">
         <thead>
           <tr className="text-slate-500 border-b border-surface-border">
             {!compact && <th className="w-10" />}

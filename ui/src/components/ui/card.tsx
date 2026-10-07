@@ -6,7 +6,7 @@ export function Card({ title, action, children, className = '' }: {
 }) {
   const hasHeader = title != null || action != null
   return (
-    <div className={`border border-surface-border rounded-lg ${className}`}>
+    <div className={`border border-surface-border rounded-[10px] bg-surface-raised ${className}`}>
       {hasHeader && (
         <div className="flex items-center justify-between">
           {title != null && (

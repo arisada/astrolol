@@ -31,13 +31,17 @@ export function EventLog({
     <div
       ref={ref}
       onScroll={handleScroll}
-      className={`h-28 shrink-0 bg-surface border-t border-surface-border overflow-y-auto px-3 py-2 font-mono ${className}`}
+      className={`h-28 shrink-0 bg-surface border-t border-surface-border overflow-y-auto px-2 py-2 font-mono ${className}`}
       style={style}
     >
       {log.map((e: LogEntry) => (
-        <div key={e.id} className="flex gap-2 text-xs leading-5">
-          <span className="text-slate-600 shrink-0">{e.timestamp.slice(11, 19)}</span>
-          <span className={`truncate ${e.level === 'error' ? 'text-status-error' : e.level === 'warning' ? 'text-yellow-400' : 'text-slate-400'}`}>
+        <div
+          key={e.id}
+          className={`flex gap-2 border-l-2 pl-2 text-xs leading-5
+            ${e.level === 'error' ? 'border-status-error' : e.level === 'warning' ? 'border-status-busy' : 'border-transparent'}`}
+        >
+          <span className="text-slate-500 shrink-0">{e.timestamp.slice(11, 19)}</span>
+          <span className={`truncate ${e.level === 'error' ? 'text-status-error' : e.level === 'warning' ? 'text-status-busy' : 'text-slate-400'}`}>
             {e.message}
           </span>
         </div>

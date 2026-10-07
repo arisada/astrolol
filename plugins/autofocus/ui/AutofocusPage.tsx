@@ -651,7 +651,7 @@ export function AutofocusPage() {
               </div>
 
               {run.total_steps > 0 && (
-                <div className="h-1.5 bg-surface-overlay rounded-full overflow-hidden">
+                <div className="h-[3px] bg-surface-overlay rounded overflow-hidden">
                   <div
                     className={`h-full rounded-full transition-all duration-500 ${
                       run.status === 'completed' ? 'bg-green-500' :

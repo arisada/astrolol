@@ -101,8 +101,8 @@ export function SequencesDialog({ queueSize, hasCompleted, onClose }: {
   }
 
   return (
-    <div className="fixed inset-0 z-40 flex items-start justify-center bg-black/60 pt-16" onClick={onClose}>
-      <div className="w-full max-w-2xl max-h-[80vh] flex flex-col rounded-lg border border-surface-border bg-surface-raised"
+    <div className="fixed inset-0 z-40 flex items-start justify-center bg-black/55 pt-16" onClick={onClose}>
+      <div className="w-full max-w-2xl max-h-[80vh] flex flex-col rounded-[10px] border border-surface-border bg-surface-raised"
         onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-5 py-3 border-b border-surface-border">
           <h2 className="text-sm font-semibold text-slate-100">{t('sequences.title')}</h2>
