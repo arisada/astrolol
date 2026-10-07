@@ -72,6 +72,7 @@ async def test_focus_uses_saved_settings_and_finds_the_minimum(rig: SimpleNamesp
     run = await rig.engine.focus("cam", "foc")
     assert run.status == "completed"
     assert run.total_steps == 7  # num_steps=3 each side
+    assert run.initial_position == 900  # where the focuser was before the run
     assert rig.focuser.moves[:7] == [750, 800, 850, 900, 950, 1000, 1050]
     assert abs(rig.focuser.position - BEST) <= 10  # moved to the fitted optimum
 
@@ -131,6 +132,7 @@ async def test_manual_start_position_moves_there_first_and_restores_original(
     await task
 
     assert run.status == "completed"
+    assert run.initial_position == 900  # the original position, not the manual start
     assert rig.focuser.moves[0] == BEST  # moved to the manual start position first
     assert rig.focuser.moves[1:8] == [850, 900, 950, 1000, 1050, 1100, 1150]  # centred on BEST
 

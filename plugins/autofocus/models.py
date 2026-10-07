@@ -107,6 +107,8 @@ class AutofocusRun(BaseModel):
     data_points: list[FocusDataPoint] = []
     curve_fit: CurveFit | None = None
     optimal_position: int | None = None
+    # Where the focuser was before the run touched it (a manual start_position does not change this).
+    initial_position: int | None = None
     error: str | None = None
     # True when the run failed because of the sky (no stars found), not the hardware:
     # a sequencer retries those later instead of treating them as errors.

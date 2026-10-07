@@ -90,5 +90,13 @@
     "south": "Sud",
     "east": "Est",
     "west": "Ouest"
+  },
+  "sky": {
+    "title": "Ciel",
+    "equatorial": "Équatorial",
+    "horizontal": "Horizontal",
+    "mount": "monture",
+    "pole": "pôle céleste",
+    "zenith": "zénith"
   }
 }

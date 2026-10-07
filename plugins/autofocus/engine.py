@@ -190,6 +190,7 @@ class AutofocusEngine:
             # where the user actually was, not at the requested sweep centre.
             focuser_status = await focuser.get_status()
             restore_to = focuser_status.position or 0
+            run.initial_position = restore_to
             start_pos = restore_to
 
             if config.start_position is not None:

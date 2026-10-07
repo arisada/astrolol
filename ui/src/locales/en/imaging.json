@@ -9,7 +9,8 @@
     "on": "Cooler ON",
     "off": "Cooler OFF",
     "target": "Target °C",
-    "set": "Set"
+    "set": "Set",
+    "gauge": "Camera temperature and cooler"
   },
   "frameType": "Frame type",
   "gain": "Gain",

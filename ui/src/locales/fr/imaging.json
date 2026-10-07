@@ -9,7 +9,8 @@
     "on": "Refroid. OUI",
     "off": "Refroid. NON",
     "target": "Cible °C",
-    "set": "Appliquer"
+    "set": "Appliquer",
+    "gauge": "Température de la caméra et refroidissement"
   },
   "frameType": "Type d'image",
   "gain": "Gain",

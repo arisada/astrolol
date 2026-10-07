@@ -5,12 +5,16 @@ import { fmtRA, fmtDec } from '@/utils/formatting'
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Crosshair, RefreshCw, RotateCw, Settings, StopCircle } from 'lucide-react'
 import { api } from '@/api/client'
 import { useStore } from '@/store'
-import type { CoordFrame, DeviceProperty, MountDeviceSettings, TrackingMode } from '@/api/types'
+import type { CoordFrame, DeviceProperty, MountDeviceSettings, OpticalPath, TrackingMode } from '@/api/types'
 import { Button } from '@/components/ui/button'
 import { DmsInput } from '@/components/ui/dms-input'
 import { StateBadge } from '@/components/ui/badge'
 import { ToggleSwitch } from '@/components/ui/toggle-switch'
 import { Card } from '@/components/ui/card'
+import { EquatorialSky } from '@/components/ui/mount-equatorial'
+import { HorizontalSky } from '@/components/ui/mount-horizontal'
+import { PillGroup } from '@/components/ui/pill-group'
+import { useLocalStorage } from '@/hooks/useLocalStorage'
 import { EventLog } from '@/components/ui/event-log'
 import { DevicePropertiesPanel } from '@/components/DevicePropertiesPanel'
 
@@ -131,6 +135,12 @@ function MountControls({ deviceId }: { deviceId: string }) {
   const { t } = useTranslation('mount')
   const status = useStore((s) => s.mountStatuses[deviceId] ?? null)
   const [showIndiPanel, setShowIndiPanel] = useState(false)
+  // The observing site this mount is attached to (from the active profile's equipment tree).
+  const [opticalPaths, setOpticalPaths] = useState<OpticalPath[]>([])
+  useEffect(() => {
+    api.profiles.activeOpticalPaths().then(setOpticalPaths).catch(() => setOpticalPaths([]))
+  }, [])
+  const [skyView, setSkyView] = useLocalStorage<'equatorial' | 'horizontal'>('astrolol.mountSky', 'equatorial')
 
   const [slewRa, setSlewRa] = useState(0)
   const [slewDec, setSlewDec] = useState(0)
@@ -202,6 +212,10 @@ function MountControls({ deviceId }: { deviceId: string }) {
   const isSlewing  = status?.is_slewing  ?? false
   const ha         = status?.hour_angle ?? null
   const lst        = status?.lst ?? null
+  const site       = opticalPaths.find((p) => p.mount_device_id === deviceId)?.site ?? null
+  // The sidereal time is apparent (of date), so pair it with the JNow position.
+  const skyRa      = status?.ra_jnow ?? status?.ra ?? null
+  const skyDec     = status?.dec_jnow ?? status?.dec ?? null
   // A flip is due when the OTA is on the pier side meant for the other half of the sky
   // (East = looking west, normal for HA >= 0; West = looking east, normal for HA < 0), like
   // MountManager.meridian_flip_due. Flipping from the normal side would raise the counterweight.
@@ -272,6 +286,31 @@ function MountControls({ deviceId }: { deviceId: string }) {
             <span className="text-slate-300">{status?.pier_side ? t(`pier.${status.pier_side}`, { defaultValue: status.pier_side }) : '—'}</span>
             <span />
           </div>
+          {site && lst != null && skyRa != null && skyDec != null && (
+            <div className="flex flex-col gap-2 border-t border-surface-border pt-3">
+              <div className="md:hidden">
+                <PillGroup
+                  options={['equatorial', 'horizontal'] as const}
+                  value={skyView}
+                  onChange={setSkyView}
+                  formatLabel={(v) => t(`sky.${v}`)}
+                />
+              </div>
+              <div className="grid gap-4 md:grid-cols-2">
+                <div className={`${skyView === 'equatorial' ? '' : 'hidden'} md:block`}>
+                  <EquatorialSky latitude={site.latitude} lst={lst} ra={skyRa} dec={skyDec} label={t('sky.equatorial')} className="mx-auto w-full max-w-[340px]" />
+                </div>
+                <div className={`${skyView === 'horizontal' ? '' : 'hidden'} md:block`}>
+                  <HorizontalSky latitude={site.latitude} lst={lst} ra={skyRa} dec={skyDec} label={t('sky.horizontal')} className="mx-auto w-full max-w-[340px]" />
+                </div>
+              </div>
+              <p className="flex flex-wrap gap-x-3 font-mono text-[11px] text-slate-500">
+                <span><span className="text-accent">{'●'}</span> {t('sky.mount')}</span>
+                <span><span className="text-slate-500">{'●'}</span> {t('sky.pole')}</span>
+                <span>{'+'} {t('sky.zenith')}</span>
+              </p>
+            </div>
+          )}
         </Card>
 
         {/* Target */}

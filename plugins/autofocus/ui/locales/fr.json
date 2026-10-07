@@ -78,6 +78,13 @@
     "title": "Résultat",
     "optimal": "Position optimale :",
     "best": "Meilleur {{metric}} :",
-    "at": "à {{position}}"
+    "at": "à {{position}}",
+    "fromStartTitle": "Écart par rapport à la position de départ ({{position}})"
+  },
+  "ruler": {
+    "title": "Position du focuseur",
+    "position": "position {{value}}",
+    "optimal": "optimale {{value}}",
+    "initial": "départ {{value}}"
   }
 }

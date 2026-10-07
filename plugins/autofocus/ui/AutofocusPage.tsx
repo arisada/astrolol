@@ -8,6 +8,7 @@ import { CollapsibleSidebar } from '@/components/ui/collapsible-sidebar'
 import { Button } from '@/components/ui/button'
 import { SidebarSection } from '@/components/ui/card'
 import { DurationStepper } from '@/components/ui/duration-stepper'
+import { FocuserRuler } from '@/components/ui/focuser-ruler'
 import { Input } from '@/components/ui/input'
 import { PillGroup } from '@/components/ui/pill-group'
 import { StatusPill } from '@/components/ui/badge'
@@ -227,6 +228,11 @@ const DEFAULT_SETTINGS: AutofocusSettings = {
 }
 
 // ── Main page component ───────────────────────────────────────────────────────
+
+/** Signed difference for display: +123, −45 or 0. */
+function fmtDelta(d: number): string {
+  return d > 0 ? `+${d}` : d < 0 ? `−${Math.abs(d)}` : '0'
+}
 
 export function AutofocusPage() {
   const { t } = useTranslation('autofocus')
@@ -685,6 +691,36 @@ export function AutofocusPage() {
           </SidebarSection>
         )}
 
+        {/* Focuser position: where we are, where we are going, and where the run started */}
+        {run && (() => {
+          const positions = run.data_points.map((d) => d.position)
+          const reach = (run.config.num_steps ?? 0) * (run.config.step_size ?? 0)
+          const here = focuserPosition ?? positions[positions.length - 1] ?? run.initial_position
+          const known = [run.initial_position, run.optimal_position, here, ...positions].filter((v): v is number => v != null)
+          if (known.length === 0 || here == null) return null
+          const centre = run.config.start_position ?? run.initial_position ?? here
+          const lo = Math.min(...known, centre - reach)
+          const hi = Math.max(...known, centre + reach)
+          const pad = Math.max(10, (hi - lo) * 0.08)
+          return (
+            <SidebarSection title={t('ruler.title')}>
+              <FocuserRuler
+                position={here}
+                target={run.optimal_position}
+                initial={run.initial_position}
+                min={Math.max(0, Math.floor(lo - pad))}
+                max={Math.ceil(hi + pad)}
+                label={t('ruler.title')}
+                legend={{
+                  position: t('ruler.position', { value: here }),
+                  target: run.optimal_position != null ? t('ruler.optimal', { value: run.optimal_position }) : undefined,
+                  initial: run.initial_position != null ? t('ruler.initial', { value: run.initial_position }) : undefined,
+                }}
+              />
+            </SidebarSection>
+          )
+        })()}
+
         {/* V-curve chart */}
         {run && run.data_points.length > 0 && (
           <SidebarSection title={t('vcurve.title')}>
@@ -705,6 +741,11 @@ export function AutofocusPage() {
               <div className="flex items-baseline gap-2">
                 <span className="text-xs text-slate-400">{t('result.optimal')}</span>
                 <span className="text-lg font-mono text-green-400">{run.optimal_position}</span>
+                {run.initial_position != null && (
+                  <span className="text-sm font-mono text-slate-400" title={t('result.fromStartTitle', { position: run.initial_position })}>
+                    {`(${fmtDelta(run.optimal_position - run.initial_position)})`}
+                  </span>
+                )}
               </div>
               {bestDataPoint && (
                 <div className="text-xs text-slate-500">

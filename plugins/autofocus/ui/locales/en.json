@@ -78,6 +78,13 @@
     "title": "Result",
     "optimal": "Optimal position:",
     "best": "Best {{metric}}:",
-    "at": "at {{position}}"
+    "at": "at {{position}}",
+    "fromStartTitle": "Difference from the starting position ({{position}})"
+  },
+  "ruler": {
+    "title": "Focuser position",
+    "position": "position {{value}}",
+    "optimal": "optimal {{value}}",
+    "initial": "started at {{value}}"
   }
 }

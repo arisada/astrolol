@@ -17,7 +17,18 @@ function Marker({ x, kind }: { x: number; kind: 'position' | 'target' | 'initial
   )
 }
 
-export function FocuserRuler({ position, target, initial, min, max, label, className = 'w-full' }: {
+/** Small triangle matching the ruler markers, for legends. */
+function Swatch({ kind }: { kind: 'position' | 'target' | 'initial' }) {
+  return (
+    <svg width="11" height="10" viewBox="0 0 11 10" className="inline-block shrink-0 align-[-1px]" aria-hidden>
+      <path d="M1 1h9L5.5 9z" strokeWidth={1.3}
+        className={kind === 'position' ? 'fill-accent stroke-accent' : kind === 'target' ? 'fill-none stroke-accent' : 'fill-none stroke-slate-400'}
+        strokeDasharray={kind === 'initial' ? '1.5 1.5' : undefined} />
+    </svg>
+  )
+}
+
+export function FocuserRuler({ position, target, initial, min, max, label, legend, className = 'w-full' }: {
   position: number
   target?: number | null
   /** Optional: where the run started, shown as a dotted marker. */
@@ -25,6 +36,8 @@ export function FocuserRuler({ position, target, initial, min, max, label, class
   min: number
   max: number
   label: string
+  /** Optional legend, one entry per marker that has text (already formatted and translated). */
+  legend?: { position?: string; target?: string; initial?: string }
   className?: string
 }) {
   const x = (v: number) => PAD + ((Math.min(max, Math.max(min, v)) - min) / (max - min)) * (W - 2 * PAD)
@@ -33,7 +46,8 @@ export function FocuserRuler({ position, target, initial, min, max, label, class
   const labelEvery = major.length > 6 ? 2 : 1
 
   return (
-    <svg viewBox="0 0 300 44" className={className} role="img" aria-label={label}>
+    <div className={className}>
+    <svg viewBox="0 0 300 44" className="w-full" role="img" aria-label={label}>
       <path d={`M${PAD} 22H${W - PAD}`} className="stroke-surface-border" vectorEffect="non-scaling-stroke" />
       {minor.map((v) => <path key={`n${v}`} d={`M${x(v)} 22v3.5`} className="stroke-surface-border" strokeWidth={1} vectorEffect="non-scaling-stroke" />)}
       {major.map((v, i) => (
@@ -48,5 +62,13 @@ export function FocuserRuler({ position, target, initial, min, max, label, class
       {target != null && <Marker x={x(target)} kind="target" />}
       <Marker x={x(position)} kind="position" />
     </svg>
+    {legend && (
+      <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 font-mono text-[11px] text-slate-400">
+        {legend.position && <span className="inline-flex items-center gap-1"><Swatch kind="position" />{legend.position}</span>}
+        {legend.target && <span className="inline-flex items-center gap-1"><Swatch kind="target" />{legend.target}</span>}
+        {legend.initial && <span className="inline-flex items-center gap-1"><Swatch kind="initial" />{legend.initial}</span>}
+      </div>
+    )}
+    </div>
   )
 }

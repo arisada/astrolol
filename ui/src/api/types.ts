@@ -216,6 +216,7 @@ export interface AutofocusRun {
   data_points: FocusDataPoint[]
   curve_fit: CurveFit | null
   optimal_position: number | null
+  initial_position: number | null
   error: string | null
   started_at: string
   completed_at: string | null

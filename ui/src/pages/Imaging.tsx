@@ -10,6 +10,7 @@ import type {
   CameraStatus, DitherConfig, FilterWheelStatus, FrameType, ImagerDeviceSettings, OpticalPath,
 } from '@/api/types'
 import { Button } from '@/components/ui/button'
+import { CoolingGauge } from '@/components/ui/cooling-gauge'
 import { Input } from '@/components/ui/input'
 import { SidebarSection } from '@/components/ui/card'
 import { DurationStepper } from '@/components/ui/duration-stepper'
@@ -381,14 +382,18 @@ function CameraPanel({
         {/* Temperature */}
         {hasCooler && (
           <div className="flex flex-col gap-2 pb-2 border-b border-surface-border">
+            <div className="mx-auto w-full max-w-[220px]">
+              <CoolingGauge
+                temperature={cameraStatus!.temperature!}
+                setPoint={cameraStatus!.cooler_on && Number.isFinite(parseFloat(settings.target_temp)) ? parseFloat(settings.target_temp) : null}
+                power={cameraStatus!.cooler_on ? cameraStatus!.cooler_power : null}
+                min={Math.min(-30, Math.floor(cameraStatus!.temperature! / 10) * 10)}
+                max={Math.max(20, Math.ceil(cameraStatus!.temperature! / 10) * 10)}
+                label={t('cooler.gauge')}
+              />
+            </div>
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-1.5 text-xs text-slate-400">
-                <Thermometer size={12} />
-                <span>{cameraStatus!.temperature?.toFixed(1)}°C</span>
-                {cameraStatus!.cooler_power != null && (
-                  <span className="text-slate-600">({Math.round(cameraStatus!.cooler_power)}%)</span>
-                )}
-              </div>
+              <Thermometer size={12} className="text-slate-500" />
               <button
                 onClick={() => setCooler(!cameraStatus!.cooler_on)}
                 className={`text-xs px-2 py-0.5 rounded border transition-colors ${
