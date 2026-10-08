@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { NavLink, useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import {
-  BookOpen, Boxes, Camera, ChevronDown, ChevronsLeft, ChevronsRight, Cpu, Orbit, ScrollText, Settings,
+  BookOpen, Boxes, Camera, ChevronDown, ChevronsLeft, ChevronsRight, Cpu, Stars, ScrollText, Settings,
   SlidersHorizontal, Telescope,
 } from 'lucide-react'
 import { useStore } from '@/store'
@@ -14,7 +14,7 @@ export type NavItem = { to: string; icon: typeof Cpu; label: string; badge?: boo
 
 export const NAV_GROUPS: { id: NavGroupId; icon: typeof Cpu }[] = [
   { id: 'equipment', icon: Boxes },
-  { id: 'astronomy', icon: Orbit },
+  { id: 'astronomy', icon: Stars },
   { id: 'settings',  icon: SlidersHorizontal },
 ]
 
