@@ -5,6 +5,11 @@
     "mount": "Monture",
     "imaging": "Imagerie",
     "logs": "Journaux",
+    "group": {
+      "equipment": "Équipement",
+      "astronomy": "Astronomie",
+      "settings": "Réglages"
+    },
     "options": "Options"
   },
   "ws": {

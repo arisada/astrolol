@@ -17,6 +17,7 @@ logger = structlog.get_logger()
 class GuideSimulatorPlugin:
     manifest = PluginManifest(
         id="guide_simulator",
+        nav_group="equipment",
         name="Guide Simulator",
         version="0.1.0",
         description=(

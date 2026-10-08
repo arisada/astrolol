@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Trans, useTranslation } from 'react-i18next'
 import { api } from '@/api/client'
 import type { PluginInfo } from '@/api/types'
+import { NAV_GROUPS } from '@/components/Sidebar'
 import { useStore } from '@/store'
 import { ToggleSwitch } from '@/components/ui/toggle-switch'
 import { Input } from '@/components/ui/input'
@@ -423,20 +424,32 @@ export function Options() {
 
       {pluginInfos.length > 0 && (
         <Section title={t('plugins.title')}>
-          <div className="space-y-3">
-            {pluginInfos.map((plugin) => (
-              <Row
-                key={plugin.id}
-                label={i18n.t('manifest.name', { ns: plugin.id, defaultValue: plugin.name })}
-                hint={
-                  plugin.pending_restart
-                    ? t('plugins.restartPending')
-                    : i18n.t('manifest.description', { ns: plugin.id, defaultValue: plugin.description }) || undefined
-                }
-              >
-                <ToggleSwitch checked={plugin.enabled} onChange={() => togglePlugin(plugin)} label={i18n.t('manifest.name', { ns: plugin.id, defaultValue: plugin.name })} />
-              </Row>
-            ))}
+          <div className="space-y-4">
+            {NAV_GROUPS.map(({ id, icon: GroupIcon }) => {
+              const members = pluginInfos.filter((p) => (p.nav_group ?? 'astronomy') === id)
+              if (members.length === 0) return null
+              return (
+                <div key={id} className="space-y-3">
+                  <div className="label-caps flex items-center gap-2 border-b border-surface-border pb-1 text-slate-500">
+                    <GroupIcon size={12} />
+                    {i18n.t(`nav.group.${id}`, { ns: 'common' })}
+                  </div>
+                  {members.map((plugin) => (
+                    <Row
+                      key={plugin.id}
+                      label={i18n.t('manifest.name', { ns: plugin.id, defaultValue: plugin.name })}
+                      hint={
+                        plugin.pending_restart
+                          ? t('plugins.restartPending')
+                          : i18n.t('manifest.description', { ns: plugin.id, defaultValue: plugin.description }) || undefined
+                      }
+                    >
+                      <ToggleSwitch checked={plugin.enabled} onChange={() => togglePlugin(plugin)} label={i18n.t('manifest.name', { ns: plugin.id, defaultValue: plugin.name })} />
+                    </Row>
+                  ))}
+                </div>
+              )
+            })}
           </div>
           {pluginSaveStatus === 'saved' && (
             <p className="text-xs text-status-connected mt-2">{t('plugins.saved')}</p>

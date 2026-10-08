@@ -14,6 +14,7 @@ logger = structlog.get_logger()
 class SystemPlugin:
     manifest = PluginManifest(
         id="system",
+        nav_group="settings",
         name="System",
         version="0.1.0",
         description=(

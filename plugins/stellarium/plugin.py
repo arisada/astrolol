@@ -15,6 +15,7 @@ logger = structlog.get_logger()
 class StellariumPlugin:
     manifest = PluginManifest(
         id="stellarium",
+        nav_group="equipment",
         name="Stellarium Server",
         version="0.1.0",
         description=(

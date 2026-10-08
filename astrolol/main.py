@@ -293,6 +293,7 @@ def create_app() -> FastAPI:
                 "enabled": p.manifest.id in enabled,
                 "nav_order": p.manifest.nav_order,
                 "nav_before": p.manifest.nav_before,
+                "nav_group": p.manifest.nav_group,
                 "hot_reloadable": p.manifest.hot_reloadable,
                 # True whenever the persisted desired state (from user settings)
                 # disagrees with what's actually live — covers both a newly

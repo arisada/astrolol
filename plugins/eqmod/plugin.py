@@ -25,6 +25,7 @@ logger = structlog.get_logger()
 class EqmodPlugin:
     manifest = PluginManifest(
         id="eqmod",
+        nav_group="equipment",
         name="EQMOD Mount",
         version="0.3.0",
         description=(

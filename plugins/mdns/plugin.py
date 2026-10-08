@@ -16,6 +16,7 @@ logger = structlog.get_logger()
 class MdnsPlugin:
     manifest = PluginManifest(
         id="mdns",
+        nav_group="settings",
         name="mDNS Discovery",
         version="0.1.0",
         description="Advertises this astrolol server on the local network via mDNS.",

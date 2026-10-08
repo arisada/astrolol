@@ -24,6 +24,7 @@ logger = structlog.get_logger()
 class BluetoothSerialPlugin:
     manifest = PluginManifest(
         id="bluetooth_serial",
+        nav_group="equipment",
         name="Bluetooth Serial",
         version="0.1.0",
         description="Pair Bluetooth serial devices, such as an EQMOD cable replacement.",

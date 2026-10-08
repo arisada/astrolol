@@ -12,6 +12,7 @@ if TYPE_CHECKING:
 class HelloPlugin:
     manifest = PluginManifest(
         id="hello",
+        nav_group="settings",
         name="Hello World",
         version="0.1.0",
         description="Proof-of-concept plugin with a single toggle property.",

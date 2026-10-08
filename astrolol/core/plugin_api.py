@@ -7,7 +7,7 @@ code directly; it only calls ``get_plugin()`` after discovering the module.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Protocol, TypeVar, runtime_checkable
+from typing import Any, Literal, Protocol, TypeVar, runtime_checkable
 
 from fastapi import FastAPI
 from pydantic import BaseModel
@@ -23,6 +23,9 @@ class LogScope:
     logger: str   # stdlib logger hierarchy root (e.g. "plugins.phd2")
 
 
+NavGroup = Literal["equipment", "astronomy", "settings"]
+
+
 @dataclass
 class PluginManifest:
     """Metadata declared by every plugin.  Consumed by the loader and the /plugins API."""
@@ -33,6 +36,8 @@ class PluginManifest:
     requires: list[str] = field(default_factory=list)  # IDs of plugins this one depends on
     nav_order: int = 0                   # sidebar sort key — lower = higher in the list
     nav_before: str | None = None        # insert before a named core page ("mount", "imaging", "logs")
+    # Navigation category the plugin's page (and its row in Options → Plugins) belongs to.
+    nav_group: NavGroup = "astronomy"
     log_scopes: list[LogScope] = field(default_factory=list)  # verbosity scopes for this plugin
     # True only if setup()+startup() are safe to call on an already-serving app
     # (no port binding, no unguarded background task/singleton re-registration,

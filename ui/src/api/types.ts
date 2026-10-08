@@ -672,6 +672,7 @@ export interface PluginInfo {
   enabled: boolean
   nav_order: number
   nav_before: string | null
+  nav_group: 'equipment' | 'astronomy' | 'settings'
   hot_reloadable: boolean
   pending_restart: boolean
 }

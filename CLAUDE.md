@@ -50,6 +50,7 @@ plugins/
   Use `app.state` to store plugin-scoped state — never module-level globals (breaks test isolation).
 - **`PluginContext`** provides `event_bus`, `device_manager`, `device_registry`. Plugins must not
   import from each other directly; use the EventBus for inter-plugin communication.
+- **`nav_group`** (manifest) puts the plugin's page in a navigation category: `equipment` (drivers, simulators, protocol bridges), `astronomy` (default: observing features) or `settings` (host/system). Options → Plugins groups by it too.
 - **Enabling/disabling** requires a restart (`POST /admin/restart` or restart the process).
   `UserSettings.enabled_plugins` is persisted in `profiles.json`.
 - See `plugins/hello/` for a minimal example; `plugins/autofocus/` for a full-stack example.
@@ -342,7 +343,7 @@ Plugin scopes are collected at startup and exposed via `GET /admin/log_scopes`;
 - Structlog output is captured by pytest's log system, not `capsys`. Use
   `caplog.at_level(logging.WARNING, logger="<module>")` to assert on log output.
 
-Current count: **658 unit tests**, **37 integration tests**, **964 plugin tests** (all passing).
+Current count: **659 unit tests**, **37 integration tests**, **964 plugin tests** (all passing).
 
 ### UI unit tests
 
@@ -532,7 +533,7 @@ ui/
 
 tests/
 ├── conftest.py         # FakeCamera (real FITS), FakeMount, FakeFocuser + fixtures
-├── unit/               # 658 tests — no hardware required
+├── unit/               # 659 tests — no hardware required
 └── integration/        # 37 tests — require indiserver (skipped if not installed)
 ```
 

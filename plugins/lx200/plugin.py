@@ -15,6 +15,7 @@ logger = structlog.get_logger()
 class Lx200Plugin:
     manifest = PluginManifest(
         id="lx200",
+        nav_group="equipment",
         name="LX200 Server",
         version="0.1.0",
         description=(
