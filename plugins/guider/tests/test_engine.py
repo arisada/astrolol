@@ -143,7 +143,9 @@ def test_hot_pixel_next_to_the_star_is_healed_by_the_dark() -> None:
     with_dark = StarTracker(stars, lib).update(field(star_at, hot=hot, seed=5))
     without = StarTracker(stars).update(field(star_at, hot=hot, seed=5))
     assert abs(with_dark.dx) < 0.1
-    assert abs(without.dx) > abs(with_dark.dx) + 0.2
+    # Without the dark the hot pixel either drags the centroid or makes the star look smeared.
+    assert without.dx is None or abs(without.dx) > abs(with_dark.dx) + 0.2
+    assert with_dark.readings[0].state == "ok"
 
 
 def test_tracker_handles_a_cropped_frame_with_origin() -> None:
@@ -173,3 +175,52 @@ def test_dark_needs_matching_frames() -> None:
     b = Frame(pixels=a.pixels, seq=2, timestamp=0, exposure=2.0, gain=50)
     with pytest.raises(ValueError):
         make_dark([a, b])
+
+
+# --- blur and recovery ---
+
+def elongated_field(x: float, y: float, sx: float, sy: float, amp: float = 600.0, seed: int = 9) -> Frame:
+    rng = np.random.default_rng(seed)
+    ys, xs = np.mgrid[0:H, 0:W]
+    img = 100 + rng.normal(0, 3, (H, W)) + amp * np.exp(-((xs - x) ** 2 / (2 * sx**2) + (ys - y) ** 2 / (2 * sy**2)))
+    return Frame(pixels=img.astype(np.uint16), seq=1, timestamp=0.0, exposure=1.0, gain=50)
+
+
+def test_elongation_tells_a_smear_from_a_round_star() -> None:
+    round_star = measure(elongated_field(100, 80, 2, 2).pixels.astype(np.float32), 100, 80, half=12)
+    smear = measure(elongated_field(100, 80, 7, 2, amp=250).pixels.astype(np.float32), 100, 80, half=12)
+    assert round_star.elongation < 1.2 and smear.elongation > 2.0
+
+
+def test_a_smeared_star_is_blurred_not_lost() -> None:
+    star = measure(elongated_field(100, 80, 2, 2).pixels.astype(np.float32), 100, 80, half=12)
+    tracker = StarTracker([star], half=12)
+    tracker.refresh(elongated_field(100, 80, 2, 2))
+    result = tracker.update(elongated_field(103, 80, 7, 2, amp=250))
+    assert [r.state for r in result.readings] == ["blurred"]
+    assert result.dx is None and result.found == 0 and result.blurred == 1
+    assert tracker.update(elongated_field(103, 80, 2, 2)).readings[0].state == "ok"  # next frame is fine
+
+
+def test_an_empty_window_is_lost() -> None:
+    star = measure(elongated_field(100, 80, 2, 2).pixels.astype(np.float32), 100, 80, half=12)
+    tracker = StarTracker([star], half=12)
+    result = tracker.update(field([], seed=4))
+    assert result.readings[0].state == "lost" and result.readings[0].star is None
+
+
+def test_reacquire_finds_a_star_that_jumped_out_of_its_window() -> None:
+    first = field([(100, 80, 600)])
+    star = detect_stars(first)[0]
+    tracker = StarTracker([star], half=8)
+    jumped = field([(135, 105, 600)], seed=3)  # 43 px away: beyond the tracking window
+    assert tracker.update(jumped).readings[0].state == "lost"
+    assert tracker.reacquire(jumped, radius=60) == 1
+    again = tracker.update(jumped)
+    assert again.readings[0].state == "ok" and again.readings[0].star.x == pytest.approx(135, abs=0.2)
+
+
+def test_reacquire_does_not_invent_a_star() -> None:
+    star = detect_stars(field([(100, 80, 600)]))[0]
+    tracker = StarTracker([star], half=8)
+    assert tracker.reacquire(field([], seed=5), radius=60) == 0

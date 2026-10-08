@@ -25,6 +25,7 @@ class Star:
     snr: float  # peak over the window's background noise
     fwhm: float  # pixels; ~0 for a single hot pixel
     saturated: bool = False
+    elongation: float = 1.0  # major over minor axis of the light distribution; ~1 for a round star
 
     def shifted(self, dx: float, dy: float) -> Star:
         return replace(self, x=self.x + dx, y=self.y + dy)
@@ -71,6 +72,21 @@ def measure(
         x = float((weights * xs).sum() / total)
         y = float((weights * ys).sum() / total)
         peak = float(win.max() - bg)
+        # Shape from the pixels above a fifth of the peak (noise stays out of it): a star
+        # smeared by motion during the exposure is long along the motion.
+        core = np.clip(win - bg - 0.2 * peak, 0.0, None)
+        core_total = float(core.sum())
+        elongation = 1.0
+        if core_total > 0:
+            cx = float((core * xs).sum() / core_total)
+            cy = float((core * ys).sum() / core_total)
+            sxx = float((core * (xs - cx) ** 2).sum() / core_total)
+            syy = float((core * (ys - cy) ** 2).sum() / core_total)
+            sxy = float((core * (xs - cx) * (ys - cy)).sum() / core_total)
+            spread = float(np.sqrt(max((sxx - syy) ** 2 / 4 + sxy**2, 0.0)))
+            major, minor = (sxx + syy) / 2 + spread, (sxx + syy) / 2 - spread
+            if major > 1.0:  # smaller than about a pixel: a hot pixel, not a shape
+                elongation = float(np.sqrt(major / max(minor, 0.05)))
         # FWHM from the area above half maximum: unlike second moments it is not inflated by
         # noise, so a lone hot pixel (area 1 -> 1.13 px) stays narrower than any real star.
         area = int(np.count_nonzero(win - bg > peak / 2))
@@ -83,6 +99,7 @@ def measure(
             snr=peak / noise,
             fwhm=fwhm,
             saturated=saturation is not None and float(win.max()) >= saturation,
+            elongation=elongation,
         )
     return star
 
