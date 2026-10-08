@@ -90,10 +90,26 @@ class IndiClient(IPyClient):
         # of forwarding the setBLOBVector.  We parse that message and store the path here
         # so IndiCamera.expose() can retrieve it via wait_for_local_image().
         self._local_image_paths: dict[str, Path] = {}  # device_name → path
+        # BLOB listeners get every frame as it arrives (not just the latest): used by streams.
+        self._blob_listeners: dict[tuple[str, str], list[Callable[[bytes, str], None]]] = defaultdict(list)
 
     # ------------------------------------------------------------------
     # Property listeners
     # ------------------------------------------------------------------
+
+    def add_blob_listener(
+        self, device_name: str, prop_name: str, cb: Callable[[bytes, str], None]
+    ) -> None:
+        """Call ``cb(data, format)`` for every BLOB received on (device_name, prop_name)."""
+        self._blob_listeners[(device_name, prop_name)].append(cb)
+
+    def remove_blob_listener(
+        self, device_name: str, prop_name: str, cb: Callable[[bytes, str], None]
+    ) -> None:
+        try:
+            self._blob_listeners[(device_name, prop_name)].remove(cb)
+        except ValueError:
+            pass
 
     def add_prop_listener(self, device_name: str, prop_name: str, cb: Callable[[], None]) -> None:
         """Register a no-argument callback fired whenever (device_name, prop_name) changes."""
@@ -164,6 +180,12 @@ class IndiClient(IPyClient):
         if isinstance(event, indi_events.setBLOBVector):
             key = (event.devicename, event.vectorname)
             self._blob_versions[key] = self._blob_versions.get(key, 0) + 1
+            for cb in list(self._blob_listeners.get(key, [])):
+                try:
+                    name, data = next(iter(event.data.items()))
+                    cb(data, event.sizeformat.get(name, (0, ""))[1])
+                except Exception:
+                    logger.warning("indi.blob_listener_error", device=key[0], prop=key[1], exc_info=True)
 
         if isinstance(event, indi_events.Message) and event.message:
             if event.devicename:

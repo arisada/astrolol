@@ -28,6 +28,8 @@ from astrolol.devices.base.models import (
     TrackingMode,
 )
 from astrolol.devices.indi.client import IndiClient
+from astrolol.devices.base.pulse import PulseDirection
+from astrolol.devices.indi.pulse import indi_pulse_guide
 
 logger = structlog.get_logger()
 
@@ -405,6 +407,10 @@ class IndiMount:
                 )
             except Exception:
                 pass
+
+    async def pulse_guide(self, direction: PulseDirection, duration_ms: int) -> None:
+        """Timed guide pulse through the mount's own guide inputs."""
+        await indi_pulse_guide(self._client, self._device_name, direction, duration_ms)
 
     async def meridian_flip(self) -> None:
         """Slew to the current target on the opposite pier side (meridian flip).

@@ -14,9 +14,11 @@ from __future__ import annotations
 
 import asyncio
 import re
+import time
 from pathlib import Path
 
 import astropy.io.fits as astropy_fits
+import numpy as np
 import structlog
 
 from astrolol.config.settings import settings
@@ -26,7 +28,16 @@ from astrolol.devices.base.models import (
     ExposureParams,
     Image,
 )
+from astrolol.devices.base.pulse import PulseDirection
+from astrolol.devices.base.streaming import (
+    Frame,
+    FrameBroadcaster,
+    FrameSubscription,
+    StreamNotSupported,
+    StreamParams,
+)
 from astrolol.devices.indi.client import IndiClient
+from astrolol.devices.indi.pulse import indi_pulse_guide
 
 logger = structlog.get_logger()
 
@@ -54,6 +65,10 @@ class IndiCamera:
         self._state = DeviceState.DISCONNECTED
         self._image_counter = 0
         self._current_upload_dir: Path | None = None  # set while UPLOAD_LOCAL is active
+        self._broadcaster = FrameBroadcaster()
+        self._stream_params: StreamParams | None = None
+        self._stream_seq = 0
+        self._stream_bad_size_logged = False
 
     # ------------------------------------------------------------------
     # ICamera protocol
@@ -86,6 +101,8 @@ class IndiCamera:
     }
 
     async def expose(self, params: ExposureParams) -> Image:
+        if self._stream_params is not None:
+            raise RuntimeError("camera is streaming: stop the stream before exposing")
         self._state = DeviceState.BUSY
 
         # Set frame type if supported (best-effort)
@@ -207,6 +224,115 @@ class IndiCamera:
             exposure_duration=params.duration,
         )
 
+    # ------------------------------------------------------------------
+    # IStreamingCamera: the driver's own video stream (CCD_VIDEO_STREAM)
+    # ------------------------------------------------------------------
+
+    def subscribe_frames(self) -> FrameSubscription:
+        return self._broadcaster.subscribe()
+
+    @property
+    def can_stream(self) -> bool:
+        return self._client._get_vector(self._device_name, "CCD_VIDEO_STREAM") is not None
+
+    async def start_stream(self, params: StreamParams) -> None:
+        """Start the driver's raw video stream.
+
+        A region of interest is applied by the driver (CCD_STREAM_FRAME), so far fewer bytes
+        travel to us than full frames: for guiding, always pass one once a star is chosen.
+        """
+        if not self.can_stream:
+            raise StreamNotSupported(f"{self._device_name} has no CCD_VIDEO_STREAM")
+        if self._stream_params is not None:
+            raise RuntimeError("already streaming")
+        dev, client = self._device_name, self._client
+        if params.gain is not None:
+            await self._best_effort("gain", client.set_number(dev, "CCD_GAIN", {"GAIN": float(params.gain)}))
+        await self._best_effort(
+            "binning",
+            client.set_number(dev, "CCD_BINNING", {"HOR_BIN": float(params.binning), "VER_BIN": float(params.binning)}),
+        )
+        await self._best_effort("encoder", client.set_switch(dev, "CCD_STREAM_ENCODER", ["RAW"]))
+        if params.roi is not None:
+            r = params.roi
+            frame = {"X": float(r.x), "Y": float(r.y), "WIDTH": float(r.width), "HEIGHT": float(r.height)}
+        else:
+            max_x = await client.get_number(dev, "CCD_INFO", "CCD_MAX_X")
+            max_y = await client.get_number(dev, "CCD_INFO", "CCD_MAX_Y")
+            frame = {"X": 0.0, "Y": 0.0, "WIDTH": float(max_x) // params.binning, "HEIGHT": float(max_y) // params.binning}
+        await self._best_effort("stream frame", client.set_number(dev, "CCD_STREAM_FRAME", frame))
+        await client.set_number(dev, "STREAMING_EXPOSURE", {"STREAMING_EXPOSURE_VALUE": params.exposure})
+
+        self._stream_params = params
+        self._stream_seq = 0
+        self._stream_bad_size_logged = False
+        client.add_blob_listener(dev, "CCD1", self._on_stream_blob)
+        try:
+            await client.enable_blob(dev)
+            await client.set_switch(dev, "CCD_VIDEO_STREAM", ["STREAM_ON"])
+        except Exception:
+            client.remove_blob_listener(dev, "CCD1", self._on_stream_blob)
+            self._stream_params = None
+            raise
+        self._state = DeviceState.BUSY
+        logger.info("indi.camera_stream_started", device=dev, exposure=params.exposure)
+
+    async def stop_stream(self) -> None:
+        params, self._stream_params = self._stream_params, None
+        if params is None:
+            return
+        dev, client = self._device_name, self._client
+        client.remove_blob_listener(dev, "CCD1", self._on_stream_blob)
+        try:
+            await self._best_effort("stream off", client.set_switch(dev, "CCD_VIDEO_STREAM", ["STREAM_OFF"]))
+            await self._best_effort("blob off", client.disable_blob(dev))
+        finally:
+            self._broadcaster.end()
+            self._state = DeviceState.CONNECTED
+        logger.info("indi.camera_stream_stopped", device=dev, frames=self._stream_seq)
+
+    def _on_stream_blob(self, data: bytes, fmt: str) -> None:
+        params = self._stream_params
+        if params is None:
+            return
+        client, dev = self._client, self._device_name
+        width = client.get_number_nowait(dev, "CCD_STREAM_FRAME", "WIDTH")
+        height = client.get_number_nowait(dev, "CCD_STREAM_FRAME", "HEIGHT")
+        if not width or not height or len(data) % int(width * height) != 0:
+            if not self._stream_bad_size_logged:  # one line, not one per frame
+                self._stream_bad_size_logged = True
+                logger.warning("indi.camera_stream_bad_frame", device=dev, size=len(data), width=width, height=height, format=fmt)
+            return
+        w, h = int(width), int(height)
+        bytes_per_pixel = len(data) // (w * h)
+        if bytes_per_pixel not in (1, 2):
+            if not self._stream_bad_size_logged:
+                self._stream_bad_size_logged = True
+                logger.warning("indi.camera_stream_unsupported_depth", device=dev, bytes_per_pixel=bytes_per_pixel, format=fmt)
+            return
+        pixels = np.frombuffer(data, dtype=np.uint8 if bytes_per_pixel == 1 else "<u2").reshape(h, w)
+        self._stream_seq += 1
+        self._broadcaster.publish(
+            Frame(
+                pixels=pixels,
+                seq=self._stream_seq,
+                timestamp=time.monotonic(),
+                exposure=params.exposure,
+                gain=params.gain,
+                binning=params.binning,
+                origin=(
+                    int(client.get_number_nowait(dev, "CCD_STREAM_FRAME", "X") or 0),
+                    int(client.get_number_nowait(dev, "CCD_STREAM_FRAME", "Y") or 0),
+                ),
+            )
+        )
+
+    async def _best_effort(self, what: str, call) -> None:  # noqa: ANN001
+        try:
+            await call
+        except Exception as exc:
+            logger.debug("indi.camera_stream_setting_skipped", device=self._device_name, setting=what, error=str(exc))
+
     async def abort(self) -> None:
         try:
             await self._client.set_switch(
@@ -324,6 +450,10 @@ class IndiCamera:
                 device=self._device_name,
                 error=str(exc),
             )
+
+    async def pulse_guide(self, direction: PulseDirection, duration_ms: int) -> None:
+        """Timed guide pulse through the camera's ST4 output, for cameras that have one."""
+        await indi_pulse_guide(self._client, self._device_name, direction, duration_ms)
 
     async def set_cooler(self, enabled: bool, target_temperature: float | None) -> None:
         """Enable/disable the cooler and optionally set the target temperature."""

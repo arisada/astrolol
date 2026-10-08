@@ -12,6 +12,8 @@ from astrolol.devices.base.models import (
     FocuserStatus,
     TrackingMode,
 )
+from astrolol.devices.base.pulse import PulseDirection
+from astrolol.devices.base.streaming import FrameSubscription, StreamParams
 
 if TYPE_CHECKING:
     from astropy.coordinates import SkyCoord
@@ -26,6 +28,30 @@ class ICamera(Protocol):
     async def get_status(self) -> CameraStatus: ...
     async def set_cooler(self, enabled: bool, target_temperature: float | None) -> None: ...
     async def ping(self) -> bool: ...
+
+
+@runtime_checkable
+class IStreamingCamera(Protocol):
+    """Optional capability of a camera: a continuous in-memory frame stream.
+
+    Not part of ``ICamera`` (not every adapter can stream); check with ``isinstance`` or wrap
+    any ICamera in ``astrolol.imaging.streaming.LoopingExposureStream``. While streaming,
+    the camera cannot ``expose()``.
+    """
+    async def start_stream(self, params: StreamParams) -> None: ...
+    async def stop_stream(self) -> None: ...
+    def subscribe_frames(self) -> FrameSubscription: ...
+
+
+@runtime_checkable
+class IPulseGuider(Protocol):
+    """Optional capability of a mount, or of a guide camera with an ST4 output.
+
+    Raises ``PulseGuideNotSupported`` when the device has no pulse-guide output.
+    """
+    async def pulse_guide(self, direction: PulseDirection, duration_ms: int) -> None:
+        """Move the mount in *direction* for *duration_ms*; returns when the pulse is over."""
+        ...
 
 
 @runtime_checkable
