@@ -157,7 +157,7 @@ const DEFAULT_SETTINGS: AutofocusSettings = {
   gain: null,
   filter_slot: null,
   fit_algo: 'parabola',
-  metric: 'fwhm',
+  metric: 'hfd',
   lock_stars: false,
 }
 

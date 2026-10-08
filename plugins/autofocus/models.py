@@ -29,7 +29,7 @@ class AutofocusSettings(BaseModel):
     gain: int | None = None
     filter_slot: int | None = None
     fit_algo: Literal["parabola", "hyperbola"] = "parabola"
-    metric: Literal["fwhm", "hfd"] = "fwhm"
+    metric: Literal["fwhm", "hfd"] = "hfd"
     lock_stars: bool = Field(
         default=False,
         description="Keep measuring the same stars detected on the first exposure "
@@ -62,7 +62,7 @@ class AutofocusConfig(BaseModel):
         "current position as the centre of the sweep.",
     )
     fit_algo: Literal["parabola", "hyperbola"] = "parabola"
-    metric: Literal["fwhm", "hfd"] = "fwhm"
+    metric: Literal["fwhm", "hfd"] = "hfd"
     lock_stars: bool = Field(
         default=False,
         description="Keep measuring the same stars detected on the first exposure "

@@ -220,8 +220,7 @@ class AutofocusEngine:
 
             # When lock_stars is set, frozen after the first step that detects any
             # stars, and reused as the preferred population for every later step —
-            # see star_detector.detect_stars() for how a step falls back to a fresh
-            # detection if none of these stars can be matched.
+            # a step where none of these stars can be matched reports no stars.
             reference_stars: list[dict] | None = None
 
             for step_idx, position in enumerate(positions):
@@ -251,7 +250,7 @@ class AutofocusEngine:
                 run.image_height = fits_h or None
 
                 # 3. Detect stars and measure sharpness (FWHM or HFD).
-                # Wrapped in mem_guard so the heavy numpy/photutils work is
+                # Wrapped in mem_guard so the heavy numpy/scipy work is
                 # serialised with other memory-intensive tasks on low-RAM hosts.
                 logger.info("autofocus.detecting_stars", step=run.current_step, metric=config.metric)
                 async with mem_guard():
