@@ -1042,6 +1042,17 @@ export interface Phd2GuideStepEvent extends BaseEvent {
 }
 export interface Phd2SettledEvent extends BaseEvent { type: 'phd2.settled'; error: string | null }
 
+export interface GuiderStepEvent extends BaseEvent {
+  type: 'guider.step'
+  frame: number
+  ra_dist: number
+  dec_dist: number
+  ra_corr: number
+  dec_corr: number
+  star_snr: number | null
+  stars_found: number
+}
+
 export interface AutofocusStartedEvent extends BaseEvent {
   type: 'autofocus.started'
   run_id: string
@@ -1312,6 +1323,7 @@ export type AstrolollEvent =
   | FocuserPositionUpdatedEvent
   | Phd2ConnectedEvent | Phd2DisconnectedEvent | Phd2StateChangedEvent
   | Phd2GuideStepEvent | Phd2SettledEvent
+  | GuiderStepEvent
   | PlatesolveStartedEvent | PlatesolveCompletedEvent | PlatesolveFailedEvent | PlatesolveCancelledEvent
   | AutofocusStartedEvent | AutofocusDataPointEvent | AutofocusCompletedEvent
   | AutofocusAbortedEvent | AutofocusFailedEvent

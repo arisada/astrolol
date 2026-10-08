@@ -1,5 +1,6 @@
 // Fetch helpers mirroring plugins/guider/api.py.
 import type { GuiderStatus, GuidingHealth, GuidingStats, SettleParams } from '@/api/types'
+import type { GuideSample } from '@/utils/guiding'
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(path, { headers: { 'Content-Type': 'application/json' }, ...options })
@@ -54,10 +55,41 @@ export interface GuiderReport {
   darks: DarkInfo[]
 }
 
-export interface GuiderChipState {
-  guiding: boolean
+// What the plugin keeps in the store (pluginStates['guider']).
+export interface GuiderPluginState {
+  guiding: boolean | null // null until the guider has said anything
   reason: string | null
+  steps: GuideSample[]
 }
+
+export const DEFAULT_GUIDER_STATE: GuiderPluginState = { guiding: null, reason: null, steps: [] }
+export const MAX_STEPS = 500
+
+export type StarKind = 'primary' | 'companion' | 'candidate' | 'lost'
+
+export interface OverlayStar {
+  x: number
+  y: number
+  kind: StarKind
+  snr: number | null
+  fwhm: number | null
+  half: number
+}
+
+export interface ViewInfo {
+  mode: 'idle' | 'preview' | 'guiding'
+  version: number
+  width: number
+  height: number
+  origin: [number, number]
+  stars: OverlayStar[]
+  locks: [number, number][]
+}
+
+export const frameUrl = (version: number) => `${BASE}/frame.jpg?v=${version}`
+export const getView = () => request<ViewInfo>(`${BASE}/view`)
+export const startPreview = () => post<void>('/preview')
+export const stopPreview = () => request<void>(`${BASE}/preview`, { method: 'DELETE' })
 
 export const getStatus = () => request<GuiderReport>(`${BASE}/status`)
 export const guide = (recalibrate: boolean, settle?: SettleParams) =>

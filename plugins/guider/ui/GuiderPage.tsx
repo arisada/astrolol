@@ -3,11 +3,19 @@ import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { EventLog } from '@/components/ui/event-log'
+import { GuideGraph } from '@/components/ui/guide-graph'
+import { GuideTarget } from '@/components/ui/guide-target'
 import { Input } from '@/components/ui/input'
 import { PillGroup } from '@/components/ui/pill-group'
 import { useStore } from '@/store'
 import * as api from './api'
 import { summarizeCalibration } from './calibration'
+import { GuiderView } from './GuiderView'
+import { niceRange } from '@/utils/guiding'
+
+const RANGE_OPTIONS = ['auto', 2, 4, 8, 16] as const
+const SAMPLE_OPTIONS = [50, 100, 200, 500] as const
+const NO_STEPS: api.GuiderPluginState['steps'] = []
 
 const fmt = (v: number | null | undefined, digits = 2) => (v == null ? '—' : v.toFixed(digits))
 const SELECT_CLASS =
@@ -16,6 +24,10 @@ const SELECT_CLASS =
 export function GuiderPage() {
   const { t } = useTranslation('guider')
   const devices = useStore((s) => s.connectedDevices)
+  const steps = useStore((s) => (s.pluginStates['guider'] as api.GuiderPluginState | null | undefined)?.steps ?? NO_STEPS)
+  const [rangeOpt, setRangeOpt] = useState<(typeof RANGE_OPTIONS)[number]>('auto')
+  const [samples, setSamples] = useState<(typeof SAMPLE_OPTIONS)[number]>(100)
+  const [pixelScale, setPixelScale] = useState('')
   const [report, setReport] = useState<api.GuiderReport | null>(null)
   const [settings, setSettings] = useState<api.GuiderSettings | null>(null)
   const [exposure, setExposure] = useState('')
@@ -30,7 +42,7 @@ export function GuiderPage() {
   }, [])
   useEffect(() => {
     refresh()
-    api.getSettings().then((s) => { setSettings(s); setExposure(String(s.exposure)) }).catch(() => {})
+    api.getSettings().then((s) => { setSettings(s); setExposure(String(s.exposure)); setPixelScale(s.pixel_scale == null ? '' : String(s.pixel_scale)) }).catch(() => {})
     const timer = setInterval(refresh, 1000)
     return () => clearInterval(timer)
   }, [refresh])
@@ -55,6 +67,13 @@ export function GuiderPage() {
     void save({ ...settings, exposure: n })
   }
 
+  const savePixelScale = () => {
+    if (!settings) return
+    const n = Number(pixelScale)
+    if (pixelScale.trim() !== '' && !(n > 0)) { setMessage(t('settings.invalidPixelScale')); return }
+    void save({ ...settings, pixel_scale: pixelScale.trim() === '' ? null : n })
+  }
+
   const captureDark = () => {
     setBusy(true)
     setMessage(t('darks.capturing'))
@@ -70,16 +89,56 @@ export function GuiderPage() {
   const h = report?.health
   const w = report?.last_minute
   const cal = report?.calibration ? summarizeCalibration(report.calibration) : null
+  const previewing = st?.state === 'Previewing'
+  const unit = st?.pixel_scale ? '"' : 'px'
+  const unitName = st?.pixel_scale ? t('graph.arcsec') : t('graph.pixels')
+  const points = steps.slice(-samples)
+  const range = rangeOpt === 'auto' ? niceRange(points.flatMap((p) => [p.ra, p.dec])) : rangeOpt
 
   return (
     <div className="flex flex-col h-full">
       <div className="flex-1 overflow-y-auto p-6">
-        <div className="max-w-3xl flex flex-col gap-6">
+        <div className="max-w-5xl flex flex-col gap-6">
           <div>
             <h1 className="text-lg font-semibold text-slate-100">{t('title')}</h1>
             <p className="text-xs text-slate-500 mt-1">{t('intro')}</p>
           </div>
           {error && <p className="text-xs text-status-error bg-status-error/10 rounded px-3 py-2">{error}</p>}
+
+          <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
+            <Section title={t('view.title')}>
+              <GuiderView poll={!!st?.active || previewing} />
+              {!st?.active && (
+                <div className="mt-2">
+                  {previewing
+                    ? <Button size="sm" variant="outline" onClick={act(api.stopPreview)}>{t('view.hide')}</Button>
+                    : <Button size="sm" variant="outline" disabled={!settings?.camera_id} onClick={act(api.startPreview)}>{t('view.show')}</Button>}
+                </div>
+              )}
+            </Section>
+            <Section title={t('target.title')}>
+              <div className="flex flex-col items-center gap-3">
+                <GuideTarget points={points} range={range} rmsTotal={w?.rms_total} unit={unit} />
+                <div className="grid grid-cols-3 gap-2 w-full text-sm">
+                  <Stat label={t('target.rmsRa')} value={`${fmt(w?.rms_ra)}`} />
+                  <Stat label={t('target.rmsDec')} value={`${fmt(w?.rms_dec)}`} />
+                  <Stat label={t('target.rmsTotal')} value={`${fmt(w?.rms_total)}`} />
+                </div>
+                <p className="text-[11px] text-slate-600">{t('target.unit', { unit: unitName })}</p>
+              </div>
+            </Section>
+          </div>
+
+          <Section title={t('graph.title', { unit: unitName })}>
+            <div className="flex flex-wrap gap-4 mb-2">
+              <PillGroup options={RANGE_OPTIONS} value={rangeOpt} onChange={setRangeOpt}
+                formatLabel={(v) => (v === 'auto' ? t('graph.auto') : `±${v / 2}`)} />
+              <PillGroup options={SAMPLE_OPTIONS} value={samples} onChange={setSamples} />
+            </div>
+            <div className="rounded border border-surface-border bg-surface-raised p-3">
+              <GuideGraph points={points} range={range} rmsTotal={w?.rms_total} unit={unit} />
+            </div>
+          </Section>
 
           {settings && (
             <Section title={t('settings.title')}>
@@ -112,6 +171,14 @@ export function GuiderPage() {
                         onChange={(e) => setExposure(e.target.value)} onBlur={saveExposure} />
                     </div>
                     <span className="text-xs text-slate-500">s</span>
+                  </div>
+                </Field>
+                <Field label={t('settings.pixelScale')}>
+                  <div className="flex items-center gap-2">
+                    <div className="w-24">
+                      <Input inputSize="sm" value={pixelScale} placeholder="—" onChange={(e) => setPixelScale(e.target.value)} onBlur={savePixelScale} />
+                    </div>
+                    <span className="text-xs text-slate-500">″/px</span>
                   </div>
                 </Field>
                 <Field label={t('settings.stars')}>

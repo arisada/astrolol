@@ -38,7 +38,9 @@
     "exposure": "Pose",
     "stars": "Étoiles de guidage",
     "saved": "Enregistré.",
-    "invalidExposure": "La pose doit être un nombre de secondes supérieur à zéro."
+    "invalidExposure": "La pose doit être un nombre de secondes supérieur à zéro.",
+    "pixelScale": "Échelle",
+    "invalidPixelScale": "L'échelle doit être un nombre d'arcsecondes par pixel supérieur à zéro, ou vide."
   },
   "status": {
     "title": "Guidage",
@@ -76,5 +78,29 @@
     "done": "Dark enregistré.",
     "none": "Aucun dark pour l'instant.",
     "entry": "{{exposure}} s, gain {{gain}} — {{frames}} images, {{hot}} pixels chauds"
+  },
+  "view": {
+    "title": "Caméra de guidage",
+    "none": "Pas encore d'image. Affichez la caméra pour voir ce qu'elle voit, ou lancez le guidage.",
+    "alt": "Dernière image de la caméra de guidage",
+    "show": "Afficher la caméra",
+    "hide": "Masquer la caméra",
+    "kind_primary": "Étoile de guidage",
+    "kind_companion": "Compagne",
+    "kind_candidate": "Autre étoile",
+    "kind_lost": "Perdue"
+  },
+  "target": {
+    "title": "Cible",
+    "rmsRa": "RMS AD",
+    "rmsDec": "RMS Dec",
+    "rmsTotal": "RMS",
+    "unit": "Dernière minute, en {{unit}}"
+  },
+  "graph": {
+    "title": "Erreur de guidage ({{unit}})",
+    "auto": "Auto",
+    "arcsec": "arcsecondes",
+    "pixels": "pixels"
   }
 }

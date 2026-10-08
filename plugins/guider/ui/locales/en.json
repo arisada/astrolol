@@ -38,7 +38,9 @@
     "exposure": "Exposure",
     "stars": "Guide stars",
     "saved": "Saved.",
-    "invalidExposure": "The exposure must be a number of seconds above zero."
+    "invalidExposure": "The exposure must be a number of seconds above zero.",
+    "pixelScale": "Pixel scale",
+    "invalidPixelScale": "The pixel scale must be a number of arcseconds per pixel above zero, or empty."
   },
   "status": {
     "title": "Guiding",
@@ -76,5 +78,29 @@
     "done": "Dark saved.",
     "none": "No darks yet.",
     "entry": "{{exposure}} s, gain {{gain}} — {{frames}} frames, {{hot}} hot pixels"
+  },
+  "view": {
+    "title": "Guide camera",
+    "none": "No image yet. Show the camera to see what it sees, or start guiding.",
+    "alt": "Latest guide camera image",
+    "show": "Show camera",
+    "hide": "Hide camera",
+    "kind_primary": "Guide star",
+    "kind_companion": "Companion",
+    "kind_candidate": "Other star",
+    "kind_lost": "Lost"
+  },
+  "target": {
+    "title": "Target",
+    "rmsRa": "RMS RA",
+    "rmsDec": "RMS Dec",
+    "rmsTotal": "RMS",
+    "unit": "Last minute, in {{unit}}"
+  },
+  "graph": {
+    "title": "Guide error ({{unit}})",
+    "auto": "Auto",
+    "arcsec": "arcsec",
+    "pixels": "pixels"
   }
 }
