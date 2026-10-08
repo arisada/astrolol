@@ -115,14 +115,29 @@ more design/testing than a single sitting allows:
   fails visibly (now logged and shown in the UI) rather than silently. A fix would require
   a minimum margin scaled to the expected rough-alignment error, or a re-plan of the
   reference point after the fit.
-- **Autofocus star detector picks up hot pixels, especially on defocused frames** — no
-  single run worked reliably with the L filter that night (`autofocus.failed`: "Focus
-  curve did not fit a valid V shape" × 6 in `astrolol.log`). `plugins/autofocus/star_detector.py`
-  needs a hot-pixel rejection pass (e.g. a bad-pixel map, or rejecting single-pixel-wide
-  sources) before HFD/FWHM measurement.
-- **FWHM metric performs much worse than HFD** for autofocus on this rig — consider
-  defaulting new autofocus configs to HFD, or investigating why FWHM's star fit is so much
-  more hot-pixel-sensitive than HFD's.
+- ~~Autofocus star detector picks up hot pixels, especially on defocused frames~~ and
+  ~~FWHM metric performs much worse than HFD~~ — **fixed (15545bb).** Stars are now found by
+  scale-space blob detection (any size, sharp to ~90 px), isolated hot pixels are cleaned first,
+  and HFD is the default metric. Checked end to end on the INDI CCD/focuser simulators
+  (`plugins/autofocus/tests/test_autofocus_simulator.py`). Remaining autofocus work:
+  - **Choose the reference stars at the best-focus frame**, not at step 1 (the most defocused
+    frame when the sweep starts far off), then re-measure every frame at those fixed positions
+    after the sweep so a star too faint to detect at the far end still gets a measurement.
+    Live progress would show the quick per-frame value first.
+  - **Reject sweep steps with too few valid stars** in the engine (e.g. under half the
+    reference stars), instead of accepting any `star_count > 0`, and report skipped points.
+  - **Hot-pixel map from dark frames** — let the user register darks to identify known hot
+    pixels; the detector already cleans unknown ones but a map is exact. Feed it into
+    `_suppress_hot_pixels`.
+  - **`fit_hyperbola` rejects wide, nearly pure-V sweeps** — on the simulator (size 3 → 34 px
+    over 80 000 steps) the fitted y² parabola dips just below zero at its minimum and the
+    `c - b²/4a < 0` check rejects it. The default parabola fit works.
+  - **Saturated stars are measured too wide** (FWHM 4–9 px for a true 3 px) because the
+    clipped core shifts the moments and the HFD. Exclude stars with clipped pixels.
+  - **Hot-pixel cleaning is only verified on synthetic frames** (the simulator has none) —
+    check on a real camera, including the 0.12 neighbour ratio and the sharp-star case.
+  - **Undersampled stars (FWHM under ~1.6 px)**: the moment-based FWHM is quantised by pixel
+    sampling near focus; HFD is steadier. Consider dropping FWHM as a choice in the UI.
 - **Resuming a sequencer task after a crash skips re-plate-solving** — a crash mid-task
   should be treated like a long pause on the next startup (force `setup_needed=True` so
   `_setup()`'s slew/center/plate-solve runs again), not resume straight into exposing at
