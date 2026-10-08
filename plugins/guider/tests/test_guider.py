@@ -1,0 +1,179 @@
+import asyncio
+import math
+
+import numpy as np
+import pytest
+
+from astrolol.core.events import EventBus
+from astrolol.core.guiding import GuiderError, SettleFailed, SettleParams
+from plugins.guider.calibration import Calibration, CalibrationFailed, calibrate
+from plugins.guider.controller import AxisSettings
+from plugins.guider.guider import BuiltinGuider
+from plugins.guider.settings import GuiderSettings
+from plugins.guider.tests.rig import Rig, RigDevices
+
+FAST = dict(exposure=0.03, calibration_steps=5)
+EASY_SETTLE = SettleParams(pixels=1.0, time=0, timeout=10)
+
+ROTATED = np.array([[0.030 * math.cos(0.5), 0.030 * math.sin(0.5)],
+                    [0.030 * math.sin(0.5), -0.030 * math.cos(0.5)]])  # rotated and mirrored
+
+
+def make_guider(rig: Rig | None, **kw: object) -> BuiltinGuider:
+    fine = AxisSettings(min_pulse_ms=2)  # the rig moves the star 0.03 px per ms: far finer than 20 ms
+    return BuiltinGuider(EventBus(), GuiderSettings(**{**FAST, **kw}), RigDevices(rig), ra=fine, dec=fine)  # type: ignore[arg-type]
+
+
+# --- calibration against a known matrix ---
+
+async def _calibrate_rig(rig: Rig) -> Calibration:
+    rig.drift_enabled = False
+    pos = lambda: rig.star_positions()[0]  # noqa: E731
+
+    async def measure():  # noqa: ANN202
+        await asyncio.sleep(0)
+        return pos()
+
+    return await calibrate(measure, rig.pulse_guide, steps=5)
+
+
+@pytest.mark.parametrize("matrix", [((0.03, 0), (0, 0.03)), ROTATED, ((0.008, 0), (0, 0.008))])
+async def test_calibration_recovers_the_matrix(matrix) -> None:
+    rig = Rig(matrix=matrix)
+    cal = await _calibrate_rig(rig)
+    assert np.allclose(cal.matrix, np.array(matrix), rtol=0.03, atol=1e-5)
+    # and it inverts correctly
+    west, north = cal.pulses_for(*(np.array(matrix) @ [100, 50]).tolist())
+    assert (west, north) == pytest.approx((-100, -50), rel=0.03)
+
+
+async def test_calibration_measures_dec_backlash() -> None:
+    cal = await _calibrate_rig(Rig(dec_backlash_ms=150))
+    assert np.allclose(cal.matrix, np.diag([0.03, 0.03]), rtol=0.03, atol=1e-5)
+    assert 120 <= cal.dec_backlash_ms <= 180
+
+
+async def test_calibration_fails_if_the_star_does_not_move() -> None:
+    with pytest.raises(CalibrationFailed):
+        await _calibrate_rig(Rig(matrix=np.zeros((2, 2))))
+
+
+async def test_calibration_fails_if_axes_are_parallel() -> None:
+    with pytest.raises(CalibrationFailed, match="same line"):
+        await _calibrate_rig(Rig(matrix=((0.03, 0.03), (0.0, 0.0))))
+
+
+# --- guiding ---
+
+def rms_unguided(rig: Rig, seconds: float) -> float:
+    return rig.drift[0] * seconds
+
+
+@pytest.mark.parametrize("matrix", [((0.03, 0), (0, 0.03)), ROTATED])
+async def test_guiding_holds_the_star_against_drift(matrix) -> None:
+    rig = Rig(matrix=matrix, drift=(4.0, 1.0))
+    g = make_guider(rig)
+    await g.guide(EASY_SETTLE)
+    assert g.status().guiding and g.status().state == "Guiding"
+    start = g.mark()
+    await asyncio.sleep(1.5)
+    stats = g.stats(start)
+    await g.stop()
+    assert stats.steps > 10
+    assert stats.rms_total is not None and stats.rms_total < 0.6, stats  # drift alone: 6 px in 1.5 s
+    assert g.status().state == "Stopped" and not g.status().active
+
+
+async def test_calibration_is_reused_between_runs() -> None:
+    rig = Rig()
+    g = make_guider(rig)
+    await g.guide(EASY_SETTLE)
+    await g.stop()
+    cal, pulses_before = g.calibration, len(rig.pulses)
+    await g.guide(EASY_SETTLE)
+    await g.stop()
+    assert g.calibration is cal
+    assert all(ms < 90 for _, ms in rig.pulses[pulses_before:])  # corrections only, no sweep
+    await g.guide(EASY_SETTLE, recalibrate=True)
+    await g.stop()
+    assert g.calibration is not cal
+
+
+async def test_stream_window_follows_the_stars() -> None:
+    rig = Rig(stars=((100.0, 80.0, 700.0),))
+    g = make_guider(rig, star_count=1)
+    await g.guide(EASY_SETTLE)
+    roi_used = rig._task is not None  # streaming
+    await g.stop()
+    assert roi_used
+
+
+async def test_dither_moves_the_star_and_settles() -> None:
+    rig = Rig(drift=(0.0, 0.0))
+    g = make_guider(rig)
+    await g.guide(EASY_SETTLE)
+    before = np.array(rig.star_positions()[0])
+    await g.dither(4.0, False, EASY_SETTLE)
+    after = np.array(rig.star_positions()[0])
+    await g.stop()
+    assert 2.0 < np.linalg.norm(after - before) < 6.0  # settled to within 1 px at both ends
+
+
+async def test_dither_requires_guiding() -> None:
+    with pytest.raises(GuiderError):
+        await make_guider(Rig()).dither(3, False, EASY_SETTLE)
+
+
+async def test_losing_the_star_reports_and_recovers() -> None:
+    rig = Rig(drift=(1.0, 0.0))
+    g = make_guider(rig)
+    await g.guide(EASY_SETTLE)
+    rig.hidden = True
+    await asyncio.sleep(0.5)
+    assert not g.health().guiding and g.health().reason == "star_lost"
+    rig.hidden = False
+    await asyncio.sleep(0.7)
+    assert g.health().guiding
+    await g.stop()
+
+
+async def test_guiding_gives_up_when_the_star_stays_lost() -> None:
+    rig = Rig(drift=(1.0, 0.0))
+    g = make_guider(rig, lost_timeout_s=0.4)
+    await g.guide(EASY_SETTLE)
+    rig.hidden = True
+    await asyncio.sleep(1.2)
+    assert not g.status().active
+
+
+async def test_settle_times_out_when_the_error_never_gets_small() -> None:
+    g = make_guider(Rig(drift=(1.0, 0.0)))
+    with pytest.raises(SettleFailed, match="timed-out"):
+        await g.guide(SettleParams(pixels=0.001, time=5, timeout=1))  # tighter than the noise
+    await g.stop()
+
+
+async def test_no_star_is_a_clear_error() -> None:
+    rig = Rig(stars=())
+    with pytest.raises(GuiderError, match="No suitable guide star"):
+        await make_guider(rig).guide(EASY_SETTLE)
+
+
+async def test_missing_camera_is_a_clear_error() -> None:
+    with pytest.raises(GuiderError, match="no guide camera"):
+        await make_guider(None).guide(EASY_SETTLE)
+
+
+async def test_pause_stops_the_corrections() -> None:
+    rig = Rig()
+    g = make_guider(rig)
+    await g.guide(EASY_SETTLE)
+    await g.pause()
+    await asyncio.sleep(0.15)  # a pulse already under way may still land
+    n = len(rig.pulses)
+    await asyncio.sleep(0.4)
+    assert len(rig.pulses) == n and g.status().state == "Paused"
+    await g.resume()
+    await asyncio.sleep(0.4)
+    assert len(rig.pulses) > n
+    await g.stop()

@@ -343,7 +343,7 @@ Plugin scopes are collected at startup and exposed via `GET /admin/log_scopes`;
 - Structlog output is captured by pytest's log system, not `capsys`. Use
   `caplog.at_level(logging.WARNING, logger="<module>")` to assert on log output.
 
-Current count: **659 unit tests**, **37 integration tests**, **964 plugin tests** (all passing).
+Current count: **672 unit tests**, **37 integration tests**, **979 plugin tests** (all passing).
 
 ### UI unit tests
 
@@ -454,7 +454,9 @@ astrolol/
 │   └── sequencer/       # Sequencer Protocol + task/session/lane event & model set —
 │                        # the plugin-agnostic contract the sequencer plugin implements
 ├── devices/
-│   ├── base/           # ICamera, IMount, IFocuser Protocols + Pydantic models
+│   ├── base/           # ICamera, IMount, IFocuser Protocols + Pydantic models; optional
+│   │                   # IStreamingCamera (streaming.py: Frame, latest-wins subscriptions) and
+│   │                   # IPulseGuider (pulse.py)
 │   ├── config.py       # DeviceConfig — friendly ID generation + validation
 │   ├── manager.py      # DeviceManager — connect/disconnect lifecycle + events
 │   ├── registry.py     # DeviceRegistry — adapter_key → class mapping
@@ -489,6 +491,11 @@ plugins/
 ├── eqmod/              # Native (non-INDI) Sky-Watcher motor-controller driver: GoTo/sync/
 │                       # tracking/park over EQMOD cable or USB; ships an INDI mount-proxy so
 │                       # PHD2/other INDI clients can guide through it
+├── guider/             # Built-in autoguider (REST API + UI page, first version): star detection,
+│                       # dark frames, windowed tracking, calibration (pulse→pixel matrix),
+│                       # controller, BuiltinGuider implementing core.guiding.Guider.
+│                       # Frames come from IStreamingCamera, pulses go to IPulseGuider on the
+│                       # guide camera (ST4) or the mount — selectable, camera by default
 ├── guide_simulator/    # Simulated guider (registers against core/guiding) for testing
 │                       # without PHD2/hardware — noisy steps, settling, injectable faults
 ├── lx200/              # Virtual LX200 telescope TCP server (SkySafari, Cartes du Ciel, etc.)
@@ -533,7 +540,7 @@ ui/
 
 tests/
 ├── conftest.py         # FakeCamera (real FITS), FakeMount, FakeFocuser + fixtures
-├── unit/               # 659 tests — no hardware required
+├── unit/               # 672 tests — no hardware required
 └── integration/        # 37 tests — require indiserver (skipped if not installed)
 ```
 
