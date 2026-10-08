@@ -1,0 +1,80 @@
+{
+  "label": "Guider",
+  "manifest": {
+    "name": "Built-in Guider",
+    "description": "Autoguider that runs inside astrolol, without PHD2: it picks guide stars, calibrates itself, and corrects the mount from any camera. Don't enable it together with PHD2."
+  },
+  "title": "Built-in Guider",
+  "intro": "Keeps a star on the same spot while you image. Choose the guide camera, then start guiding: the first run calibrates by moving the mount a little.",
+  "chip": {
+    "label": "Guider",
+    "guiding": "guiding",
+    "lost": "lost"
+  },
+  "state": {
+    "stopped": "Stopped",
+    "selecting_star": "Choosing a star",
+    "calibrating": "Calibrating",
+    "guiding": "Guiding",
+    "paused": "Paused",
+    "capturing_dark": "Taking darks"
+  },
+  "reason": {
+    "not_guiding": "not guiding",
+    "star_lost": "star lost",
+    "stopped": "stopped",
+    "paused": "paused",
+    "disconnected": "disconnected",
+    "error": "failed"
+  },
+  "settings": {
+    "title": "Set-up",
+    "camera": "Guide camera",
+    "choose": "Choose…",
+    "output": "Send corrections through",
+    "output_camera": "Guide camera",
+    "output_mount": "Mount",
+    "mount": "Mount",
+    "exposure": "Exposure",
+    "stars": "Guide stars",
+    "saved": "Saved.",
+    "invalidExposure": "The exposure must be a number of seconds above zero."
+  },
+  "status": {
+    "title": "Guiding",
+    "state": "State",
+    "guidingFor": "Guiding for",
+    "unguidedFor": "Not guiding for",
+    "rms": "RMS, last minute",
+    "losses": "Losses / unguided",
+    "reason": "Reason: {{reason}}"
+  },
+  "guiding": {
+    "start": "Start guiding",
+    "stop": "Stop",
+    "pause": "Pause",
+    "resume": "Resume",
+    "dither": "Dither",
+    "recalibrate": "Calibrate again"
+  },
+  "calibration": {
+    "title": "Calibration",
+    "raRate": "RA speed",
+    "decRate": "Dec speed",
+    "axes": "Angle between axes",
+    "backlash": "Dec backlash",
+    "clear": "Forget calibration",
+    "none": "Not calibrated yet. The next run calibrates first."
+  },
+  "darks": {
+    "title": "Dark frames",
+    "hint": "Cover the telescope, then take darks with the exposure and gain above. They remove hot pixels from the guide star's surroundings.",
+    "frames": "frames",
+    "capture": "Take dark",
+    "clear": "Delete darks",
+    "capturing": "Taking darks…",
+    "done": "Dark saved.",
+    "none": "No darks yet.",
+    "entry": "{{exposure}} s, gain {{gain}} — {{frames}} frames, {{hot}} hot pixels"
+  }
+}

@@ -173,6 +173,33 @@ more design/testing than a single sitting allows:
   (`astrolol.core.sequencer.Sequencer`: `switch_to`, `insert_next`, `wait_for_task`,
   `subscribe`, interruption history per task). Not designed yet.
 
+## Built-in guider — remaining work
+
+Done (first version, `plugins/guider/`): native INDI camera streaming (`IStreamingCamera`),
+pulse guiding through the camera's ST4 output or the mount (`IPulseGuider`, selectable,
+camera by default), star detection/selection, dark frames (subtraction + hot pixels),
+windowed tracking, self-calibration (drift-corrected, Dec backlash), controller, dither,
+settle, REST API and UI page. Verified against INDI's Guide Simulator on both routes; the
+quirks found there are listed in the project memory ("guider known quirks") to evaluate by hand.
+
+- **Real hardware and a Pi** — never run on a real camera/mount; detection (~90 ms full frame
+  on x86) and the per-frame loop haven't been timed on a Raspberry Pi.
+- **Mount route** — its RA calibration varied between runs on the simulator and guided worse
+  (~2.3 px vs ~0.6 px RMS on the camera ST4 route). Cause unknown.
+- **Persist the calibration** (per camera/mount/exposure/pier side) so a restart or a
+  meridian flip doesn't force a recalibration; flip handling (Dec sign) and Dec compensation
+  for the target's declination.
+- **Simulator test with periodic error** — the Guide Simulator has no drift of its own, so the
+  integration test proves stability, not improvement; use its `EQUATORIAL_PE` properties.
+- **Star re-acquisition** — when the star is lost the tracker keeps looking at its last
+  position; searching a wider area (or a companion star) would recover from a bigger jump.
+- **Guide graph / live star view** in the UI, the star choice (pick a star by hand), and a
+  "bin 2" / ROI-from-the-UI option.
+- **Predictive algorithms** (PHD2's GP / hysteresis-style controllers) behind the same
+  controller interface.
+- **Dark capture UX** — the scope has to be covered by hand; no prompt-and-wait flow, and
+  darks for the sequencer's own camera aren't shared.
+
 ## Sequencer — remaining work
 
 Design: `SEQUENCER_SPEC.md`. Done: phase 1 (core interface, queue/runner, UI), platesolve

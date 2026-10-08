@@ -1,0 +1,80 @@
+{
+  "label": "Guideur",
+  "manifest": {
+    "name": "Guideur intégré",
+    "description": "Autoguideur intégré à astrolol, sans PHD2 : il choisit les étoiles de guidage, se calibre tout seul et corrige la monture à partir de n'importe quelle caméra. Ne l'activez pas en même temps que PHD2."
+  },
+  "title": "Guideur intégré",
+  "intro": "Garde une étoile au même endroit pendant la prise de vue. Choisissez la caméra de guidage puis lancez le guidage : le premier lancement se calibre en déplaçant un peu la monture.",
+  "chip": {
+    "label": "Guideur",
+    "guiding": "guidage",
+    "lost": "perdu"
+  },
+  "state": {
+    "stopped": "Arrêté",
+    "selecting_star": "Choix d'une étoile",
+    "calibrating": "Calibration",
+    "guiding": "Guidage",
+    "paused": "En pause",
+    "capturing_dark": "Prise de darks"
+  },
+  "reason": {
+    "not_guiding": "pas de guidage",
+    "star_lost": "étoile perdue",
+    "stopped": "arrêté",
+    "paused": "en pause",
+    "disconnected": "déconnecté",
+    "error": "échec"
+  },
+  "settings": {
+    "title": "Réglages",
+    "camera": "Caméra de guidage",
+    "choose": "Choisir…",
+    "output": "Envoyer les corrections par",
+    "output_camera": "Caméra de guidage",
+    "output_mount": "Monture",
+    "mount": "Monture",
+    "exposure": "Pose",
+    "stars": "Étoiles de guidage",
+    "saved": "Enregistré.",
+    "invalidExposure": "La pose doit être un nombre de secondes supérieur à zéro."
+  },
+  "status": {
+    "title": "Guidage",
+    "state": "État",
+    "guidingFor": "Guidage depuis",
+    "unguidedFor": "Sans guidage depuis",
+    "rms": "RMS, dernière minute",
+    "losses": "Pertes / non guidé",
+    "reason": "Raison : {{reason}}"
+  },
+  "guiding": {
+    "start": "Lancer le guidage",
+    "stop": "Arrêter",
+    "pause": "Pause",
+    "resume": "Reprendre",
+    "dither": "Dithering",
+    "recalibrate": "Recalibrer"
+  },
+  "calibration": {
+    "title": "Calibration",
+    "raRate": "Vitesse AD",
+    "decRate": "Vitesse Dec",
+    "axes": "Angle entre les axes",
+    "backlash": "Jeu en Dec",
+    "clear": "Oublier la calibration",
+    "none": "Pas encore calibré. Le prochain lancement se calibre d'abord."
+  },
+  "darks": {
+    "title": "Images de dark",
+    "hint": "Couvrez le télescope puis prenez des darks avec la pose et le gain ci-dessus. Ils retirent les pixels chauds autour de l'étoile de guidage.",
+    "frames": "images",
+    "capture": "Prendre un dark",
+    "clear": "Supprimer les darks",
+    "capturing": "Prise de darks…",
+    "done": "Dark enregistré.",
+    "none": "Aucun dark pour l'instant.",
+    "entry": "{{exposure}} s, gain {{gain}} — {{frames}} images, {{hot}} pixels chauds"
+  }
+}
