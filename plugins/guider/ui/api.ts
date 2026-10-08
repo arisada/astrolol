@@ -26,8 +26,21 @@ export interface GuiderSettings {
   gain: number | null
   pixel_scale: number | null
   star_count: number
+  dec_backlash_compensation: boolean
   calibration_steps: number
   lost_timeout_s: number
+}
+
+export type CalibrationPhase = 'drift' | 'probe' | 'west' | 'east' | 'north' | 'south'
+
+export interface CalibrationPoint {
+  phase: CalibrationPhase
+  step: number // 0 is the position before the phase's first pulse
+  pulse_ms: number
+  x: number
+  y: number
+  t: number // seconds since the calibration started
+  used: boolean // false: measured but left out of the fit
 }
 
 export interface Calibration {
@@ -36,6 +49,10 @@ export interface Calibration {
   dec_x: number
   dec_y: number
   dec_backlash_ms: number
+  ra_backlash_ms: number
+  drift_x: number
+  drift_y: number
+  trace: CalibrationPoint[]
 }
 
 export interface DarkInfo {

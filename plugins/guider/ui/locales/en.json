@@ -40,7 +40,8 @@
     "saved": "Saved.",
     "invalidExposure": "The exposure must be a number of seconds above zero.",
     "pixelScale": "Pixel scale",
-    "invalidPixelScale": "The pixel scale must be a number of arcseconds per pixel above zero, or empty."
+    "invalidPixelScale": "The pixel scale must be a number of arcseconds per pixel above zero, or empty.",
+    "compensateBacklash": "Compensate Dec backlash"
   },
   "status": {
     "title": "Guiding",
@@ -66,7 +67,20 @@
     "axes": "Angle between axes",
     "backlash": "Dec backlash",
     "clear": "Forget calibration",
-    "none": "Not calibrated yet. The next run calibrates first."
+    "none": "Not calibrated yet. The next run calibrates first.",
+    "raBacklash": "RA backlash",
+    "drift": "Drift",
+    "noTrace": "No measurements were kept for this calibration.",
+    "graph": "Calibration measurements",
+    "phase_drift": "Drift",
+    "phase_probe": "Test pulse",
+    "phase_west": "West pulses",
+    "phase_east": "East pulses (back)",
+    "phase_north": "North pulses",
+    "phase_south": "South pulses (back)",
+    "axisRa": "RA",
+    "axisDec": "Dec",
+    "leftOut": "Left out of the fit"
   },
   "darks": {
     "title": "Dark frames",

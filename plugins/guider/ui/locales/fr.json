@@ -40,7 +40,8 @@
     "saved": "Enregistré.",
     "invalidExposure": "La pose doit être un nombre de secondes supérieur à zéro.",
     "pixelScale": "Échelle",
-    "invalidPixelScale": "L'échelle doit être un nombre d'arcsecondes par pixel supérieur à zéro, ou vide."
+    "invalidPixelScale": "L'échelle doit être un nombre d'arcsecondes par pixel supérieur à zéro, ou vide.",
+    "compensateBacklash": "Compenser le jeu en Dec"
   },
   "status": {
     "title": "Guidage",
@@ -66,7 +67,20 @@
     "axes": "Angle entre les axes",
     "backlash": "Jeu en Dec",
     "clear": "Oublier la calibration",
-    "none": "Pas encore calibré. Le prochain lancement se calibre d'abord."
+    "none": "Pas encore calibré. Le prochain lancement se calibre d'abord.",
+    "raBacklash": "Jeu en AD",
+    "drift": "Dérive",
+    "noTrace": "Aucune mesure n'a été conservée pour cette calibration.",
+    "graph": "Mesures de calibration",
+    "phase_drift": "Dérive",
+    "phase_probe": "Impulsion d'essai",
+    "phase_west": "Impulsions Ouest",
+    "phase_east": "Impulsions Est (retour)",
+    "phase_north": "Impulsions Nord",
+    "phase_south": "Impulsions Sud (retour)",
+    "axisRa": "AD",
+    "axisDec": "Dec",
+    "leftOut": "Écartées du calcul"
   },
   "darks": {
     "title": "Images de dark",

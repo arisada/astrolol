@@ -7,10 +7,12 @@ import { GuideGraph } from '@/components/ui/guide-graph'
 import { GuideTarget } from '@/components/ui/guide-target'
 import { Input } from '@/components/ui/input'
 import { PillGroup } from '@/components/ui/pill-group'
+import { ToggleSwitch } from '@/components/ui/toggle-switch'
 import { useStore } from '@/store'
 import * as api from './api'
 import { summarizeCalibration } from './calibration'
 import { GuiderView } from './GuiderView'
+import { CalibrationGraph } from './CalibrationGraph'
 import { niceRange } from '@/utils/guiding'
 
 const RANGE_OPTIONS = ['auto', 2, 4, 8, 16] as const
@@ -185,6 +187,11 @@ export function GuiderPage() {
                   <PillGroup options={[1, 2, 3, 4, 5, 6] as const} value={settings.star_count}
                     onChange={(v) => void save({ ...settings, star_count: v })} />
                 </Field>
+                <div className="flex items-center gap-3">
+                  <ToggleSwitch label={t('settings.compensateBacklash')} checked={settings.dec_backlash_compensation}
+                    onChange={() => void save({ ...settings, dec_backlash_compensation: !settings.dec_backlash_compensation })} />
+                  <span className="text-sm text-slate-300">{t('settings.compensateBacklash')}</span>
+                </div>
                 {message && <span className="text-xs text-slate-400">{message}</span>}
               </div>
             </Section>
@@ -219,12 +226,17 @@ export function GuiderPage() {
           <Section title={t('calibration.title')}>
             {cal ? (
               <>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 text-sm">
-                  <Stat label={t('calibration.raRate')} value={`${fmt(cal.raRate, 1)} px/s`} />
-                  <Stat label={t('calibration.decRate')} value={`${fmt(cal.decRate, 1)} px/s`} />
-                  <Stat label={t('calibration.axes')} value={`${fmt(cal.orthogonality, 0)}°`}
-                    tone={Math.abs(cal.orthogonality - 90) > 20 ? 'text-amber-300' : 'text-slate-200'} />
-                  <Stat label={t('calibration.backlash')} value={`${fmt(cal.backlashMs, 0)} ms`} />
+                <div className="grid gap-4 md:grid-cols-[minmax(0,360px)_minmax(0,1fr)] items-start">
+                  <CalibrationGraph calibration={report!.calibration!} />
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <Stat label={t('calibration.raRate')} value={`${fmt(cal.raRate, 1)} px/s`} />
+                    <Stat label={t('calibration.decRate')} value={`${fmt(cal.decRate, 1)} px/s`} />
+                    <Stat label={t('calibration.axes')} value={`${fmt(cal.orthogonality, 0)}°`}
+                      tone={Math.abs(cal.orthogonality - 90) > 20 ? 'text-amber-300' : 'text-slate-200'} />
+                    <Stat label={t('calibration.drift')} value={`${fmt(cal.drift, 2)} px/s`} />
+                    <Stat label={t('calibration.backlash')} value={`${fmt(cal.backlashMs, 0)} ms`} />
+                    <Stat label={t('calibration.raBacklash')} value={`${fmt(cal.raBacklashMs, 0)} ms`} />
+                  </div>
                 </div>
                 <Button size="sm" variant="ghost" className="mt-2" disabled={!!st?.active} onClick={act(api.clearCalibration)}>{t('calibration.clear')}</Button>
               </>
