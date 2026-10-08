@@ -1,5 +1,7 @@
 # astrolol
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 Headless, modular, open-source astronomy platform. Runs on the machine attached to your
 telescope (Raspberry Pi, mini-PC, etc.). Connect from any web browser.
 
