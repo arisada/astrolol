@@ -3,7 +3,7 @@
 
 declare module '@plugins/*/ui/index.ts' {
   import type { ComponentType } from 'react'
-  import type { LucideIcon } from 'lucide-react'
-  const plugin: { icon: LucideIcon; label: string; Component: ComponentType }
+  import type { NavIcon } from '@/plugin-registry'
+  const plugin: { icon: NavIcon; label: string; Component: ComponentType }
   export default plugin
 }

@@ -1,4 +1,4 @@
-import { Sparkles } from 'lucide-react'
+import { Phd2Icon } from './Phd2Icon'
 import { Phd2Page } from './Phd2Page'
 import { Phd2Chip } from './Phd2Chip'
 import { registerPluginEventHandlers, registerSilentEventTypes } from '@/store'
@@ -44,7 +44,7 @@ registerPluginEventHandlers('phd2', {
 registerSilentEventTypes('phd2.guide_step')
 
 export default {
-  icon: Sparkles,
+  icon: Phd2Icon,
   label: 'Guiding',
   Component: Phd2Page,
   StatusChip: Phd2Chip,

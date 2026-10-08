@@ -6,13 +6,13 @@ import {
   SlidersHorizontal, Telescope,
 } from 'lucide-react'
 import { useStore } from '@/store'
-import { getPluginEntry } from '@/plugin-registry'
+import { getPluginEntry, type NavIcon } from '@/plugin-registry'
 import { useLocalStorage } from '@/hooks/useLocalStorage'
 
 export type NavGroupId = 'equipment' | 'astronomy' | 'settings'
-export type NavItem = { to: string; icon: typeof Cpu; label: string; badge?: boolean; group: NavGroupId }
+export type NavItem = { to: string; icon: NavIcon; label: string; badge?: boolean; group: NavGroupId }
 
-export const NAV_GROUPS: { id: NavGroupId; icon: typeof Cpu }[] = [
+export const NAV_GROUPS: { id: NavGroupId; icon: NavIcon }[] = [
   { id: 'equipment', icon: Boxes },
   { id: 'astronomy', icon: Stars },
   { id: 'settings',  icon: SlidersHorizontal },
@@ -72,7 +72,7 @@ export function useNavItems(): NavItem[] {
 
 export interface NavGroup {
   id: NavGroupId
-  icon: typeof Cpu
+  icon: NavIcon
   label: string
   items: NavItem[]
   /** An item in the group wants attention (e.g. errors in the log). */

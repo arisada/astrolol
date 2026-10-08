@@ -3,11 +3,13 @@
 // The plugin ID is derived from the directory name in the path.
 // No manual registration is needed when adding a new plugin.
 import type { ComponentType } from 'react'
-import type { LucideIcon } from 'lucide-react'
+
+/** Any icon component: Lucide, another icon set, or an inline SVG that draws with `currentColor`. */
+export type NavIcon = ComponentType<{ size?: number | string; className?: string }>
 
 export interface PluginRegistryEntry {
   to: string
-  icon: LucideIcon
+  icon: NavIcon
   label: string
   Component: ComponentType
   /** Optional status-bar chip rendered while the plugin is active. */
@@ -18,7 +20,7 @@ export interface PluginRegistryEntry {
 // Side-effects in each index.ts (e.g. registerPluginEventHandlers) run here.
 const modules = import.meta.glob('@plugins/*/ui/index.ts', { eager: true }) as Record<
   string,
-  { default: { icon: LucideIcon; label: string; Component: ComponentType; StatusChip?: ComponentType } }
+  { default: { icon: NavIcon; label: string; Component: ComponentType; StatusChip?: ComponentType } }
 >
 
 // Build the registry by extracting the plugin ID from each module path.
