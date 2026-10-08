@@ -115,5 +115,16 @@
   "number": {
     "less": "Decrease",
     "more": "Increase"
+  },
+  "guideGraph": {
+    "none": "No guide data",
+    "ra": "RA",
+    "dec": "Dec",
+    "rms": "RMS avg"
+  },
+  "guideTarget": {
+    "label": "Guide target",
+    "ra": "RA",
+    "dec": "Dec"
   }
 }

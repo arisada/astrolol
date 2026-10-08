@@ -36,11 +36,7 @@
     "debugHint": "Affiche le trafic JSON-RPC brut dans la console du serveur"
   },
   "graph": {
-    "title": "Erreur de guidage (arcsec)",
-    "none": "Aucune donnée de guidage",
-    "ra": "AD",
-    "dec": "Dec",
-    "rms": "RMS moy."
+    "title": "Erreur de guidage (arcsec)"
   },
   "metrics": {
     "rmsRa": "RMS AD",

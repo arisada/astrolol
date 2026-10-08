@@ -185,6 +185,7 @@ Use components from `ui/src/components/ui/` rather than re-implementing them per
 | `EquatorialSky`, `HorizontalSky` | `@/components/ui/mount-equatorial`, `mount-horizontal` | Mount position on the sky (centred on the pole, or on the zenith); take `latitude`, `lst`, `ra`, `dec` |
 | `CoolingGauge` | `@/components/ui/cooling-gauge` | Sensor temperature, set point and cooler power as two half circles |
 | `FocuserRuler` | `@/components/ui/focuser-ruler` | Graduated focuser position with target and optional initial marker |
+| `GuideGraph`, `GuideTarget` | `@/components/ui/guide-graph`, `guide-target` | Guide error over time (RA/Dec lines, RMS band) and the recent positions around the aim point; take `GuideSample[]` (`ra`, `dec`, `ts`), a `range` and a `unit`. Helpers in `@/utils/guiding` |
 
 ```tsx
 import { EventLog } from '@/components/ui/event-log'

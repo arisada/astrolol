@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Crosshair, Pause, Play, Settings, Square, Target, Wifi, WifiOff } from 'lucide-react'
 import { useStore } from '@/store'
@@ -7,16 +7,13 @@ import { Input } from '@/components/ui/input'
 import { ToggleSwitch } from '@/components/ui/toggle-switch'
 import { Card } from '@/components/ui/card'
 import { EventLog } from '@/components/ui/event-log'
+import { GuideGraph } from '@/components/ui/guide-graph'
 import type { Phd2Settings } from '@/api/types'
 import * as phd2Api from './api'
-import type { GuidePoint, Phd2PluginState } from './api'
+import type { Phd2PluginState } from './api'
 import { DEFAULT_PHD2_STATE } from './api'
 
-// ── Graph constants ────────────────────────────────────────────────────────────
-
-const GRAPH_H  = 130
-const MARGIN_L = 28   // left margin inside SVG coordinate space for y-axis labels
-const X_AXIS_H = 14   // extra height below the graph for x-axis tick labels
+// ── Graph options ──────────────────────────────────────────────────────────────
 
 const GRAPH_SCALES: Array<{ label: string; range: number }> = [
   { label: '±0.5"', range: 1.0 },
@@ -34,147 +31,6 @@ function lsGet(key: string, fallback: string): string {
 }
 function lsSet(key: string, value: string): void {
   try { localStorage.setItem(key, value) } catch { /* ignore */ }
-}
-
-/** Format as negative elapsed label, e.g. "-1m30s", "-45s", "0" */
-function fmtAgo(secondsAgo: number): string {
-  if (secondsAgo < 1) return '0'
-  if (secondsAgo < 60) return `-${Math.round(secondsAgo)}s`
-  const m = Math.floor(secondsAgo / 60)
-  const s = Math.round(secondsAgo % 60)
-  return s === 0 ? `-${m}m` : `-${m}m${s}s`
-}
-
-// ── Guide graph ───────────────────────────────────────────────────────────────
-
-function GuideGraph({ points, range, rmsTotal }: {
-  points: GuidePoint[]
-  range: number
-  rmsTotal: number | null | undefined
-}) {
-  const { t } = useTranslation('phd2')
-  const wrapRef = useRef<HTMLDivElement>(null)
-  const [W, setW] = useState(400)
-
-  useEffect(() => {
-    const el = wrapRef.current
-    if (!el) return
-    const ro = new ResizeObserver(entries => {
-      const w = Math.round(entries[0].contentRect.width)
-      if (w > 0) setW(w)
-    })
-    ro.observe(el)
-    return () => ro.disconnect()
-  }, [])
-
-  if (points.length === 0) {
-    return (
-      <div ref={wrapRef} className="flex items-center justify-center h-24 text-xs text-slate-600">
-        {t('graph.none')}
-      </div>
-    )
-  }
-
-  const halfRange = range / 2
-  // Width available for the actual data area (right of y-axis labels)
-  const dataW = W - MARGIN_L
-
-  // arcsec value → SVG y (positive arcsec = up = smaller y)
-  const toY = (v: number): number => GRAPH_H / 2 - (v / halfRange) * (GRAPH_H / 2)
-
-  // point index → SVG x, offset by MARGIN_L so labels fit inside the SVG
-  const n = points.length
-  const toX = (i: number): number =>
-    MARGIN_L + (n <= 1 ? dataW / 2 : Math.round((i / (n - 1)) * dataW))
-
-  // Horizontal grid lines every 0.5" (0.25" for tight scale)
-  const gridStep = range <= 1.0 ? 0.25 : 0.5
-  const gridLines: number[] = []
-  for (let v = -halfRange; v <= halfRange + 0.0001; v += gridStep) {
-    gridLines.push(Math.round(v * 1000) / 1000)
-  }
-
-  // Data paths
-  const raPath  = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${toX(i)},${toY(p.ra).toFixed(1)}`).join(' ')
-  const decPath = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${toX(i)},${toY(p.dec).toFixed(1)}`).join(' ')
-
-  // X-axis: 0 at the right ("now"), negative values going left
-  // Up to 5 ticks; use array index as React key so elements are stable DOM nodes
-  // that just get their content updated — avoids repaint artifacts from key churn.
-  const xTicks: Array<{ x: number; label: string }> = []
-  if (n > 1) {
-    const tLast = Date.parse(points[n - 1].ts)
-    const numTicks = Math.min(5, n)
-    for (let k = 0; k < numTicks; k++) {
-      const idx   = Math.round(k * (n - 1) / (numTicks - 1))
-      const secsAgo = (tLast - Date.parse(points[idx].ts)) / 1000
-      xTicks.push({ x: toX(idx), label: fmtAgo(secsAgo) })
-    }
-  }
-
-  // RMS average band: symmetric dashed lines at ±rmsTotal clamped to graph bounds
-  const rmsY    = rmsTotal != null && rmsTotal > 0 ? Math.max(0, Math.min(GRAPH_H, toY(rmsTotal)))  : null
-  const rmsYNeg = rmsTotal != null && rmsTotal > 0 ? Math.max(0, Math.min(GRAPH_H, toY(-rmsTotal))) : null
-
-  return (
-    // No pl-6 / overflow="visible" — MARGIN_L is baked into the SVG coordinate space
-    <div ref={wrapRef} className="w-full">
-      <svg width={W} height={GRAPH_H + X_AXIS_H} viewBox={`0 0 ${W} ${GRAPH_H + X_AXIS_H}`}>
-
-        {/* Horizontal grid lines (start at MARGIN_L so they don't overlap labels) */}
-        {gridLines.map(v => {
-          const y = toY(v)
-          const isZero = Math.abs(v) < 0.001
-          return (
-            <line key={v}
-              x1={MARGIN_L} y1={y} x2={W} y2={y}
-              className={isZero ? 'stroke-slate-700' : 'stroke-slate-800'}
-              strokeWidth={isZero ? 1 : 0.5}
-              strokeDasharray={isZero ? '4 4' : undefined}
-            />
-          )
-        })}
-
-        {/* Y-axis labels inside the left margin */}
-        {gridLines.filter(v => Math.abs(v) > 0.001).map(v => (
-          <text key={v} x={MARGIN_L - 4} y={toY(v) + 3} fontSize="8" className="fill-slate-600" textAnchor="end">
-            {v > 0 ? `+${v}` : `${v}`}
-          </text>
-        ))}
-
-        {/* RMS average band */}
-        {rmsY != null && rmsYNeg != null && (
-          <>
-            <line x1={MARGIN_L} y1={rmsY} x2={W} y2={rmsY}
-              className="stroke-slate-400" strokeWidth={1} strokeDasharray="4 4" />
-            <line x1={MARGIN_L} y1={rmsYNeg} x2={W} y2={rmsYNeg}
-              className="stroke-slate-400" strokeWidth={1} strokeDasharray="4 4" />
-            <text x={W - 2} y={rmsY - 3} fontSize="8" className="fill-slate-400" textAnchor="end">
-              ±{rmsTotal!.toFixed(2)}&quot;
-            </text>
-          </>
-        )}
-
-        {/* RA (blue) and Dec (red) data paths */}
-        <path d={raPath}  fill="none" className="stroke-series-1" strokeWidth={1.5} />
-        <path d={decPath} fill="none" className="stroke-series-2" strokeWidth={1.5} />
-
-        {/* X-axis temporal labels — keyed by index so DOM nodes are stable */}
-        {xTicks.map(({ x, label }, idx) => (
-          <text key={idx} x={x} y={GRAPH_H + 11} fontSize="8" className="fill-slate-600" textAnchor="middle">
-            {label}
-          </text>
-        ))}
-
-        {/* Legend */}
-        <text x={MARGIN_L + 4}  y={10} fontSize="9" className="fill-series-1">{t('graph.ra')}</text>
-        <text x={MARGIN_L + 22} y={10} fontSize="9" className="fill-series-2">{t('graph.dec')}</text>
-        {rmsY != null && (
-          <text x={MARGIN_L + 44} y={10} fontSize="9" className="fill-slate-400">{t('graph.rms')}</text>
-        )}
-      </svg>
-    </div>
-  )
 }
 
 // ── Status badge ──────────────────────────────────────────────────────────────

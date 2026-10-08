@@ -36,11 +36,7 @@
     "debugHint": "Prints raw JSON-RPC traffic to the server console"
   },
   "graph": {
-    "title": "Guide error (arcsec)",
-    "none": "No guide data",
-    "ra": "RA",
-    "dec": "Dec",
-    "rms": "RMS avg"
+    "title": "Guide error (arcsec)"
   },
   "metrics": {
     "rmsRa": "RMS RA",
