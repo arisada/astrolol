@@ -45,7 +45,7 @@ registerSilentEventTypes('phd2.guide_step')
 
 export default {
   icon: Phd2Icon,
-  label: 'Guiding',
+  label: 'PHD2 Guiding',
   Component: Phd2Page,
   StatusChip: Phd2Chip,
 }

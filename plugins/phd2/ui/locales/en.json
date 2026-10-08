@@ -1,5 +1,5 @@
 {
-  "label": "Guiding",
+  "label": "PHD2 Guiding",
   "manifest": {
     "name": "PHD2 Guiding",
     "description": "PHD2 autoguider integration — live connection status, guiding metrics, guide graph, and configurable automatic dithering between frames."

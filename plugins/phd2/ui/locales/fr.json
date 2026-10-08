@@ -1,5 +1,5 @@
 {
-  "label": "Guidage",
+  "label": "Guidage PHD2",
   "manifest": {
     "name": "Guidage PHD2",
     "description": "Intégration de l'autoguidage PHD2 — état de connexion en direct, métriques de guidage, graphique de guidage et dithering automatique configurable entre les images."
