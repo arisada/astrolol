@@ -82,3 +82,35 @@ def test_changing_exposure_forgets_the_calibration(client) -> None:
     s = client.get("/plugins/guider/settings").json() | {"exposure": 0.05}
     assert client.put("/plugins/guider/settings", json=s).status_code == 200
     assert g.calibration is None
+
+
+def test_view_and_frame_before_anything_is_shown(client) -> None:
+    info = client.get("/plugins/guider/view").json()
+    assert info["mode"] == "idle" and info["stars"] == [] and info["width"] == 0
+    assert client.get("/plugins/guider/frame.jpg").status_code == 404
+
+
+def test_preview_serves_a_frame_and_stars(client) -> None:
+    import time
+
+    assert client.post("/plugins/guider/preview").status_code == 204
+    try:
+        for _ in range(50):
+            info = client.get("/plugins/guider/view").json()
+            if info["stars"]:
+                break
+            time.sleep(0.1)
+        assert info["mode"] == "preview" and info["stars"][0]["kind"] in ("primary", "companion")
+        assert client.get("/plugins/guider/status").json()["status"]["state"] == "Previewing"
+        img = client.get("/plugins/guider/frame.jpg", params={"v": info["version"]})
+        assert img.status_code == 200 and img.headers["content-type"] == "image/jpeg"
+        assert img.content[:2] == b"\xff\xd8"
+    finally:
+        assert client.delete("/plugins/guider/preview").status_code == 204
+    assert client.get("/plugins/guider/view").json()["mode"] == "idle"
+
+
+def test_preview_is_refused_while_guiding(client) -> None:
+    client.post("/plugins/guider/guide")
+    assert client.post("/plugins/guider/preview").status_code == 409
+    client.post("/plugins/guider/stop")

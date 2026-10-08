@@ -66,6 +66,15 @@ class StarTracker:
         self._saturation = saturation
 
     @property
+    def half(self) -> int:
+        return self._half
+
+    @property
+    def last_positions(self) -> list[tuple[float, float]]:
+        """Where each star was last seen (sensor coordinates)."""
+        return list(self._last)
+
+    @property
     def lock_positions(self) -> list[tuple[float, float]]:
         return list(self._locks)
 

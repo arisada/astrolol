@@ -52,6 +52,7 @@ class GuiderPlugin:
     async def shutdown(self) -> None:
         if self._guider is not None:
             await self._guider.stop()
+            await self._guider.stop_preview()
             if self._app is not None:
                 unregister_guider(self._app, self._guider)
 

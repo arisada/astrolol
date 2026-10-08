@@ -177,3 +177,80 @@ async def test_pause_stops_the_corrections() -> None:
     await asyncio.sleep(0.4)
     assert len(rig.pulses) > n
     await g.stop()
+
+
+# --- what the UI shows ---
+
+async def test_preview_shows_the_stars_it_would_pick() -> None:
+    g = make_guider(Rig())
+    await g.start_preview()
+    await asyncio.sleep(0.5)
+    info = g.view.info()
+    assert g.status().state == "Previewing" and not g.status().active
+    assert info.mode == "preview" and (info.width, info.height) == (200, 160)
+    kinds = sorted(s.kind for s in info.stars)
+    assert kinds == ["companion", "companion", "primary"]
+    primary = next(s for s in info.stars if s.kind == "primary")
+    assert (round(primary.x), round(primary.y)) == (100, 80)
+    assert g.view.jpeg()[:2] == b"\xff\xd8"  # a JPEG
+    await g.stop_preview()
+    assert g.view.info().mode == "idle" and g.view.info().stars == []
+
+
+async def test_preview_marks_candidates_that_were_not_picked() -> None:
+    rig = Rig(stars=((100.0, 80.0, 700.0), (60.0, 50.0, 500.0), (150.0, 110.0, 450.0), (40.0, 120.0, 400.0)))
+    g = make_guider(rig, star_count=2)
+    await g.start_preview()
+    await asyncio.sleep(0.5)
+    kinds = sorted(s.kind for s in g.view.info().stars)
+    assert kinds == ["candidate", "candidate", "companion", "primary"]
+    await g.stop_preview()
+
+
+async def test_guiding_takes_over_from_the_preview() -> None:
+    g = make_guider(Rig())
+    await g.start_preview()
+    await asyncio.sleep(0.2)
+    await g.guide(EASY_SETTLE)
+    assert g.status().state == "Guiding" and g.view.info().mode == "guiding"
+    await g.stop()
+
+
+async def test_preview_refused_while_guiding() -> None:
+    g = make_guider(Rig())
+    await g.guide(EASY_SETTLE)
+    with pytest.raises(GuiderError, match="Already guiding"):
+        await g.start_preview()
+    await g.stop()
+
+
+async def test_view_follows_the_stars_while_guiding() -> None:
+    rig = Rig(drift=(1.0, 0.0))
+    g = make_guider(rig)
+    await g.guide(EASY_SETTLE)
+    info = g.view.info()
+    assert info.mode == "guiding" and len(info.locks) == 3
+    assert {s.kind for s in info.stars} <= {"primary", "companion"}
+    truth = rig.star_positions()
+    primary = next(s for s in info.stars if s.kind == "primary")
+    assert abs(primary.x - truth[0][0]) < 3 and abs(primary.y - truth[0][1]) < 3
+    await g.stop()
+    assert g.view.info().mode == "idle"
+
+
+async def test_guide_steps_are_published() -> None:
+    rig = Rig(drift=(4.0, 1.0))
+    g = make_guider(rig)
+    queue = g._bus.subscribe()
+    await g.guide(EASY_SETTLE)
+    await asyncio.sleep(0.6)
+    await g.stop()
+    steps = []
+    while not queue.empty():
+        e = queue.get_nowait()
+        if getattr(e, "type", "") == "guider.step":
+            steps.append(e)
+    assert len(steps) > 5
+    assert any(s.ra_corr != 0 for s in steps)           # it corrected the drift
+    assert all(s.stars_found >= 1 for s in steps)
+    assert all(abs(s.ra_dist) < 5 and abs(s.dec_dist) < 5 for s in steps)

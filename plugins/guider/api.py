@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import structlog
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 
 from astrolol.core.guiding import (
@@ -17,6 +17,7 @@ from plugins.guider.calibration import Calibration
 from plugins.guider.darks import DarkInfo
 from plugins.guider.guider import BuiltinGuider
 from plugins.guider.settings import GuiderSettings
+from plugins.guider.view import ViewInfo
 
 logger = structlog.get_logger()
 router = APIRouter(prefix="/plugins/guider", tags=["guider"])
@@ -49,6 +50,35 @@ async def get_status(request: Request) -> GuiderReport:
         calibration=g.calibration,
         darks=g.darks.describe(),
     )
+
+
+@router.get("/view", response_model=ViewInfo)
+async def get_view(request: Request) -> ViewInfo:
+    """The guide camera's latest frame, described: its size and the stars to draw on it."""
+    return _guider(request).view.info()
+
+
+@router.get("/frame.jpg")
+async def get_frame(request: Request, v: int | None = None) -> Response:
+    """The latest frame as a stretched JPEG. *v* (the view's version) only busts caches."""
+    data = _guider(request).view.jpeg()
+    if data is None:
+        raise HTTPException(status_code=404, detail="No frame yet")
+    return Response(content=data, media_type="image/jpeg", headers={"Cache-Control": "no-store"})
+
+
+@router.post("/preview", status_code=204)
+async def start_preview(request: Request) -> None:
+    """Show the guide camera (and the stars it would guide on) without guiding."""
+    try:
+        await _guider(request).start_preview()
+    except GuiderError as exc:
+        raise _conflict(exc) from exc
+
+
+@router.delete("/preview", status_code=204)
+async def stop_preview(request: Request) -> None:
+    await _guider(request).stop_preview()
 
 
 class GuideBody(BaseModel):
@@ -136,6 +166,8 @@ async def put_settings(body: GuiderSettings, request: Request) -> GuiderSettings
         raise _conflict(GuiderError("Stop guiding before changing the exposure or gain"))
     if body.exposure != g.settings.exposure or body.gain != g.settings.gain:
         g.calibration = None  # the star's response depends on the exposure the loop works at
+    if body.exposure != g.settings.exposure or body.gain != g.settings.gain:
+        await g.stop_preview()  # it would keep running at the old exposure
     g.settings = body
     store = getattr(request.app.state, "profile_store", None)
     if store is not None:
