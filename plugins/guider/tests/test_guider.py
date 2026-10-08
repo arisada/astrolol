@@ -254,3 +254,80 @@ async def test_guide_steps_are_published() -> None:
     assert any(s.ra_corr != 0 for s in steps)           # it corrected the drift
     assert all(s.stars_found >= 1 for s in steps)
     assert all(abs(s.ra_dist) < 5 and abs(s.dec_dist) < 5 for s in steps)
+
+
+# --- calibration under trouble, and what it records ---
+
+async def test_calibration_waits_out_smeared_frames() -> None:
+    rig = Rig(drift=(1.0, 0.5), smear_frames_after_pulse=2)
+    g = make_guider(rig)
+    await g.guide(EASY_SETTLE)
+    cal = g.calibration
+    await g.stop()
+    assert cal is not None and np.allclose(cal.matrix, np.diag([0.03, 0.03]), rtol=0.05, atol=1e-4)
+
+
+async def test_calibration_waits_out_missing_frames() -> None:
+    rig = Rig(drift=(1.0, 0.5), lose_frames_after_pulse=2)
+    g = make_guider(rig)
+    await g.guide(EASY_SETTLE)
+    cal = g.calibration
+    await g.stop()
+    assert cal is not None and np.allclose(cal.matrix, np.diag([0.03, 0.03]), rtol=0.05, atol=1e-4)
+
+
+async def test_calibration_gives_up_clearly_when_the_star_never_comes_back() -> None:
+    rig = Rig(lose_frames_after_pulse=10_000)
+    g = make_guider(rig)
+    with pytest.raises(GuiderError, match="Lost the guide star during calibration"):
+        await g.guide(EASY_SETTLE)
+
+
+async def test_calibration_keeps_every_measurement() -> None:
+    rig = Rig(drift=(2.0, -1.0), dec_backlash_ms=150)
+    g = make_guider(rig)
+    await g.guide(EASY_SETTLE)
+    cal = g.calibration
+    await g.stop()
+    phases = [p.phase for p in cal.trace]
+    for phase in ("drift", "probe", "west", "east", "north", "south"):
+        assert phase in phases
+    ts = [p.t for p in cal.trace]
+    assert ts == sorted(ts)
+    assert (cal.drift_x, cal.drift_y) == pytest.approx((2.0, -1.0), abs=0.6)
+    # The slack at the start of the way back is left out of the fit, and marked as such.
+    south = [p for p in cal.trace if p.phase == "south"]
+    assert any(not p.used for p in south) and sum(p.used for p in south) >= 4
+    assert not any(p.used for p in cal.trace if p.phase in ("drift", "probe"))
+    assert 120 <= cal.dec_backlash_ms <= 180
+
+
+async def test_the_way_back_is_a_second_reading_of_the_speed() -> None:
+    cal = await _calibrate_rig(Rig(matrix=((0.03, 0), (0, 0.03))))
+    assert cal.ra_rate == pytest.approx(0.03, rel=0.03)
+    assert [p.phase for p in cal.trace].count("east") == 6  # the way back: 5 pulses and the start
+
+
+# --- Dec backlash compensation ---
+
+
+
+async def _guided_dec_rms(compensate: bool) -> float:
+    # The star swings in Dec by +-2.5 px every 1.2 s, so corrections keep reversing; each reversal
+    # costs 150 ms of pulse (4.5 px) in the gears.
+    rig = Rig(drift=(0.0, 0.0), dec_backlash_ms=150, dec_wobble=(0.0, 1.2), seed=3)
+    g = make_guider(rig, dec_backlash_compensation=compensate)
+    await g.guide(EASY_SETTLE)
+    rig.dec_wobble = (2.5, 1.2)
+    await asyncio.sleep(0.3)
+    start = g.mark()
+    await asyncio.sleep(3.0)
+    rms = g.stats(start).rms_dec
+    await g.stop()
+    return rms
+
+
+async def test_backlash_compensation_improves_dec_guiding() -> None:
+    plain = await _guided_dec_rms(False)
+    compensated = await _guided_dec_rms(True)
+    assert compensated < plain * 0.85, (plain, compensated)

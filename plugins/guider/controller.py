@@ -29,12 +29,19 @@ class GuideController:
         ra: AxisSettings | None = None,
         dec: AxisSettings | None = None,
         dec_mode: DecMode = "auto",
+        *,
+        compensate_backlash: bool = False,
+        last_dec_dir: int = 0,
     ) -> None:
         self.calibration = calibration
         self.ra = ra or AxisSettings()
         self.dec = dec or AxisSettings(aggressiveness=0.6)
         self.dec_mode = dec_mode
-        self._prev = (0.0, 0.0)  # last commanded (West ms, North ms)
+        self._prev = (0.0, 0.0)  # last commanded (West ms, North ms), before backlash compensation
+        self.compensate_backlash = compensate_backlash
+        # Direction of the last Dec pulse sent (+1 North, -1 South, 0 unknown): when the next one
+        # goes the other way, the gears must first take up the slack.
+        self._dec_dir = last_dec_dir
 
     def reset(self) -> None:
         self._prev = (0.0, 0.0)
@@ -50,12 +57,25 @@ class GuideController:
         ):
             north = 0.0
         self._prev = (west, north)
+        north = self._compensate(north)
         pulses: list[tuple[PulseDirection, int]] = []
         if abs(west) >= self.ra.min_pulse_ms:
             pulses.append(("W" if west > 0 else "E", int(round(abs(west)))))
         if abs(north) >= self.dec.min_pulse_ms:
             pulses.append(("N" if north > 0 else "S", int(round(abs(north)))))
         return pulses
+
+    def _compensate(self, north: float) -> float:
+        """Lengthen a Dec pulse that reverses direction by the backlash measured at calibration."""
+        if north == 0:
+            return 0.0
+        sign = 1 if north > 0 else -1
+        compensated = north
+        if self.compensate_backlash and self._dec_dir not in (0, sign):
+            compensated += sign * min(self.calibration.dec_backlash_ms, self.dec.max_pulse_ms)
+        if abs(compensated) >= self.dec.min_pulse_ms:
+            self._dec_dir = sign  # a pulse really goes out
+        return compensated
 
     @staticmethod
     def _axis(full_ms: float, err_px: float, prev_ms: float, s: AxisSettings) -> float:

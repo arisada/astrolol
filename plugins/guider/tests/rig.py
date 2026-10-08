@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import math
 import time
 
 import numpy as np
@@ -24,8 +25,15 @@ class Rig:
         shape: tuple[int, int] = (160, 200),
         seed: int = 0,
         time_scale: float = 0.05,
+        smear_frames_after_pulse: int = 0,
+        lose_frames_after_pulse: int = 0,
+        dec_wobble: tuple[float, float] = (0.0, 1.0),
     ) -> None:
         self.time_scale = time_scale
+        self.smear_frames = smear_frames_after_pulse  # stars smeared along x for this many frames
+        self.lose_frames = lose_frames_after_pulse  # stars invisible for this many frames
+        self.dec_wobble = dec_wobble  # (amplitude px, period s): a Dec swing that forces reversals
+        self._glitch = 0
         self.matrix = np.array(matrix, dtype=float)
         self.stars = stars
         self.drift = np.array(drift)
@@ -71,11 +79,15 @@ class Rig:
             self._dec_slack -= take
             dec = sign * (abs(dec) - take)
         self.offset += self.matrix @ np.array([ra, dec], dtype=float)
+        self._glitch = max(self.smear_frames, self.lose_frames)
 
     # -- internals
     def star_positions(self) -> list[tuple[float, float]]:
         t = time.monotonic() - self._t0
         shift = self.offset + (self.drift * t if self.drift_enabled else 0)
+        amp, period = self.dec_wobble
+        if amp:
+            shift = shift + np.array([0.0, amp * math.sin(2 * math.pi * t / period)])
         return [(x + shift[0], y + shift[1]) for x, y, _ in self.stars]
 
     async def _produce(self, params: StreamParams) -> None:
@@ -87,9 +99,13 @@ class Rig:
         while True:
             await asyncio.sleep(params.exposure)
             img = 100 + self.rng.normal(0, 3, (h, w))
-            if not self.hidden:
+            glitched, self._glitch = self._glitch > 0, max(self._glitch - 1, 0)
+            smear = glitched and self.smear_frames > 0
+            hidden = self.hidden or (glitched and self.lose_frames > 0)
+            if not hidden:
+                sx = 8.0 if smear else 1.8  # motion during the exposure: long along x, and dimmer
                 for (x, y), (_, _, amp) in zip(self.star_positions(), self.stars):
-                    img += amp * np.exp(-((xs - (x - ox)) ** 2 + (ys - (y - oy)) ** 2) / (2 * 1.8**2))
+                    img += amp * (0.4 if smear else 1.0) * np.exp(-((xs - (x - ox)) ** 2 / (2 * sx**2) + (ys - (y - oy)) ** 2 / (2 * 1.8**2)))
             seq += 1
             self._broadcaster.publish(
                 Frame(

@@ -44,6 +44,9 @@ logger = structlog.get_logger()
 
 ROI_PADDING = 48  # pixels around the outermost guide star
 ROI_MAX_FRACTION = 0.6  # a window covering more of the frame than this is not worth it
+MEASURE_TRIES = 6  # frames to wait for a usable star position before giving up on a measurement
+REACQUIRE_RADIUS = 60  # pixels searched around a star's last position when it has gone missing
+MAX_BLURRED_FRAMES = 10  # a star smeared this many frames in a row counts as lost
 
 
 def window_half(stars: list[Star]) -> int:
@@ -313,26 +316,41 @@ class BuiltinGuider:
                     await self._rereference(sub, tracker, since)
 
             async def measure() -> tuple[float, float]:
-                frame = await self._next_frame(sub, self._usable_after_pulse())
-                result = tracker.update(frame)
-                self._show(frame, result, tracker)
-                star = result.readings[0].star
-                if star is None:
-                    raise GuiderError("Lost the guide star during calibration")
-                return star.x, star.y
+                """The guide star's position in a frame taken after the last pulse.
+
+                A star smeared by the pulse (it moved during the exposure) or briefly missing
+                is waited out; one that moved out of its window is searched for.
+                """
+                for attempt in range(MEASURE_TRIES):
+                    frame = await self._next_frame(sub, self._usable_after_pulse())
+                    result = tracker.update(frame)
+                    if result.readings[0].state == "lost" and attempt >= 1:
+                        if tracker.reacquire(frame, REACQUIRE_RADIUS, indices=[0]):
+                            result = tracker.update(frame)
+                    self._show(frame, result, tracker)
+                    reading = result.readings[0]
+                    if reading.state == "ok" and reading.star is not None:
+                        return reading.star.x, reading.star.y
+                    logger.debug("guider.measure_retry", attempt=attempt, state=reading.state)
+                raise GuiderError(f"Lost the guide star during calibration ({MEASURE_TRIES} frames without it)")
 
             async def pulse(direction, ms) -> None:  # noqa: ANN001
                 await pulser.pulse_guide(direction, ms)
                 self._pulse_end = time.monotonic()
 
+            fresh_calibration = self.calibration is None
             if self.calibration is None:
                 self._state = "Calibrating"
                 self.calibration = await calibrate(
                     measure, pulse, steps=cfg.calibration_steps
                 )
-                logger.info("guider.calibrated", **self.calibration.model_dump())
+                logger.info("guider.calibrated", **self.calibration.model_dump(exclude={"trace"}), points=len(self.calibration.trace))
             tracker.reset_lock()
-            self._controller = GuideController(self.calibration, self._ra, self._dec, self._dec_mode)
+            self._controller = GuideController(
+                self.calibration, self._ra, self._dec, self._dec_mode,
+                compensate_backlash=cfg.dec_backlash_compensation,
+                last_dec_dir=-1 if fresh_calibration else 0,  # calibration ends with South pulses
+            )
 
             self._state = "Guiding"
             await self._guide_loop(sub, tracker, pulser)
@@ -351,6 +369,7 @@ class BuiltinGuider:
         assert self.calibration is not None and self._controller is not None
         scale = cfg.pixel_scale or 1.0
         lost_since: float | None = None
+        blurred_frames = 0
         while True:
             frame = await self._next_frame(sub, self._usable_after_pulse())
             now = time.monotonic()
@@ -358,13 +377,18 @@ class BuiltinGuider:
             self._show(frame, result, tracker)
             await self._check_settle_timeout(now)
             if result.dx is None or result.dy is None:
+                if result.blurred and blurred_frames < MAX_BLURRED_FRAMES:
+                    blurred_frames += 1  # smeared by a pulse or by wind: its position is not to be trusted
+                    continue
                 lost_since = lost_since or now
                 if now - lost_since > self._frame_wait * 2:
                     await self._lost("star_lost")
+                    tracker.reacquire(frame, REACQUIRE_RADIUS)
                 if now - lost_since > cfg.lost_timeout_s:
                     raise GuiderError("Guide star lost")
                 continue
             lost_since = None
+            blurred_frames = 0
             ra_px, dec_px = self.calibration.axis_error(result.dx, result.dy)
             if self._health.on_step(ra_px * scale, dec_px * scale):
                 await self._bus.publish(GuidingStateChanged(guider=self.name, guiding=True))

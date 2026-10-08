@@ -22,6 +22,9 @@ class GuiderSettings(BaseModel):
     gain: int | None = None
     pixel_scale: float | None = Field(default=None, gt=0, description="arcsec per guide pixel")
     star_count: int = Field(default=3, ge=1, le=6, description="Guide star plus companions")
+    dec_backlash_compensation: bool = Field(
+        default=True, description="Add the measured Dec backlash to the first pulse after Dec reverses"
+    )
     calibration_steps: int = Field(default=6, ge=3, le=20)
     lost_timeout_s: float = Field(default=60.0, gt=0, description="Give up after the star is lost this long")
 
