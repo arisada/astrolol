@@ -195,8 +195,24 @@ quirks found there are listed in the project memory ("guider known quirks") to e
   position; searching a wider area (or a companion star) would recover from a bigger jump.
 - **Guide graph / live star view** in the UI, the star choice (pick a star by hand), and a
   "bin 2" / ROI-from-the-UI option.
-- **Predictive algorithms** (PHD2's GP / hysteresis-style controllers) behind the same
-  controller interface.
+- **Guiding algorithm ideas** (from PHD2's "Guide algorithms" page; the controller is already its
+  Hysteresis algorithm, and Dec now has ResistSwitch). Put new ones behind one controller interface:
+  - *Min-move from the seeing* — set each axis' minimum move from the measured star-position
+    noise (we already compute it), and expose min move per axis in the UI.
+  - *Per-axis settings in the UI* — aggressiveness, hysteresis, max pulse, Dec mode
+    (auto/north/south) and the resist-switch frame count / fast-switch factor are
+    code-only today.
+  - *Predictive PEC for RA* — a Gaussian-process model of the periodic error, issuing
+    corrections before the error shows (predictive gain + reactive gain, worm period,
+    retained for ~40 % of a period unguided). Needs ~2 worm periods to train, resets on a
+    big slew, survives dithers and pauses. Worth it for mounts with large periodic error and
+    for the RA spikes seen on the simulator; start from the guide log's FFT.
+  - *LowPass2* (linear extension of recent commands) — suited to encoder mounts; low priority.
+  - *Z-filter* — lets a 0.5-1 s exposure act like a longer virtual one; PHD2 itself says it
+    rarely beats LowPass2. Skip unless short exposures matter.
+  - *Dec backlash* — the calibrated value is unreliable on the simulator (0-144 ms between
+    runs); consider measuring it from the guiding history (overshoot after reversals) and
+    keeping the learned share across runs instead of resetting it each time.
 - **Dark capture UX** — the scope has to be covered by hand; no prompt-and-wait flow, and
   darks for the sequencer's own camera aren't shared.
 
