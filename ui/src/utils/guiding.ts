@@ -4,6 +4,26 @@ export interface GuideSample {
   ra: number
   dec: number
   ts: string // ISO timestamp
+  /** Pulse sent for this sample, in ms: positive West / North, negative East / South. */
+  raCorr?: number
+  decCorr?: number
+}
+
+const PULSE_SCALES = [100, 200, 500, 1000, 2000, 5000]
+
+/** Full-height pulse length (ms) for the bars of a graph; 0 when no sample carries a pulse. */
+export function pulseScale(points: GuideSample[]): number {
+  const longest = points.reduce((m, p) => Math.max(m, Math.abs(p.raCorr ?? 0), Math.abs(p.decCorr ?? 0)), 0)
+  if (longest === 0) return 0
+  return PULSE_SCALES.find((s) => s >= longest) ?? Math.ceil(longest / 1000) * 1000
+}
+
+/**
+ * A pulse on the error axes (East and North positive, like the error lines): a West pulse
+ * points down because it answers an error to the East.
+ */
+export function pulseOnAxes(p: GuideSample): { ra: number; dec: number } {
+  return { ra: 0 - (p.raCorr ?? 0), dec: p.decCorr ?? 0 }
 }
 
 /** Format an elapsed time as a negative label, e.g. "-1m30s", "-45s", "0". */

@@ -120,7 +120,8 @@
     "none": "No guide data",
     "ra": "RA",
     "dec": "Dec",
-    "rms": "RMS avg"
+    "rms": "RMS avg",
+    "pulses": "Pulses: bars, full scale ±{{ms}} ms"
   },
   "guideTarget": {
     "label": "Guide target",

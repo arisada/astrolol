@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { fmtAgo, gridStep, gridValues, niceRange, rmsOf, targetPosition } from './guiding'
+import { fmtAgo, gridStep, gridValues, niceRange, pulseOnAxes, pulseScale, rmsOf, targetPosition } from './guiding'
 
 describe('fmtAgo', () => {
   it('uses seconds, then minutes', () => {
@@ -67,5 +67,24 @@ describe('targetPosition', () => {
     expect(Math.hypot(p.x, p.y)).toBeCloseTo(100)
     expect(p.clamped).toBe(true)
     expect(p.x / p.y).toBeCloseTo(-30 / 40)
+  })
+})
+
+describe('pulses on the graph', () => {
+  const at = (raCorr?: number, decCorr?: number) => ({ ra: 0, dec: 0, ts: '', raCorr, decCorr })
+
+  it('picks a scale that holds the longest pulse', () => {
+    expect(pulseScale([at(80, -30), at(-150, 0)])).toBe(200)
+    expect(pulseScale([at(1500, 0)])).toBe(2000)
+    expect(pulseScale([at(9000, 0)])).toBe(9000)
+  })
+
+  it('has no scale without pulses', () => {
+    expect(pulseScale([at(), at(0, 0)])).toBe(0)
+  })
+
+  it('draws a West pulse against an East error', () => {
+    expect(pulseOnAxes(at(100, 40))).toEqual({ ra: -100, dec: 40 })
+    expect(pulseOnAxes(at())).toEqual({ ra: 0, dec: 0 })
   })
 })

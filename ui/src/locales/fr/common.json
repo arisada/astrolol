@@ -120,7 +120,8 @@
     "none": "Pas de données de guidage",
     "ra": "AD",
     "dec": "Dec",
-    "rms": "RMS moy."
+    "rms": "RMS moy.",
+    "pulses": "Impulsions : barres, pleine échelle ±{{ms}} ms"
   },
   "guideTarget": {
     "label": "Cible de guidage",
