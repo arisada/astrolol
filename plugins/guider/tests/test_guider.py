@@ -331,3 +331,69 @@ async def test_backlash_compensation_improves_dec_guiding() -> None:
     plain = await _guided_dec_rms(False)
     compensated = await _guided_dec_rms(True)
     assert compensated < plain * 0.85, (plain, compensated)
+
+
+# --- stable star choice, frame statistics, pixel scale, live exposure ---
+
+async def test_view_describes_the_frame_and_its_stars() -> None:
+    g = make_guider(Rig())
+    await g.start_preview()
+    await asyncio.sleep(0.5)
+    info = g.view.info()
+    await g.stop_preview()
+    assert info.stats is not None and info.stats.exposure == 0.03
+    assert 90 < info.stats.background < 110 and info.stats.brightest > 400
+    primary = next(s for s in info.stars if s.kind == "primary")
+    assert primary.hfd is not None and 3.0 < primary.hfd < 6.0  # sigma 1.8 px: HFD ~ 2.5 sigma
+    assert primary.peak and primary.flux
+
+
+async def test_pixel_scale_comes_from_the_optics_unless_set() -> None:
+    async def optics(camera_id: str | None) -> float | None:
+        return 0.78
+
+    g = BuiltinGuider(EventBus(), GuiderSettings(**FAST), RigDevices(Rig()), scale_resolver=optics)
+    await g.refresh_pixel_scale()
+    assert g.status().pixel_scale == 0.78 and g.pixel_scale_source == "optics"
+    await g.update_settings(g.settings.model_copy(update={"pixel_scale": 2.0}))
+    assert g.status().pixel_scale == 2.0 and g.pixel_scale_source == "settings"
+
+
+async def test_guide_errors_are_in_arcseconds_when_the_scale_is_known() -> None:
+    async def optics(camera_id: str | None) -> float | None:
+        return 2.0
+
+    rig = Rig(drift=(4.0, 0.0))
+    fine = AxisSettings(min_pulse_ms=2)
+    g = BuiltinGuider(EventBus(), GuiderSettings(**FAST), RigDevices(rig), ra=fine, dec=fine, scale_resolver=optics)
+    queue = g._bus.subscribe()
+    await g.guide(EASY_SETTLE)
+    await asyncio.sleep(0.4)
+    await g.stop()
+    steps = [e for e in iter(lambda: queue.get_nowait() if not queue.empty() else None, None) if getattr(e, "type", "") == "guider.step"]
+    assert g._health.health().guiding is False and steps
+    assert max(abs(s.ra_dist) for s in steps) > 0.5  # a drift of a pixel is 2 arcsec
+
+
+async def test_exposure_changes_while_guiding_and_guiding_goes_on() -> None:
+    rig = Rig(drift=(2.0, 0.0))
+    g = make_guider(rig)
+    await g.guide(EASY_SETTLE)
+    calibration, locks = g.calibration, g.view.info().locks
+    await g.update_settings(g.settings.model_copy(update={"exposure": 0.05}))
+    await asyncio.sleep(0.8)
+    assert rig.exposures[-1] == 0.05 and g.status().state == "Guiding"
+    assert g.calibration is calibration                       # pulses still mean the same
+    assert g.view.info().locks == locks                       # and the aim point did not move
+    assert g.view.info().stats.exposure == 0.05
+    await g.stop()
+
+
+async def test_exposure_changes_in_the_preview() -> None:
+    rig = Rig()
+    g = make_guider(rig)
+    await g.start_preview()
+    await g.update_settings(g.settings.model_copy(update={"exposure": 0.05}))
+    await asyncio.sleep(0.3)
+    assert rig.exposures[-1] == 0.05 and g.status().state == "Previewing"
+    await g.stop_preview()

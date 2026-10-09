@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
+import { CountStepper } from '@/components/ui/count-stepper'
 import { EventLog } from '@/components/ui/event-log'
 import { GuideGraph } from '@/components/ui/guide-graph'
 import { GuideTarget } from '@/components/ui/guide-target'
@@ -17,6 +18,8 @@ import { niceRange } from '@/utils/guiding'
 
 const RANGE_OPTIONS = ['auto', 2, 4, 8, 16] as const
 const SAMPLE_OPTIONS = [50, 100, 200, 500] as const
+// Guide exposures are short: whole milliseconds, stepping through the values people use.
+const EXPOSURE_STEPS_MS = [100, 200, 300, 500, 750, 1000, 1500, 2000, 3000, 4000, 5000, 7500, 10000]
 const NO_STEPS: api.GuiderPluginState['steps'] = []
 
 const fmt = (v: number | null | undefined, digits = 2) => (v == null ? '—' : v.toFixed(digits))
@@ -32,7 +35,7 @@ export function GuiderPage() {
   const [pixelScale, setPixelScale] = useState('')
   const [report, setReport] = useState<api.GuiderReport | null>(null)
   const [settings, setSettings] = useState<api.GuiderSettings | null>(null)
-  const [exposure, setExposure] = useState('')
+  const [exposureMs, setExposureMs] = useState<number | null>(null)
   const [recalibrate, setRecalibrate] = useState(false)
   const [darkCount, setDarkCount] = useState('10')
   const [busy, setBusy] = useState(false)
@@ -44,7 +47,7 @@ export function GuiderPage() {
   }, [])
   useEffect(() => {
     refresh()
-    api.getSettings().then((s) => { setSettings(s); setExposure(String(s.exposure)); setPixelScale(s.pixel_scale == null ? '' : String(s.pixel_scale)) }).catch(() => {})
+    api.getSettings().then((s) => { setSettings(s); setExposureMs(Math.round(s.exposure * 1000)); setPixelScale(s.pixel_scale == null ? '' : String(s.pixel_scale)) }).catch(() => {})
     const timer = setInterval(refresh, 1000)
     return () => clearInterval(timer)
   }, [refresh])
@@ -63,11 +66,12 @@ export function GuiderPage() {
       setMessage((e as Error).message)
     }
   }
-  const saveExposure = () => {
-    const n = Number(exposure)
-    if (!settings || !(n > 0)) { setMessage(t('settings.invalidExposure')); return }
-    void save({ ...settings, exposure: n })
-  }
+  // The exposure applies at once, even while guiding: wait until the stepper rests.
+  useEffect(() => {
+    if (!settings || exposureMs == null || exposureMs / 1000 === settings.exposure) return
+    const timer = setTimeout(() => void save({ ...settings, exposure: exposureMs / 1000 }), 600)
+    return () => clearTimeout(timer)
+  }, [exposureMs]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const savePixelScale = () => {
     if (!settings) return
@@ -91,6 +95,7 @@ export function GuiderPage() {
   const h = report?.health
   const w = report?.last_minute
   const cal = report?.calibration ? summarizeCalibration(report.calibration) : null
+  const fromOptics = report?.pixel_scale_source === 'optics'
   const previewing = st?.state === 'Previewing'
   const unit = st?.pixel_scale ? '"' : 'px'
   const unitName = st?.pixel_scale ? t('graph.arcsec') : t('graph.pixels')
@@ -168,19 +173,18 @@ export function GuiderPage() {
                 )}
                 <Field label={t('settings.exposure')}>
                   <div className="flex items-center gap-2">
-                    <div className="w-24">
-                      <Input inputSize="sm" value={exposure} disabled={st?.active}
-                        onChange={(e) => setExposure(e.target.value)} onBlur={saveExposure} />
-                    </div>
-                    <span className="text-xs text-slate-500">s</span>
+                    <CountStepper value={exposureMs ?? 0} steps={EXPOSURE_STEPS_MS} min={50} max={60000}
+                      disabled={exposureMs == null} onChange={setExposureMs} />
+                    <span className="text-xs text-slate-500">ms</span>
                   </div>
                 </Field>
                 <Field label={t('settings.pixelScale')}>
                   <div className="flex items-center gap-2">
                     <div className="w-24">
-                      <Input inputSize="sm" value={pixelScale} placeholder="—" onChange={(e) => setPixelScale(e.target.value)} onBlur={savePixelScale} />
+                      <Input inputSize="sm" value={pixelScale} placeholder={fromOptics ? fmt(st?.pixel_scale, 2) : '—'} onChange={(e) => setPixelScale(e.target.value)} onBlur={savePixelScale} />
                     </div>
                     <span className="text-xs text-slate-500">″/px</span>
+                    {fromOptics && pixelScale.trim() === '' && <span className="text-xs text-slate-500">{t('settings.pixelScaleOptics')}</span>}
                   </div>
                 </Field>
                 <Field label={t('settings.stars')}>
@@ -191,6 +195,11 @@ export function GuiderPage() {
                   <ToggleSwitch label={t('settings.compensateBacklash')} checked={settings.dec_backlash_compensation}
                     onChange={() => void save({ ...settings, dec_backlash_compensation: !settings.dec_backlash_compensation })} />
                   <span className="text-sm text-slate-300">{t('settings.compensateBacklash')}</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <ToggleSwitch label={t('settings.resistReversals')} checked={settings.dec_resist_reversals}
+                    onChange={() => void save({ ...settings, dec_resist_reversals: !settings.dec_resist_reversals })} />
+                  <span className="text-sm text-slate-300">{t('settings.resistReversals')}</span>
                 </div>
                 {message && <span className="text-xs text-slate-400">{message}</span>}
               </div>

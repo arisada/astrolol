@@ -103,6 +103,55 @@ export function GuiderView({ poll }: { poll: boolean }) {
           </li>
         ))}
       </ul>
+      <FrameInfo view={view} kindLabel={kindLabel} />
+    </div>
+  )
+}
+
+const n = (v: number | null | undefined, digits = 1) => (v == null ? '—' : v.toFixed(digits))
+
+/** The frame's numbers, and a line per star with its size, brightness and signal-to-noise. */
+function FrameInfo({ view, kindLabel }: { view: api.ViewInfo; kindLabel: Record<api.StarKind, string> }) {
+  const { t } = useTranslation('guider')
+  const f = view.stats
+  const scale = view.pixel_scale
+  const size = (px: number | null) => (px == null ? '—' : scale ? `${n(px * scale)}″` : `${n(px)} px`)
+  let chosen = 0
+  const rows = view.stars.map((s) => ({ s, label: s.kind === 'candidate' ? null : ++chosen }))
+  return (
+    <div className="flex flex-col gap-2 text-[11px] text-slate-400">
+      {f && (
+        <p className="font-mono">
+          {t('frame.summary', {
+            seq: f.seq, exposure: n(f.exposure, 2), rate: f.period ? n(1 / f.period) : '—',
+            background: n(f.background, 0), noise: n(f.noise, 1), brightest: n(f.brightest, 0),
+          })}
+        </p>
+      )}
+      {rows.length > 0 && (
+        <table className="w-full font-mono">
+          <thead>
+            <tr className="text-slate-500 text-left">
+              <th className="font-normal pr-2">{t('frame.star')}</th>
+              <th className="font-normal pr-2">{t('frame.hfd')}</th>
+              <th className="font-normal pr-2">{t('frame.fwhm')}</th>
+              <th className="font-normal pr-2">{t('frame.snr')}</th>
+              <th className="font-normal">{t('frame.peak')}</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map(({ s, label }, i) => (
+              <tr key={i} className={s.kind === 'lost' ? 'text-rose-300' : ''}>
+                <td className="pr-2">{label == null ? kindLabel[s.kind] : `${label} ${kindLabel[s.kind]}`}</td>
+                <td className="pr-2">{size(s.hfd)}</td>
+                <td className="pr-2">{size(s.fwhm)}</td>
+                <td className="pr-2">{n(s.snr, 0)}</td>
+                <td>{n(s.peak, 0)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
     </div>
   )
 }

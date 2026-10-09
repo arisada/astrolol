@@ -16,7 +16,7 @@ registerPluginEventHandlers('guider', {
   'guider.step': (event: AstrolollEvent, cur: unknown): GuiderPluginState => {
     const e = event as Extract<AstrolollEvent, { type: 'guider.step' }>
     const s = current(cur)
-    const sample = { ra: e.ra_dist, dec: e.dec_dist, ts: e.timestamp }
+    const sample = { ra: e.ra_dist, dec: e.dec_dist, ts: e.timestamp, raCorr: e.ra_corr, decCorr: e.dec_corr }
     return { ...s, guiding: true, reason: null, steps: [...s.steps, sample].slice(-MAX_STEPS) }
   },
 })

@@ -26,6 +26,7 @@ class Star:
     fwhm: float  # pixels; ~0 for a single hot pixel
     saturated: bool = False
     elongation: float = 1.0  # major over minor axis of the light distribution; ~1 for a round star
+    hfd: float = 0.0  # half-flux diameter, pixels: twice the flux-weighted mean distance from the centre
 
     def shifted(self, dx: float, dy: float) -> Star:
         return replace(self, x=self.x + dx, y=self.y + dy)
@@ -91,6 +92,8 @@ def measure(
         # noise, so a lone hot pixel (area 1 -> 1.13 px) stays narrower than any real star.
         area = int(np.count_nonzero(win - bg > peak / 2))
         fwhm = 2.0 * float(np.sqrt(area / np.pi))
+        radius = np.hypot(xs - x, ys - y)
+        hfd = 2.0 * float((weights * radius).sum() / total)
         star = Star(
             x=x,
             y=y,
@@ -100,6 +103,7 @@ def measure(
             fwhm=fwhm,
             saturated=saturation is not None and float(win.max()) >= saturation,
             elongation=elongation,
+            hfd=hfd,
         )
     return star
 
@@ -152,8 +156,13 @@ def select_guide_stars(
     min_separation: float = 20.0,
     max_fwhm: float = 12.0,
     min_snr: float = 10.0,
+    keep: list[Star] | None = None,
+    keep_radius: float = 5.0,
 ) -> list[Star]:
     """The primary guide star followed by companions, best first.
+
+    Stars of *keep* (the previous choice) that are still usable stay, in their order: noise
+    would otherwise reshuffle stars of similar brightness from one frame to the next.
 
     Saturated stars (the centroid flattens), blurred ones and any star with a neighbour
     closer than *min_separation* (the windows would overlap and the pair biases each other)
@@ -170,5 +179,15 @@ def select_guide_stars(
         for s in stars
         if not s.saturated and s.snr >= min_snr and s.fwhm <= max_fwhm and not crowded(s)
     ]
-    usable.sort(key=lambda s: min(s.snr, 100.0), reverse=True)
-    return usable[:count]
+    usable.sort(key=lambda s: (min(s.snr, 100.0), s.flux), reverse=True)
+    kept: list[Star] = []
+    for old in keep or []:
+        match = min(
+            (s for s in usable if s not in kept and np.hypot(s.x - old.x, s.y - old.y) <= keep_radius),
+            key=lambda s: np.hypot(s.x - old.x, s.y - old.y),
+            default=None,
+        )
+        if match is not None:
+            kept.append(match)
+    rest = [s for s in usable if s not in kept]
+    return (kept + rest)[:count]

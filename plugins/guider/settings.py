@@ -25,6 +25,9 @@ class GuiderSettings(BaseModel):
     dec_backlash_compensation: bool = Field(
         default=True, description="Add the measured Dec backlash to the first pulse after Dec reverses"
     )
+    dec_resist_reversals: bool = Field(
+        default=True, description="Reverse Dec only when several frames in a row, or one large error, ask for it"
+    )
     calibration_steps: int = Field(default=6, ge=3, le=20)
     lost_timeout_s: float = Field(default=60.0, gt=0, description="Give up after the star is lost this long")
 

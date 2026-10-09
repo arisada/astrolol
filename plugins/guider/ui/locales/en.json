@@ -38,10 +38,11 @@
     "exposure": "Exposure",
     "stars": "Guide stars",
     "saved": "Saved.",
-    "invalidExposure": "The exposure must be a number of seconds above zero.",
     "pixelScale": "Pixel scale",
     "invalidPixelScale": "The pixel scale must be a number of arcseconds per pixel above zero, or empty.",
-    "compensateBacklash": "Compensate Dec backlash"
+    "compensateBacklash": "Compensate Dec backlash",
+    "resistReversals": "Resist Dec reversals",
+    "pixelScaleOptics": "Calculated from the telescope and the camera."
   },
   "status": {
     "title": "Guiding",
@@ -116,5 +117,13 @@
     "auto": "Auto",
     "arcsec": "arcsec",
     "pixels": "pixels"
+  },
+  "frame": {
+    "summary": "Frame {{seq}} · {{exposure}} s · {{rate}} frames/s · background {{background}} (noise {{noise}}) · brightest {{brightest}}",
+    "star": "Star",
+    "hfd": "HFD",
+    "fwhm": "FWHM",
+    "snr": "SNR",
+    "peak": "Peak"
   }
 }

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Literal
+
 import structlog
 from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel, Field
@@ -37,11 +39,13 @@ class GuiderReport(BaseModel):
     last_minute: GuidingStats
     calibration: Calibration | None
     darks: list[DarkInfo]
+    pixel_scale_source: Literal["settings", "optics"] | None = None  # where status.pixel_scale comes from
 
 
 @router.get("/status", response_model=GuiderReport)
 async def get_status(request: Request) -> GuiderReport:
     g = _guider(request)
+    await g.refresh_pixel_scale(max_age=10.0)
     now = g.mark()
     return GuiderReport(
         status=g.status(),
@@ -49,6 +53,7 @@ async def get_status(request: Request) -> GuiderReport:
         last_minute=g.stats(now - 60, now),
         calibration=g.calibration,
         darks=g.darks.describe(),
+        pixel_scale_source=g.pixel_scale_source,
     )
 
 
@@ -160,15 +165,12 @@ async def get_settings(request: Request) -> GuiderSettings:
 
 @router.put("/settings", response_model=GuiderSettings)
 async def put_settings(body: GuiderSettings, request: Request) -> GuiderSettings:
-    """Applied at the next run (a run in progress keeps its settings)."""
+    """Exposure and gain apply at once, even while guiding; the rest at the next run."""
     g = _guider(request)
-    if g.status().active and (body.exposure, body.gain) != (g.settings.exposure, g.settings.gain):
-        raise _conflict(GuiderError("Stop guiding before changing the exposure or gain"))
-    if body.exposure != g.settings.exposure or body.gain != g.settings.gain:
-        g.calibration = None  # the star's response depends on the exposure the loop works at
-    if body.exposure != g.settings.exposure or body.gain != g.settings.gain:
-        await g.stop_preview()  # it would keep running at the old exposure
-    g.settings = body
+    try:
+        await g.update_settings(body)
+    except GuiderError as exc:
+        raise _conflict(exc) from exc
     store = getattr(request.app.state, "profile_store", None)
     if store is not None:
         current = store.get_user_settings()

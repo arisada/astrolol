@@ -104,8 +104,11 @@ class StarTracker:
         """Make the stars' last positions (plus *offset*) the new lock positions."""
         self._locks = [(x + offset[0], y + offset[1]) for x, y in self._last]
 
-    def refresh(self, frame: Frame) -> int:
+    def refresh(self, frame: Frame, *, relock: bool = True) -> int:
         """Re-measure every star in *frame* with this tracker's window and lock on the result.
+
+        With ``relock=False`` only the reference brightness and shape are renewed (the stream
+        changed exposure): the lock positions stay where the guider wants the stars.
 
         Detection may have used a different window than tracking will; this makes the
         reference flux and lock positions consistent with what ``update`` measures.
@@ -116,7 +119,9 @@ class StarTracker:
         for i, (x, y) in enumerate(self._last):
             star = self._measure(frame, dark, x, y, i, check_flux=False)
             if star is not None:
-                self._locks[i] = self._last[i] = (star.x, star.y)
+                self._last[i] = (star.x, star.y)
+                if relock:
+                    self._locks[i] = self._last[i]
                 self._ref_flux[i] = star.flux
                 self._ref_fwhm[i] = star.fwhm
                 found += 1

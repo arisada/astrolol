@@ -11,6 +11,7 @@ from plugins.guider.api import router
 from plugins.guider.darks import DarkLibrary
 from plugins.guider.devices import ManagerDevices
 from plugins.guider.guider import BuiltinGuider
+from plugins.guider.scale import derive_pixel_scale
 from plugins.guider.settings import GuiderSettings
 
 logger = structlog.get_logger()
@@ -39,7 +40,10 @@ class GuiderPlugin:
         darks = DarkLibrary(app_settings.profiles_file.parent / "guider" / "darks")
         # The devices read the guider's *current* settings, so edits apply without a restart.
         devices = ManagerDevices(ctx.device_manager, lambda: self._guider.settings)  # type: ignore[union-attr]
-        guider = BuiltinGuider(ctx.event_bus, cfg, devices, darks)
+        guider = BuiltinGuider(
+            ctx.event_bus, cfg, devices, darks,
+            scale_resolver=lambda camera_id: derive_pixel_scale(app, camera_id),
+        )
         self._guider, self._app = guider, app
         app.state.builtin_guider = guider
         register_guider(app, guider)

@@ -13,6 +13,7 @@ import math
 import random
 import time
 from dataclasses import dataclass
+from collections.abc import Awaitable, Callable
 from typing import Any, Literal, Protocol
 
 import structlog
@@ -88,6 +89,7 @@ class BuiltinGuider:
         ra: AxisSettings | None = None,
         dec: AxisSettings | None = None,
         dec_mode: DecMode = "auto",
+        scale_resolver: Callable[[str | None], Awaitable[float | None]] | None = None,
     ) -> None:
         self._bus = bus
         self.settings = settings
@@ -111,6 +113,18 @@ class BuiltinGuider:
         self._period = 0.0
         self._last_frame_at: float | None = None
         self._last_frame_seq = 0
+        # Pixel scale: the setting when given, else worked out from the optics. It only changes
+        # between runs, so that a run reports its errors in one unit throughout.
+        self._scale_resolver = scale_resolver
+        self._scale: float | None = settings.pixel_scale
+        self.pixel_scale_source: Literal["settings", "optics"] | None = "settings" if settings.pixel_scale else None
+        self._scale_checked = 0.0
+        # The live stream, for changing its exposure while guiding.
+        self._camera: IStreamingCamera | None = None
+        self._sub: FrameSubscription | None = None
+        self._roi: StreamRoi | None = None
+        self._restream = False
+        self._preview_picks: list[Star] = []  # the stars shown last, so the choice stays put
 
     # ── Guider protocol ──────────────────────────────────────────────────
 
@@ -122,7 +136,7 @@ class BuiltinGuider:
             guiding=self._health.guiding,
             active=self._running or self._capturing_dark,
             settling=self._settle is not None,
-            pixel_scale=self.settings.pixel_scale,
+            pixel_scale=self._scale,
         )
 
     def health(self) -> GuidingHealth:
@@ -148,6 +162,7 @@ class BuiltinGuider:
         if self._capturing_dark:
             raise GuiderBusy("Taking darks")
         await self.stop_preview()
+        await self.refresh_pixel_scale()
         if self._running and recalibrate:
             await self.stop()
         if self._running:
@@ -196,6 +211,45 @@ class BuiltinGuider:
         if self._controller is not None:
             self._controller.reset()
 
+    async def refresh_pixel_scale(self, *, max_age: float = 0.0) -> float | None:
+        """Settle on the pixel scale to use: the setting, else the one the optics give.
+
+        Left alone during a run, so that its errors keep one unit.
+        """
+        if self._running:
+            return self._scale
+        now = time.monotonic()
+        if max_age and now - self._scale_checked < max_age:
+            return self._scale
+        self._scale_checked = now
+        if self.settings.pixel_scale:
+            self._scale, self.pixel_scale_source = self.settings.pixel_scale, "settings"
+        else:
+            derived = await self._scale_resolver(self.settings.camera_id) if self._scale_resolver else None
+            self._scale, self.pixel_scale_source = derived, "optics" if derived else None
+        self.view.pixel_scale = self._scale
+        return self._scale
+
+    async def update_settings(self, new: GuiderSettings) -> None:
+        """Take new settings. A change of exposure or gain reaches the camera at once: the
+        preview restarts, and a guiding run swaps its stream between two frames."""
+        old, stream_changed = self.settings, (new.exposure, new.gain) != (self.settings.exposure, self.settings.gain)
+        if stream_changed and self._capturing_dark:
+            raise GuiderBusy("Taking darks")
+        self.settings = new
+        self._scale_checked = 0.0
+        if stream_changed:
+            if self._previewing:
+                await self.stop_preview()
+                try:
+                    await self.start_preview()
+                except GuiderError:
+                    pass
+            elif self._running:
+                self._restream = True
+        if (new.pixel_scale, new.camera_id) != (old.pixel_scale, old.camera_id):
+            await self.refresh_pixel_scale()
+
     async def start_preview(self) -> None:
         """Show what the guide camera sees, with the stars the guider would pick."""
         if self._running or self._capturing_dark:
@@ -203,6 +257,8 @@ class BuiltinGuider:
         if self._previewing:
             return
         camera = self._devices.camera()  # fail here, in the caller's request, if there is none
+        await self.refresh_pixel_scale()
+        self._preview_picks = []
         self._preview = asyncio.create_task(self._preview_loop(camera), name="guider_preview")
 
     async def stop_preview(self) -> None:
@@ -224,11 +280,12 @@ class BuiltinGuider:
                 frame = await self._next_frame(sub, 0.0)
                 now = time.monotonic()
                 if now - analysed < 1.0:  # finding stars costs far more than showing a frame
-                    self.view.update(frame, self.view.info().stars, "preview")
+                    self.view.update(frame, self.view.stars, "preview", period=self._period)
                     continue
                 analysed = now
-                chosen, found = await asyncio.to_thread(self._pick_stars, frame)
-                self.view.update(frame, self._candidates(chosen, found), "preview")
+                chosen, found = await asyncio.to_thread(self._pick_stars, frame, self._preview_picks)
+                self._preview_picks = chosen
+                self.view.update(frame, self._candidates(chosen, found), "preview", period=self._period)
         except (StreamClosed, asyncio.TimeoutError) as exc:
             logger.warning("guider.preview_ended", error=str(exc))
         finally:
@@ -277,15 +334,16 @@ class BuiltinGuider:
         sub: FrameSubscription | None = None
         error: BaseException | None = None
         try:
-            camera = self._devices.camera()
+            camera = self._camera = self._devices.camera()
             pulser = self._devices.pulse_guider()
             cfg = self.settings
             params = StreamParams(exposure=cfg.exposure, gain=cfg.gain)
+            self._restream, self._roi = False, None
             self._pulse_end = 0.0
             self._restarted_stream()
 
             self._state = "Selecting star"
-            sub = camera.subscribe_frames()
+            sub = self._sub = camera.subscribe_frames()
             await camera.start_stream(params)
             first = await self._next_frame(sub, 0.0)
             stars, detected = await asyncio.to_thread(self._pick_stars, first)
@@ -302,15 +360,17 @@ class BuiltinGuider:
             if roi is not None:  # the driver now sends only the window we track
                 sub.close()
                 await camera.stop_stream()
-                sub = camera.subscribe_frames()
+                sub = self._sub = camera.subscribe_frames()
                 since = time.monotonic()
                 await camera.start_stream(params.model_copy(update={"roi": roi}))
+                self._roi = roi
                 if not await self._rereference(sub, tracker, since):
                     # The driver did not give us the region we asked for: track in full frames.
                     logger.warning("guider.roi_ignored", roi=roi.model_dump())
                     sub.close()
                     await camera.stop_stream()
-                    sub = camera.subscribe_frames()
+                    sub = self._sub = camera.subscribe_frames()
+                    self._roi = None
                     since = time.monotonic()
                     await camera.start_stream(params)
                     await self._rereference(sub, tracker, since)
@@ -322,7 +382,8 @@ class BuiltinGuider:
                 is waited out; one that moved out of its window is searched for.
                 """
                 for attempt in range(MEASURE_TRIES):
-                    frame = await self._next_frame(sub, self._usable_after_pulse())
+                    await self._apply_stream_change(tracker)
+                    frame = await self._next_frame(self._sub, self._usable_after_pulse())
                     result = tracker.update(frame)
                     if result.readings[0].state == "lost" and attempt >= 1:
                         if tracker.reacquire(frame, REACQUIRE_RADIUS, indices=[0]):
@@ -347,13 +408,15 @@ class BuiltinGuider:
                 logger.info("guider.calibrated", **self.calibration.model_dump(exclude={"trace"}), points=len(self.calibration.trace))
             tracker.reset_lock()
             self._controller = GuideController(
-                self.calibration, self._ra, self._dec, self._dec_mode,
+                self.calibration, self._ra,
+                (self._dec or AxisSettings(aggressiveness=0.6)).model_copy(update={"resist_switch": cfg.dec_resist_reversals}),
+                self._dec_mode,
                 compensate_backlash=cfg.dec_backlash_compensation,
                 last_dec_dir=-1 if fresh_calibration else 0,  # calibration ends with South pulses
             )
 
             self._state = "Guiding"
-            await self._guide_loop(sub, tracker, pulser)
+            await self._guide_loop(tracker, pulser)
         except asyncio.CancelledError:
             raise
         except StreamClosed as exc:
@@ -364,14 +427,15 @@ class BuiltinGuider:
         finally:
             await self._finish(camera, sub, error)
 
-    async def _guide_loop(self, sub: FrameSubscription, tracker: StarTracker, pulser: IPulseGuider) -> None:
+    async def _guide_loop(self, tracker: StarTracker, pulser: IPulseGuider) -> None:
         cfg = self.settings
         assert self.calibration is not None and self._controller is not None
-        scale = cfg.pixel_scale or 1.0
+        scale = self._scale or 1.0
         lost_since: float | None = None
         blurred_frames = 0
         while True:
-            frame = await self._next_frame(sub, self._usable_after_pulse())
+            await self._apply_stream_change(tracker)
+            frame = await self._next_frame(self._sub, self._usable_after_pulse())
             now = time.monotonic()
             result = tracker.update(frame)
             self._show(frame, result, tracker)
@@ -411,11 +475,35 @@ class BuiltinGuider:
                 await asyncio.gather(*(pulser.pulse_guide(d, ms) for d, ms in pulses))
                 self._pulse_end = time.monotonic()
 
+    async def _apply_stream_change(self, tracker: StarTracker) -> None:
+        """Restart the stream with the exposure and gain now in the settings, if they changed.
+
+        The calibration and the lock positions stay; only the stars' reference brightness is
+        measured again, since it depends on the exposure.
+        """
+        if not self._restream or self._camera is None or self._sub is None:
+            return
+        self._restream = False
+        cfg = self.settings
+        self._sub.close()
+        await self._camera.stop_stream()
+        self._sub = self._camera.subscribe_frames()
+        since = time.monotonic()
+        await self._camera.start_stream(StreamParams(exposure=cfg.exposure, gain=cfg.gain, roi=self._roi))
+        self._restarted_stream()
+        await self._next_frame(self._sub, since)  # the first frame may predate the new setting
+        tracker.refresh(await self._next_frame(self._sub, since), relock=False)
+        self._pulse_end = 0.0
+        logger.info("guider.exposure_changed", exposure=cfg.exposure, gain=cfg.gain)
+
     async def _finish(
         self, camera: IStreamingCamera | None, sub: FrameSubscription | None, error: BaseException | None
     ) -> None:
-        if sub is not None:
-            sub.close()
+        for s in (sub, self._sub):
+            if s is not None:
+                s.close()
+        self._sub = self._camera = None
+        self._restream = False
         if camera is not None:
             with contextlib.suppress(Exception):
                 await asyncio.shield(camera.stop_stream())
@@ -431,17 +519,17 @@ class BuiltinGuider:
 
     # ── Helpers ──────────────────────────────────────────────────────────
 
-    def _pick_stars(self, frame: Frame) -> tuple[list[Star], list[Star]]:
-        """(the stars to guide on, every star detected)."""
+    def _pick_stars(self, frame: Frame, keep: list[Star] | None = None) -> tuple[list[Star], list[Star]]:
+        """(the stars to guide on, every star detected); *keep* holds the previous choice."""
         found = detect_stars(frame, self.darks)
-        return select_guide_stars(found, self.settings.star_count), found
+        return select_guide_stars(found, self.settings.star_count, keep=keep), found
 
     @staticmethod
     def _candidates(chosen: list[Star], found: list[Star]) -> list[OverlayStar]:
         picked = {id(s): i for i, s in enumerate(chosen)}
         return [
             OverlayStar(
-                x=s.x, y=s.y, snr=s.snr, fwhm=s.fwhm, half=window_half([s]),
+                x=s.x, y=s.y, snr=s.snr, fwhm=s.fwhm, hfd=s.hfd, peak=s.peak, flux=s.flux, half=window_half([s]),
                 kind="candidate" if id(s) not in picked else "primary" if picked[id(s)] == 0 else "companion",
             )
             for s in found
@@ -455,10 +543,12 @@ class BuiltinGuider:
                 OverlayStar(
                     x=star.x if star else last[0], y=star.y if star else last[1],
                     kind="lost" if star is None else "primary" if i == 0 else "companion",
-                    snr=star.snr if star else None, fwhm=star.fwhm if star else None, half=tracker.half,
+                    snr=star.snr if star else None, fwhm=star.fwhm if star else None,
+                    hfd=star.hfd if star else None, peak=star.peak if star else None,
+                    flux=star.flux if star else None, half=tracker.half,
                 )
             )
-        self.view.update(frame, stars, "guiding", tracker.lock_positions)
+        self.view.update(frame, stars, "guiding", tracker.lock_positions, period=self._period)
 
     def _roi_for(self, stars: list[Star], frame: Frame, half: int) -> StreamRoi | None:
         pad = ROI_PADDING + half

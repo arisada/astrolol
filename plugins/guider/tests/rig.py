@@ -47,6 +47,7 @@ class Rig:
         self._dec_dir = 0
         self._dec_slack = 0.0
         self.pulses: list[tuple[str, int]] = []
+        self.exposures: list[float] = []  # the exposure of each stream started
         self.hidden = False  # stars invisible (clouds)
         self.drift_enabled = True
 
@@ -55,6 +56,7 @@ class Rig:
         return self._broadcaster.subscribe()
 
     async def start_stream(self, params: StreamParams) -> None:
+        self.exposures.append(params.exposure)
         self._task = asyncio.create_task(self._produce(params))
 
     async def stop_stream(self) -> None:

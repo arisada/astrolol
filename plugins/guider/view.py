@@ -21,7 +21,21 @@ class OverlayStar(BaseModel):
     kind: StarKind
     snr: float | None = None
     fwhm: float | None = None
+    hfd: float | None = None  # half-flux diameter, pixels
+    peak: float | None = None  # brightest pixel above the background
+    flux: float | None = None
     half: int = 8  # half-size of the window the tracker measures
+
+
+class FrameStats(BaseModel):
+    """What the latest frame looks like, apart from its stars."""
+
+    seq: int
+    exposure: float  # seconds
+    period: float | None = None  # seconds between frames as observed
+    background: float  # median level, ADU
+    noise: float  # robust spread of the background, ADU
+    brightest: float  # brightest pixel, ADU
 
 
 class ViewInfo(BaseModel):
@@ -32,6 +46,8 @@ class ViewInfo(BaseModel):
     origin: tuple[int, int]  # sensor position of the image's top-left pixel
     stars: list[OverlayStar]
     locks: list[tuple[float, float]] = []  # where the guided stars should be
+    pixel_scale: float | None = None  # arcsec per pixel, when known
+    stats: FrameStats | None = None
 
 
 def render_jpeg(pixels: np.ndarray, max_width: int = 960, quality: int = 80) -> bytes:
@@ -58,6 +74,9 @@ class GuideView:
         self._mode: ViewMode = "idle"
         self._version = 0
         self._jpeg: tuple[int, bytes] | None = None
+        self._period = 0.0
+        self._stats: tuple[int, FrameStats] | None = None
+        self.pixel_scale: float | None = None
 
     def update(
         self,
@@ -65,10 +84,16 @@ class GuideView:
         stars: list[OverlayStar],
         mode: ViewMode,
         locks: list[tuple[float, float]] | None = None,
+        period: float = 0.0,
     ) -> None:
         self._frame, self._stars, self._mode = frame, stars, mode
+        self._period = period
         self._locks = locks or []
         self._version += 1
+
+    @property
+    def stars(self) -> list[OverlayStar]:
+        return self._stars
 
     def go_idle(self) -> None:
         """Keep the last image but drop the overlay: its stars no longer mean anything."""
@@ -85,7 +110,26 @@ class GuideView:
             origin=f.origin if f else (0, 0),
             stars=self._stars,
             locks=self._locks,
+            pixel_scale=self.pixel_scale,
+            stats=self._frame_stats(),
         )
+
+    def _frame_stats(self) -> FrameStats | None:
+        f = self._frame
+        if f is None:
+            return None
+        if self._stats is None or self._stats[0] != self._version:
+            sample = f.pixels[:: max(1, f.height // 128), :: max(1, f.width // 128)].astype(np.float32)
+            background = float(np.median(sample))
+            noise = float(1.4826 * np.median(np.abs(sample - background)))
+            self._stats = (
+                self._version,
+                FrameStats(
+                    seq=f.seq, exposure=f.exposure, period=self._period or None,
+                    background=background, noise=noise, brightest=float(f.pixels.max()),
+                ),
+            )
+        return self._stats[1]
 
     def jpeg(self) -> bytes | None:
         if self._frame is None:

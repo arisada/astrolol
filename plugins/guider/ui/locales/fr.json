@@ -38,10 +38,11 @@
     "exposure": "Pose",
     "stars": "Étoiles de guidage",
     "saved": "Enregistré.",
-    "invalidExposure": "La pose doit être un nombre de secondes supérieur à zéro.",
     "pixelScale": "Échelle",
     "invalidPixelScale": "L'échelle doit être un nombre d'arcsecondes par pixel supérieur à zéro, ou vide.",
-    "compensateBacklash": "Compenser le jeu en Dec"
+    "compensateBacklash": "Compenser le jeu en Dec",
+    "resistReversals": "Limiter les inversions en Dec",
+    "pixelScaleOptics": "Calculé d’après le télescope et la caméra."
   },
   "status": {
     "title": "Guidage",
@@ -116,5 +117,13 @@
     "auto": "Auto",
     "arcsec": "arcsecondes",
     "pixels": "pixels"
+  },
+  "frame": {
+    "summary": "Image {{seq}} · {{exposure}} s · {{rate}} images/s · fond {{background}} (bruit {{noise}}) · plus brillant {{brightest}}",
+    "star": "Étoile",
+    "hfd": "HFD",
+    "fwhm": "FWHM",
+    "snr": "RSB",
+    "peak": "Pic"
   }
 }

@@ -27,6 +27,7 @@ export interface GuiderSettings {
   pixel_scale: number | null
   star_count: number
   dec_backlash_compensation: boolean
+  dec_resist_reversals: boolean
   calibration_steps: number
   lost_timeout_s: number
 }
@@ -70,6 +71,7 @@ export interface GuiderReport {
   last_minute: GuidingStats
   calibration: Calibration | null
   darks: DarkInfo[]
+  pixel_scale_source: 'settings' | 'optics' | null
 }
 
 // What the plugin keeps in the store (pluginStates['guider']).
@@ -90,7 +92,19 @@ export interface OverlayStar {
   kind: StarKind
   snr: number | null
   fwhm: number | null
+  hfd: number | null // half-flux diameter, pixels
+  peak: number | null
+  flux: number | null
   half: number
+}
+
+export interface FrameStats {
+  seq: number
+  exposure: number
+  period: number | null // seconds between frames
+  background: number
+  noise: number
+  brightest: number
 }
 
 export interface ViewInfo {
@@ -101,6 +115,8 @@ export interface ViewInfo {
   origin: [number, number]
   stars: OverlayStar[]
   locks: [number, number][]
+  pixel_scale: number | null
+  stats: FrameStats | null
 }
 
 export const frameUrl = (version: number) => `${BASE}/frame.jpg?v=${version}`

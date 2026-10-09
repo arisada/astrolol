@@ -224,3 +224,17 @@ def test_reacquire_does_not_invent_a_star() -> None:
     star = detect_stars(field([(100, 80, 600)]))[0]
     tracker = StarTracker([star], half=8)
     assert tracker.reacquire(field([], seed=5), radius=60) == 0
+
+
+def test_guide_star_choice_stays_put_when_brightness_order_flips() -> None:
+    from plugins.guider.stars import Star, select_guide_stars
+
+    def star(x: float, snr: float) -> Star:
+        return Star(x=x, y=50.0, peak=100.0, flux=snr * 100, snr=snr, fwhm=3.0)
+
+    first = [star(0, 150), star(50, 140), star(100, 130)]
+    chosen = select_guide_stars(first, 2)
+    again = [star(0.4, 138), star(50.3, 152), star(100.2, 131)]  # noise swapped the order
+    assert [round(s.x) for s in select_guide_stars(again, 2)] == [50, 0]  # without keep: reshuffled
+    assert [round(s.x) for s in select_guide_stars(again, 2, keep=chosen)] == [0, 50]
+    assert [round(s.x) for s in select_guide_stars(again, 2, keep=chosen[:1])] == [0, 50]

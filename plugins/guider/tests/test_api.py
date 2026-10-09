@@ -76,12 +76,13 @@ def test_clear_calibration(client) -> None:
     assert g.calibration is None
 
 
-def test_changing_exposure_forgets_the_calibration(client) -> None:
+def test_changing_exposure_keeps_the_calibration(client) -> None:
+    # Pulse length to displacement does not depend on the exposure, so a run can change it live.
     g = client.app.state.builtin_guider
     g.calibration = object()  # type: ignore[assignment]
     s = client.get("/plugins/guider/settings").json() | {"exposure": 0.05}
     assert client.put("/plugins/guider/settings", json=s).status_code == 200
-    assert g.calibration is None
+    assert g.settings.exposure == 0.05 and g.calibration is not None
 
 
 def test_view_and_frame_before_anything_is_shown(client) -> None:
