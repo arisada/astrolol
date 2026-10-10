@@ -18,7 +18,8 @@
     "waiting_for_guiding": "Waiting for guiding",
     "meridian_flip": "Meridian flip",
     "parking": "Parking",
-    "waiting": "Waiting"
+    "waiting": "Waiting",
+    "cooling": "Cooling"
   },
   "runState": {
     "idle": "idle",
@@ -174,7 +175,8 @@
       "stalls": "Guiding loss and stalls",
       "autofocus": "Autofocus",
       "journal": "Session journal",
-      "resume": "Resume and timeouts"
+      "resume": "Resume and timeouts",
+      "cooling": "Camera cooling"
     },
     "fields": {
       "unpark_on_start": {
@@ -298,6 +300,20 @@
       "exposure_timeout_margin_s": {
         "label": "Exposure timeout margin",
         "unit": "s"
+      },
+      "warm_on_complete": {
+        "label": "Set cameras to a temperature when the queue is done"
+      },
+      "warm_temperature_c": {
+        "label": "Temperature"
+      },
+      "cooling_tolerance_c": {
+        "label": "Close enough to the set point",
+        "unit": "°C"
+      },
+      "cooling_timeout_min": {
+        "label": "Give up waiting for the set point after",
+        "unit": "min"
       }
     },
     "invalid": "Invalid value for {{field}}",
@@ -428,14 +444,12 @@
     "solarHint": "Solar-system objects are re-resolved when the task starts.",
     "favUnavailable": "Favorites unavailable: {{error}}",
     "favNone": "No favorites yet — add some from the Target page.",
-    "currentHint": "No slew and no centering: the task images wherever the mount points when it starts. The name labels the frames (FITS OBJECT, file names).",
+    "currentHint": "No slew and no centering: the task images wherever the mount points when it starts. The name is optional; it labels the frames (FITS OBJECT, file names).",
     "framesName": "Name for the frames",
-    "use": "Use",
     "coordsHint": "ICRS (J2000). RA in hours (5 35 17 or 5.588), Dec in degrees (-5 23 28 or -5.39).",
     "name": "Name",
     "raPlaceholder": "RA  hh mm ss",
-    "decPlaceholder": "Dec  ±dd mm ss",
-    "useCoords": "Use these coordinates"
+    "decPlaceholder": "Dec  ±dd mm ss"
   },
   "editor": {
     "onError": {
@@ -515,7 +529,8 @@
       "sequential": "Group by group",
       "roundRobin": "Round robin",
       "perTurn": "Frames per turn",
-      "afFilter": "Autofocus after each filter change"
+      "afFilter": "Autofocus after each filter change",
+      "setTemperature": "Set temperature"
     },
     "efficiency": {
       "cannotStart": "A {{longest}} s exposure is longer than the time between two of the primary's dithers{{interval}}: it could never start. Shorten it, or make the primary dither less often.",
@@ -525,6 +540,7 @@
       "shorter": ". Shorter exposures would waste less.",
       "end": ".",
       "total": " About {{time}} in total."
-    }
+    },
+    "waitTemperature": "Wait for cameras to reach temperature"
   }
 }

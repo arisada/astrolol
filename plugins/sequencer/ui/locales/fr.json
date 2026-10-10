@@ -18,7 +18,8 @@
     "waiting_for_guiding": "Attente du guidage",
     "meridian_flip": "Retournement au méridien",
     "parking": "Parcage",
-    "waiting": "Attente"
+    "waiting": "Attente",
+    "cooling": "Refroidissement"
   },
   "runState": {
     "idle": "inactif",
@@ -174,7 +175,8 @@
       "stalls": "Perte de guidage et blocages",
       "autofocus": "Autofocus",
       "journal": "Journal de session",
-      "resume": "Reprise et délais"
+      "resume": "Reprise et délais",
+      "cooling": "Refroidissement des caméras"
     },
     "fields": {
       "unpark_on_start": {
@@ -298,6 +300,20 @@
       "exposure_timeout_margin_s": {
         "label": "Marge du délai de pose",
         "unit": "s"
+      },
+      "warm_on_complete": {
+        "label": "Régler les caméras à une température quand la file est terminée"
+      },
+      "warm_temperature_c": {
+        "label": "Température"
+      },
+      "cooling_tolerance_c": {
+        "label": "Assez proche de la consigne",
+        "unit": "°C"
+      },
+      "cooling_timeout_min": {
+        "label": "Abandonner l'attente de la consigne après",
+        "unit": "min"
       }
     },
     "invalid": "Valeur invalide pour {{field}}",
@@ -428,14 +444,12 @@
     "solarHint": "Les objets du système solaire sont recalculés au démarrage de la tâche.",
     "favUnavailable": "Favoris indisponibles : {{error}}",
     "favNone": "Aucun favori pour l'instant — ajoutez-en depuis la page Cible.",
-    "currentHint": "Pas de pointage ni de centrage : la tâche photographie là où la monture pointe à son démarrage. Le nom étiquette les images (OBJECT du FITS, noms de fichiers).",
+    "currentHint": "Pas de pointage ni de centrage : la tâche photographie là où la monture pointe à son démarrage. Le nom est facultatif ; il étiquette les images (OBJECT du FITS, noms de fichiers).",
     "framesName": "Nom pour les images",
-    "use": "Utiliser",
     "coordsHint": "ICRS (J2000). AD en heures (5 35 17 ou 5.588), Dec en degrés (-5 23 28 ou -5.39).",
     "name": "Nom",
     "raPlaceholder": "AD  hh mm ss",
-    "decPlaceholder": "Dec  ±dd mm ss",
-    "useCoords": "Utiliser ces coordonnées"
+    "decPlaceholder": "Dec  ±dd mm ss"
   },
   "editor": {
     "onError": {
@@ -515,7 +529,8 @@
       "sequential": "Groupe par groupe",
       "roundRobin": "Alternance",
       "perTurn": "Images par tour",
-      "afFilter": "Autofocus après chaque changement de filtre"
+      "afFilter": "Autofocus après chaque changement de filtre",
+      "setTemperature": "Régler la température"
     },
     "efficiency": {
       "cannotStart": "Une pose de {{longest}} s est plus longue que le temps entre deux dithers de la principale{{interval}} : elle ne pourrait jamais démarrer. Raccourcissez-la, ou faites dithérer la principale moins souvent.",
@@ -525,6 +540,7 @@
       "shorter": ". Des poses plus courtes gaspilleraient moins.",
       "end": ".",
       "total": " Environ {{time}} au total."
-    }
+    },
+    "waitTemperature": "Attendre que les caméras atteignent la température"
   }
 }

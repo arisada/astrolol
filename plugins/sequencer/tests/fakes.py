@@ -268,6 +268,28 @@ class FakeFocuser:
         return SimpleNamespace(temperature=self.temperature)
 
 
+class FakeCamera:
+    """A cooled camera whose sensor reaches the set point after ``settle_polls`` reads."""
+
+    def __init__(self, temperature: float | None = 20.0) -> None:
+        self.temperature = temperature
+        self.set_point: float | None = None
+        self.cooler_calls: list[tuple[bool, float | None]] = []
+        self.settle_polls = 0
+        self._reads = 0
+
+    async def get_status(self) -> Any:
+        if self.temperature is not None and self.set_point is not None:
+            self._reads += 1
+            if self._reads > self.settle_polls:
+                self.temperature = self.set_point
+        return SimpleNamespace(temperature=self.temperature)
+
+    async def set_cooler(self, enabled: bool, target_temperature: float | None) -> None:
+        self.cooler_calls.append((enabled, target_temperature))
+        self.set_point = target_temperature
+
+
 class FakeSolveManager:
     def __init__(self) -> None:
         self.calls: list[dict[str, Any]] = []
@@ -300,6 +322,10 @@ class FakeDeviceManager:
     def __init__(self, devices: list[tuple[str, str]]) -> None:
         self.devices = devices  # (device_id, kind)
         self.focuser = FakeFocuser()
+        self.camera = FakeCamera()
+
+    def get_camera(self, device_id: str) -> FakeCamera:
+        return self.camera
 
     def get_focuser(self, device_id: str) -> FakeFocuser:
         return self.focuser

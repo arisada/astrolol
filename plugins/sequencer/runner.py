@@ -361,6 +361,8 @@ class Runner:
                         break
             if outcome == RunOutcome.COMPLETED and self.settings.park_on_complete:
                 await self._steps.park(mount_id)
+            if outcome == RunOutcome.COMPLETED and self.settings.warm_on_complete:
+                await self._steps.warm_cameras(self.settings.warm_temperature_c)
         except (_AbortRun, StepError) as exc:
             outcome, error = RunOutcome.FAILED, str(exc)
         except asyncio.CancelledError:
@@ -700,6 +702,13 @@ class Runner:
         ts.target = await self._steps.resolve_target(task)
         rt.resolved_ra, rt.resolved_dec = ts.target.ra, ts.target.dec
         has_coords = ts.target.ra is not None
+        # Start cooling first: it runs while the mount slews, centres and guides.
+        cooling: dict[str, float] = {}
+        for lane in task.lanes:
+            camera_id = ts.lane_devices[lane.id].camera_id
+            if lane.target_temperature is not None and camera_id is not None:
+                if await self._steps.set_temperature(task.id, camera_id, lane.target_temperature):
+                    cooling[camera_id] = lane.target_temperature
         if task.slew and has_coords:
             await self._steps.stop_guiding(task.id)
             await self._steps.slew(task, ts.target, ts.devices.mount_id)
@@ -720,6 +729,8 @@ class Runner:
             for idx, lane in enumerate(task.lanes):
                 ls = ts.lanes.setdefault(lane.id, _LaneState())
                 await run_autofocus(self, entry, ls, ts.lane_devices[lane.id], "task start", idx)
+        if task.wait_for_temperature:
+            await self._steps.wait_for_temperature(task.id, cooling)
         ts.frames_since_dither = 0
         for ls in ts.lanes.values():
             ls.current_filter = None

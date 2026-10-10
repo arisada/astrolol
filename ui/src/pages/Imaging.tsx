@@ -16,7 +16,7 @@ import { FocuserRuler } from '@/components/ui/focuser-ruler'
 import { NumberStepper } from '@/components/ui/number-stepper'
 import { Input } from '@/components/ui/input'
 import { SidebarSection } from '@/components/ui/card'
-import { DurationStepper } from '@/components/ui/duration-stepper'
+import { DurationStepper, EXPOSURE_STEPS } from '@/components/ui/duration-stepper'
 import { EventLog } from '@/components/ui/event-log'
 import { PillGroup } from '@/components/ui/pill-group'
 import { DevicePropertiesPanel } from '@/components/DevicePropertiesPanel'
@@ -51,13 +51,6 @@ const DEFAULT_IMAGER_SETTINGS: ImagerDeviceSettings = {
 
 // ── Exposure duration helpers ─────────────────────────────────────────────────
 
-const EXPOSURE_STEPS = [
-  0.001, 0.002, 0.003, 0.004, 0.005, 0.008,
-  0.01, 0.013, 0.015, 0.02, 0.025, 0.033, 0.04, 0.05,
-  0.067, 0.08, 0.1, 0.125, 0.15, 0.2, 0.25, 0.3, 0.4, 0.5, 0.6, 0.8,
-  1, 1.5, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20, 25, 30,
-  45, 60, 90, 120, 180, 240, 300, 360, 480, 600, 900, 1200, 1800, 3600,
-]
 
 // ── Shared sub-components ─────────────────────────────────────────────────────
 

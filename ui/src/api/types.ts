@@ -423,6 +423,7 @@ export interface SequencerLane {
   order: 'sequential' | 'round_robin'
   round_robin_batch: number
   autofocus_on_filter_change: boolean
+  target_temperature: number | null
 }
 
 export interface SequencerTask {
@@ -434,6 +435,7 @@ export interface SequencerTask {
   center: boolean
   start_guiding: boolean
   autofocus_at_start: boolean
+  wait_for_temperature: boolean
   dither_every: number | null
   sub_delay_s: number
   on_error: 'skip' | 'defer' | 'pause' | 'abort'
@@ -443,7 +445,7 @@ export type SequencerTaskStatus = 'pending' | 'running' | 'interrupted' | 'compl
 export type SequencerRunState = 'idle' | 'starting' | 'running' | 'pausing' | 'paused' | 'stopping'
 export type SequencerActivity =
   | 'unparking' | 'slewing' | 'centering' | 'starting_guiding' | 'focusing' | 'changing_filter'
-  | 'exposing' | 'dithering' | 'waiting_for_primary' | 'waiting_for_guiding' | 'meridian_flip'
+  | 'exposing' | 'dithering' | 'waiting_for_primary' | 'waiting_for_guiding' | 'meridian_flip' | 'cooling'
   | 'parking' | 'waiting'
 export type SequencerStallKind = 'guiding' | 'centering' | 'autofocus'
 export type SequencerBoundary = 'now' | 'frame' | 'task'
@@ -553,6 +555,10 @@ export interface SequencerPreflightReport {
 export interface SequencerSettings {
   unpark_on_start: boolean
   park_on_complete: boolean
+  warm_on_complete: boolean
+  warm_temperature_c: number
+  cooling_tolerance_c: number
+  cooling_timeout_min: number
   guide_settle_pixels: number
   guide_settle_time_s: number
   guide_settle_timeout_s: number

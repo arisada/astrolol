@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { NumberStepper } from '@/components/ui/number-stepper'
 import { ToggleSwitch } from '@/components/ui/toggle-switch'
 import type { SequencerSettings } from '@/api/types'
 import { getSettings, putSettings } from './api'
@@ -20,6 +21,7 @@ const GROUPS: {
   id: string
   bools?: BoolKey[]
   nums?: NumKey[]
+  temps?: 'warm_temperature_c'[]
   texts?: 'journal_dir'[]
 }[] = [
   { id: 'mount', bools: ['unpark_on_start', 'park_on_complete'] },
@@ -27,6 +29,7 @@ const GROUPS: {
   { id: 'guiding', nums: ['guide_settle_pixels', 'guide_settle_time_s', 'guide_settle_timeout_s'] },
   { id: 'dither', bools: ['dither_ra_only'], nums: ['dither_pixels'] },
   { id: 'centering', nums: ['center_tolerance_arcsec', 'center_max_attempts', 'center_exposure_s', 'center_binning'] },
+  { id: 'cooling', bools: ['warm_on_complete'], temps: ['warm_temperature_c'], nums: ['cooling_tolerance_c', 'cooling_timeout_min'] },
   { id: 'cameras', nums: ['download_margin_s', 'secondary_efficiency_warn'] },
   {
     id: 'stalls',
@@ -90,6 +93,14 @@ export function SettingsPanel() {
               <ToggleSwitch label={t(`settings.fields.${key}.label`)} checked={settings[key]}
                 onChange={() => setSettings({ ...settings, [key]: !settings[key] })} />
               <span className="text-sm text-slate-300">{t(`settings.fields.${key}.label`)}</span>
+            </div>
+          ))}
+          {g.temps?.map((key) => (
+            <div key={key} className="flex items-center gap-3 py-1">
+              <span className="text-sm text-slate-300 w-72">{t(`settings.fields.${key}.label`)}</span>
+              <NumberStepper value={settings[key]} unit="°C" step={1} min={-60} max={40}
+                disabled={!settings.warm_on_complete}
+                onChange={(v) => setSettings({ ...settings, [key]: v })} />
             </div>
           ))}
           {g.texts?.map((key) => (

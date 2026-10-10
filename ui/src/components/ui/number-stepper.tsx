@@ -58,7 +58,7 @@ export function NumberStepper({
           onKeyDown={(e) => { if (e.key === 'Enter') (e.target as HTMLInputElement).blur() }}
           className={`${stepperValueClass} ${valueClassName} ${unit ? 'pr-0 text-right' : ''}`}
         />
-        {unit && <span className="select-none pr-2 text-xs text-slate-500">{unit}</span>}
+        {unit && <span className="select-none pl-1.5 pr-2 text-xs text-slate-500">{unit}</span>}
       </span>
     </StepperShell>
   )

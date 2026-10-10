@@ -8,6 +8,16 @@ class SequencerSettings(BaseModel):
     unpark_on_start: bool = True
     park_on_complete: bool = False
 
+    # Cameras
+    warm_on_complete: bool = False
+    warm_temperature_c: float = Field(default=20.0, ge=-60.0, le=40.0)
+    cooling_tolerance_c: float = Field(
+        default=1.0, gt=0, description="Close enough to the set point to start imaging (°C)"
+    )
+    cooling_timeout_min: float = Field(
+        default=30.0, gt=0, description="Give up waiting for a camera to reach its set point"
+    )
+
     # Guiding
     guide_settle_pixels: float = Field(default=1.5, gt=0)
     guide_settle_time_s: int = Field(default=10, ge=0)

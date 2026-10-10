@@ -58,9 +58,11 @@ export function TargetSummary({ target }: { target: SequencerTargetRef | null })
   )
 }
 
-export function TargetPicker({ value, onChange }: {
+export function TargetPicker({ value, onChange, invalid = false }: {
   value: SequencerTargetRef | null
   onChange: (target: SequencerTargetRef) => void
+  /** No target yet: the summary is outlined as an error. */
+  invalid?: boolean
 }) {
   const { t } = useTranslation('sequencer')
   const [tab, setTab] = useState<Tab>(value?.kind === 'favorite' ? 'favorites'
@@ -69,7 +71,7 @@ export function TargetPicker({ value, onChange }: {
 
   return (
     <div className="flex flex-col gap-2">
-      <div className="rounded border border-surface-border bg-surface px-3 py-2">
+      <div className={`rounded border bg-surface px-3 py-2 ${invalid ? 'border-status-error' : 'border-surface-border'}`}>
         <TargetSummary target={value} />
       </div>
       <Tabs
@@ -185,23 +187,21 @@ function CurrentTab({ value, onChange }: {
   onChange: (t: SequencerTargetRef) => void
 }) {
   const { t } = useTranslation('sequencer')
+  const fallback = t('picker.tabs.current')
   const [name, setName] = useState(value?.kind === 'current' ? value.name : '')
+  const apply = (n: string) => onChange({ kind: 'current', name: n.trim() || fallback })
+  // Opening the tab selects the mount's pointing; the name is optional and applied as typed.
+  useEffect(() => {
+    if (value?.kind !== 'current') apply(name)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   return (
     <div className="flex flex-col gap-2">
       <p className="text-xs text-slate-500">
         {t('picker.currentHint')}
       </p>
-      <div className="flex gap-2">
-        <Input placeholder={t('picker.framesName')} value={name} onChange={(e) => setName(e.target.value)} />
-        <button
-          type="button"
-          disabled={!name.trim()}
-          onClick={() => onChange({ kind: 'current', name: name.trim() })}
-          className="px-3 text-xs rounded border border-accent text-accent disabled:opacity-40"
-        >
-          {t('picker.use')}
-        </button>
-      </div>
+      <Input placeholder={fallback} aria-label={t('picker.framesName')} value={name}
+        onChange={(e) => { setName(e.target.value); apply(e.target.value) }} />
     </div>
   )
 }
@@ -217,6 +217,14 @@ function CoordinatesTab({ value, onChange }: {
   const raH = parseRA(ra)
   const decD = parseDec(dec)
   const ok = name.trim() !== '' && raH !== null && decD !== null
+  // Applied as soon as the name and both coordinates are valid.
+  const first = useRef(true)
+  useEffect(() => {
+    // Not on mount: an existing target would be rewritten from its rounded display form.
+    if (first.current) { first.current = false; return }
+    if (ok) onChange({ kind: 'coordinates', name: name.trim(), ra: raH! * 15, dec: decD! })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ok, name, raH, decD])
   return (
     <div className="flex flex-col gap-2">
       <p className="text-xs text-slate-500">{t('picker.coordsHint')}</p>
@@ -227,14 +235,6 @@ function CoordinatesTab({ value, onChange }: {
         <Input placeholder={t('picker.decPlaceholder')} value={dec} onChange={(e) => setDec(e.target.value)}
           className={dec && decD === null ? 'border-status-error' : ''} />
       </div>
-      <button
-        type="button"
-        disabled={!ok}
-        onClick={() => ok && onChange({ kind: 'coordinates', name: name.trim(), ra: raH! * 15, dec: decD! })}
-        className="self-start px-3 py-1 text-xs rounded border border-accent text-accent disabled:opacity-40"
-      >
-        {t('picker.useCoords')}
-      </button>
     </div>
   )
 }

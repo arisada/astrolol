@@ -5,7 +5,10 @@ import type { TFunction } from 'i18next'
 import { ArrowDown, ArrowUp, Crown, Plus, Trash2, X } from 'lucide-react'
 import { api } from '@/api/client'
 import { Button } from '@/components/ui/button'
+import { CountStepper } from '@/components/ui/count-stepper'
+import { DurationStepper, EXPOSURE_STEPS } from '@/components/ui/duration-stepper'
 import { Input } from '@/components/ui/input'
+import { NumberStepper } from '@/components/ui/number-stepper'
 import { PillGroup } from '@/components/ui/pill-group'
 import { ToggleSwitch } from '@/components/ui/toggle-switch'
 import { useStore } from '@/store'
@@ -25,8 +28,8 @@ import { TargetPicker } from './TargetPicker'
 
 interface GroupRow {
   filter_name: string   // '' = don't touch the wheel
-  duration: string
-  count: string
+  duration: number
+  count: number
   gain: string          // '' = leave driver gain unchanged
   binning: number
   frame_type: SequencerExposureGroup['frame_type']
@@ -40,13 +43,14 @@ interface LaneDraft {
   order: 'sequential' | 'round_robin'
   batch: string
   afFilter: boolean
+  temperature: number | null   // cooler set point; null = leave the cooler alone
 }
 
 function toRow(g: SequencerExposureGroup): GroupRow {
   return {
     filter_name: g.filter_name ?? '',
-    duration: String(g.duration),
-    count: String(g.count),
+    duration: g.duration,
+    count: g.count,
     gain: g.gain == null ? '' : String(g.gain),
     binning: g.binning,
     frame_type: g.frame_type,
@@ -54,8 +58,7 @@ function toRow(g: SequencerExposureGroup): GroupRow {
 }
 
 function parseRow(t: TFunction, r: GroupRow): SequencerExposureGroup | string {
-  const duration = Number(r.duration)
-  const count = Number(r.count)
+  const { duration, count } = r
   if (!(duration > 0)) return t('editor.errors.duration')
   if (!Number.isInteger(count) || count < 1) return t('editor.errors.count')
   let gain: number | null = null
@@ -66,7 +69,7 @@ function parseRow(t: TFunction, r: GroupRow): SequencerExposureGroup | string {
   return { filter_name: r.filter_name || null, duration, count, gain, binning: r.binning, frame_type: r.frame_type }
 }
 
-const NEW_ROW: GroupRow = { filter_name: '', duration: '300', count: '10', gain: '', binning: 1, frame_type: 'light' }
+const NEW_ROW: GroupRow = { filter_name: '', duration: 300, count: 10, gain: '', binning: 1, frame_type: 'light' }
 let draftCounter = 0
 const newKey = () => `draft-${++draftCounter}`
 
@@ -79,6 +82,7 @@ function laneToDraft(lane: SequencerLane): LaneDraft {
     order: lane.order,
     batch: String(lane.round_robin_batch),
     afFilter: lane.autofocus_on_filter_change,
+    temperature: lane.target_temperature,
   }
 }
 
@@ -96,6 +100,7 @@ function draftToLane(t: TFunction, d: LaneDraft): SequencerLane | string {
     order: d.order,
     round_robin_batch: d.order === 'round_robin' ? batch : 1,
     autofocus_on_filter_change: d.afFilter,
+    target_temperature: d.temperature,
   }
 }
 
@@ -111,12 +116,13 @@ export function TaskEditor({ entry, onClose }: {
   const [target, setTarget] = useState<SequencerTargetRef | null>(base?.target ?? null)
   const [name, setName] = useState(base?.name ?? '')
   const [lanes, setLanes] = useState<LaneDraft[]>(
-    base ? base.lanes.map(laneToDraft) : [{ key: newKey(), cameraId: '', rows: [{ ...NEW_ROW }], order: 'sequential', batch: '1', afFilter: false }],
+    base ? base.lanes.map(laneToDraft) : [{ key: newKey(), cameraId: '', rows: [{ ...NEW_ROW }], order: 'sequential', batch: '1', afFilter: false, temperature: null }],
   )
   const [slew, setSlew] = useState(base?.slew ?? true)
   const [center, setCenter] = useState(base?.center ?? true)
   const [guide, setGuide] = useState(base?.start_guiding ?? true)
   const [afStart, setAfStart] = useState(base?.autofocus_at_start ?? false)
+  const [waitTemp, setWaitTemp] = useState(base?.wait_for_temperature ?? false)
   const [ditherOn, setDitherOn] = useState(base ? base.dither_every != null : true)
   const [ditherEvery, setDitherEvery] = useState(String(base?.dither_every ?? 1))
   const [subDelay, setSubDelay] = useState(String(base?.sub_delay_s ?? 0))
@@ -153,6 +159,7 @@ export function TaskEditor({ entry, onClose }: {
       lanes: built,
       slew, center, start_guiding: guide,
       autofocus_at_start: afStart,
+      wait_for_temperature: waitTemp && lanes.some((l) => l.temperature != null),
       dither_every: ditherOn ? every : null,
       sub_delay_s: delay,
       on_error: onError,
@@ -177,6 +184,9 @@ export function TaskEditor({ entry, onClose }: {
     setLanes((ls) => ls.map((l, j) => (j === i ? { ...l, ...patch } : l)))
   const usedCameras = new Set(lanes.map((l) => l.cameraId || mainCamera))
   const freeCamera = cameras.find((c) => !usedCameras.has(c.device_id))
+
+  // What keeps "Add to queue" from working, shown next to the button.
+  const problem = (() => { const b = build(); return typeof b === 'string' ? b : null })()
 
   const save = async () => {
     const task = build()
@@ -221,7 +231,7 @@ export function TaskEditor({ entry, onClose }: {
           )}
 
           <Section title={t('editor.target')}>
-            <TargetPicker value={target} onChange={setTarget} />
+            <TargetPicker value={target} onChange={(next) => { setTarget(next); setError(null) }} invalid={!target} />
             <label className="flex flex-col gap-1 mt-2">
               <span className="text-xs text-slate-400">{t('editor.taskName')}</span>
               <Input placeholder={target?.name ?? ''} value={name} onChange={(e) => setName(e.target.value)} />
@@ -255,8 +265,8 @@ export function TaskEditor({ entry, onClose }: {
             {freeCamera && (
               <Button variant="outline" size="sm" className="self-start mt-3"
                 onClick={() => setLanes((ls) => [...ls, {
-                  key: newKey(), cameraId: freeCamera.device_id, rows: [{ ...NEW_ROW, duration: '60', count: '30' }],
-                  order: 'sequential', batch: '1', afFilter: false,
+                  key: newKey(), cameraId: freeCamera.device_id, rows: [{ ...NEW_ROW, duration: 60, count: 30 }],
+                  order: 'sequential', batch: '1', afFilter: false, temperature: null,
                 }])}>
                 <Plus size={12} className="mr-1" /> {t('editor.addCamera', { id: freeCamera.device_id })}
               </Button>
@@ -267,6 +277,12 @@ export function TaskEditor({ entry, onClose }: {
             <Toggle label={t('editor.slew')} checked={slew && !isCurrent} disabled={isCurrent} onChange={() => setSlew((v) => !v)} />
             <Toggle label={t('editor.center')} checked={center && !isCurrent} disabled={isCurrent} onChange={() => setCenter((v) => !v)} />
             <Toggle label={t('editor.guide')} checked={guide} onChange={() => setGuide((v) => !v)} />
+            <Toggle
+              label={t('editor.waitTemperature')}
+              checked={waitTemp && lanes.some((l) => l.temperature != null)}
+              disabled={!lanes.some((l) => l.temperature != null)}
+              onChange={() => setWaitTemp((v) => !v)}
+            />
             <Toggle label={lanes.length > 1 ? t('editor.autofocusAll') : t('editor.autofocus')} checked={afStart} onChange={() => setAfStart((v) => !v)} />
             {isCurrent && <p className="text-xs text-slate-500">{t('editor.currentHint')}</p>}
           </Section>
@@ -297,10 +313,12 @@ export function TaskEditor({ entry, onClose }: {
         </div>
 
         <div className="flex items-center gap-3 px-5 py-3 border-t border-surface-border">
-          {error && <p className="text-xs text-status-error flex-1">{error}</p>}
+          {(error ?? problem) && (
+            <p className={`text-xs flex-1 ${error ? 'text-status-error' : 'text-slate-400'}`} role="status">{error ?? problem}</p>
+          )}
           <div className="ml-auto flex gap-2">
             <Button variant="ghost" onClick={onClose}>{t('editor.cancel')}</Button>
-            <Button onClick={save} disabled={saving || !target}>{entry ? t('editor.saveChanges') : t('editor.addToQueue')}</Button>
+            <Button onClick={save} disabled={saving || problem !== null}>{entry ? t('editor.saveChanges') : t('editor.addToQueue')}</Button>
           </div>
         </div>
       </div>
@@ -332,6 +350,13 @@ function LaneEditor({
     if (path) return path.filter_wheel_device_id
     return filterWheels.length === 1 ? filterWheels[0].device_id : null
   }, [paths, camera, filterWheels])
+  const [cooled, setCooled] = useState(false)
+  useEffect(() => {
+    if (!camera) { setCooled(false); return }
+    let live = true
+    api.imager.cameraStatus(camera).then((s) => { if (live) setCooled(s.temperature != null) }).catch(() => { if (live) setCooled(false) })
+    return () => { live = false }
+  }, [camera])
   const [filterNames, setFilterNames] = useState<string[]>([])
   useEffect(() => {
     if (!wheelId) { setFilterNames([]); return }
@@ -351,6 +376,8 @@ function LaneEditor({
     setRows(copy)
   }
   const primary = index === 0
+  // No wheel, no filter column — unless a row already names a filter (so the stale value stays visible).
+  const showFilter = !!wheelId || rows.some((r) => r.filter_name !== '')
 
   return (
     <div className={`rounded border px-3 py-3 ${count > 1 ? 'border-surface-border bg-surface' : 'border-transparent px-0 py-0'}`}>
@@ -374,7 +401,17 @@ function LaneEditor({
         {primary && <option value="">{mainCamera ? t('editor.lane.mainNamed', { id: mainCamera }) : t('editor.lane.main')}</option>}
         {cameras.map((c) => <option key={c.device_id} value={c.device_id}>{c.device_id}</option>)}
       </select>
-      {!wheelId && <span className="text-xs text-slate-500 ml-2">{t('editor.lane.noWheel')}</span>}
+      {cooled && (
+        <div className="flex items-center gap-3 mt-2">
+          <ToggleSwitch label={t('editor.lane.setTemperature')} checked={draft.temperature != null}
+            onChange={() => onChange({ temperature: draft.temperature == null ? -10 : null })} />
+          <span className="text-sm text-slate-300">{t('editor.lane.setTemperature')}</span>
+          {draft.temperature != null && (
+            <NumberStepper value={draft.temperature} unit="°C" step={1} min={-60} max={40}
+              onChange={(v) => onChange({ temperature: v })} />
+          )}
+        </div>
+      )}
 
       {!primary && estimate && (
         <EfficiencyNote estimate={estimate} primaryInterval={primaryInterval} />
@@ -384,7 +421,7 @@ function LaneEditor({
         <table className="tbl w-full text-xs">
           <thead className="text-slate-500">
             <tr className="text-left">
-              <th className="font-normal pb-1 pr-2">{t('editor.lane.filter')}</th>
+              {showFilter && <th className="font-normal pb-1 pr-2">{t('editor.lane.filter')}</th>}
               <th className="font-normal pb-1 pr-2">{t('editor.lane.exposure')}</th>
               <th className="font-normal pb-1 pr-2">{t('editor.lane.count')}</th>
               <th className="font-normal pb-1 pr-2">{t('editor.lane.gain')}</th>
@@ -400,7 +437,7 @@ function LaneEditor({
               const knownFilter = !r.filter_name || filterNames.includes(r.filter_name)
               return (
                 <tr key={i} className="align-middle">
-                  <td className="pr-2 py-1">
+                  {showFilter && <td className="pr-2 py-1">
                     <select value={r.filter_name} onChange={(e) => patchRow(i, { filter_name: e.target.value })}
                       className={`bg-surface-overlay border rounded px-2 py-1 text-xs text-slate-200 w-24 ${knownFilter ? 'border-surface-border' : 'border-status-error'}`}
                       title={knownFilter ? undefined : t('editor.lane.badFilter')}>
@@ -408,9 +445,13 @@ function LaneEditor({
                       {filterNames.map((f) => <option key={f} value={f}>{f}</option>)}
                       {!knownFilter && <option value={r.filter_name}>{r.filter_name} (?)</option>}
                     </select>
+                  </td>}
+                  <td className="pr-2 py-1">
+                    <DurationStepper steps={EXPOSURE_STEPS} value={r.duration} label="" onChange={(v) => patchRow(i, { duration: v })} />
                   </td>
-                  <td className="pr-2 py-1 w-24"><Input inputSize="sm" value={r.duration} onChange={(e) => patchRow(i, { duration: e.target.value })} /></td>
-                  <td className="pr-2 py-1 w-20"><Input inputSize="sm" value={r.count} onChange={(e) => patchRow(i, { count: e.target.value })} /></td>
+                  <td className="pr-2 py-1">
+                    <CountStepper value={r.count} min={1} onChange={(v) => patchRow(i, { count: v })} />
+                  </td>
                   <td className="pr-2 py-1 w-20"><Input inputSize="sm" placeholder="—" value={r.gain} onChange={(e) => patchRow(i, { gain: e.target.value })} /></td>
                   <td className="pr-2 py-1">
                     <select value={r.binning} onChange={(e) => patchRow(i, { binning: Number(e.target.value) })}

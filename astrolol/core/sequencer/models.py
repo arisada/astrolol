@@ -103,6 +103,12 @@ class Lane(BaseModel):
     )
     round_robin_batch: int = Field(default=1, ge=1, description="Frames per group per round")
     autofocus_on_filter_change: bool = False
+    target_temperature: float | None = Field(
+        default=None,
+        ge=-60.0,
+        le=40.0,
+        description="Sensor set point, °C, applied when the task starts; null = leave the cooler alone",
+    )
 
 
 class ImagingTask(BaseModel):
@@ -117,6 +123,10 @@ class ImagingTask(BaseModel):
     center: bool = Field(default=True, description="Plate-solve centering after the slew")
     start_guiding: bool = Field(default=True, description="Start guiding and wait for settle")
     autofocus_at_start: bool = False
+    wait_for_temperature: bool = Field(
+        default=False,
+        description="Before imaging, wait until every cooled camera with a set point reaches it",
+    )
 
     dither_every: int | None = Field(
         default=1, ge=1, description="Dither every N primary-lane frames; null = never"
@@ -172,6 +182,7 @@ class Activity(StrEnum):
     WAITING_FOR_PRIMARY = "waiting_for_primary"
     WAITING_FOR_GUIDING = "waiting_for_guiding"
     MERIDIAN_FLIP = "meridian_flip"
+    COOLING = "cooling"
     PARKING = "parking"
     WAITING = "waiting"
 

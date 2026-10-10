@@ -43,8 +43,12 @@ SETUP_STEPS: frozenset[str] = frozenset(
         "start_guiding",
         "autofocus",
         "meridian_flip",
+        "cooling",
     }
 )
+
+
+COOLING_POLL_S = 5.0
 
 
 class StepError(Exception):
@@ -157,6 +161,73 @@ class Steps:
             raise RuntimeError(f"timed out after {timeout:.0f} s") from None
         finally:
             self._host.bus.unsubscribe(q)
+
+    # ── Camera cooling ─────────────────────────────────────────────────────
+
+    async def set_temperature(
+        self, task_id: str | None, camera_id: str, temperature: float
+    ) -> bool:
+        """Turn the cooler on at *temperature*. False (and a skip event) if the camera
+        has no cooling."""
+        dm = self._state("device_manager")
+        if dm is None:
+            await self.skipped(task_id, "cooling", "no device manager")
+            return False
+        camera = dm.get_camera(camera_id)
+        try:
+            if (await camera.get_status()).temperature is None:
+                await self.skipped(task_id, "cooling", f"{camera_id} has no cooling")
+                return False
+            t0 = await self._started(
+                task_id, "cooling", Activity.COOLING, f"Cooling {camera_id} to {temperature:g} °C"
+            )
+            await camera.set_cooler(True, temperature)
+        except Exception as exc:
+            raise StepError("cooling", f"Could not set {camera_id} temperature: {exc}") from exc
+        await self._finished(task_id, "cooling", t0, {"camera": camera_id, "target_c": temperature})
+        return True
+
+    async def wait_for_temperature(
+        self, task_id: str | None, targets: dict[str, float]
+    ) -> None:
+        """Block until every camera in *targets* is within tolerance of its set point."""
+        dm = self._state("device_manager")
+        if dm is None or not targets:
+            return
+        cfg = self._host.settings
+        t0 = await self._started(
+            task_id, "cooling", Activity.COOLING, "Waiting for cameras to reach temperature"
+        )
+        deadline = time.monotonic() + cfg.cooling_timeout_min * 60
+        while True:
+            pending: list[str] = []
+            for camera_id, target in targets.items():
+                try:
+                    temp = (await dm.get_camera(camera_id).get_status()).temperature
+                except Exception as exc:
+                    raise StepError("cooling", f"Could not read {camera_id} temperature: {exc}") from exc
+                if temp is not None and abs(temp - target) > cfg.cooling_tolerance_c:
+                    pending.append(f"{camera_id} {temp:.1f}/{target:g} °C")
+            if not pending:
+                break
+            if time.monotonic() > deadline:
+                raise StepError("cooling", "Cameras did not reach temperature: " + ", ".join(pending))
+            await self._host.set_activity(Activity.COOLING, "Cooling: " + ", ".join(pending))
+            await asyncio.sleep(COOLING_POLL_S)
+        await self._finished(task_id, "cooling", t0, {"cameras": len(targets)})
+
+    async def warm_cameras(self, temperature: float) -> None:
+        """End of queue: set every cooled connected camera to *temperature*."""
+        dm = self._state("device_manager")
+        if dm is None:
+            return
+        for dev in dm.list_connected():
+            if dev["kind"] != "camera":
+                continue
+            try:
+                await self.set_temperature(None, dev["device_id"], temperature)
+            except StepError as exc:
+                logger.warning("sequencer.warm_failed", camera=dev["device_id"], error=str(exc))
 
     # ── Mount ──────────────────────────────────────────────────────────────
 

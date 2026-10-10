@@ -1,4 +1,5 @@
 import asyncio
+import contextlib
 import os
 import traceback
 from contextlib import asynccontextmanager
@@ -63,6 +64,15 @@ _CORE_SCOPES: list[LogScope] = [
 ]
 
 
+async def _restore_profile(app: FastAPI) -> None:
+    try:
+        await restore_last_profile(app.state)
+    except asyncio.CancelledError:
+        raise
+    except Exception as exc:
+        logger.error("startup.profile_restore_failed", error=str(exc), exc_info=True)
+
+
 def create_app() -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI):  # noqa: ANN202
@@ -81,10 +91,17 @@ def create_app() -> FastAPI:
                 except Exception as exc:
                     logger.error("plugin.startup_failed", plugin_id=plugin_id, error=str(exc), exc_info=True)
 
-        await restore_last_profile(app.state)
+        # Restore in the background so the API and UI are up while devices connect
+        # (a restart can then be watched from the UI).
+        app.state.profile_restore_task = asyncio.create_task(_restore_profile(app))
         yield
 
         # --- Shutdown ---
+        restore_task: asyncio.Task[None] = app.state.profile_restore_task
+        if not restore_task.done():
+            restore_task.cancel()
+        with contextlib.suppress(asyncio.CancelledError):
+            await restore_task
         for plugin_id in app.state.enabled_plugin_ids:
             plugin = app.state.discovered_plugins.get(plugin_id)
             if plugin is not None:

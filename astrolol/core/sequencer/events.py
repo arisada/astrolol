@@ -32,6 +32,7 @@ StepKind = Literal[
     "expose",
     "dither",
     "meridian_flip",
+    "cooling",
 ]
 
 StepDetails = dict[str, str | float | int | bool | None]
