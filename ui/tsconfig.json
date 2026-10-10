@@ -18,7 +18,7 @@
     "baseUrl": ".",
     "paths": {
       "@/*": ["src/*"],
-      "@plugins/*": ["../plugins/*"],
+      "@plugins/*": ["../astrolol/plugins/*"],
       "react": ["node_modules/@types/react"],
       "react/jsx-runtime": ["node_modules/@types/react/jsx-runtime"],
       "lucide-react": ["node_modules/lucide-react"],
@@ -27,5 +27,5 @@
       "vitest": ["node_modules/vitest"]
     }
   },
-  "include": ["src", "../plugins/**/*.ts", "../plugins/**/*.tsx"]
+  "include": ["src", "../astrolol/plugins/**/*.ts", "../astrolol/plugins/**/*.tsx"]
 }

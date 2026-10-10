@@ -47,7 +47,7 @@ export default defineConfig({
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
-      '@plugins': path.resolve(__dirname, '../plugins'),
+      '@plugins': path.resolve(__dirname, '../astrolol/plugins'),
       // Allow plugin pages (outside ui/) to import packages from ui/node_modules
       'lucide-react': path.resolve(__dirname, './node_modules/lucide-react'),
       'react': path.resolve(__dirname, './node_modules/react'),

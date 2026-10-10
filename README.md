@@ -11,7 +11,7 @@ Source: https://github.com/arisada/astrolol
 
 - **Device management** — connect cameras, mounts, focusers, and filter wheels via INDI.
   Standard adapters are bundled; third-party adapters install as packages via the pluggy
-  entry-point system. `plugins/eqmod/` adds a native (non-INDI) serial driver for Sky-Watcher
+  entry-point system. `astrolol/plugins/eqmod/` adds a native (non-INDI) serial driver for Sky-Watcher
   motor controllers, with an INDI proxy so INDI-only clients can still guide through it.
 - **Equipment profiles** — named device configurations persisted to JSON, plus a separate
   equipment tree (site/mount/OTA/camera/filter wheel/focuser/rotator/GPS) for describing your
@@ -41,7 +41,7 @@ Source: https://github.com/arisada/astrolol
   throttle monitoring for the host machine (e.g. a Raspberry Pi).
 - **Live event stream** — all state changes broadcast to connected clients over WebSocket,
   with a ring-buffer replay for late-joining clients.
-- **Plugin system** — self-contained feature plugins in `plugins/`. Each plugin registers its
+- **Plugin system** — self-contained feature plugins in `astrolol/plugins/`. Each plugin registers its
   own API routes, UI page, and sidebar entry. Enable/disable from Options with a live restart.
 - **Web UI** — dark-theme React app: Equipment, Profiles, Imaging, Mount, Focuser, Logs,
   Options pages, plus one page per enabled plugin.
@@ -141,16 +141,18 @@ Source is bind-mounted; code changes are live without rebuild. Rebuild only when
 ## Test
 
 ```bash
-python3 -m pytest tests/ plugins/ -v
+python3 -m pytest tests/ astrolol/plugins/ -v
 ```
 
-Unit tests require no hardware. Integration tests (in `tests/integration/`) require
+The real-time guiding tests (about 7 minutes) are skipped by default; run them with
+`python3 -m pytest -m slow tests/integration/test_indi_guiding.py` before a release or after guiding
+changes. Unit tests require no hardware. Integration tests (in `tests/integration/`) require
 `indiserver` and are skipped automatically when it is not installed.
 
 ## Adding features
 
-New features should live in `plugins/` whenever possible — self-contained directory with
-its own API, UI component, and tests. See `plugins/hello/` for a minimal example.
+New features should live in `astrolol/plugins/` whenever possible — self-contained directory with
+its own API, UI component, and tests. See `astrolol/plugins/hello/` for a minimal example.
 
 Core changes (device adapters, event bus, profile store, etc.) go in `astrolol/`.
 

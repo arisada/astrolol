@@ -1,0 +1,63 @@
+"""Autofocus plugin for astrolol."""
+from __future__ import annotations
+
+import structlog
+from fastapi import FastAPI
+
+from astrolol.core.plugin_api import LogScope, PluginContext, PluginManifest
+
+logger = structlog.get_logger()
+
+
+class AutofocusPlugin:
+    manifest = PluginManifest(
+        id="autofocus",
+        name="Autofocus",
+        version="0.1.0",
+        description="Automated image focusing",
+        nav_order=21,
+        log_scopes=[LogScope(key="autofocus", label="Autofocus", logger="astrolol.plugins.autofocus")],
+        hot_reloadable=True,
+    )
+
+    def __init__(self) -> None:
+        self._engine = None
+
+    def setup(self, app: FastAPI, ctx: PluginContext) -> None:
+        from astrolol.plugins.autofocus.api import router
+        from astrolol.plugins.autofocus.engine import AutofocusEngine
+        from astrolol.plugins.autofocus.star_detector import detect_stars
+
+        from astrolol.plugins.autofocus.models import AutofocusSettings
+
+        engine = AutofocusEngine(
+            event_bus=ctx.event_bus,
+            device_manager=ctx.device_manager,
+            # read on every run, so settings saved from the page apply to automated runs
+            settings_provider=lambda: ctx.get_plugin_settings("autofocus", AutofocusSettings),
+        )
+        app.state.autofocus_engine = engine
+        self._engine = engine
+
+        # Register star detection with the imager so it can annotate each frame.
+        async def _analyze_stars(fits_path: str) -> tuple[float, int]:
+            fwhm, count, _ = await detect_stars(fits_path)
+            return fwhm, count
+
+        imager_manager = getattr(app.state, "imager_manager", None)
+        if imager_manager is not None:
+            imager_manager.register_star_analyzer(_analyze_stars)
+
+        app.include_router(router)
+        logger.info("autofocus.plugin_setup")
+
+    async def startup(self) -> None:
+        pass
+
+    async def shutdown(self) -> None:
+        if self._engine is not None:
+            await self._engine.abort()
+
+
+def get_plugin() -> AutofocusPlugin:
+    return AutofocusPlugin()

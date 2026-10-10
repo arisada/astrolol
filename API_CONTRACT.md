@@ -63,7 +63,7 @@ should fetch this, then subscribe to `/ws/events`, and de-duplicate on `id` (see
 overlap between what history returns and what the socket then delivers is expected, not
 a bug.
 
-### mDNS discovery (`plugins/mdns/`, optional)
+### mDNS discovery (`astrolol/plugins/mdns/`, optional)
 
 When enabled and configured, the server advertises itself via mDNS as
 `<instance_name>._astrolol._tcp.local.`, with a TXT record carrying `protocol_version`,

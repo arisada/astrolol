@@ -93,7 +93,7 @@ async def test_forwards_debug_once_the_scope_is_enabled(caplog: pytest.LogCaptur
     # Debug messages are forwarded so they appear in the live UI log panel
     # when a scope has been set to debug verbosity — but not before, since the
     # same call would never reach the file/stderr handlers either.
-    logger_name = "plugins.some_scope"
+    logger_name = "astrolol.plugins.some_scope"
     caplog.set_level(logging.DEBUG, logger=logger_name)
     fwd = EventBusForwarder()
     published: list = []
@@ -121,7 +121,7 @@ async def test_does_not_forward_debug_below_the_logger_s_level(caplog: pytest.Lo
     # panel regardless of the logger's configured level — the file/stderr
     # handlers filter these out via stdlib's level check, which only happens
     # *after* this processor runs, so it must apply the same check itself.
-    logger_name = "plugins.some_other_scope"
+    logger_name = "astrolol.plugins.some_other_scope"
     caplog.set_level(logging.INFO, logger=logger_name)
     fwd = EventBusForwarder()
     published: list = []
@@ -172,8 +172,8 @@ async def test_skips_loggers_in_skip_list():
     ("astrolol.devices.indi.client", "indi"),
     ("astrolol.api.mount",           "api"),
     ("astrolol.profiles.store",  "profiles"),
-    ("plugins.sequencer.runner", "sequencer"),
-    ("plugins.guide_simulator.simulator", "guide_simulator"),
+    ("astrolol.plugins.sequencer.runner", "sequencer"),
+    ("astrolol.plugins.guide_simulator.simulator", "guide_simulator"),
     ("astrolol.unknown.thing",   "thing"),
     ("",                         "app"),
 ])

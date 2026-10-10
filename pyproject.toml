@@ -46,6 +46,11 @@ dev = [
 [tool.hatch.metadata]
 allow-direct-references = true
 
+[tool.hatch.build.targets.wheel]
+packages = ["astrolol"]
+# Plugin UI sources (built into the web UI) and tests are not part of the Python package.
+exclude = ["astrolol/plugins/*/ui", "astrolol/plugins/*/tests"]
+
 [tool.ruff]
 target-version = "py311"
 line-length = 100
@@ -63,6 +68,11 @@ asyncio_mode = "auto"
 asyncio_default_fixture_loop_scope = "module"
 asyncio_default_test_loop_scope = "module"
 testpaths = ["tests"]
+markers = [
+    "slow: real-time tests that take minutes (guiding against the INDI simulators); skipped by default, run with `-m slow`",
+]
+# Deselect slow tests unless -m is given on the command line (a later -m overrides this one).
+addopts = "-m 'not slow'"
 
 [tool.coverage.report]
 omit = ["tests/*"]

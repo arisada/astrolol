@@ -27,7 +27,7 @@ def _placeholders(text: str) -> set[str]:
 
 def _pairs() -> list[tuple[Path, Path]]:
     pairs = []
-    for en in ROOT.glob("plugins/*/ui/locales/en.json"):
+    for en in ROOT.glob("astrolol/plugins/*/ui/locales/en.json"):
         pairs += [(en, o) for o in en.parent.glob("*.json") if o != en]
     for en in ROOT.glob("ui/src/locales/en/*.json"):
         pairs += [(en, o) for o in en.parent.parent.glob(f"*/{en.name}") if o != en]

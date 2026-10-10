@@ -40,7 +40,7 @@ scripts and a future MCP server all drive the sequencer through the same
 ## Architecture
 
 ```
-plugins/sequencer/
+astrolol/plugins/sequencer/
 ├── __init__.py
 ├── plugin.py          # SequencerPlugin — setup/startup/shutdown, restores queue
 ├── api.py             # FastAPI router — thin wrapper over SequencerService
@@ -603,7 +603,7 @@ The slew → solve → sync → re-slew loop belongs to the platesolve plugin, n
 The Mount page ("Slew & center"), the target plugin and scripts all want it too.
 
 ```python
-# plugins/platesolve — new
+# astrolol/plugins/platesolve — new
 class CenterRequest(BaseModel):
     mount_id: str
     camera_id: str
@@ -1096,7 +1096,7 @@ class SequencerSettings(BaseModel):
 
 ### Wiring
 
-- Types go in `ui/src/api/types.ts`; fetch helpers in `plugins/sequencer/ui/api.ts`.
+- Types go in `ui/src/api/types.ts`; fetch helpers in `astrolol/plugins/sequencer/ui/api.ts`.
 - `registerPluginEventHandlers('sequencer', {'sequencer.status': …, 'sequencer.queue_changed': …})`:
   the page reads `pluginStates['sequencer']`, and fetches once on mount. No polling.
 - `SequencerChip` shows the run state, the current target, and frame n/N; it pulses while

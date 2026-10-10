@@ -50,7 +50,7 @@ no longer present in the index.
 ## Architecture
 
 ```
-plugins/viewer/
+astrolol/plugins/viewer/
 ├── plugin.py          # ViewerPlugin — setup/startup (opens index db, subscribes to
 │                       # EventBus), shutdown (closes db, cancels any in-flight rescan)
 ├── api.py             # FastAPI router — everything lives under /plugins/viewer/...
@@ -362,7 +362,7 @@ file), `viewer.rescan_started` / `viewer.rescan_progress` / `viewer.rescan_compl
 
 ## Testing
 
-`plugins/viewer/tests/`, plus one `tests/unit/` case for the core `preview.py` addition:
+`astrolol/plugins/viewer/tests/`, plus one `tests/unit/` case for the core `preview.py` addition:
 
 - Indexer: correct header extraction; incremental rescan skips unchanged `(size, mtime)`,
   picks up changed ones, drops removed ones; the rescan/live-indexer race (generation

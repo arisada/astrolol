@@ -14,23 +14,23 @@ FastAPI serves the REST and WebSocket API. Devices (camera, mount, focuser, filt
 abstracted behind `Protocol` interfaces in `astrolol/devices/base/`. Concrete adapters register
 themselves via the pluggy plugin system at startup. Standard adapters (INDI) are **bundled
 inside astrolol** in `astrolol/devices/indi/` — the pluggy interface exists for extensibility,
-not to force a separate install for the common case; `plugins/eqmod/` is a real example of a
+not to force a separate install for the common case; `astrolol/plugins/eqmod/` is a real example of a
 non-INDI adapter (a native serial driver for Sky-Watcher motor controllers) that also exposes
 an INDI proxy so INDI-only clients (e.g. PHD2) can still guide through it. Similarly,
 `astrolol/core/guiding/` and `astrolol/core/sequencer/` define guider- and sequencer-agnostic
-`Protocol` contracts that `plugins/phd2/` / `plugins/guide_simulator/` and `plugins/sequencer/`
+`Protocol` contracts that `astrolol/plugins/phd2/` / `astrolol/plugins/guide_simulator/` and `astrolol/plugins/sequencer/`
 implement. An internal `EventBus` (asyncio queues) lets any component publish typed events;
 connected WebSocket clients subscribe and receive a live JSON stream. A React + TypeScript web
 UI is served as static files from `ui/dist/` and proxied through Vite in development.
 
 ## Plugin architecture
 
-**New features should go in `plugins/` whenever possible.** A plugin is a self-contained
+**New features should go in `astrolol/plugins/` whenever possible.** A plugin is a self-contained
 directory with its own API, UI component, sidebar entry, and tests. The core wires them in
 at startup based on `UserSettings.enabled_plugins`.
 
 ```
-plugins/
+astrolol/plugins/
 └── my_feature/
     ├── __init__.py
     ├── plugin.py          # class MyPlugin + get_plugin() factory
@@ -53,7 +53,7 @@ plugins/
 - **`nav_group`** (manifest) puts the plugin's page in a navigation category: `equipment` (drivers, simulators, protocol bridges), `astronomy` (default: observing features) or `settings` (host/system). Options → Plugins groups by it too.
 - **Enabling/disabling** requires a restart (`POST /admin/restart` or restart the process).
   `UserSettings.enabled_plugins` is persisted in `profiles.json`.
-- See `plugins/hello/` for a minimal example; `plugins/autofocus/` for a full-stack example.
+- See `astrolol/plugins/hello/` for a minimal example; `astrolol/plugins/autofocus/` for a full-stack example.
 
 **Core code** (`astrolol/`) is for infrastructure: device adapters, event bus, profile store,
 settings, API wiring. Features with UI, their own API routes, and optional enable/disable belong
@@ -69,10 +69,10 @@ registered at runtime through the extension points described below.
 
 ### Plugin UI file layout
 
-Every plugin with a UI must have `plugins/<id>/ui/index.ts` as its entry point:
+Every plugin with a UI must have `astrolol/plugins/<id>/ui/index.ts` as its entry point:
 
 ```ts
-// plugins/my_feature/ui/index.ts
+// astrolol/plugins/my_feature/ui/index.ts
 import { SomeIcon } from 'lucide-react'
 import { MyPage } from './MyPage'
 import { MyChip } from './MyChip'          // optional
@@ -98,7 +98,7 @@ Do **not** add plugin routes to `ui/src/api/client.ts`. Copy the `request<T>` he
 plugin's `api.ts` rather than importing it from the core (it is not exported).
 
 ```ts
-// plugins/my_feature/ui/api.ts
+// astrolol/plugins/my_feature/ui/api.ts
 import type { MySettings } from '@/api/types'
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> { /* ... */ }
@@ -260,7 +260,7 @@ suffixes for plurals and `<tag>…</tag>` + `<Trans>` for inline markup.
 |---|---|---|
 | Core page or area | `ui/src/locales/<lng>/<ns>.json` | `equipment`, `profiles`, `imaging`, `mount`, `logs`, `options`, `events` |
 | Shell + shared components | `ui/src/locales/<lng>/common.json` | `common` (default) |
-| A plugin | `plugins/<id>/ui/locales/<lng>.json` | the plugin id |
+| A plugin | `astrolol/plugins/<id>/ui/locales/<lng>.json` | the plugin id |
 
 - **Never hard-code user-visible text in TSX.** Use `const { t } = useTranslation('<ns>')`.
   That covers labels, placeholders, `title`/`aria-label`, empty states, button text and
@@ -269,7 +269,7 @@ suffixes for plurals and `<tag>…</tag>` + `<Trans>` for inline markup.
 - **Changing or adding text means changing the catalogues in the same commit**: edit the
   English value, then the French one. When you can't translate well, still add the key to
   every language file (with the English text) so the parity test passes, and say so in the commit.
-- **Plugins translate themselves.** Add `plugins/<id>/ui/locales/{en,fr}.json`; the loader in
+- **Plugins translate themselves.** Add `astrolol/plugins/<id>/ui/locales/{en,fr}.json`; the loader in
   `ui/src/i18n.ts` picks them up, no core change. Two optional top-level keys are read by
   core: `label` (sidebar entry) and `manifest.name` / `manifest.description` (Options → Plugins).
 - Non-React code (e.g. the store) uses `i18n.t(key, { ns })` — the result is fixed at call time.
@@ -314,7 +314,7 @@ manifest = PluginManifest(
     name="My Feature",
     ...
     log_scopes=[
-        LogScope(key="my_feature", label="My Feature", logger="plugins.my_feature"),
+        LogScope(key="my_feature", label="My Feature", logger="astrolol.plugins.my_feature"),
     ],
 )
 ```
@@ -322,8 +322,8 @@ manifest = PluginManifest(
 - `key` — unique identifier, used by the UI toggle and the `POST /admin/log_level` endpoint.
 - `label` — human-readable name shown in the Verbosity panel.
 - `logger` — stdlib logger name whose level is toggled. Follows Python's logger hierarchy:
-  setting `plugins.my_feature` to `DEBUG` covers `plugins.my_feature.client`,
-  `plugins.my_feature.engine`, etc.
+  setting `astrolol.plugins.my_feature` to `DEBUG` covers `astrolol.plugins.my_feature.client`,
+  `astrolol.plugins.my_feature.engine`, etc.
 
 The core always registers scopes for `indi`, `device`, `mount`, `imager`, and `focuser`.
 Plugin scopes are collected at startup and exposed via `GET /admin/log_scopes`;
@@ -333,8 +333,8 @@ Plugin scopes are collected at startup and exposed via `GET /admin/log_scopes`;
 
 **Every new feature that can be tested must have tests. No exceptions.**
 
-- Plugin API tests go in `plugins/<name>/tests/`. Run them with
-  `python3 -m pytest plugins/ -v`.
+- Plugin API tests go in `astrolol/plugins/<name>/tests/`. Run them with
+  `python3 -m pytest astrolol/plugins/ -v`.
 - Unit tests go in `tests/unit/`. Use `FakeCamera`, `FakeMount`, `FakeFocuser` from
   `tests/conftest.py` — no hardware required.
 - Integration tests go in `tests/integration/` and are skipped automatically when
@@ -344,7 +344,19 @@ Plugin scopes are collected at startup and exposed via `GET /admin/log_scopes`;
 - Structlog output is captured by pytest's log system, not `capsys`. Use
   `caplog.at_level(logging.WARNING, logger="<module>")` to assert on log output.
 
-Current count: **672 unit tests**, **37 integration tests**, **979 plugin tests** (all passing).
+**Slow tests.** The guiding integration tests (`tests/integration/test_indi_guiding.py`) run in
+real time — about 7 minutes — so they carry `@pytest.mark.slow` and are deselected by default
+(`addopts = -m 'not slow'` in `pyproject.toml`). Run them before a release and whenever you
+change guiding code (`astrolol/core/guiding/`, `astrolol/plugins/guider/`, pulse guiding in the
+INDI/EQMOD adapters, `phd2`):
+
+```bash
+python3 -m pytest -m slow tests/integration/test_indi_guiding.py -v
+python3 -m pytest tests/ astrolol/plugins/ -m "slow or not slow"   # everything, slow included
+```
+
+Current count: **696 unit tests**, **49 integration tests** (3 of them slow), **1133 plugin tests**
+(all passing).
 
 ### UI unit tests
 
@@ -404,7 +416,7 @@ python3 -m astrolol.main           # everything at http://localhost:8000
 
 ```bash
 # All tests (unit + plugin tests)
-python3 -m pytest tests/ plugins/ -v
+python3 -m pytest tests/ astrolol/plugins/ -v
 
 # Unit tests only (no hardware)
 python3 -m pytest tests/unit/ -v
@@ -412,10 +424,10 @@ python3 -m pytest tests/unit/ -v
 # Integration tests (require indiserver / indi-bin)
 python3 -m pytest tests/integration/ -v
 
-# TypeScript type checking (src/ + plugins/)
+# TypeScript type checking (src/ + astrolol/plugins/)
 cd ui && npm run typecheck
 
-# Lint: no untranslated text in JSX (src/ + plugins/)
+# Lint: no untranslated text in JSX (src/ + astrolol/plugins/)
 cd ui && npm run lint
 ```
 
@@ -426,7 +438,7 @@ cd ui && npm run lint
 docker-compose up
 
 # Run tests inside the container
-docker-compose run --rm backend python3 -m pytest tests/ plugins/ -v
+docker-compose run --rm backend python3 -m pytest tests/ astrolol/plugins/ -v
 ```
 
 Backend API at `http://localhost:8000`, UI dev server at `http://localhost:80`.
@@ -482,11 +494,12 @@ astrolol/
 ├── profiles/
 │   ├── models.py       # Profile, ProfileDevice
 │   └── store.py        # ProfileStore — JSON persistence, last-active tracking
+├── plugins/            # feature plugins, one sub-directory each (listed below)
 ├── app.py              # pluggy device-adapter wiring + plugin discovery/setup
 ├── main.py             # FastAPI app factory, lifespan, /health, /plugins, /admin/restart
 └── plugin.py           # pluggy hookspec (register_devices)
 
-plugins/
+astrolol/plugins/
 ├── hello/              # Minimal full-stack plugin (PoC / reference implementation)
 ├── autofocus/          # Full-stack plugin — canonical example for complex plugins
 ├── eqmod/              # Native (non-INDI) Sky-Watcher motor-controller driver: GoTo/sync/
@@ -520,8 +533,8 @@ plugins/
                          # altitude graph, sets mount target, favourites
 
 # Each plugin follows the same layout: plugin.py, api.py, optional engine/protocol modules,
-# ui/ (index.ts + page + optional chip + api.ts), tests/. See plugins/hello/ for the minimal
-# shape and plugins/sequencer/ for the largest (runner.py, lanes.py, journal.py, sequences.py,
+# ui/ (index.ts + page + optional chip + api.ts), tests/. See astrolol/plugins/hello/ for the minimal
+# shape and astrolol/plugins/sequencer/ for the largest (runner.py, lanes.py, journal.py, sequences.py,
 # stalls.py, targets.py, focusing.py, guiding.py, devices.py; 8 test files, 12 UI files).
 
 ui/

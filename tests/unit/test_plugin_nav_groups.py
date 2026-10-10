@@ -2,7 +2,7 @@
 import importlib
 import pkgutil
 
-import plugins
+import astrolol.plugins
 from astrolol.core.plugin_api import NavGroup
 
 EXPECTED = {
@@ -12,9 +12,9 @@ EXPECTED = {
 
 
 def _manifests():
-    for mod in pkgutil.iter_modules(plugins.__path__):
+    for mod in pkgutil.iter_modules(astrolol.plugins.__path__):
         if mod.ispkg:
-            yield importlib.import_module(f"plugins.{mod.name}.plugin").get_plugin().manifest
+            yield importlib.import_module(f"astrolol.plugins.{mod.name}.plugin").get_plugin().manifest
 
 
 def test_groups_are_valid_and_classified():

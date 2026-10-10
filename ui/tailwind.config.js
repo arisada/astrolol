@@ -8,7 +8,7 @@ const ramp = (name) =>
   Object.fromEntries([100, 200, 300, 400, 500, 600, 700, 800, 900].map((s) => [s, v(`${name}-${s}`)]))
 
 export default {
-  content: ['./index.html', './src/**/*.{ts,tsx}', '../plugins/**/*.{ts,tsx}'],
+  content: ['./index.html', './src/**/*.{ts,tsx}', '../astrolol/plugins/**/*.{ts,tsx}'],
   theme: {
     extend: {
       fontFamily: {

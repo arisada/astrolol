@@ -32,7 +32,7 @@ Items designed for but not yet built. Ordered roughly by priority.
 
 ## EQMOD native driver — assumptions & deferred items
 
-Phase 2 (`plugins/eqmod/`) deliberately starts narrow. Each item below is an assumption
+Phase 2 (`astrolol/plugins/eqmod/`) deliberately starts narrow. Each item below is an assumption
 baked into the current code/design or a feature left out; revisit when it bites.
 
 - **Northern hemisphere only** — geometry assumes the NCP; southern hemisphere (SCP home,
@@ -119,7 +119,7 @@ more design/testing than a single sitting allows:
   ~~FWHM metric performs much worse than HFD~~ — **fixed (15545bb).** Stars are now found by
   scale-space blob detection (any size, sharp to ~90 px), isolated hot pixels are cleaned first,
   and HFD is the default metric. Checked end to end on the INDI CCD/focuser simulators
-  (`plugins/autofocus/tests/test_autofocus_simulator.py`). Remaining autofocus work:
+  (`astrolol/plugins/autofocus/tests/test_autofocus_simulator.py`). Remaining autofocus work:
   - **Choose the reference stars at the best-focus frame**, not at step 1 (the most defocused
     frame when the sweep starts far off), then re-measure every frame at those fixed positions
     after the sweep so a star too faint to detect at the far end still gets a measurement.
@@ -156,10 +156,10 @@ more design/testing than a single sitting allows:
   and apply it at task setup.
 - **PHD2 log analyzer** — parse PHD2's own guide log inside astrolol (star mass, RMS,
   dither/settle events) instead of requiring a separate tool. New plugin or part of
-  `plugins/phd2/`.
+  `astrolol/plugins/phd2/`.
 - **`eqmod.stop_move` can 500 instead of degrading gracefully** — `/mount/<id>/move`
   (stop) raised `TimeoutError`/`EqmodMountError: Mount error 2: Motor not stopped` as an
-  unhandled 500 four times that night (`plugins/eqmod/mount.py::_stop_axis`,
+  unhandled 500 four times that night (`astrolol/plugins/eqmod/mount.py::_stop_axis`,
   `protocol.py::set_motion_mode`). The driver should retry or report a clean device-error
   state instead of leaking a raw exception through the API; `astrolol/api/mount.py`'s
   `stop_move` has no handling for an EQMOD-specific failure mode.
@@ -175,7 +175,7 @@ more design/testing than a single sitting allows:
 
 ## Built-in guider — remaining work
 
-Done (first version, `plugins/guider/`): native INDI camera streaming (`IStreamingCamera`),
+Done (first version, `astrolol/plugins/guider/`): native INDI camera streaming (`IStreamingCamera`),
 pulse guiding through the camera's ST4 output or the mount (`IPulseGuider`, selectable,
 camera by default), star detection/selection, dark frames (subtraction + hot pixels),
 windowed tracking, self-calibration (drift-corrected, Dec backlash), controller, dither,
@@ -242,7 +242,7 @@ named sequences (server library) and task file download/upload.
   estimate ignores download time (real runs usually do a little better than shown).
 - **A secondary lane whose duration is close to the primary's genuinely can't reach full
   efficiency, and the preflight is right to say so** — `estimate_lanes()` in
-  `plugins/sequencer/lanes.py` requires `duration + margin_s <= interval` for a secondary
+  `astrolol/plugins/sequencer/lanes.py` requires `duration + margin_s <= interval` for a secondary
   frame to fit, with no exemption for "the first frame since the last dither" — and that's
   correct, because `RigSchedule.fits()` (the actual runtime gate the primary/secondary
   lanes use to decide when a secondary frame may start) enforces the exact same inequality
@@ -307,9 +307,9 @@ named sequences (server library) and task file download/upload.
 
 ## Bluetooth serial — deferred
 
-- **INDI mounts over Bluetooth** — `plugins/bluetooth_serial` + `astrolol/devices/bluetooth/`
+- **INDI mounts over Bluetooth** — `astrolol/plugins/bluetooth_serial` + `astrolol/devices/bluetooth/`
   currently only serve native (non-INDI) drivers, which open a raw RFCOMM socket directly
-  (see `BluetoothRfcommTransport`, used by `plugins/eqmod`). An INDI driver process needs an
+  (see `BluetoothRfcommTransport`, used by `astrolol/plugins/eqmod`). An INDI driver process needs an
   actual `/dev/rfcommN` tty node, which BlueZ's D-Bus API can't create — that still needs the
   `rfcomm connect` subprocess approach discussed when this was designed, exposed as a device
   so it can sit in a profile and be waited on the same way a USB-serial port would.

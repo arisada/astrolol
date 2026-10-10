@@ -24,7 +24,7 @@ const modules = import.meta.glob('@plugins/*/ui/index.ts', { eager: true }) as R
 >
 
 // Build the registry by extracting the plugin ID from each module path.
-// Path shape: "../../plugins/<id>/ui/index.ts" (as seen from this file via the @plugins alias)
+// Path shape: "../../astrolol/plugins/<id>/ui/index.ts" (as seen from this file via the @plugins alias)
 const PLUGIN_REGISTRY: Record<string, PluginRegistryEntry> = {}
 
 for (const [path, mod] of Object.entries(modules)) {

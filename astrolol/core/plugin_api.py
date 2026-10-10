@@ -20,7 +20,7 @@ class LogScope:
     """A named logging scope that can have its verbosity toggled at runtime."""
     key: str      # stable ID matching the component label (e.g. "phd2", "imager")
     label: str    # human-readable name shown in the UI (e.g. "PHD2 Guiding")
-    logger: str   # stdlib logger hierarchy root (e.g. "plugins.phd2")
+    logger: str   # stdlib logger hierarchy root (e.g. "astrolol.plugins.phd2")
 
 
 NavGroup = Literal["equipment", "astronomy", "settings"]

@@ -17,7 +17,7 @@ const UNTRANSLATED_TEXT = [
 export default [
   { ignores: ['**/dist/**', '**/node_modules/**', '**/*.d.ts'] },
   {
-    files: ['ui/src/**/*.{ts,tsx}', 'plugins/**/ui/**/*.{ts,tsx}'],
+    files: ['ui/src/**/*.{ts,tsx}', 'astrolol/plugins/**/ui/**/*.{ts,tsx}'],
     languageOptions: { parser: tseslint.parser },
     linterOptions: { reportUnusedDisableDirectives: 'off' },
     // react-hooks / typescript-eslint are registered (with no rules enabled) only so the

@@ -2,7 +2,7 @@
 //
 // Core strings live in src/locales/<lng>/<ns>.json (one namespace per page/area, "common" for
 // the shell and shared components).
-// Each plugin ships its own catalogues in plugins/<id>/ui/locales/<lng>.json and
+// Each plugin ships its own catalogues in astrolol/plugins/<id>/ui/locales/<lng>.json and
 // they are registered under the namespace <id> — no core file needs editing to
 // translate a plugin. Use `useTranslation('<id>')` in plugin components.
 import i18n from 'i18next'

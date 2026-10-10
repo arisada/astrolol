@@ -1,0 +1,61 @@
+"""Plate-solving plugin for astrolol."""
+from __future__ import annotations
+
+import structlog
+from fastapi import FastAPI
+
+from astrolol.core.plugin_api import LogScope, PluginContext, PluginManifest
+from astrolol.plugins.platesolve.api import router
+from astrolol.plugins.platesolve.settings import PlatesolveSettings
+from astrolol.plugins.platesolve.solver import SolveManager
+
+logger = structlog.get_logger()
+
+
+class PlatesolvePlugin:
+    manifest = PluginManifest(
+        id="platesolve",
+        name="Plate Solving",
+        version="0.1.0",
+        description="Astrometric plate solving via ASTAP",
+        nav_order=20,
+        log_scopes=[LogScope(key="platesolve", label="Plate Solving", logger="astrolol.plugins.platesolve")],
+        hot_reloadable=True,
+    )
+
+    def __init__(self) -> None:
+        self._manager: SolveManager | None = None
+
+    def setup(self, app: FastAPI, ctx: PluginContext) -> None:
+        cfg = ctx.get_plugin_settings("platesolve", PlatesolveSettings)
+
+        self._manager = SolveManager(
+            event_bus=ctx.event_bus,
+            astap_bin=cfg.astap_bin,
+            astap_db_path=cfg.astap_db_path,
+        )
+        self._manager.attach_app(app)
+        app.state.solve_manager = self._manager
+
+        app.include_router(router)
+        logger.info(
+            "platesolve.plugin_setup",
+            astap_bin=cfg.astap_bin,
+            astap_db_path=cfg.astap_db_path,
+        )
+
+    async def startup(self) -> None:
+        pass  # no background loop needed
+
+    async def shutdown(self) -> None:
+        """Cancel any still-running solve tasks."""
+        if self._manager is None:
+            return
+        for job in self._manager._jobs.values():
+            if job.task is not None and not job.task.done():
+                job.task.cancel()
+        await self._manager.cancel_center()
+
+
+def get_plugin() -> PlatesolvePlugin:
+    return PlatesolvePlugin()

@@ -13,7 +13,7 @@ from fastapi.responses import HTMLResponse
 from astrolol.api.settings import router as settings_router
 from astrolol.core.plugin_api import PluginContext, PluginManifest
 from astrolol.profiles.store import ProfileStore
-from plugins.hello.plugin import HelloPlugin
+from astrolol.plugins.hello.plugin import HelloPlugin
 
 
 class _StubPlugin:

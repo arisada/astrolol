@@ -10,11 +10,17 @@ from astropy.coordinates import SkyCoord
 
 from astrolol.core.events import EventBus
 from astrolol.core.guiding import SettleParams
-from plugins.guider.guider import BuiltinGuider
-from plugins.guider.settings import GuiderSettings, pick_pulse_guider
+from astrolol.plugins.guider.guider import BuiltinGuider
+from astrolol.plugins.guider.settings import GuiderSettings, pick_pulse_guider
 from tests.integration.test_indi_simulators import _start_indiserver, _stop
 
-pytestmark = pytest.mark.skipif(shutil.which("indiserver") is None, reason="indiserver not installed")
+# Real-time: each test guides for minutes of wall-clock time (~7 min in all), so these are
+# deselected by default (see pyproject.toml). Run them before a release and after any
+# guiding change:  python3 -m pytest tests/integration/test_indi_guiding.py -m slow
+pytestmark = [
+    pytest.mark.slow,
+    pytest.mark.skipif(shutil.which("indiserver") is None, reason="indiserver not installed"),
+]
 
 _PORT = 17650
 
@@ -97,7 +103,7 @@ async def test_plugin_api_guides_the_simulator(rig) -> None:
     from fastapi import FastAPI
 
     from astrolol.core.plugin_api import PluginContext
-    from plugins.guider.plugin import get_plugin
+    from astrolol.plugins.guider.plugin import get_plugin
 
     cam, mount = rig
 

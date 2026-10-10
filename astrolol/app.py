@@ -15,8 +15,8 @@ from astrolol.devices.registry import DeviceRegistry
 
 logger = structlog.get_logger()
 
-# Feature plugins live next to the astrolol package, one sub-directory each.
-PLUGINS_DIR = Path(__file__).parent.parent / "plugins"
+# Feature plugins live in the astrolol.plugins package, one sub-directory each.
+PLUGINS_DIR = Path(__file__).parent / "plugins"
 
 
 # ── Device-adapter plugin system (pluggy) ────────────────────────────────────
@@ -63,7 +63,7 @@ def discover_plugins() -> dict[str, Plugin]:
             continue
         if not (item / "plugin.py").exists():
             continue
-        module_path = f"plugins.{item.name}.plugin"
+        module_path = f"astrolol.plugins.{item.name}.plugin"
         try:
             mod = importlib.import_module(module_path)
             instance: Plugin = mod.get_plugin()

@@ -43,9 +43,9 @@ def _sources() -> list[tuple[Path, Path, str | None]]:
     for f in (ROOT / "ui/src").rglob("*.ts*"):
         if "locales" not in f.parts:
             out.append((f, ROOT / "ui/src/locales/en", None))
-    for f in ROOT.glob("plugins/*/ui/**/*.ts*"):
-        pid = f.relative_to(ROOT / "plugins").parts[0]
-        out.append((f, ROOT / f"plugins/{pid}/ui/locales", pid))
+    for f in ROOT.glob("astrolol/plugins/*/ui/**/*.ts*"):
+        pid = f.relative_to(ROOT / "astrolol" / "plugins").parts[0]
+        out.append((f, ROOT / f"astrolol/plugins/{pid}/ui/locales", pid))
     return out
 
 

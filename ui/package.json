@@ -9,7 +9,7 @@
     "typecheck": "tsc --noEmit",
     "preview": "vite preview",
     "generate-api-types": "npx openapi-typescript http://localhost:8000/openapi.json -o src/api/schema.d.ts",
-    "lint": "cd .. && eslint -c ui/eslint.config.js ui/src plugins",
+    "lint": "cd .. && eslint -c ui/eslint.config.js ui/src astrolol/plugins",
     "gen:themes": "node scripts/gen-themes.mjs",
     "test": "vitest run"
   },
