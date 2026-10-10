@@ -2,7 +2,8 @@
 # install-nginx-https.sh — put nginx in front of astrolol with HTTPS.
 #
 # Does what the header of nginx-https.conf describes, automatically:
-#   1. finds the built UI (ui/dist of this checkout, or the path you give),
+#   1. finds the built UI (the one the installed astrolol serves, or the path
+#      you give),
 #   2. creates a self-signed certificate for this machine's host name
 #      (short name, name.local, fully qualified name and every IP address),
 #   3. installs deploy/nginx-https.conf with those paths filled in,
@@ -14,8 +15,11 @@
 #   sudo deploy/install-nginx-https.sh [options]
 #
 # Options:
-#   --ui-dist DIR     UI build directory (default: $ASTROLOL_UI_DIST, else
-#                     <this checkout>/ui/dist)
+#   --ui-dist DIR     UI build directory. Default: $ASTROLOL_UI_DIST, else the
+#                     one the service user's astrolol install serves, else
+#                     <this checkout>/ui/dist
+#   --user NAME       the service user (default: astrolol); its ~/venv is
+#                     asked where the UI is
 #   --name NAME       extra name for the certificate; repeatable
 #   --ip ADDR         extra IP for the certificate; repeatable
 #   --days N          certificate lifetime (default 3650)
@@ -36,7 +40,8 @@ SSL_DIR=/etc/nginx/ssl
 CERT="$SSL_DIR/astrolol.crt"
 KEY="$SSL_DIR/astrolol.key"
 
-ui_dist="${ASTROLOL_UI_DIST:-$SRC_DIR/../ui/dist}"
+ui_dist="${ASTROLOL_UI_DIST:-}"
+service_user=astrolol
 days=3650
 force_cert=0
 keep_default=0
@@ -51,6 +56,7 @@ run()  { if ((dry)); then echo "[dry-run] $*"; else "$@"; fi; }
 while (($#)); do
     case "$1" in
         --ui-dist)      ui_dist="${2:?}"; shift 2 ;;
+        --user)         service_user="${2:?}"; shift 2 ;;
         --name)         extra_names+=("${2:?}"); shift 2 ;;
         --ip)           extra_ips+=("${2:?}"); shift 2 ;;
         --days)         days="${2:?}"; shift 2 ;;
@@ -68,6 +74,16 @@ command -v openssl >/dev/null || die "openssl is not installed"
 [[ -f $TEMPLATE ]] || die "missing $TEMPLATE"
 
 # ── UI build directory ─────────────────────────────────────────────────────
+# Ask the installed astrolol where it finds the UI: that is the one the
+# service really serves, whether it is a git checkout or a package.
+if [[ -z $ui_dist ]]; then
+    home="$(getent passwd "$service_user" | cut -d: -f6 || true)"
+    if [[ -n $home && -x $home/venv/bin/python3 ]]; then
+        ui_dist="$(cd / && "$home/venv/bin/python3" -c \
+            'from astrolol.api.static import UI_DIST; print(UI_DIST or "")' 2>/dev/null || true)"
+    fi
+    [[ -n $ui_dist ]] || ui_dist="$SRC_DIR/../ui/dist"
+fi
 ui_dist="$(realpath -m "$ui_dist")"
 [[ -f $ui_dist/index.html ]] \
     || die "no UI build in $ui_dist — run 'cd ui && npm run build', or pass --ui-dist DIR"
