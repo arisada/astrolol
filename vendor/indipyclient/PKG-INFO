@@ -1,6 +1,6 @@
-Metadata-Version: 2.4
+Metadata-Version: 2.5
 Name: indipyclient
-Version: 0.9.1
+Version: 0.9.3
 Summary: Pure python package, providing a set of classes which can be used to create scripts or clients to control remote instruments using the INDI protocol.
 Keywords: indi,client,astronomy,instrument
 Author-email: Bernard Czenkusz <bernie@skipole.co.uk>
@@ -13,6 +13,7 @@ Classifier: Topic :: Scientific/Engineering :: Interface Engine/Protocol Transla
 License-File: LICENSE
 Project-URL: Documentation, https://indipyclient.readthedocs.io
 Project-URL: Source, https://github.com/bernie-skipole/indipyclient
+Import-Name: indipyclient
 
 # indipyclient
 
@@ -59,4 +60,10 @@ A terminal client 'indipyterm' is available, which itself calls on indipyclient 
 https://pypi.org/project/indipyterm
 
 https://github.com/bernie-skipole/indipyterm
+
+Similarly 'indipyweb' is available, also using indipyclient, and creates a web service which enables browsers to view and control the connected instruments. This is available at:
+
+https://pypi.org/project/indipyweb
+
+https://github.com/bernie-skipole/indipyweb
 
