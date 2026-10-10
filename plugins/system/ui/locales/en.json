@@ -156,5 +156,21 @@
     "shutdown": "shutdown / poweroff",
     "setup": "Setup instructions",
     "runAsRoot": "Run as root on the host:"
+  },
+  "development": {
+    "title": "Development",
+    "gitPull": "Git pull",
+    "pulling": "Pulling…",
+    "rebuildUi": "Rebuild UI",
+    "building": "Building…",
+    "pull": {
+      "ok": "Git pull done",
+      "failed": "Git pull failed"
+    },
+    "build": {
+      "ok": "UI rebuilt",
+      "failed": "UI build failed"
+    },
+    "hint": "Git pull only fast-forwards. Restart the app to run new backend code; reload the page after a UI rebuild."
   }
 }

@@ -156,5 +156,21 @@
     "shutdown": "shutdown / poweroff",
     "setup": "Instructions de configuration",
     "runAsRoot": "À exécuter en root sur la machine :"
+  },
+  "development": {
+    "title": "Développement",
+    "gitPull": "Git pull",
+    "pulling": "Mise à jour…",
+    "rebuildUi": "Reconstruire l'interface",
+    "building": "Construction…",
+    "pull": {
+      "ok": "Git pull terminé",
+      "failed": "Échec du git pull"
+    },
+    "build": {
+      "ok": "Interface reconstruite",
+      "failed": "Échec de la construction de l'interface"
+    },
+    "hint": "Git pull ne fait que des avances rapides. Redémarrez l'application pour exécuter le nouveau code du serveur ; rechargez la page après une reconstruction de l'interface."
   }
 }

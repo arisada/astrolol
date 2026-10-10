@@ -25,6 +25,8 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
   return res.json()
 }
 
+export interface CommandResult { ok: boolean; output: string }
+
 export const getSystemStatus = () =>
   request<SystemStatus>('/plugins/system/status')
 
@@ -99,6 +101,12 @@ export const setHostname = (hostname: string) =>
     method: 'PUT',
     body: JSON.stringify({ hostname }),
   })
+
+export const gitPull = () =>
+  request<CommandResult>('/plugins/system/dev/git_pull', { method: 'POST' })
+
+export const rebuildUi = () =>
+  request<CommandResult>('/plugins/system/dev/rebuild_ui', { method: 'POST' })
 
 export const reboot = () =>
   request<{ status: string }>('/plugins/system/reboot', { method: 'POST' })

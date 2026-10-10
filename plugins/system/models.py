@@ -6,6 +6,11 @@ from enum import Enum
 from pydantic import BaseModel, Field
 
 
+class CommandResult(BaseModel):
+    ok: bool
+    output: str
+
+
 class NetworkMode(str, Enum):
     wifi = "wifi"
     hotspot = "hotspot"

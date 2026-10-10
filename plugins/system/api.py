@@ -8,10 +8,12 @@ import sys
 import structlog
 from fastapi import APIRouter, HTTPException, Request
 
+from plugins.system import development as _dev
 from plugins.system import network as _net
 from plugins.system import system_info as _si
 from plugins.system import throttle as _throttle
 from plugins.system.models import (
+    CommandResult,
     HostnameInfo,
     HotspotStartRequest,
     NetworkStatus,
@@ -291,3 +293,28 @@ async def restart_astrolol() -> dict[str, str]:
 
     asyncio.create_task(_do())
     return {"status": "restarting"}
+
+
+# ── Development ────────────────────────────────────────────────────────────────
+
+async def _exclusive_dev(request: Request, command):  # noqa: ANN001, ANN202
+    """Run one development command at a time (a second click while one runs is refused)."""
+    lock: asyncio.Lock | None = getattr(request.app.state, "system_dev_lock", None)
+    if lock is None:
+        lock = request.app.state.system_dev_lock = asyncio.Lock()
+    if lock.locked():
+        raise HTTPException(status_code=409, detail="A development command is already running")
+    async with lock:
+        return await command()
+
+
+@router.post("/dev/git_pull", response_model=CommandResult)
+async def dev_git_pull(request: Request) -> CommandResult:
+    """git pull --ff-only in the astrolol checkout."""
+    return await _exclusive_dev(request, _dev.git_pull)
+
+
+@router.post("/dev/rebuild_ui", response_model=CommandResult)
+async def dev_rebuild_ui(request: Request) -> CommandResult:
+    """npm run build in the ui directory."""
+    return await _exclusive_dev(request, _dev.rebuild_ui)

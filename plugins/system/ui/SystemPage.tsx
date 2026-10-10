@@ -20,6 +20,9 @@ import {
   Usb,
   Trash2,
   Zap,
+  GitPullRequestArrow,
+  Hammer,
+  Code,
 } from 'lucide-react'
 import type {
   HostnameInfo,
@@ -198,6 +201,53 @@ function Section({ title, icon: Icon, children }: {
       </div>
       <div className="p-4">{children}</div>
     </div>
+  )
+}
+
+// ── Development (update the checkout, rebuild the UI) ─────────────────────────
+
+function DevelopmentSection() {
+  const { t } = useTranslation('system')
+  const [running, setRunning] = useState<'pull' | 'build' | null>(null)
+  const [result, setResult] = useState<{ what: 'pull' | 'build'; ok: boolean; output: string } | null>(null)
+
+  const run = async (what: 'pull' | 'build') => {
+    setRunning(what)
+    setResult(null)
+    try {
+      const r = await (what === 'pull' ? api.gitPull() : api.rebuildUi())
+      setResult({ what, ...r })
+    } catch (e) {
+      setResult({ what, ok: false, output: (e as Error).message })
+    } finally {
+      setRunning(null)
+    }
+  }
+
+  const btn = 'flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-surface-border bg-surface-overlay text-xs text-slate-200 hover:text-slate-50 disabled:opacity-50 transition-colors'
+  return (
+    <Section title={t('development.title')} icon={Code}>
+      <div className="flex flex-wrap gap-2">
+        <button className={btn} disabled={running !== null} onClick={() => run('pull')}>
+          <GitPullRequestArrow size={13} /> {running === 'pull' ? t('development.pulling') : t('development.gitPull')}
+        </button>
+        <button className={btn} disabled={running !== null} onClick={() => run('build')}>
+          <Hammer size={13} /> {running === 'build' ? t('development.building') : t('development.rebuildUi')}
+        </button>
+      </div>
+      {result && (
+        <div className="mt-3">
+          <p className={`text-xs flex items-center gap-1.5 ${result.ok ? 'text-emerald-400' : 'text-rose-400'}`}>
+            {result.ok ? <CheckCircle size={12} /> : <XCircle size={12} />}
+            {t(`development.${result.what}.${result.ok ? 'ok' : 'failed'}`)}
+          </p>
+          {result.output && (
+            <pre className="mt-2 max-h-64 overflow-auto rounded bg-surface-overlay border border-surface-border p-3 text-xs text-slate-300 font-mono whitespace-pre-wrap break-all">{result.output}</pre>
+          )}
+        </div>
+      )}
+      <p className="text-xs text-slate-600 mt-3">{t('development.hint')}</p>
+    </Section>
   )
 }
 
@@ -944,6 +994,9 @@ export function SystemPage() {
         </div>
         <p className="text-xs text-slate-600 mt-3">{t('controls.hint')}</p>
       </Section>
+
+      {/* ── Development ───────────────────────────────────────────────────── */}
+      <DevelopmentSection />
 
       {/* ── Sudo permissions ──────────────────────────────────────────────── */}
       {sudoSetup && (
