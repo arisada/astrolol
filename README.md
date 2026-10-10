@@ -47,7 +47,8 @@ Source: https://github.com/arisada/astrolol
   Options pages, plus one page per enabled plugin.
 
 Pre-1.0: functional core with a wide plugin surface, but persistence beyond JSON files, a
-red-mode/mobile UI, and packaging (systemd/reverse-proxy) are not built yet — see `TODO.md`.
+red-mode/mobile UI, and a packaged install (systemd and nginx files are in `deploy/`) are not
+finished yet — see `TODO.md`.
 
 ## Requirements
 

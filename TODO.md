@@ -356,7 +356,12 @@ named sequences (server library) and task file download/upload.
   recommended 44px minimum for touch. Worst offenders: `DurationStepper` +/− buttons,
   focuser move-in/out buttons, and the CollapsibleSidebar toggle strip (h-8). Audit and
   increase tap area before declaring mobile support.
-- **Caddy / systemd packaging** — deployment guide for Raspberry Pi with HTTPS and autostart.
+- **Deployment guide / packaging** — `deploy/` has a systemd unit (`astrolol.service`,
+  respawns on exit) and nginx configs for HTTP and HTTPS with a self-signed certificate
+  (`install-nginx-https.sh`). Still missing: a written Raspberry Pi guide tying them
+  together, a Caddy alternative (automatic certificates), a trusted-certificate path
+  (Let's Encrypt / local CA instead of a self-signed one), an installer for the systemd unit
+  (user creation, venv, UI build), and a `.deb` / image.
 - **Auth token** — bearer token, generated once, entered manually into the Android app;
   must work for both `GET`/`POST` (Authorization header) and the `/ws/events` WebSocket
   (query param or subprotocol, since browsers can't set arbitrary headers on a WS handshake);
