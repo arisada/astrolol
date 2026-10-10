@@ -1,0 +1,85 @@
+# astrolol.service — run astrolol at boot and keep it running.
+#
+# ── WHAT TO CHANGE ──────────────────────────────────────────────────────────
+# 1. User= / Group=      The account astrolol runs as (default: astrolol).
+# 2. WorkingDirectory=   The checkout of this repository. Relative paths such as
+#                        the default images directory (./images) resolve here.
+# 3. ExecStart=          Path to the Python interpreter that has astrolol
+#                        installed. With a virtualenv inside the checkout that is
+#                        <checkout>/.venv/bin/python3; with a system-wide
+#                        `pip install` use /usr/bin/python3.
+# 4. Environment=        Optional ASTROLOL_* overrides (see astrolol/config/
+#                        settings.py). Data (profiles, logs) defaults to
+#                        ~astrolol/.astrolol/.
+# 5. ui/dist             Build the web UI once so the backend can serve it:
+#                        `cd ui && npm install && npm run build`.
+#
+# The server listens on 0.0.0.0:8000.
+#
+# ── ONE-TIME SETUP (as root, adapt the paths) ───────────────────────────────
+#   # create the service account; dialout = serial ports (EQMOD, focusers),
+#   # plugdev = USB devices, video = cameras
+#   sudo useradd --system --create-home --shell /usr/sbin/nologin astrolol
+#   sudo usermod -aG dialout,plugdev,video astrolol
+#
+#   # put the code where the service user can read it, and install it
+#   sudo git clone <repo-url> /opt/astrolol
+#   sudo chown -R astrolol:astrolol /opt/astrolol
+#   sudo -u astrolol python3 -m venv /opt/astrolol/.venv
+#   sudo -u astrolol /opt/astrolol/.venv/bin/pip install -e /opt/astrolol
+#
+# ── INSTALL ─────────────────────────────────────────────────────────────────
+#   sudo cp /opt/astrolol/deploy/astrolol.service /etc/systemd/system/
+#   sudo nano /etc/systemd/system/astrolol.service      # apply the changes above
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now astrolol                # start now and at boot
+#
+# ── DAY TO DAY ──────────────────────────────────────────────────────────────
+#   systemctl status astrolol
+#   journalctl -u astrolol -f                           # live console output
+#   sudo systemctl restart astrolol
+#   sudo systemctl disable --now astrolol               # stop and don't start at boot
+#
+# After editing this file: `sudo systemctl daemon-reload && sudo systemctl restart astrolol`.
+# Restarting from the UI (POST /admin/restart) re-execs the same process, so
+# systemd keeps tracking it — nothing to configure for that.
+
+[Unit]
+Description=astrolol astronomy platform
+# Wait for the network (clients connect over it) and for udev to have
+# created the device nodes.
+After=network-online.target systemd-udev-settle.service
+Wants=network-online.target
+
+# Never give up restarting: without this, systemd stops retrying after
+# 5 starts in 10 seconds (the default start limit).
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=astrolol
+Group=astrolol
+# replace with /home/astrolol/astrolol if installed locally from git
+WorkingDirectory=/opt/astrolol
+# Here replace with python3 -m astrolol.main
+# if you aren't using venv or globally installed astrolol
+ExecStart=/opt/astrolol/.venv/bin/python3 -m astrolol.main
+
+# Respawn whenever the process exits, whatever the reason (crash, kill, clean
+# exit). Only `systemctl stop` keeps it down.
+Restart=always
+RestartSec=3
+
+# Python: don't buffer output, so journalctl shows lines as they happen.
+Environment=PYTHONUNBUFFERED=1
+# Examples (uncomment to use):
+#Environment=ASTROLOL_DATA_DIR=/var/lib/astrolol
+#Environment=ASTROLOL_IMAGES_DIR=/home/astrolol/images
+
+# Shutdown: SIGTERM first so running exposures/slews can be cancelled and
+# hardware left in a sane state; SIGKILL after 20 s.
+KillMode=mixed
+TimeoutStopSec=20
+
+[Install]
+WantedBy=multi-user.target
