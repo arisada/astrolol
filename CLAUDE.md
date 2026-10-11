@@ -59,6 +59,28 @@ astrolol/plugins/
 settings, API wiring. Features with UI, their own API routes, and optional enable/disable belong
 in plugins.
 
+## Access control
+
+Two layers in `astrolol/core/`, both always installed as middleware:
+
+- `same_origin.py` — refuses any request (HTTP or WebSocket) whose `Origin` differs from the
+  `Host` it was addressed to, unless the origin is allowed (`ASTROLOL_ALLOWED_ORIGINS` or the
+  security plugin's setting, which are CORS-enabled for bearer-token callers). Not optional.
+- `auth.py` — `AuthMiddleware` asks `app.state.authorizer` (installed by the `security` plugin;
+  `None` = open API) who the caller is and compares their level (`viewer < operator < admin`)
+  with the ACL. First matching rule wins; without a rule GET/HEAD need viewer and everything
+  else operator, so a new mutating route is never open to viewers by accident.
+
+**When you add routes, decide their level.** Declare `acl_rules=[AclRule(path, Level, methods)]` in
+the plugin's `PluginManifest` for anything that is not plain operating: reconfiguring hardware or
+network, setting paths/commands/ports, opening listeners, reading secrets (`Level.ADMIN`), or a
+POST that only reads (`Level.VIEWER`). `*` is one path segment, `**` any depth (and the prefix
+itself). Plugin settings that can hold credentials must not be readable by viewers. Core routes are
+listed in `default_acl()`. `tests/unit/test_auth_app.py` fails if a mutating route is open to viewers.
+
+Helper processes started by astrolol (the INDI mount proxy) authenticate with the loopback-only
+service token in `Settings.service_token_file` (operator level), never with a user's token.
+
 ## Plugin UI guidelines
 
 ### The hard rule: plugins never touch core UI files
@@ -443,7 +465,7 @@ docker-compose run --rm backend python3 -m pytest tests/ astrolol/plugins/ -v
 
 Backend API at `http://localhost:8000`, UI dev server at `http://localhost:80`.
 Vite proxies `/api`, `/devices`, `/profiles`, `/imager`, `/mount`, `/focuser`, `/filter_wheel`,
-`/indi`, `/inventory`, `/settings`, `/events`, `/health`, `/plugins`, `/admin`, and `/ws` to the
+`/indi`, `/inventory`, `/settings`, `/events`, `/health`, `/plugins`, `/admin`, `/auth`, and `/ws` to the
 backend container. All plugin routes are mounted under `/plugins/<id>/...`, so no per-plugin
 proxy entries are needed.
 
@@ -461,6 +483,8 @@ astrolol/
 ├── core/
 │   ├── errors.py       # domain exception hierarchy
 │   ├── plugin_api.py   # Plugin protocol, PluginManifest, PluginContext
+│   ├── auth.py         # Level/Principal/Authorizer seam, ACL rules, AuthMiddleware
+│   ├── same_origin.py  # cross-origin refusal + CORS for allowed origins
 │   ├── events/         # EventBus (asyncio pub/sub, ring buffer) + typed event models
 │   ├── guiding/         # Guider Protocol + GuiderStatus/GuidingHealth/SettleParams models,
 │   │                   # GuidingHealthTracker — shared contract for phd2 + guide_simulator
@@ -525,6 +549,8 @@ astrolol/plugins/
 ├── sequencer/          # Task-queue imaging sequencer — ordered exposure plans with slew/
 │                       # center/guide/dither/meridian-flip, resumable, multi-camera lanes,
 │                       # session journal, named/saved sequences. Largest plugin.
+├── security/           # Users (viewer/operator/admin), guest mode, API tokens, allowed origins;
+│                       # implements core.auth.Authorizer. Recovery CLI: python -m astrolol.plugins.security
 ├── stellarium/         # Stellarium "remote telescope" TCP protocol server (same pattern
 │                       # as lx200)
 ├── system/             # Host-machine management — WiFi/AP mode, system info, thermal/

@@ -161,11 +161,35 @@ sent back.
 
 ## Security
 
-**astrolol has no authentication.** Anyone who can reach the web server can control your
-telescope, start exposures, and read FITS images from disk. astrolol allows setting paths to helper binaries from its web interface, which is a known security risk.
+**Out of the box astrolol has no authentication.** Anyone who can reach the web server can
+control your telescope, start exposures, and read FITS images from disk. astrolol allows
+setting paths to helper binaries from its web interface, which is a known security risk.
+
+Enable the **Security** plugin (Options → Plugins, then restart) and create the first account
+on its page to turn sign-in on:
+
+- **Three access levels.** *Read-only* users observe every screen but change nothing;
+  *operators* run the telescope, exposures and sequences; *admins* also change settings,
+  plugins, equipment, users and tokens.
+- **Guest access** (optional) lets people look without a password, as read-only.
+- **API tokens** let other tools call the REST API without a password.
+- **Allowed origins** list the web apps on other sites that may call the API with a token.
+- Lost the admin password? On the Pi, run `python -m astrolol.plugins.security set-password
+  <name>` (or `add-admin <name>`, or `reset` to go back to an open API) and restart astrolol.
+
+Whether the plugin is on or off, a web page on another site can never drive astrolol through
+your browser: requests from a different origin are refused.
+
+Limits to know about:
+
+- Use **HTTPS** (see the [deployment guide](docs/raspberry-pi-deployment.md)). Over plain HTTP
+  a password and the session cookie can be read by anyone on the network; the UI warns you.
+- The LX200, Stellarium and INDI listeners are separate network ports and are **not**
+  covered by sign-in.
+- Disabling the plugin opens the API again.
+
+Either way:
 
 - Run it on a **trusted local network only** (your home LAN, a dedicated AP at the
   observing site, or a VPN).
 - Do **not** expose port 8000 directly to the internet or to untrusted Wi-Fi networks.
-- If you need remote access, put it behind a VPN such as WireGuard or an
-  authenticating reverse proxy (nginx with `auth_basic`).

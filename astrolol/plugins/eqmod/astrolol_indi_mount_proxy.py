@@ -48,8 +48,10 @@ def _timestamp() -> str:
 class AstrololApi:
     """One persistent HTTP/1.1 connection to astrolol, shared by all requests (one at a time)."""
 
-    def __init__(self, base_url: str) -> None:
+    def __init__(self, base_url: str, token_file: str | None = None) -> None:
         self.base = base_url.rstrip("/")
+        # Credential for astrolol's own helper processes; only used when astrolol asks for sign-in.
+        self._token_file = token_file
         parts = urllib.parse.urlsplit(self.base)
         self._https = parts.scheme == "https"
         self._host = parts.hostname or "127.0.0.1"
@@ -58,6 +60,16 @@ class AstrololApi:
         self._conn: http.client.HTTPConnection | None = None
         self._lock = threading.Lock()  # requests run in worker threads
 
+    def _auth_headers(self) -> dict[str, str]:
+        if not self._token_file:
+            return {}
+        try:
+            with open(self._token_file) as f:
+                token = f.read().strip()
+        except OSError:
+            return {}  # not created yet (security plugin never enabled): nothing to send
+        return {"Authorization": f"Bearer {token}"} if token else {}
+
     def _close(self) -> None:
         if self._conn is not None:
             self._conn.close()
@@ -65,7 +77,7 @@ class AstrololApi:
 
     def _request(self, method: str, path: str, body: Any = None, timeout: float = 5.0) -> Any:
         data = json.dumps(body).encode() if body is not None else None
-        headers = {"Content-Type": "application/json"}
+        headers = {"Content-Type": "application/json", **self._auth_headers()}
         with self._lock:
             while True:
                 reused = self._conn is not None
@@ -344,10 +356,11 @@ class MountProxy:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--api", default="http://127.0.0.1:8000", help="astrolol base URL")
+    parser.add_argument("--token-file", default=None, help="file holding astrolol's service token")
     args = parser.parse_args()
     logging.basicConfig(stream=sys.stderr, level=logging.INFO, format=f"{EXECUTABLE}: %(message)s")
     log.info("relaying to %s", args.api)
-    asyncio.run(MountProxy(AstrololApi(args.api), sys.stdout.buffer).run(sys.stdin.buffer))
+    asyncio.run(MountProxy(AstrololApi(args.api, args.token_file), sys.stdout.buffer).run(sys.stdin.buffer))
 
 
 if __name__ == "__main__":

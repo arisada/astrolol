@@ -127,5 +127,17 @@
     "label": "Guide target",
     "ra": "RA",
     "dec": "Dec"
+  },
+  "auth": {
+    "title": "Sign in to astrolol",
+    "username": "User name",
+    "password": "Password",
+    "signIn": "Sign in",
+    "signingIn": "Signing in…",
+    "signOut": "Sign out",
+    "cancel": "Continue as guest",
+    "guest": "Guest",
+    "failed": "Sign-in failed",
+    "insecure": "This connection is not encrypted: your password would travel in clear text on the network. Use HTTPS (see the deployment guide)."
   }
 }

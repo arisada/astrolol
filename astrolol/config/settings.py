@@ -24,6 +24,8 @@ class Settings(BaseSettings):
     inventory_file: Path = _BASE / "inventory.json"
     bluetooth_devices_file: Path = _BASE / "bluetooth_devices.json"
     log_file: Path = _BASE / "astrolol.log"
+    security_file: Path = _BASE / "security.json"       # users, API tokens, sessions (security plugin)
+    service_token_file: Path = _BASE / "service_token"  # credential for astrolol's own helper processes
 
     # INDI server settings (advanced — normally hidden in UI)
     indi_manage_server: bool = True   # False = connect to already-running server

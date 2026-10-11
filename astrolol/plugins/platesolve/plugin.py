@@ -4,6 +4,7 @@ from __future__ import annotations
 import structlog
 from fastapi import FastAPI
 
+from astrolol.core.auth import AclRule, Level
 from astrolol.core.plugin_api import LogScope, PluginContext, PluginManifest
 from astrolol.plugins.platesolve.api import router
 from astrolol.plugins.platesolve.settings import PlatesolveSettings
@@ -21,6 +22,10 @@ class PlatesolvePlugin:
         nav_order=20,
         log_scopes=[LogScope(key="platesolve", label="Plate Solving", logger="astrolol.plugins.platesolve")],
         hot_reloadable=True,
+        acl_rules=[
+            AclRule("/plugins/platesolve/settings", Level.ADMIN, ("PUT",)),
+            AclRule("/plugins/platesolve/install_db", Level.ADMIN),
+        ],
     )
 
     def __init__(self) -> None:

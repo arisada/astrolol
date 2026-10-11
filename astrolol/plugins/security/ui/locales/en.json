@@ -1,0 +1,66 @@
+{
+  "label": "Security",
+  "title": "Security",
+  "intro": "Control who can see and operate this telescope. Until the first account exists, anyone who can reach astrolol has full access.",
+  "failed": "Something went wrong",
+  "insecure": "This connection is not encrypted. Passwords and sessions can be read by anyone on the network. Use HTTPS (see the deployment guide).",
+  "open": "Security is off: anyone who can reach astrolol can operate the telescope and change its settings. Create the first account to turn sign-in on.",
+  "adminOnly": "Only admins can manage users, tokens and origins.",
+  "level": {
+    "viewer": "read-only",
+    "operator": "operator",
+    "admin": "admin"
+  },
+  "first": {
+    "title": "Create the first account",
+    "hint": "The first account is an admin. Signing in is required for everyone as soon as it exists.",
+    "create": "Create account and turn security on"
+  },
+  "me": {
+    "title": "Your account",
+    "signedIn": "Signed in as {{name}} ({{level}}).",
+    "current": "Current password",
+    "new": "New password",
+    "change": "Change password",
+    "changed": "Password changed — sign in again."
+  },
+  "guest": {
+    "title": "Guest access",
+    "hint": "Let people look without a password. Guests see every screen but cannot change anything."
+  },
+  "users": {
+    "title": "Users",
+    "hint": "Read-only users observe. Operators run the telescope and sequences. Admins also change settings, plugins and equipment.",
+    "name": "User name",
+    "password": "Password",
+    "passwordHint": "At least 8 characters.",
+    "add": "Add user",
+    "resetPassword": "Reset password",
+    "delete": "Delete",
+    "promptPassword": "New password for {{name}} (at least 8 characters):",
+    "confirmDelete": "Delete {{name}}?",
+    "lastAdmin": "The only admin cannot be demoted or deleted."
+  },
+  "tokens": {
+    "title": "API tokens",
+    "hint": "Tokens let other tools call the API without a password.",
+    "created": "Copy this token now — it will not be shown again.",
+    "name": "Token name",
+    "days": "Valid for (days)",
+    "never": "No expiry",
+    "add": "Create token",
+    "revoke": "Revoke",
+    "lastUsed": "last used {{date}}",
+    "expires": "expires {{date}}"
+  },
+  "origins": {
+    "title": "Allowed origins",
+    "hint": "Web pages served from these addresses may call the API from another site, using a token. One per line.",
+    "placeholder": "https://tool.example",
+    "save": "Save origins"
+  },
+  "manifest": {
+    "name": "Security",
+    "description": "Sign-in, read-only guest access, API tokens and allowed origins."
+  }
+}

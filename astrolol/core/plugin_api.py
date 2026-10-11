@@ -12,6 +12,8 @@ from typing import Any, Literal, Protocol, TypeVar, runtime_checkable
 from fastapi import FastAPI
 from pydantic import BaseModel
 
+from astrolol.core.auth import AclRule
+
 T = TypeVar("T", bound=BaseModel)
 
 
@@ -44,6 +46,11 @@ class PluginManifest:
     # no dependency on boot-time ordering). Enabling a non-hot-reloadable plugin
     # still requires a full restart; disabling always does, regardless of this flag.
     hot_reloadable: bool = False
+    # Access rules for this plugin's routes (first match wins, before the core defaults).
+    # Without a matching rule: GET needs viewer, anything else operator. Registered for
+    # every discovered plugin, enabled or not, so a disabled plugin's stored settings are
+    # not exposed through the generic /plugins/{id}/settings route either.
+    acl_rules: list[AclRule] = field(default_factory=list)
 
 
 @dataclass

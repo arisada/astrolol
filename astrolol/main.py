@@ -20,6 +20,7 @@ from fastapi.exceptions import HTTPException
 from fastapi.responses import JSONResponse
 
 from astrolol.api.static import mount_ui
+from astrolol.api.auth import router as auth_router
 from astrolol.api.bluetooth import router as bluetooth_router
 from astrolol.api.devices import router as devices_router
 from astrolol.api.filter_wheel import router as filter_wheel_router
@@ -53,6 +54,7 @@ from astrolol.mount import MountManager
 from astrolol.version import PROTOCOL_VERSION, SERVER_VERSION
 
 logger = structlog.get_logger()
+
 
 # Core module log scopes (always present regardless of enabled plugins)
 _CORE_SCOPES: list[LogScope] = [
@@ -113,9 +115,19 @@ def create_app() -> FastAPI:
     app = FastAPI(title="astrolol", version=SERVER_VERSION, lifespan=lifespan)
 
     from astrolol.config.settings import settings as _settings
+    from astrolol.core.auth import AuthMiddleware, default_acl
     from astrolol.core.same_origin import SameOriginMiddleware
 
-    app.add_middleware(SameOriginMiddleware, allowed_origins=_settings.allowed_origins)
+    # Last added is outermost: the origin check runs first, then authentication.
+    app.add_middleware(AuthMiddleware)
+    app.state.origin_providers = []
+    app.add_middleware(
+        SameOriginMiddleware,
+        allowed_origins=_settings.allowed_origins,
+        providers=app.state.origin_providers,
+    )
+    app.state.authorizer = None  # set by the security plugin; None = open API
+    app.state.acl = default_acl()
 
     profile_store = ProfileStore(_settings.profiles_file)
     equipment_store = EquipmentStore(_settings.inventory_file)
@@ -171,6 +183,8 @@ def create_app() -> FastAPI:
         bluetooth_manager=bluetooth_manager,
     )
     discovered_plugins = discover_plugins()
+    for _plugin in discovered_plugins.values():
+        app.state.acl.add_plugin(*_plugin.manifest.acl_rules)
     # Auto-enable each enabled plugin's declared dependencies (e.g. "target"
     # requires "object_resolver") without persisting that back to user settings —
     # disabling "target" later naturally drops the dependency too.
@@ -190,6 +204,7 @@ def create_app() -> FastAPI:
     ]
     app.state.log_scopes = _CORE_SCOPES + plugin_scopes
 
+    app.include_router(auth_router)
     app.include_router(devices_router)
     app.include_router(bluetooth_router)
     app.include_router(properties_router)

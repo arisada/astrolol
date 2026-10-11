@@ -75,6 +75,7 @@ export default defineConfig({
       '/health':   p(backendHttp),
       '/plugins':  p(backendHttp),
       '/admin':    p(backendHttp),
+      '/auth':     p(backendHttp),
       '/ws': { target: backendWs, ws: true, configure: withFallback },
     },
   },

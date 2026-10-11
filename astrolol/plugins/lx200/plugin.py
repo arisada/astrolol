@@ -4,6 +4,7 @@ from __future__ import annotations
 import structlog
 from fastapi import FastAPI
 
+from astrolol.core.auth import AclRule, Level
 from astrolol.core.plugin_api import LogScope, PluginContext, PluginManifest
 from astrolol.plugins.lx200.api import router
 from astrolol.plugins.lx200.server import Lx200Server
@@ -28,6 +29,9 @@ class Lx200Plugin:
         # Not hot_reloadable: startup() binds a TCP server socket and setup()
         # reads app.state.mount_manager unguarded — both assume boot-time
         # ordering and a restart-clean process.
+        acl_rules=[
+            AclRule("/plugins/lx200/**", Level.ADMIN, ("POST", "PUT", "DELETE")),
+        ],
     )
 
     def __init__(self) -> None:

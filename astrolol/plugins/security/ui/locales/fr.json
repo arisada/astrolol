@@ -1,0 +1,66 @@
+{
+  "label": "Sécurité",
+  "title": "Sécurité",
+  "intro": "Contrôlez qui peut voir et piloter ce télescope. Tant qu'aucun compte n'existe, toute personne qui peut joindre astrolol a un accès complet.",
+  "failed": "Une erreur est survenue",
+  "insecure": "Cette connexion n'est pas chiffrée. Les mots de passe et les sessions peuvent être lus par n'importe qui sur le réseau. Utilisez HTTPS (voir le guide de déploiement).",
+  "open": "La sécurité est désactivée : toute personne qui peut joindre astrolol peut piloter le télescope et modifier ses réglages. Créez le premier compte pour activer la connexion.",
+  "adminOnly": "Seuls les administrateurs gèrent les utilisateurs, les jetons et les origines.",
+  "level": {
+    "viewer": "lecture seule",
+    "operator": "opérateur",
+    "admin": "admin"
+  },
+  "first": {
+    "title": "Créer le premier compte",
+    "hint": "Le premier compte est administrateur. La connexion devient obligatoire pour tout le monde dès qu'il existe.",
+    "create": "Créer le compte et activer la sécurité"
+  },
+  "me": {
+    "title": "Votre compte",
+    "signedIn": "Connecté en tant que {{name}} ({{level}}).",
+    "current": "Mot de passe actuel",
+    "new": "Nouveau mot de passe",
+    "change": "Changer le mot de passe",
+    "changed": "Mot de passe changé — reconnectez-vous."
+  },
+  "guest": {
+    "title": "Accès invité",
+    "hint": "Permet de regarder sans mot de passe. Les invités voient tous les écrans mais ne peuvent rien modifier."
+  },
+  "users": {
+    "title": "Utilisateurs",
+    "hint": "Les utilisateurs en lecture seule observent. Les opérateurs pilotent le télescope et les séquences. Les admins modifient aussi les réglages, les plugins et le matériel.",
+    "name": "Nom d'utilisateur",
+    "password": "Mot de passe",
+    "passwordHint": "Au moins 8 caractères.",
+    "add": "Ajouter l'utilisateur",
+    "resetPassword": "Réinitialiser le mot de passe",
+    "delete": "Supprimer",
+    "promptPassword": "Nouveau mot de passe pour {{name}} (au moins 8 caractères) :",
+    "confirmDelete": "Supprimer {{name}} ?",
+    "lastAdmin": "Le seul admin ne peut être ni rétrogradé ni supprimé."
+  },
+  "tokens": {
+    "title": "Jetons d'API",
+    "hint": "Les jetons permettent à d'autres outils d'appeler l'API sans mot de passe.",
+    "created": "Copiez ce jeton maintenant — il ne sera plus affiché.",
+    "name": "Nom du jeton",
+    "days": "Validité (jours)",
+    "never": "Sans expiration",
+    "add": "Créer le jeton",
+    "revoke": "Révoquer",
+    "lastUsed": "utilisé le {{date}}",
+    "expires": "expire le {{date}}"
+  },
+  "origins": {
+    "title": "Origines autorisées",
+    "hint": "Les pages web servies depuis ces adresses peuvent appeler l'API depuis un autre site, avec un jeton. Une par ligne.",
+    "placeholder": "https://outil.example",
+    "save": "Enregistrer les origines"
+  },
+  "manifest": {
+    "name": "Sécurité",
+    "description": "Connexion, accès invité en lecture seule, jetons d'API et origines autorisées."
+  }
+}

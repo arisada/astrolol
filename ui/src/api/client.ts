@@ -31,12 +31,16 @@ import type {
   UserSettings,
 } from './types'
 
+import { useAuth } from '@/auth'
+
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(path, {
     headers: { 'Content-Type': 'application/json' },
     ...options,
   })
   if (!res.ok) {
+    // Session expired or revoked: let the app swap to the sign-in screen.
+    if (res.status === 401) void useAuth.getState().refresh()
     const body = await res.json().catch(() => ({}))
     throw new Error(body.detail ?? `HTTP ${res.status}`)
   }

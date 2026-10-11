@@ -90,3 +90,20 @@ async def test_without_indi_support_it_is_a_noop(tmp_path) -> None:
     reg = IndiProxyRegistration(None, tmp_path)
     await reg.apply(True, "http://127.0.0.1:8000")
     assert reg.status()["indi_available"] is False
+
+
+def test_launcher_passes_the_service_token_file(tmp_path) -> None:
+    token = tmp_path / "service_token"
+    path = write_launcher(tmp_path, "http://127.0.0.1:8123", token)
+    assert f"--token-file {token}" in path.read_text()
+    assert "--token-file" not in write_launcher(tmp_path, "http://127.0.0.1:8123").read_text()
+
+
+def test_proxy_sends_the_service_token_when_the_file_exists(tmp_path) -> None:
+    from astrolol.plugins.eqmod.astrolol_indi_mount_proxy import AstrololApi
+
+    token = tmp_path / "service_token"
+    assert AstrololApi("http://x", str(token))._auth_headers() == {}  # not created yet
+    token.write_text("abc123\n")
+    assert AstrololApi("http://x", str(token))._auth_headers() == {"Authorization": "Bearer abc123"}
+    assert AstrololApi("http://x")._auth_headers() == {}

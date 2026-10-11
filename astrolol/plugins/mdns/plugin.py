@@ -6,6 +6,7 @@ from __future__ import annotations
 import structlog
 from fastapi import FastAPI
 
+from astrolol.core.auth import AclRule, Level
 from astrolol.core.plugin_api import PluginContext, PluginManifest
 from astrolol.plugins.mdns.models import MdnsSettings
 from astrolol.plugins.mdns.service import MdnsAdvertiser
@@ -21,6 +22,9 @@ class MdnsPlugin:
         version="0.1.0",
         description="Advertises this astrolol server on the local network via mDNS.",
         nav_order=95,
+        acl_rules=[
+            AclRule("/plugins/mdns/settings", Level.ADMIN, ("PUT",)),
+        ],
     )
 
     def __init__(self) -> None:

@@ -12,6 +12,7 @@ from pathlib import Path
 import structlog
 from fastapi import FastAPI
 
+from astrolol.core.auth import AclRule, Level
 from astrolol.core.plugin_api import LogScope, PluginContext, PluginManifest
 from astrolol.plugins.eqmod.api import router
 from astrolol.plugins.eqmod.indi_proxy_setup import IndiProxyRegistration
@@ -33,6 +34,9 @@ class EqmodPlugin:
             "simulator and an INDI mount proxy for PHD2 and other INDI clients."
         ),
         log_scopes=[LogScope(key="eqmod", label="EQMOD", logger="astrolol.plugins.eqmod")],
+        acl_rules=[
+            AclRule("/plugins/eqmod/settings", Level.ADMIN, ("PUT",)),
+        ],
     )
 
     def __init__(self) -> None:

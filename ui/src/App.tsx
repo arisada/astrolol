@@ -7,6 +7,8 @@ import { Logs } from './pages/Logs'
 import { Mount } from './pages/Mount'
 import { Options } from './pages/Options'
 import { Profiles } from './pages/Profiles'
+import { LoginScreen } from './components/LoginScreen'
+import { useAuth } from '@/auth'
 import { api } from '@/api/client'
 import { useStore } from '@/store'
 import { getPluginEntry } from '@/plugin-registry'
@@ -17,22 +19,34 @@ export function App() {
   const setPluginInfos = useStore((s) => s.setPluginInfos)
   const pluginInfos = useStore((s) => s.pluginInfos)
 
+  const authStatus = useAuth((s) => s.status)
+  const loginOpen = useAuth((s) => s.loginOpen)
+  const refreshAuth = useAuth((s) => s.refresh)
+  const ready = authStatus !== null && (!authStatus.enforced || authStatus.authenticated)
+
+  useEffect(() => { void refreshAuth() }, [refreshAuth])
+
   useEffect(() => {
+    if (!ready) return
     api.plugins.list()
       .then(setPluginInfos)
       .catch(() => {})
-  }, [setPluginInfos])
+  }, [setPluginInfos, ready, authStatus?.name])
 
   useEffect(() => {
+    if (!ready) return
     api.settings.get()
       .then((s) => {
         setLanguage(s.language ?? 'en')
         setTheme(s.theme ?? 'midnight')
       })
       .catch(() => {})
-  }, [])
+  }, [ready, authStatus?.name])
 
   const enabledPlugins = pluginInfos.filter((p) => p.enabled)
+
+  if (authStatus === null) return null
+  if (!ready || loginOpen) return <LoginScreen />
 
   return (
     <BrowserRouter>

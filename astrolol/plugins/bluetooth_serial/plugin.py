@@ -12,6 +12,7 @@ from typing import TYPE_CHECKING
 
 import structlog
 
+from astrolol.core.auth import AclRule, Level
 from astrolol.core.plugin_api import LogScope, Plugin, PluginContext, PluginManifest
 from astrolol.plugins.bluetooth_serial.api import router
 
@@ -30,6 +31,9 @@ class BluetoothSerialPlugin:
         description="Pair Bluetooth serial devices, such as an EQMOD cable replacement.",
         log_scopes=[LogScope(key="bluetooth", label="Bluetooth", logger="astrolol.plugins.bluetooth_serial")],
         hot_reloadable=True,
+        acl_rules=[
+            AclRule("/plugins/bluetooth_serial/**", Level.ADMIN, ("POST", "PUT", "DELETE")),
+        ],
     )
 
     def setup(self, app: "FastAPI", ctx: PluginContext) -> None:

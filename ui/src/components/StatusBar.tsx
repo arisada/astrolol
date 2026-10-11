@@ -4,9 +4,10 @@
  * filter wheels, PHD2 guiding, and active plate solves.
  */
 import { useEffect, useState } from 'react'
-import { Wifi, WifiOff } from 'lucide-react'
+import { LogIn, LogOut, Wifi, WifiOff } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { useStore } from '@/store'
+import { useAuth } from '@/auth'
 import { getAllPluginEntries } from '@/plugin-registry'
 import type { ConnectedDevice } from '@/api/types'
 import { Chip } from '@/components/ui/badge'
@@ -118,6 +119,29 @@ function FilterWheelChip({ device }: { device: ConnectedDevice }) {
 // Status bar
 // ---------------------------------------------------------------------------
 
+function UserChip() {
+  const { t } = useTranslation()
+  const status = useAuth((s) => s.status)
+  const logout = useAuth((s) => s.logout)
+  const openLogin = useAuth((s) => s.openLogin)
+  if (!status?.enforced || !status.authenticated) return null
+  const guest = status.kind === 'guest'
+  return (
+    <span className="inline-flex items-center gap-1.5 pl-2.5 font-mono text-xs shrink-0 text-slate-400">
+      <span className="label-caps">{guest ? t('auth.guest') : status.name}</span>
+      <button
+        type="button"
+        onClick={() => (guest ? openLogin(true) : void logout())}
+        className="text-slate-500 hover:text-slate-200 transition-colors"
+        title={guest ? t('auth.signIn') : t('auth.signOut')}
+        aria-label={guest ? t('auth.signIn') : t('auth.signOut')}
+      >
+        {guest ? <LogIn size={13} /> : <LogOut size={13} />}
+      </button>
+    </span>
+  )
+}
+
 export function StatusBar({ showLogo = false }: { showLogo?: boolean }) {
   const { t } = useTranslation()
   const wsConnected    = useStore((s) => s.wsConnected)
@@ -146,6 +170,8 @@ export function StatusBar({ showLogo = false }: { showLogo?: boolean }) {
 
       {/* Spacer */}
       <div className="flex-1" />
+
+      <UserChip />
 
       {/* WebSocket connection indicator */}
       <span className={`inline-flex items-center gap-1.5 pl-2.5 font-mono text-xs shrink-0

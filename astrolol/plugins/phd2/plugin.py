@@ -4,6 +4,7 @@ from __future__ import annotations
 import structlog
 from fastapi import FastAPI
 
+from astrolol.core.auth import AclRule, Level
 from astrolol.core.plugin_api import LogScope, PluginContext, PluginManifest
 from astrolol.plugins.phd2.api import router
 from astrolol.core.guiding import register_guider, unregister_guider
@@ -25,6 +26,10 @@ class Phd2Plugin:
         ),
         nav_order=10,
         log_scopes=[LogScope(key="phd2", label="PHD2 Guiding", logger="astrolol.plugins.phd2")],
+        acl_rules=[
+            AclRule("/plugins/phd2/settings", Level.ADMIN, ("PUT",)),
+            AclRule("/plugins/phd2/debug", Level.ADMIN),
+        ],
     )
 
     def __init__(self) -> None:

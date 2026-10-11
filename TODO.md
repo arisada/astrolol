@@ -367,8 +367,20 @@ named sequences (server library) and task file download/upload.
   - A Caddy alternative (automatic certificates) and a trusted-certificate path
     (Let's Encrypt / local CA) instead of self-signed.
   - A `.deb` or SD-card image.
-- **Auth token** — bearer token, generated once, entered manually into the Android app;
-  must work for both `GET`/`POST` (Authorization header) and the `/ws/events` WebSocket
-  (query param or subprotocol, since browsers can't set arbitrary headers on a WS handshake);
-  must survive a reverse proxy injecting the header. Required before any internet exposure.
-  See the Security section in README.md.
+- **Security plugin — follow-ups.** First version shipped (`astrolol/plugins/security/`:
+  users with viewer/operator/admin, guest mode, API tokens, allowed origins, loopback service
+  token for the INDI mount proxy). Still open:
+  - **Prevent disabling the plugin once users exist.** Disabling it today silently opens the
+    API again (and hides the Security page). Decide how: refuse in `PUT /settings`, require a
+    recovery CLI, or keep enforcement in core independent of the plugin.
+  - **WebSocket auth for non-browser clients.** They send `Authorization: Bearer` in the
+    handshake; browsers can't, but use the session cookie. A short-lived ticket endpoint
+    would help clients that cannot set headers.
+  - **Unauthenticated TCP listeners.** LX200, Stellarium and the INDI server accept anyone who
+    can reach the port; give them bind-address / allowed-client settings.
+  - **Host allowlist** (DNS rebinding) is unnecessary once sign-in is on, but matters while
+    the API is open.
+  - Per-user preferences (language, theme): only admins can write settings today.
+  - Audit `operator`-reachable settings for anything that can run commands or point at
+    arbitrary paths (rule: those are admin-only, see each plugin's `acl_rules`).
+  - Session idle timeout / "sign out everywhere" button; login audit log in the UI.

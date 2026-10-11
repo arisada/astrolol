@@ -30,9 +30,11 @@ Each file explains its options in its own header comment. This guide puts them i
   recommended. Imaging pipelines and plate solving are noticeably slower on older boards.
 - **Network:** the Pi and your clients on the same network, or the Pi acting as an access
   point (System page, if you use the `system` plugin).
-- **Security:** astrolol has **no authentication**. Keep it on a trusted network or behind
-  a VPN, and never forward its port to the internet. See *Security* in the
-  [README](../README.md#security). HTTPS encrypts the traffic; it does not authenticate users.
+- **Security:** astrolol has **no authentication** until you enable the Security plugin.
+  Keep it on a trusted network or behind a VPN, and never forward its port to the internet.
+  See *Security* in the [README](../README.md#security). HTTPS encrypts the traffic; sign-in
+  (the Security plugin) is what authenticates users, and it needs HTTPS (section 6) to keep
+  passwords from travelling in clear text.
 
 Everything below is run on the Pi, over SSH or a keyboard.
 
@@ -156,11 +158,19 @@ because nobody but the Pi vouches for it. Either accept the exception once per d
 import `/etc/nginx/ssl/astrolol.crt` as a trusted certificate on your clients. Some browser
 features (installing the UI as an app, its offline cache) only work on a trusted HTTPS page.
 
+Use HTTPS if you turn on sign-in (Options → Plugins → Security): over plain HTTP, passwords
+and session cookies are readable by anyone on the network, and the UI shows a warning.
+
 Port 80 redirects to HTTPS. If you prefer plain HTTP, skip the script and install
 `deploy/nginx-http.conf` by hand; its header lists the steps.
 
 nginx serves the files in `ui/dist` itself and forwards everything else, including the
 WebSocket, to astrolol. After rebuilding the UI nothing needs reloading.
+
+The configs keep the browser's `Host` header, which astrolol compares with the page's origin to
+refuse requests from other sites. Keep it that way if you edit them, and use the standard
+ports. On another port, change `proxy_set_header Host $host;` to `$http_host`, or add the
+page's origin to *Allowed origins* on the Security page.
 
 If nginx answers **403**, the web server user (`www-data`) cannot read `ui/dist`. Home
 directories are often private (mode 700 or 750); `chmod o+x /home/astrolol` lets other

@@ -4,6 +4,7 @@ from __future__ import annotations
 import structlog
 from fastapi import FastAPI
 
+from astrolol.core.auth import AclRule, Level
 from astrolol.core.plugin_api import LogScope, PluginContext, PluginManifest
 from astrolol.plugins.system.models import SystemSettings
 from astrolol.plugins.system.throttle import ThrottleMonitor
@@ -26,6 +27,16 @@ class SystemPlugin:
         ),
         nav_order=90,
         log_scopes=[LogScope(key="system", label="System", logger="astrolol.plugins.system")],
+        acl_rules=[
+            AclRule("/plugins/system/status", Level.VIEWER, ("GET",)),
+            AclRule("/plugins/system/throttled", Level.VIEWER, ("GET",)),
+            AclRule("/plugins/system/network", Level.VIEWER, ("GET",)),
+            AclRule("/plugins/system/usb", Level.VIEWER, ("GET",)),
+            AclRule("/plugins/system/storage", Level.VIEWER, ("GET",)),
+            AclRule("/plugins/system/time", Level.VIEWER, ("GET",)),
+            AclRule("/plugins/system/hostname", Level.VIEWER, ("GET",)),
+            AclRule("/plugins/system/**", Level.ADMIN),
+        ],
     )
 
     def __init__(self) -> None:

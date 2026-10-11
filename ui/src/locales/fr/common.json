@@ -127,5 +127,17 @@
     "label": "Cible de guidage",
     "ra": "AD",
     "dec": "Dec"
+  },
+  "auth": {
+    "title": "Connexion à astrolol",
+    "username": "Utilisateur",
+    "password": "Mot de passe",
+    "signIn": "Se connecter",
+    "signingIn": "Connexion…",
+    "signOut": "Se déconnecter",
+    "cancel": "Continuer en invité",
+    "guest": "Invité",
+    "failed": "Échec de la connexion",
+    "insecure": "Cette connexion n'est pas chiffrée : votre mot de passe circulerait en clair sur le réseau. Utilisez HTTPS (voir le guide de déploiement)."
   }
 }
