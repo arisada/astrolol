@@ -113,6 +113,9 @@ def create_app() -> FastAPI:
     app = FastAPI(title="astrolol", version=SERVER_VERSION, lifespan=lifespan)
 
     from astrolol.config.settings import settings as _settings
+    from astrolol.core.same_origin import SameOriginMiddleware
+
+    app.add_middleware(SameOriginMiddleware, allowed_origins=_settings.allowed_origins)
 
     profile_store = ProfileStore(_settings.profiles_file)
     equipment_store = EquipmentStore(_settings.inventory_file)

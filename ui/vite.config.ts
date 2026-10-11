@@ -38,7 +38,8 @@ function withFallback(proxy: any): void {
 }
 
 function p(target: string) {
-  return { target, changeOrigin: true, configure: withFallback }
+  // No changeOrigin: the backend compares Origin to Host, so Host must stay the browser's.
+  return { target, configure: withFallback }
 }
 
 // https://vitejs.dev/config/
@@ -74,7 +75,7 @@ export default defineConfig({
       '/health':   p(backendHttp),
       '/plugins':  p(backendHttp),
       '/admin':    p(backendHttp),
-      '/ws': { target: backendWs, ws: true, changeOrigin: true, configure: withFallback },
+      '/ws': { target: backendWs, ws: true, configure: withFallback },
     },
   },
   build: {

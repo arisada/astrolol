@@ -30,6 +30,11 @@ class Settings(BaseSettings):
     indi_host: str = "localhost"
     indi_port: int = 7624
 
+    # Extra browser origins allowed to call the API (e.g. a UI served from another
+    # host). The server's own origin is always allowed. JSON list in the env var:
+    # ASTROLOL_ALLOWED_ORIGINS='["https://astro.example"]'
+    allowed_origins: list[str] = []
+
     model_config = {"env_prefix": "ASTROLOL_"}
 
 
