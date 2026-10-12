@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 
 import structlog
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
@@ -10,13 +10,33 @@ logger = structlog.get_logger()
 
 # Path prefixes that belong to the backend API (mirrors the dev-server proxy
 # list in ui/vite.config.ts). No client-side route ever starts with one of
-# these — plugin UI pages are mounted at "/<plugin_id>", never "/plugins/...".
+# these, except the pages listed in _CLIENT_ROUTES_SHADOWING_API below — plugin UI
+# pages are mounted at "/<plugin_id>", never "/plugins/...".
 # A request under one of these that no route matched (e.g. a disabled
 # plugin's "/plugins/<id>/..." routes) is a real 404, not a client page.
 _API_PREFIXES = frozenset({
     "api", "devices", "profiles", "imager", "mount", "focuser", "filter_wheel",
     "indi", "inventory", "settings", "events", "health", "plugins", "admin", "ws", "auth",
 })
+
+# Client-side pages whose path is also a REST endpoint ("/profiles" lists profiles,
+# "/mount/..." drives the mount). The API route wins the match, so a browser reload on
+# such a page used to show the JSON. A browser *navigation* to one of these gets the app
+# shell instead; fetch() calls from the UI are not navigations and still reach the API.
+# tests/unit/test_static_spa.py checks this covers every route declared in ui/src/App.tsx.
+_CLIENT_ROUTES_SHADOWING_API = frozenset({"profiles", "mount"})
+
+
+def _is_page_navigation(request: Request) -> bool:
+    """True for a user typing/reloading a URL, never for a script's fetch()/XHR."""
+    if request.method not in ("GET", "HEAD"):
+        return False
+    dest = request.headers.get("sec-fetch-dest")
+    if dest is not None:
+        return dest == "document"
+    # Browsers too old to send Fetch Metadata: a navigation asks for HTML first.
+    return request.headers.get("accept", "").startswith("text/html")
+
 
 # Candidate locations for ui/dist, in priority order:
 #   1. ASTROLOL_UI_DIST env var (explicit override)
@@ -62,6 +82,13 @@ def mount_ui(app: FastAPI) -> None:
 
     logger.info("static.ui_mounted", path=str(UI_DIST))
     app.mount("/assets", StaticFiles(directory=UI_DIST / "assets"), name="assets")
+
+    @app.middleware("http")
+    async def page_navigation(request: Request, call_next):
+        first, _, rest = request.url.path.strip("/").partition("/")
+        if first in _CLIENT_ROUTES_SHADOWING_API and not rest and _is_page_navigation(request):
+            return FileResponse(UI_DIST / "index.html")
+        return await call_next(request)
 
     @app.get("/{full_path:path}", include_in_schema=False)
     async def spa_fallback(full_path: str) -> FileResponse:
