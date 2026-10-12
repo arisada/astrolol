@@ -78,6 +78,13 @@ POST that only reads (`Level.VIEWER`). `*` is one path segment, `**` any depth (
 itself). Plugin settings that can hold credentials must not be readable by viewers. Core routes are
 listed in `default_acl()`. `tests/unit/test_auth_app.py` fails if a mutating route is open to viewers.
 
+Settings: `ASTROLOL_ALLOWED_ORIGINS` (JSON list) adds trusted origins; `security_file` and
+`service_token_file` (under the data dir, mode 0600) hold users/tokens/sessions and the service
+token. The only core UI that knows about sign-in is `ui/src/auth/`, `LoginScreen.tsx`, the user
+chip in `StatusBar.tsx` and the 401 handling in `api/client.ts` (the gate has to render before any
+plugin loads); plugin pages need no changes. Recovery without a login:
+`python -m astrolol.plugins.security {list|set-password|add-admin|reset}`.
+
 Helper processes started by astrolol (the INDI mount proxy) authenticate with the loopback-only
 service token in `Settings.service_token_file` (operator level), never with a user's token.
 

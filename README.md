@@ -39,6 +39,8 @@ Source: https://github.com/arisada/astrolol
   mount astrolol controls.
 - **System management** — WiFi connect/AP-mode switching, system info, and thermal/power
   throttle monitoring for the host machine (e.g. a Raspberry Pi).
+- **Security** — optional sign-in with read-only, operator and admin users, guest access, API tokens
+  for other tools and configurable allowed origins (see [Security](#security)).
 - **Live event stream** — all state changes broadcast to connected clients over WebSocket,
   with a ring-buffer replay for late-joining clients.
 - **Plugin system** — self-contained feature plugins in `astrolol/plugins/`. Each plugin registers its
