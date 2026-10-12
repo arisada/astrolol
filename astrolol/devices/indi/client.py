@@ -85,9 +85,9 @@ class IndiClient(IPyClient):
         # Callbacks are called (with no arguments) whenever that property changes.
         # Adapters register listeners in connect() and remove them in disconnect().
         self._prop_listeners: dict[tuple[str, str], list[Callable[[], None]]] = defaultdict(list)
-        # LOCAL upload mode: indiserver sends a Message "Image saved to /path" instead
-        # of forwarding the setBLOBVector.  We parse that message and store the path here
-        # so IndiCamera.expose() can retrieve it via wait_for_local_image().
+        # LOCAL upload mode: the driver saves the FITS itself and reports its path in the
+        # CCD_FILE_PATH text vector instead of sending a BLOB.  We store that path here so
+        # IndiCamera.expose() can retrieve it via wait_for_local_image().
         self._local_image_paths: dict[str, Path] = {}  # device_name → path
         # BLOB listeners get every frame as it arrives (not just the latest): used by streams.
         self._blob_listeners: dict[tuple[str, str], list[Callable[[bytes, str], None]]] = defaultdict(list)
@@ -186,16 +186,14 @@ class IndiClient(IPyClient):
                 except Exception:
                     logger.warning("indi.blob_listener_error", device=key[0], prop=key[1], exc_info=True)
 
+        if isinstance(event, indi_events.setTextVector) and event.vectorname == "CCD_FILE_PATH":
+            path_str = (event.data.get("FILE_PATH") or "").strip()
+            if path_str:
+                self._local_image_paths[event.devicename] = Path(path_str)
+
         if isinstance(event, indi_events.Message) and event.message:
             if event.devicename:
                 logger.debug("indi.message", device=event.devicename, message=event.message)
-                # In LOCAL upload mode indiserver does not forward setBLOBVector to clients;
-                # instead it sends a Message "... Image saved to /path".  Parse it here so
-                # wait_for_local_image() can return the path without polling.
-                if "Image saved to " in event.message:
-                    path_str = event.message.split("Image saved to ", 1)[1].strip()
-                    if path_str:
-                        self._local_image_paths[event.devicename] = Path(path_str)
             else:
                 logger.debug("indi.message", message=event.message)
 
@@ -482,11 +480,10 @@ class IndiClient(IPyClient):
         self._local_image_paths.pop(device_name, None)
 
     async def wait_for_local_image(self, device_name: str, timeout: float) -> Path:
-        """Wait for a LOCAL-mode image to be reported via the INDI Message channel.
+        """Wait for a LOCAL-mode image to be reported in the CCD_FILE_PATH text vector.
 
-        indiserver does not forward setBLOBVector to clients in UPLOAD_LOCAL mode.
-        Instead it emits a device Message "... Image saved to /path".  This method
-        waits for that message (parsed by rxevent) and returns the file path.
+        In UPLOAD_LOCAL mode the driver writes the FITS to disk and sets CCD_FILE_PATH
+        (parsed by rxevent) instead of sending a BLOB.  Returns the file path.
         Call clear_local_image_path() before triggering the exposure so that stale
         messages from a previous exposure cannot satisfy this wait.
         """

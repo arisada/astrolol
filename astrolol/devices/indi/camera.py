@@ -171,10 +171,10 @@ class IndiCamera:
         timeout = params.duration + self._exposure_timeout_extra
 
         if self._current_upload_dir is not None:
-            # LOCAL upload mode: indiserver writes the FITS to disk and sends a
-            # device Message "... Image saved to /path" instead of forwarding the
-            # setBLOBVector.  Clear any stale path before triggering so we can't
-            # accidentally pick up a result from a previous exposure.
+            # LOCAL upload mode: the driver writes the FITS to disk and reports its
+            # path in CCD_FILE_PATH instead of sending a BLOB.  Clear any stale path
+            # before triggering so we can't accidentally pick up
+            # a result from a previous exposure.
             self._client.clear_local_image_path(self._device_name)
             await self._client.set_number(
                 self._device_name,
