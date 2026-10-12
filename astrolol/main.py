@@ -267,7 +267,9 @@ def create_app() -> FastAPI:
         async def _do_restart() -> None:
             await asyncio.sleep(0.2)  # let the 202 response flush
             logger.info("admin.restart")
-            os.execv(sys.executable, [sys.executable] + sys.argv)
+            # orig_argv keeps `-m astrolol.main`; sys.argv alone would re-run main.py as a
+            # script, where the `astrolol` package is no longer importable.
+            os.execv(sys.executable, sys.orig_argv)
 
         asyncio.create_task(_do_restart())
         return {"status": "restarting"}
