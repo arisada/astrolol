@@ -43,7 +43,6 @@ class BlobData:
     """Received BLOB payload."""
     data: bytes
     format: str   # file extension, e.g. '.fits'
-    local_path: Path | None = None  # set when driver uses UPLOAD_LOCAL mode (size=0)
 
 
 class IndiClient(IPyClient):
@@ -476,10 +475,6 @@ class IndiClient(IPyClient):
         if v is None:
             raise RuntimeError(f"BLOB vector {device_name}/{prop_name} not found")
         first = next(iter(v.data.values()))
-        # LOCAL mode: driver sends size=0 and the file path as raw bytes
-        if getattr(first, 'blobsize', -1) == 0 and first.membervalue:
-            path_str = first.membervalue.decode().strip()
-            return BlobData(data=b"", format=first.blobformat, local_path=Path(path_str))
         return BlobData(data=first.membervalue, format=first.blobformat)
 
     def clear_local_image_path(self, device_name: str) -> None:

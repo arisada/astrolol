@@ -1,7 +1,7 @@
 # Local patches on top of indipyclient 0.9.3
 
 Upstream: https://github.com/bernie-skipole/indipyclient (PyPI: `indipyclient`).
-This directory is the 0.9.3 sdist plus the three patches below. None of them is
+This directory is the 0.9.3 sdist plus the two patches below. None of them is
 merged upstream yet. Once they are, drop this directory and depend on the PyPI release.
 
 To re-vendor a newer release: unpack its sdist over this directory (keep this file),
@@ -34,13 +34,3 @@ property state was not updated.
 
 **Fix**: three subclasses (`newSwitchVector(setSwitchVector)` and so on) treat them like
 their `set*` counterparts.
-
-## 3. Fix `setBLOBVector` parsing in UPLOAD_LOCAL mode (`events.py`)
-
-**Problem**: with an INDI CCD driver in `UPLOAD_MODE=UPLOAD_LOCAL`, the driver writes the
-FITS file to disk and sends a `setBLOBVector` with `size=0` and the file path as the element
-text instead of base64 data. The original code always called `standard_b64decode`, which
-raised `ParseException` because a path is not valid base64.
-
-**Fix**: when `membersize == 0`, store the element text (the path) as raw bytes, so callers
-can detect local-upload mode by the zero size and read the path from the member value.
