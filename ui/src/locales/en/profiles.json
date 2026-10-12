@@ -1,0 +1,52 @@
+{
+  "title": "Profiles",
+  "subtitle": "A profile is a name and an equipment tree. Activate it to connect devices.",
+  "new": "New profile",
+  "newTitle": "New profile",
+  "editTitle": "Edit profile",
+  "loading": "Loading…",
+  "empty": {
+    "title": "No profiles yet.",
+    "hint": "Create a profile to save your equipment setup.",
+    "create": "Create first profile"
+  },
+  "picker": {
+    "none": "No matching items in inventory.<br/>Add them in Equipment → Inventory first.",
+    "used": "already in tree"
+  },
+  "tree": {
+    "unknown": "Unknown ({{id}})",
+    "attach": "Attach child item",
+    "child": "child",
+    "remove": "Remove from tree",
+    "title": "Equipment tree",
+    "saving": "Saving…",
+    "empty": "No equipment tree configured.",
+    "add": "Add to tree"
+  },
+  "form": {
+    "nameRequired": "Name is required.",
+    "name": "Profile name",
+    "placeholder": "e.g. Backyard rig",
+    "hint": "Equipment (telescope, camera, site…) is managed through the equipment tree after the profile is created.",
+    "saving": "Saving…",
+    "save": "Save changes",
+    "create": "Create profile",
+    "cancel": "Cancel"
+  },
+  "activation": {
+    "ok": "Profile activated",
+    "errors": "Activated with errors",
+    "dismiss": "Dismiss",
+    "connected": "Connected: {{devices}}"
+  },
+  "card": {
+    "items_one": "{{count}} item in tree",
+    "items_other": "{{count}} items in tree",
+    "emptyTree": "Empty tree",
+    "active": "active",
+    "edit": "Edit",
+    "reload": "Reload",
+    "activate": "Activate"
+  }
+}

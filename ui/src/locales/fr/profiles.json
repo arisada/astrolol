@@ -1,0 +1,52 @@
+{
+  "title": "Profils",
+  "subtitle": "Un profil est un nom et une arborescence de matériel. Activez-le pour connecter les appareils.",
+  "new": "Nouveau profil",
+  "newTitle": "Nouveau profil",
+  "editTitle": "Modifier le profil",
+  "loading": "Chargement…",
+  "empty": {
+    "title": "Aucun profil pour l'instant.",
+    "hint": "Créez un profil pour enregistrer votre configuration matérielle.",
+    "create": "Créer le premier profil"
+  },
+  "picker": {
+    "none": "Aucun élément correspondant dans l'inventaire.<br/>Ajoutez-les d'abord dans Matériel → Inventaire.",
+    "used": "déjà dans l'arborescence"
+  },
+  "tree": {
+    "unknown": "Inconnu ({{id}})",
+    "attach": "Rattacher un élément enfant",
+    "child": "enfant",
+    "remove": "Retirer de l'arborescence",
+    "title": "Arborescence du matériel",
+    "saving": "Enregistrement…",
+    "empty": "Aucune arborescence de matériel configurée.",
+    "add": "Ajouter à l'arborescence"
+  },
+  "form": {
+    "nameRequired": "Le nom est obligatoire.",
+    "name": "Nom du profil",
+    "placeholder": "ex. Setup du jardin",
+    "hint": "Le matériel (télescope, caméra, site…) se gère dans l'arborescence du matériel une fois le profil créé.",
+    "saving": "Enregistrement…",
+    "save": "Enregistrer les modifications",
+    "create": "Créer le profil",
+    "cancel": "Annuler"
+  },
+  "activation": {
+    "ok": "Profil activé",
+    "errors": "Activé avec des erreurs",
+    "dismiss": "Fermer",
+    "connected": "Connecté : {{devices}}"
+  },
+  "card": {
+    "items_one": "{{count}} élément dans l'arborescence",
+    "items_other": "{{count}} éléments dans l'arborescence",
+    "emptyTree": "Arborescence vide",
+    "active": "actif",
+    "edit": "Modifier",
+    "reload": "Recharger",
+    "activate": "Activer"
+  }
+}

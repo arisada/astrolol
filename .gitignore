@@ -14,7 +14,7 @@ build/
 !ui/public/*.png
 
 # Runtime data
-profiles.json
+/profiles.json
 images/
 astrolol.log
 
