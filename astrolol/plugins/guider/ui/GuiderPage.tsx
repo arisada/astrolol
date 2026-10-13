@@ -209,6 +209,14 @@ export function GuiderPage() {
                   <Stat label={t('status.pierSide')}
                     value={report?.mount?.pier_side ? t(`pier.${report.mount.pier_side}`, { defaultValue: report.mount.pier_side }) : '—'} />
                 </div>
+                {report?.prediction && (report.prediction.pe_period_s != null || Math.abs(report.prediction.drift_ra) + Math.abs(report.prediction.drift_dec) > 0) && (
+                  <p className="text-xs text-slate-400 mt-2">
+                    {t('status.drift', { ra: fmt(report.prediction.drift_ra * 60, 1), dec: fmt(report.prediction.drift_dec * 60, 1), unit })}
+                    {report.prediction.pe_period_s != null && (
+                      <> · {t('status.periodicError', { period: fmt(report.prediction.pe_period_s, 0), amplitude: fmt(report.prediction.pe_amplitude, 1), unit })}</>
+                    )}
+                  </p>
+                )}
                 {report?.calibration_attempt?.running && (
                   <p className="text-xs text-amber-300 mt-2">
                     {t('calibration.running', { phase: t(`calibration.phases.${report.calibration_attempt.phase}`, { defaultValue: report.calibration_attempt.phase }) })}{' '}

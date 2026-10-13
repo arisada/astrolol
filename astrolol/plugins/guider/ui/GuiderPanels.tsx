@@ -119,7 +119,7 @@ export function SetupPanel({ settings, save, active, cameras, mounts, report, ex
 
 export function TuningPanel({ settings, save, autoMinMove }: { settings: api.GuiderSettings; save: Save; autoMinMove: number }) {
   const { t } = useTranslation('guider')
-  const toggle = (key: 'dec_backlash_compensation' | 'dec_resist_reversals' | 'predict_drift', label: string, hint: string) => (
+  const toggle = (key: 'dec_backlash_compensation' | 'dec_resist_reversals' | 'predict_drift' | 'predict_periodic_error', label: string, hint: string) => (
     <Field label={label} hint={hint}>
       <ToggleSwitch label={label} checked={settings[key]} onChange={() => save({ [key]: !settings[key] })} />
     </Field>
@@ -139,6 +139,18 @@ export function TuningPanel({ settings, save, autoMinMove }: { settings: api.Gui
           onChange={(v) => save({ dec_aggressiveness: v / 100 }, { soon: true })} />
       </Field>
       {toggle('predict_drift', t('tuning.predictDrift'), t('tuning.predictDriftHint'))}
+      {settings.predict_drift && toggle('predict_periodic_error', t('tuning.predictPe'), t('tuning.predictPeHint'))}
+      {settings.predict_drift && settings.predict_periodic_error && (
+        <Field label={t('tuning.wormPeriod')} hint={t('tuning.wormPeriodHint')}>
+          <PillGroup options={['auto', 'set'] as const} value={settings.worm_period_s == null ? 'auto' : 'set'}
+            formatLabel={(v) => (v === 'auto' ? t('tuning.findIt') : t('tuning.manual'))}
+            onChange={(v) => save({ worm_period_s: v === 'auto' ? null : 480 })} />
+          {settings.worm_period_s != null && (
+            <NumberStepper value={settings.worm_period_s} min={10} max={3600} step={1} decimals={1} unit="s"
+              onChange={(v) => save({ worm_period_s: v }, { soon: true })} />
+          )}
+        </Field>
+      )}
       <Field label={t('tuning.minMove')} hint={t('tuning.minMoveHint')}>
         <PillGroup options={['auto', 'set'] as const} value={settings.min_move_px == null ? 'auto' : 'set'}
           formatLabel={(v) => (v === 'auto' ? t('tuning.auto', { value: autoMinMove.toFixed(2) }) : t('tuning.manual'))}

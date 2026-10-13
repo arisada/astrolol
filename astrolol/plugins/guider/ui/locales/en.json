@@ -62,7 +62,9 @@
     "losses": "Losses / unguided",
     "lastError": "Guiding stopped: {{error}}",
     "pointing": "Declination",
-    "pierSide": "Pier side"
+    "pierSide": "Pier side",
+    "drift": "Drift RA {{ra}}{{unit}}/min, Dec {{dec}}{{unit}}/min",
+    "periodicError": "periodic error {{amplitude}}{{unit}} every {{period}} s"
   },
   "guiding": {
     "start": "Start guiding",
@@ -222,6 +224,11 @@
       "no": "Unchanged"
     },
     "predictDrift": "Predict drift",
-    "predictDriftHint": "Learns how the mount drifts and corrects it ahead."
+    "predictDriftHint": "Learns how the mount drifts and corrects it ahead.",
+    "predictPe": "Predict periodic error",
+    "predictPeHint": "Learns the regular wobble of the RA gears and corrects it ahead.",
+    "wormPeriod": "RA worm period",
+    "wormPeriodHint": "The time of one turn of the RA worm, if you know it.",
+    "findIt": "Find it"
   }
 }

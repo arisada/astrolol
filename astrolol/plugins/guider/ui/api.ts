@@ -43,6 +43,8 @@ export interface GuiderSettings {
   min_pulse_ms: number
   dec_mode: DecMode
   predict_drift: boolean
+  predict_periodic_error: boolean
+  worm_period_s: number | null
 }
 
 export type CalibrationPhase = 'drift' | 'probe' | 'west' | 'east' | 'north' | 'south'
@@ -98,6 +100,13 @@ export interface CalibrationAttempt {
   error: string | null
 }
 
+export interface Prediction {
+  drift_ra: number // per second, arcsec (pixels without a pixel scale)
+  drift_dec: number
+  pe_period_s: number | null
+  pe_amplitude: number | null // peak to peak
+}
+
 export interface MountReport {
   dec: number | null
   pier_side: string | null
@@ -126,6 +135,7 @@ export interface GuiderReport {
   last_error: string | null
   mount: MountReport | null
   preferred_star: [number, number] | null
+  prediction: Prediction | null
 }
 
 // What the plugin keeps in the store (pluginStates['guider']).

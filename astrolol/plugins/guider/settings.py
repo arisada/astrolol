@@ -50,6 +50,8 @@ class GuiderSettings(BaseModel):
     min_pulse_ms: int = Field(default=20, ge=1, le=500)
     dec_mode: Literal["auto", "north", "south", "off"] = "auto"
     predict_drift: bool = Field(default=True, description="Learn the steady drift and correct it ahead")
+    predict_periodic_error: bool = Field(default=True, description="Also learn the RA worm's periodic error")
+    worm_period_s: float | None = Field(default=None, gt=0, description="RA worm period (s); None: found while guiding")
 
 
 def auto_min_move_px(pixel_scale: float | None) -> float:

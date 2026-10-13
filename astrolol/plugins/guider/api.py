@@ -17,7 +17,7 @@ from astrolol.core.guiding import (
 )
 from astrolol.plugins.guider.calibration import Calibration
 from astrolol.plugins.guider.darks import DarkInfo
-from astrolol.plugins.guider.guider import BuiltinGuider, CalibrationAttempt
+from astrolol.plugins.guider.guider import BuiltinGuider, CalibrationAttempt, Prediction
 from astrolol.plugins.guider.settings import GuiderSettings
 from astrolol.plugins.guider.view import ViewInfo
 
@@ -53,6 +53,7 @@ class GuiderReport(BaseModel):
     last_error: str | None = None  # why the last run ended, when it failed
     mount: MountReport | None = None
     preferred_star: tuple[float, float] | None = None
+    prediction: Prediction | None = None
 
 
 @router.get("/status", response_model=GuiderReport)
@@ -75,6 +76,7 @@ async def get_status(request: Request) -> GuiderReport:
         last_error=g.last_error,
         mount=MountReport(dec=m.dec, pier_side=m.pier_side, slewing=m.slewing) if m else None,
         preferred_star=g.preferred_star,
+        prediction=g.prediction(),
     )
 
 

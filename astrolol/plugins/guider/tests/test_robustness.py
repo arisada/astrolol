@@ -434,3 +434,21 @@ async def test_a_night_of_incidents(monkeypatch) -> None:  # noqa: ANN001
     await g.stop()
     errors.sort()
     assert errors[len(errors) // 2] < 1.0  # median, dithers included
+
+
+async def test_the_periodic_error_is_learnt_while_guiding() -> None:
+    # A fast 'worm' (2.5 s) so that a few periods pass in a test; slow frames so that
+    # corrections made afterwards trail it.
+    rig = Rig(drift=(0.0, 0.0), seeing_px=0.1, seed=2)
+    g = make_guider(rig, exposure=0.08)
+    await g.guide(EASY_SETTLE)
+    rig.pe = (5.0, 2.5)  # a real worm turns in minutes: calibration sees only part of a period
+    for _ in range(80):
+        await asyncio.sleep(0.25)
+        p = g.prediction()
+        if p and p.pe_period_s:
+            break
+    p = g.prediction()
+    await g.stop()
+    assert p is not None and p.pe_period_s == pytest.approx(2.5, rel=0.1), p
+    assert p.pe_amplitude == pytest.approx(10.0, rel=0.35)  # peak to peak

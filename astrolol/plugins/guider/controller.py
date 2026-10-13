@@ -8,8 +8,8 @@ from pydantic import BaseModel, Field
 
 from astrolol.devices.base.pulse import PulseDirection
 from astrolol.plugins.guider.calibration import Calibration
+from astrolol.plugins.guider.predictor import MotionPredictor
 
-DRIFT_ALPHA = 0.12  # weight of each frame in the drift estimate: slow enough to average seeing out
 SWITCH_FRAMES = 3  # consecutive frames asking to reverse before a resisting axis gives in
 FAST_SWITCH_FACTOR = 3.0  # an error this many times the minimum move reverses at once
 OVERSHOOT_SHRINK = 0.6  # backlash share kept after a compensated pulse overshoots
@@ -49,6 +49,8 @@ class GuideController:
         compensate_backlash: bool = False,
         last_dec_dir: int = 0,
         predict_drift: bool = True,
+        predict_periodic: bool = True,
+        pe_period_s: float | None = None,
     ) -> None:
         self.calibration = calibration
         self.ra = ra or AxisSettings()
@@ -67,8 +69,8 @@ class GuideController:
         self._resist_dir = 0  # direction Dec was last allowed to correct in
         self._resist_votes = 0  # consecutive frames asking for the other direction
         self.predict_drift = predict_drift
-        self.drift = [0.0, 0.0]  # the star's own motion along RA and Dec, axis pixels per second
-        self._drift_samples = 0
+        # The star's own motion along RA (drift and the worm's periodic error) and Dec (drift).
+        self.predictors = (MotionPredictor(pe_period_s, periodic=predict_periodic), MotionPredictor(periodic=False))
         self._cycle = 0.0  # seconds between corrections
         self._last: tuple[float, float, float] | None = None  # (time, RA error, Dec error)
         self._sent = (0.0, 0.0)  # West ms, North ms actually sent after the last measurement
@@ -81,11 +83,16 @@ class GuideController:
         self._last = None
         self._sent = (0.0, 0.0)
 
+    @property
+    def drift(self) -> list[float]:
+        """The steady part of the star's own motion, axis pixels per second (RA, Dec)."""
+        return [p.drift for p in self.predictors]
+
     def forget_drift(self) -> None:
-        """The axes changed meaning (one was reversed): the drift learnt no longer applies."""
+        """The axes changed meaning (one was reversed): the motion learnt no longer applies."""
         self.reset()
-        self.drift = [0.0, 0.0]
-        self._drift_samples = 0
+        for p in self.predictors:
+            p.reset()
 
     def pulses_failed(self) -> None:
         """The pulses of the last correction did not go out."""
@@ -105,16 +112,16 @@ class GuideController:
             (ra_err - last[1] - self._sent[0] * c.ra_rate) / dt,
             (dec_err - last[2] - self._sent[1] * c.dec_rate) / dt,
         )
-        self._drift_samples += 1
-        alpha = max(DRIFT_ALPHA, 1.0 / self._drift_samples)  # faster at first, then steady
-        self.drift = [d + alpha * (o - d) for d, o in zip(self.drift, own)]
+        for predictor, rate in zip(self.predictors, own):
+            predictor.add(last[0], now, rate)
 
-    def _feed_forward(self) -> tuple[float, float]:
-        """(West ms, North ms) cancelling the drift until the next measurement."""
-        if not self.predict_drift or self._drift_samples < 3 or self._cycle == 0:
+    def _feed_forward(self, now: float | None) -> tuple[float, float]:
+        """(West ms, North ms) cancelling the motion predicted until the next measurement."""
+        if not self.predict_drift or now is None or self._cycle == 0:
             return 0.0, 0.0
         c = self.calibration
-        return -self.drift[0] * self._cycle / c.ra_rate, -self.drift[1] * self._cycle / c.dec_rate
+        ra, dec = (p.displacement(now, now + self._cycle) for p in self.predictors)
+        return -ra / c.ra_rate, -dec / c.dec_rate
 
     def correct(self, dx: float, dy: float, now: float | None = None) -> list[tuple[PulseDirection, int]]:
         """Pulses for an error of (dx, dy) pixels measured at *now* (monotonic seconds; without
@@ -126,7 +133,7 @@ class GuideController:
         self._learn_overshoot(north, abs(dec_err))
         west = self._axis(west, abs(ra_err), self._prev[0], self.ra)
         north = self._axis(north, abs(dec_err), self._prev[1], self.dec)
-        ff_west, ff_north = self._feed_forward()
+        ff_west, ff_north = self._feed_forward(now)
         prev = (west, north)
         west = max(-self.ra.max_pulse_ms, min(self.ra.max_pulse_ms, west + ff_west))
         north = max(-self.dec.max_pulse_ms, min(self.dec.max_pulse_ms, north + ff_north))

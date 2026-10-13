@@ -62,7 +62,9 @@
     "losses": "Pertes / non guidé",
     "lastError": "Guidage arrêté : {{error}}",
     "pointing": "Déclinaison",
-    "pierSide": "Côté du pilier"
+    "pierSide": "Côté du pilier",
+    "drift": "Dérive AD {{ra}}{{unit}}/min, Déc {{dec}}{{unit}}/min",
+    "periodicError": "erreur périodique {{amplitude}}{{unit}} toutes les {{period}} s"
   },
   "guiding": {
     "start": "Lancer le guidage",
@@ -222,6 +224,11 @@
       "no": "Inchangée"
     },
     "predictDrift": "Anticiper la dérive",
-    "predictDriftHint": "Apprend comment la monture dérive et la corrige à l'avance."
+    "predictDriftHint": "Apprend comment la monture dérive et la corrige à l'avance.",
+    "predictPe": "Anticiper l'erreur périodique",
+    "predictPeHint": "Apprend l'oscillation régulière des engrenages en AD et la corrige à l'avance.",
+    "wormPeriod": "Période de la vis sans fin AD",
+    "wormPeriodHint": "La durée d'un tour de la vis sans fin en AD, si vous la connaissez.",
+    "findIt": "La trouver"
   }
 }

@@ -99,6 +99,15 @@ class CalibrationAttempt(BaseModel):
     error: str | None = None
 
 
+class Prediction(BaseModel):
+    """The star's own motion as guiding has learnt it (arcsec, or pixels without a pixel scale)."""
+
+    drift_ra: float  # per second
+    drift_dec: float
+    pe_period_s: float | None = None  # the periodic error being predicted, if any
+    pe_amplitude: float | None = None  # peak to peak
+
+
 class MountMoved(GuiderError):
     pass
 
@@ -532,6 +541,18 @@ class BuiltinGuider:
             self.mount = await self._read_mount()
         return self.mount
 
+    def prediction(self) -> Prediction | None:
+        """What guiding has learnt of the star's own motion, while guiding."""
+        c = self._controller
+        if c is None:
+            return None
+        ra = c.predictors[0]
+        scale = self._scale or 1.0
+        return Prediction(
+            drift_ra=ra.drift * scale, drift_dec=c.predictors[1].drift * scale,
+            pe_period_s=ra.active_period, pe_amplitude=ra.amplitude_px * scale if ra.active_period else None,
+        )
+
     def dark_matches(self) -> bool:
         """Is there a dark for the current exposure and gain?"""
         cfg = self.settings
@@ -617,6 +638,8 @@ class BuiltinGuider:
                 compensate_backlash=cfg.dec_backlash_compensation,
                 last_dec_dir=-1 if fresh_calibration else 0,  # calibration ends with South pulses
                 predict_drift=cfg.predict_drift,
+                predict_periodic=cfg.predict_periodic_error,
+                pe_period_s=cfg.worm_period_s,
             )
 
             self._state = "Guiding"
