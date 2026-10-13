@@ -11,14 +11,17 @@ from dataclasses import dataclass
 from typing import Literal
 
 import numpy as np
-from scipy.ndimage import gaussian_filter
+from scipy.ndimage import gaussian_filter, maximum_filter
 
 from astrolol.devices.base.streaming import Frame
 from astrolol.plugins.guider.darks import DarkLibrary, heal_hot_pixels
 from astrolol.plugins.guider.stars import Star, measure
 
 
-ReadingState = Literal["ok", "blurred", "lost"]
+ReadingState = Literal["ok", "blurred", "lost", "outlier"]
+
+REF_ADAPT = 0.05  # weight of each good frame in the reference brightness and shape
+MATCH_PX = 3.0  # two stars further apart than this after a shift are not the same star
 
 
 @dataclass(frozen=True)
@@ -27,11 +30,12 @@ class StarReading:
 
     "blurred": the star is there but smeared (it moved during the exposure), so its position
     is not trustworthy: wait for the next frame instead of acting on it. "lost": it is not
-    there at all (cloud, left the window).
+    there at all (cloud, left the window), or something else is (brightness far off).
+    "outlier": measured, but it disagrees with the other guide stars, so it is left out.
     """
 
     star: Star | None  # None only when lost
-    dx: float | None  # displacement from the lock position, pixels; only when ok
+    dx: float | None  # displacement from the lock position, pixels; ok and outlier only
     dy: float | None
     state: ReadingState = "ok"
 
@@ -39,7 +43,7 @@ class StarReading:
 @dataclass(frozen=True)
 class TrackerResult:
     readings: list[StarReading]
-    dx: float | None  # median displacement of the stars found; None when none were found
+    dx: float | None  # mean displacement of the agreeing stars; None when none were found
     dy: float | None
 
     @property
@@ -54,9 +58,12 @@ class TrackerResult:
 class StarTracker:
     """Tracks stars locked at the positions given (sensor coordinates).
 
-    The reported offset is the median over the stars still found, so one star lost to a
-    cloud edge, a satellite or a hot pixel does not shift the correction. Stars whose flux
-    falls below *min_flux_ratio* of their locked flux count as lost.
+    The reported offset is the mean over the stars that agree with each other (the median
+    picks them), so one star lost to a cloud edge, a satellite or a hot pixel does not shift
+    the correction while several good stars average their seeing out. A star whose flux
+    leaves [*min_flux_ratio*, *max_flux_ratio*] of its reference counts as lost: it faded,
+    or the window now holds something else. The references follow slow changes (the target
+    sinking into haze, the seeing worsening) so that those do not end guiding.
     """
 
     def __init__(
@@ -68,6 +75,7 @@ class StarTracker:
         margin: int = 6,
         min_snr: float = 4.0,
         min_flux_ratio: float = 0.4,
+        max_flux_ratio: float = 2.5,
         saturation: float | None = None,
         max_elongation: float = 1.8,
         max_fwhm_ratio: float = 1.7,
@@ -77,6 +85,7 @@ class StarTracker:
         self._locks = [(s.x, s.y) for s in stars]
         self._ref_flux = [s.flux for s in stars]
         self._ref_fwhm = [s.fwhm for s in stars]
+        self._ref_elong = [s.elongation for s in stars]
         self._max_elongation = max_elongation
         self._max_fwhm_ratio = max_fwhm_ratio
         self._last = [(s.x, s.y) for s in stars]
@@ -85,11 +94,16 @@ class StarTracker:
         self._margin = margin
         self._min_snr = min_snr
         self._min_flux_ratio = min_flux_ratio
+        self._max_flux_ratio = max_flux_ratio
         self._saturation = saturation
 
     @property
     def half(self) -> int:
         return self._half
+
+    @property
+    def count(self) -> int:
+        return len(self._locks)
 
     @property
     def last_positions(self) -> list[tuple[float, float]]:
@@ -99,6 +113,10 @@ class StarTracker:
     @property
     def lock_positions(self) -> list[tuple[float, float]]:
         return list(self._locks)
+
+    @property
+    def reference_flux(self) -> list[float]:
+        return list(self._ref_flux)
 
     def reset_lock(self, offset: tuple[float, float] = (0.0, 0.0)) -> None:
         """Make the stars' last positions (plus *offset*) the new lock positions."""
@@ -124,12 +142,17 @@ class StarTracker:
                     self._locks[i] = self._last[i]
                 self._ref_flux[i] = star.flux
                 self._ref_fwhm[i] = star.fwhm
+                self._ref_elong[i] = star.elongation
                 found += 1
         return found
 
     def shift_lock(self, dx: float, dy: float) -> None:
         """Move where the stars should be (a dither): the controller then walks them there."""
         self._locks = [(x + dx, y + dy) for x, y in self._locks]
+
+    def shift_last(self, dx: float, dy: float) -> None:
+        """Expect the stars *dx*, *dy* away from where they were last seen (a known move)."""
+        self._last = [(x + dx, y + dy) for x, y in self._last]
 
     def update(self, frame: Frame) -> TrackerResult:
         dark = self._darks.lookup(frame) if self._darks is not None else None
@@ -144,23 +167,59 @@ class StarTracker:
                 readings.append(StarReading(star, None, None, "blurred"))
                 continue
             readings.append(StarReading(star, star.x - lx, star.y - ly))
-        good = [r for r in readings if r.state == "ok"]
+        readings = self._reject_outliers(readings)
+        good = [(i, r) for i, r in enumerate(readings) if r.state == "ok"]
+        for i, r in good:
+            self._adapt(i, r.star)  # type: ignore[arg-type]
         if not good:
             return TrackerResult(readings, None, None)
         return TrackerResult(
             readings,
-            float(np.median([r.dx for r in good])),
-            float(np.median([r.dy for r in good])),
+            float(np.mean([r.dx for _, r in good])),
+            float(np.mean([r.dy for _, r in good])),
         )
 
+    @staticmethod
+    def _reject_outliers(readings: list[StarReading]) -> list[StarReading]:
+        """Leave out stars whose displacement disagrees with the others' (needs three)."""
+        good = [r for r in readings if r.state == "ok"]
+        if len(good) < 3:
+            return readings
+        mx = float(np.median([r.dx for r in good]))
+        my = float(np.median([r.dy for r in good]))
+        dist = np.array([np.hypot(r.dx - mx, r.dy - my) for r in good])  # type: ignore[operator]
+        limit = max(1.0, 4.0 * 1.4826 * float(np.median(dist)))
+        return [
+            StarReading(r.star, r.dx, r.dy, "outlier")
+            if r.state == "ok" and np.hypot(r.dx - mx, r.dy - my) > limit  # type: ignore[operator]
+            else r
+            for r in readings
+        ]
+
+    def _adapt(self, i: int, star: Star) -> None:
+        self._ref_flux[i] += REF_ADAPT * (star.flux - self._ref_flux[i])
+        self._ref_fwhm[i] += REF_ADAPT * (star.fwhm - self._ref_fwhm[i])
+        self._ref_elong[i] += REF_ADAPT * (star.elongation - self._ref_elong[i])
+
     def _smeared(self, star: Star, i: int) -> bool:
-        return star.elongation > self._max_elongation or star.fwhm > self._max_fwhm_ratio * self._ref_fwhm[i]
+        # Relative to the star as it was locked: off-axis and guide-scope stars are often
+        # never round, and they must still be guided on.
+        max_elong = max(self._max_elongation, 1.4 * self._ref_elong[i])
+        return star.elongation > max_elong or star.fwhm > self._max_fwhm_ratio * self._ref_fwhm[i]
+
+    def _looks_like(self, star: Star, i: int) -> bool:
+        ratio = star.flux / max(self._ref_flux[i], 1e-6)
+        return (
+            self._min_flux_ratio <= ratio <= self._max_flux_ratio
+            and star.fwhm <= self._max_fwhm_ratio * max(self._ref_fwhm[i], 1.0)
+        )
 
     def reacquire(self, frame: Frame, radius: int = 60, indices: list[int] | None = None) -> int:
         """Look for stars that have moved out of their window, within *radius* pixels.
 
-        Picks the brightest peak there that looks like the star (flux and SNR as in
-        ``update``) and resumes tracking from it. Returns how many were found again.
+        Of the peaks there that look like the star (brightness and size near its reference),
+        takes the one nearest to where it was last seen, and resumes tracking from it.
+        Returns how many were found again.
         """
         dark = self._darks.lookup(frame) if self._darks is not None else None
         ox, oy = frame.origin
@@ -173,14 +232,50 @@ class StarTracker:
                 continue
             crop = self._crop(frame, dark, x0, y0, x1, y1)
             smooth = gaussian_filter(crop - float(np.median(crop)), 1.5)
-            peaks = np.argsort(smooth, axis=None)[::-1][:1]  # the brightest spot; others rarely are the star
-            for flat in peaks:
-                py, px = divmod(int(flat), smooth.shape[1])
-                star = self._measure(frame, dark, px + x0 + ox, py + y0 + oy, i)
-                if star is not None:
-                    self._last[i] = (star.x, star.y)
-                    found += 1
+            noise = max(float(1.4826 * np.median(np.abs(smooth - np.median(smooth)))), 1e-3)
+            peaks = (smooth == maximum_filter(smooth, size=7)) & (smooth > 5 * noise)
+            ys, xs = np.nonzero(peaks)
+            order = np.argsort(smooth[ys, xs])[::-1][:12]
+            best: Star | None = None
+            for k in order:
+                star = self._measure(frame, dark, float(xs[k] + x0 + ox), float(ys[k] + y0 + oy), i, check_flux=False)
+                if star is None or not self._looks_like(star, i):
+                    continue
+                if best is None or np.hypot(star.x - ex, star.y - ey) < np.hypot(best.x - ex, best.y - ey):
+                    best = star
+            if best is not None:
+                self._last[i] = (best.x, best.y)
+                found += 1
         return found
+
+    def relocate(self, detected: list[Star]) -> tuple[float, float] | None:
+        """Find the guide stars anywhere among *detected* (a full frame) after a big move.
+
+        Each detected star that looks like the primary proposes a shift; the shift under which
+        the most guide stars land on a detected star wins (one star alone must also match in
+        brightness). On success every star's expected position moves by it.
+        """
+        if not detected:
+            return None
+        n = len(self._last)
+        best: tuple[int, float, tuple[float, float]] | None = None
+        for d in detected:
+            ratio = d.flux / max(self._ref_flux[0], 1e-6)
+            if not self._min_flux_ratio <= ratio <= self._max_flux_ratio:
+                continue
+            shift = (d.x - self._last[0][0], d.y - self._last[0][1])
+            score = 1
+            for j in range(1, n):
+                ex, ey = self._last[j][0] + shift[0], self._last[j][1] + shift[1]
+                if any(np.hypot(o.x - ex, o.y - ey) < MATCH_PX for o in detected):
+                    score += 1
+            size = float(np.hypot(*shift))
+            if best is None or (score, -size) > (best[0], -best[1]):
+                best = (score, size, shift)
+        if best is None or best[0] < min(n, 2):
+            return None
+        self.shift_last(*best[2])
+        return best[2]
 
     def _crop(self, frame: Frame, dark, x0: int, y0: int, x1: int, y1: int) -> np.ndarray:  # noqa: ANN001
         ox, oy = frame.origin
@@ -200,10 +295,11 @@ class StarTracker:
         if x1 - x0 < 2 * self._half or y1 - y0 < 2 * self._half:
             return None
         crop = self._crop(frame, dark, x0, y0, x1, y1)
-        saturation = self._saturation
-        star = measure(crop, x - ox - x0, y - oy - y0, half=self._half, saturation=saturation)
+        star = measure(crop, x - ox - x0, y - oy - y0, half=self._half, saturation=self._saturation)
         if star is None or star.snr < self._min_snr:
             return None
-        if check_flux and star.flux < self._min_flux_ratio * self._ref_flux[i]:
-            return None
+        if check_flux:
+            ratio = star.flux / max(self._ref_flux[i], 1e-6)
+            if not self._min_flux_ratio <= ratio <= self._max_flux_ratio:
+                return None
         return star.shifted(ox + x0, oy + y0)

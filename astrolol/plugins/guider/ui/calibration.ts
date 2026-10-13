@@ -14,7 +14,9 @@ export interface CalibrationSummary {
 
 const deg = (rad: number) => (rad * 180) / Math.PI
 
-export function summarizeCalibration(c: Calibration): CalibrationSummary {
+type Rates = Pick<Calibration, 'ra_x' | 'ra_y' | 'dec_x' | 'dec_y' | 'dec_backlash_ms' | 'ra_backlash_ms' | 'drift_x' | 'drift_y'>
+
+export function summarizeCalibration(c: Rates): CalibrationSummary {
   const ra = Math.hypot(c.ra_x, c.ra_y)
   const dec = Math.hypot(c.dec_x, c.dec_y)
   const cos = (c.ra_x * c.dec_x + c.ra_y * c.dec_y) / (ra * dec)

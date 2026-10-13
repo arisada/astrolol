@@ -298,7 +298,8 @@ async def test_calibration_keeps_every_measurement() -> None:
     # The slack at the start of the way back is left out of the fit, and marked as such.
     south = [p for p in cal.trace if p.phase == "south"]
     assert any(not p.used for p in south) and sum(p.used for p in south) >= 4
-    assert not any(p.used for p in cal.trace if p.phase in ("drift", "probe"))
+    assert not any(p.used for p in cal.trace if p.phase == "probe")
+    assert all(p.used for p in cal.trace if p.phase == "drift")  # the drift is fitted with the speeds
     assert 120 <= cal.dec_backlash_ms <= 180
 
 

@@ -17,7 +17,8 @@
     "calibrating": "Calibrating",
     "guiding": "Guiding",
     "paused": "Paused",
-    "capturing_dark": "Taking darks"
+    "capturing_dark": "Taking darks",
+    "previewing": "Showing the camera"
   },
   "reason": {
     "not_guiding": "not guiding",
@@ -25,10 +26,13 @@
     "stopped": "stopped",
     "paused": "paused",
     "disconnected": "disconnected",
-    "error": "failed"
+    "error": "failed",
+    "mount_moved": "the mount moved",
+    "pulse_failed": "the mount refuses corrections",
+    "camera": "no frames from the camera",
+    "axis_reversed": "an axis was reversed"
   },
   "settings": {
-    "title": "Set-up",
     "camera": "Guide camera",
     "choose": "Choose…",
     "output": "Send corrections through",
@@ -42,16 +46,28 @@
     "invalidPixelScale": "The pixel scale must be a number of arcseconds per pixel above zero, or empty.",
     "compensateBacklash": "Compensate Dec backlash",
     "resistReversals": "Resist Dec reversals",
-    "pixelScaleOptics": "Calculated from the telescope and the camera."
+    "pixelScaleOptics": "Calculated from the telescope and the camera.",
+    "mountHint": "Lets the calibration follow slews and meridian flips.",
+    "mountAuto": "The connected mount",
+    "gain": "Gain",
+    "gainHint": "Empty: leave the camera's gain as it is.",
+    "starsHint": "More stars average the seeing out.",
+    "lostTimeout": "Give up after",
+    "lostTimeoutHint": "How long to look for a lost star. 0: until it comes back.",
+    "binning": "Binning"
   },
   "status": {
     "title": "Guiding",
-    "state": "State",
     "guidingFor": "Guiding for",
     "unguidedFor": "Not guiding for",
-    "rms": "RMS, last minute",
     "losses": "Losses / unguided",
-    "reason": "Reason: {{reason}}"
+    "lastError": "Guiding stopped: {{error}}",
+    "pointing": "Declination",
+    "pierSide": "Pier side",
+    "drift": "Drift RA {{ra}}{{unit}}/min, Dec {{dec}}{{unit}}/min",
+    "periodicError": "periodic error {{amplitude}}{{unit}} every {{period}} s",
+    "starSnr": "Star SNR",
+    "stars": "Stars"
   },
   "guiding": {
     "start": "Start guiding",
@@ -59,10 +75,10 @@
     "pause": "Pause",
     "resume": "Resume",
     "dither": "Dither",
-    "recalibrate": "Calibrate again"
+    "recalibrate": "Calibrate again",
+    "ditherAmount": "Dither distance"
   },
   "calibration": {
-    "title": "Calibration",
     "raRate": "RA speed",
     "decRate": "Dec speed",
     "axes": "Angle between axes",
@@ -81,10 +97,43 @@
     "phase_south": "South pulses (back)",
     "axisRa": "RA",
     "axisDec": "Dec",
-    "leftOut": "Left out of the fit"
+    "leftOut": "Left out of the fit",
+    "failed": "Calibration failed: {{error}}",
+    "running": "Calibrating: {{phase}}…",
+    "phase_failed": "failed",
+    "scatter": "Scatter",
+    "travel": "Distance RA / Dec",
+    "madeAt": "Made at declination {{dec}}, pier side {{side}}, {{when}}.",
+    "adjusted": "Adjusted to where the mount points now.",
+    "good": "The measurements agree well.",
+    "warnings_one": "The calibration has {{count}} warning.",
+    "warnings_other": "The calibration has {{count}} warnings.",
+    "show": "Show",
+    "steps": "Steps per direction",
+    "distance": "Distance",
+    "distanceHint": "How far calibration moves the star in each direction.",
+    "issues": {
+      "noisy": "The measurements scatter a lot: steadier air, a longer exposure or a brighter star would help.",
+      "short_travel": "The star moved only a short distance: increase the calibration distance.",
+      "not_perpendicular": "RA and Dec are not at right angles: check for backlash or a loose mount.",
+      "ra_asymmetric": "West and East moved the star at different speeds.",
+      "dec_asymmetric": "North and South moved the star at different speeds: Dec backlash or a stuck axis.",
+      "rate_ratio": "The RA speed does not match the declination: check the mount's guide rates.",
+      "high_dec": "Calibrated close to the pole: RA cannot be measured well there. Calibrate again nearer the celestial equator.",
+      "dec_backlash_large": "Dec backlash took up most of the way back.",
+      "ra_backlash_large": "RA backlash took up most of the way back."
+    },
+    "phases": {
+      "drift": "Drift",
+      "probe": "Test pulse",
+      "west": "West pulses",
+      "east": "East pulses (back)",
+      "north": "North pulses",
+      "south": "South pulses (back)",
+      "failed": "failed"
+    }
   },
   "darks": {
-    "title": "Dark frames",
     "hint": "Cover the telescope, then take darks with the exposure and gain above. They remove hot pixels from the guide star's surroundings.",
     "frames": "frames",
     "capture": "Take dark",
@@ -92,7 +141,9 @@
     "capturing": "Taking darks…",
     "done": "Dark saved.",
     "none": "No darks yet.",
-    "entry": "{{exposure}} s, gain {{gain}} — {{frames}} frames, {{hot}} hot pixels"
+    "entry": "{{exposure}} s, gain {{gain}} — {{frames}} frames, {{hot}} hot pixels",
+    "matches": "A dark matches the current exposure and gain.",
+    "noMatch": "No dark for the current exposure and gain."
   },
   "view": {
     "title": "Guide camera",
@@ -103,7 +154,10 @@
     "kind_primary": "Guide star",
     "kind_companion": "Companion",
     "kind_candidate": "Other star",
-    "kind_lost": "Lost"
+    "kind_lost": "Lost",
+    "pickHint": "Click a star to guide on it.",
+    "picked": "This star will be the guide star.",
+    "autoStar": "Choose the star for me"
   },
   "target": {
     "title": "Target",
@@ -116,7 +170,9 @@
     "title": "Guide error ({{unit}})",
     "auto": "Auto",
     "arcsec": "arcsec",
-    "pixels": "pixels"
+    "pixels": "pixels",
+    "samples_one": "{{count}} frame",
+    "samples_other": "{{count}} frames"
   },
   "frame": {
     "summary": "Frame {{seq}} · {{exposure}} s · {{rate}} frames/s · background {{background}} (noise {{noise}}) · brightest {{brightest}}",
@@ -124,6 +180,58 @@
     "hfd": "HFD",
     "fwhm": "FWHM",
     "snr": "SNR",
-    "peak": "Peak"
+    "peak": "Peak",
+    "saturated": "saturated",
+    "states": {
+      "blurred": "smeared",
+      "outlier": "left out"
+    }
+  },
+  "dismiss": "Dismiss",
+  "pier": {
+    "East": "East",
+    "West": "West"
+  },
+  "tabs": {
+    "setup": "Set-up",
+    "tuning": "Corrections",
+    "calibration": "Calibration",
+    "darks": "Dark frames"
+  },
+  "tuning": {
+    "raAggressiveness": "RA aggressiveness",
+    "aggressivenessHint": "Share of the error corrected at each frame.",
+    "raHysteresis": "RA hysteresis",
+    "hysteresisHint": "Share of the previous correction kept, to smooth the corrections out.",
+    "decAggressiveness": "Dec aggressiveness",
+    "minMove": "Minimum move",
+    "minMoveHint": "Smaller errors are left alone: they are seeing, not drift.",
+    "auto": "Automatic ({{value}} px)",
+    "manual": "Set",
+    "maxPulse": "Longest correction",
+    "decMode": "Dec corrections",
+    "decModeHint": "Correcting one way only avoids Dec backlash on a mount that drifts one way.",
+    "resistHint": "Changes direction only when several frames in a row, or one large error, ask for it.",
+    "backlashHint": "Lengthens the first Dec correction after a change of direction by the backlash measured at calibration.",
+    "flipDec": "Dec after a meridian flip",
+    "flipDecHint": "Whether North pulses move the star the other way after a meridian flip. Guiding notices a wrong choice and corrects it.",
+    "decModes": {
+      "auto": "Both ways",
+      "north": "North only",
+      "south": "South only",
+      "off": "Off"
+    },
+    "flipDecs": {
+      "auto": "Automatic",
+      "yes": "Reversed",
+      "no": "Unchanged"
+    },
+    "predictDrift": "Predict drift",
+    "predictDriftHint": "Learns how the mount drifts and corrects it ahead.",
+    "predictPe": "Predict periodic error",
+    "predictPeHint": "Learns the regular wobble of the RA gears and corrects it ahead.",
+    "wormPeriod": "RA worm period",
+    "wormPeriodHint": "The time of one turn of the RA worm, if you know it.",
+    "findIt": "Find it"
   }
 }

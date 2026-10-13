@@ -5,7 +5,7 @@
     "description": "Autoguideur intégré à astrolol, sans PHD2 : il choisit les étoiles de guidage, se calibre tout seul et corrige la monture à partir de n'importe quelle caméra. Ne l'activez pas en même temps que PHD2."
   },
   "title": "Guideur intégré",
-  "intro": "Garde une étoile au même endroit pendant la prise de vue. Choisissez la caméra de guidage puis lancez le guidage : le premier lancement se calibre en déplaçant un peu la monture.",
+  "intro": "Garde une étoile au même endroit pendant que vous photographiez. Choisissez la caméra de guidage, puis lancez le guidage : la première fois, il se calibre en déplaçant un peu la monture.",
   "chip": {
     "label": "Guideur",
     "guiding": "guidage",
@@ -17,7 +17,8 @@
     "calibrating": "Calibration",
     "guiding": "Guidage",
     "paused": "En pause",
-    "capturing_dark": "Prise de darks"
+    "capturing_dark": "Prise de darks",
+    "previewing": "Caméra affichée"
   },
   "reason": {
     "not_guiding": "pas de guidage",
@@ -25,10 +26,13 @@
     "stopped": "arrêté",
     "paused": "en pause",
     "disconnected": "déconnecté",
-    "error": "échec"
+    "error": "échec",
+    "mount_moved": "la monture a bougé",
+    "pulse_failed": "la monture refuse les corrections",
+    "camera": "plus d'images de la caméra",
+    "axis_reversed": "un axe a été inversé"
   },
   "settings": {
-    "title": "Réglages",
     "camera": "Caméra de guidage",
     "choose": "Choisir…",
     "output": "Envoyer les corrections par",
@@ -42,16 +46,28 @@
     "invalidPixelScale": "L'échelle doit être un nombre d'arcsecondes par pixel supérieur à zéro, ou vide.",
     "compensateBacklash": "Compenser le jeu en Dec",
     "resistReversals": "Limiter les inversions en Dec",
-    "pixelScaleOptics": "Calculé d’après le télescope et la caméra."
+    "pixelScaleOptics": "Calculé d’après le télescope et la caméra.",
+    "mountHint": "Permet à la calibration de suivre les pointages et les retournements au méridien.",
+    "mountAuto": "La monture connectée",
+    "gain": "Gain",
+    "gainHint": "Vide : laisser le gain de la caméra tel quel.",
+    "starsHint": "Plus d'étoiles moyennent la turbulence.",
+    "lostTimeout": "Abandonner après",
+    "lostTimeoutHint": "Combien de temps chercher une étoile perdue. 0 : jusqu'à ce qu'elle revienne.",
+    "binning": "Binning"
   },
   "status": {
     "title": "Guidage",
-    "state": "État",
     "guidingFor": "Guidage depuis",
     "unguidedFor": "Sans guidage depuis",
-    "rms": "RMS, dernière minute",
     "losses": "Pertes / non guidé",
-    "reason": "Raison : {{reason}}"
+    "lastError": "Guidage arrêté : {{error}}",
+    "pointing": "Déclinaison",
+    "pierSide": "Côté du pilier",
+    "drift": "Dérive AD {{ra}}{{unit}}/min, Déc {{dec}}{{unit}}/min",
+    "periodicError": "erreur périodique {{amplitude}}{{unit}} toutes les {{period}} s",
+    "starSnr": "RSB de l'étoile",
+    "stars": "Étoiles"
   },
   "guiding": {
     "start": "Lancer le guidage",
@@ -59,10 +75,10 @@
     "pause": "Pause",
     "resume": "Reprendre",
     "dither": "Dithering",
-    "recalibrate": "Recalibrer"
+    "recalibrate": "Recalibrer",
+    "ditherAmount": "Distance du dithering"
   },
   "calibration": {
-    "title": "Calibration",
     "raRate": "Vitesse AD",
     "decRate": "Vitesse Dec",
     "axes": "Angle entre les axes",
@@ -81,10 +97,43 @@
     "phase_south": "Impulsions Sud (retour)",
     "axisRa": "AD",
     "axisDec": "Dec",
-    "leftOut": "Écartées du calcul"
+    "leftOut": "Écartées du calcul",
+    "failed": "La calibration a échoué : {{error}}",
+    "running": "Calibration : {{phase}}…",
+    "phase_failed": "échec",
+    "scatter": "Dispersion",
+    "travel": "Distance AD / Déc",
+    "madeAt": "Faite à la déclinaison {{dec}}, côté du pilier {{side}}, {{when}}.",
+    "adjusted": "Ajustée à l'endroit où pointe la monture.",
+    "good": "Les mesures concordent bien.",
+    "warnings_one": "La calibration a {{count}} avertissement.",
+    "warnings_other": "La calibration a {{count}} avertissements.",
+    "show": "Voir",
+    "steps": "Pas par direction",
+    "distance": "Distance",
+    "distanceHint": "Jusqu'où la calibration déplace l'étoile dans chaque direction.",
+    "issues": {
+      "noisy": "Les mesures sont très dispersées : un ciel plus calme, une pose plus longue ou une étoile plus brillante aideraient.",
+      "short_travel": "L'étoile s'est peu déplacée : augmentez la distance de calibration.",
+      "not_perpendicular": "L'AD et la Déc ne sont pas à angle droit : vérifiez le jeu ou le serrage de la monture.",
+      "ra_asymmetric": "Ouest et Est ont déplacé l'étoile à des vitesses différentes.",
+      "dec_asymmetric": "Nord et Sud ont déplacé l'étoile à des vitesses différentes : jeu en Déc ou axe qui accroche.",
+      "rate_ratio": "La vitesse en AD ne correspond pas à la déclinaison : vérifiez les vitesses de guidage de la monture.",
+      "high_dec": "Calibrée près du pôle : l'AD s'y mesure mal. Recalibrez plus près de l'équateur céleste.",
+      "dec_backlash_large": "Le jeu en Déc a occupé la plus grande partie du retour.",
+      "ra_backlash_large": "Le jeu en AD a occupé la plus grande partie du retour."
+    },
+    "phases": {
+      "drift": "Dérive",
+      "probe": "Impulsion d'essai",
+      "west": "Impulsions Ouest",
+      "east": "Impulsions Est (retour)",
+      "north": "Impulsions Nord",
+      "south": "Impulsions Sud (retour)",
+      "failed": "échec"
+    }
   },
   "darks": {
-    "title": "Images de dark",
     "hint": "Couvrez le télescope puis prenez des darks avec la pose et le gain ci-dessus. Ils retirent les pixels chauds autour de l'étoile de guidage.",
     "frames": "images",
     "capture": "Prendre un dark",
@@ -92,7 +141,9 @@
     "capturing": "Prise de darks…",
     "done": "Dark enregistré.",
     "none": "Aucun dark pour l'instant.",
-    "entry": "{{exposure}} s, gain {{gain}} — {{frames}} images, {{hot}} pixels chauds"
+    "entry": "{{exposure}} s, gain {{gain}} — {{frames}} images, {{hot}} pixels chauds",
+    "matches": "Un dark correspond à la pose et au gain actuels.",
+    "noMatch": "Aucun dark pour la pose et le gain actuels."
   },
   "view": {
     "title": "Caméra de guidage",
@@ -103,7 +154,10 @@
     "kind_primary": "Étoile de guidage",
     "kind_companion": "Compagne",
     "kind_candidate": "Autre étoile",
-    "kind_lost": "Perdue"
+    "kind_lost": "Perdue",
+    "pickHint": "Cliquez sur une étoile pour guider dessus.",
+    "picked": "Cette étoile sera l'étoile guide.",
+    "autoStar": "Choisir l'étoile pour moi"
   },
   "target": {
     "title": "Cible",
@@ -116,7 +170,9 @@
     "title": "Erreur de guidage ({{unit}})",
     "auto": "Auto",
     "arcsec": "arcsecondes",
-    "pixels": "pixels"
+    "pixels": "pixels",
+    "samples_one": "{{count}} image",
+    "samples_other": "{{count}} images"
   },
   "frame": {
     "summary": "Image {{seq}} · {{exposure}} s · {{rate}} images/s · fond {{background}} (bruit {{noise}}) · plus brillant {{brightest}}",
@@ -124,6 +180,58 @@
     "hfd": "HFD",
     "fwhm": "FWHM",
     "snr": "RSB",
-    "peak": "Pic"
+    "peak": "Pic",
+    "saturated": "saturée",
+    "states": {
+      "blurred": "étalée",
+      "outlier": "écartée"
+    }
+  },
+  "dismiss": "Fermer",
+  "pier": {
+    "East": "Est",
+    "West": "Ouest"
+  },
+  "tabs": {
+    "setup": "Réglages",
+    "tuning": "Corrections",
+    "calibration": "Calibration",
+    "darks": "Darks"
+  },
+  "tuning": {
+    "raAggressiveness": "Agressivité AD",
+    "aggressivenessHint": "Part de l'erreur corrigée à chaque image.",
+    "raHysteresis": "Hystérésis AD",
+    "hysteresisHint": "Part de la correction précédente conservée, pour lisser les corrections.",
+    "decAggressiveness": "Agressivité Déc",
+    "minMove": "Déplacement minimum",
+    "minMoveHint": "Les erreurs plus petites sont ignorées : c'est de la turbulence, pas une dérive.",
+    "auto": "Automatique ({{value}} px)",
+    "manual": "Fixé",
+    "maxPulse": "Correction la plus longue",
+    "decMode": "Corrections en Déc",
+    "decModeHint": "Corriger dans un seul sens évite le jeu en Déc sur une monture qui dérive toujours du même côté.",
+    "resistHint": "Ne change de sens que si plusieurs images de suite, ou une grande erreur, le demandent.",
+    "backlashHint": "Allonge la première correction en Déc après un changement de sens du jeu mesuré à la calibration.",
+    "flipDec": "Déc après un retournement",
+    "flipDecHint": "Si les impulsions Nord déplacent l'étoile dans l'autre sens après un retournement au méridien. Le guidage remarque un mauvais choix et le corrige.",
+    "decModes": {
+      "auto": "Deux sens",
+      "north": "Nord seulement",
+      "south": "Sud seulement",
+      "off": "Désactivées"
+    },
+    "flipDecs": {
+      "auto": "Automatique",
+      "yes": "Inversée",
+      "no": "Inchangée"
+    },
+    "predictDrift": "Anticiper la dérive",
+    "predictDriftHint": "Apprend comment la monture dérive et la corrige à l'avance.",
+    "predictPe": "Anticiper l'erreur périodique",
+    "predictPeHint": "Apprend l'oscillation régulière des engrenages en AD et la corrige à l'avance.",
+    "wormPeriod": "Période de la vis sans fin AD",
+    "wormPeriodHint": "La durée d'un tour de la vis sans fin en AD, si vous la connaissez.",
+    "findIt": "La trouver"
   }
 }

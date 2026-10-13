@@ -17,7 +17,7 @@ from astrolol.core.guiding import (
 )
 from astrolol.plugins.guider.calibration import Calibration
 from astrolol.plugins.guider.darks import DarkInfo
-from astrolol.plugins.guider.guider import BuiltinGuider
+from astrolol.plugins.guider.guider import BuiltinGuider, CalibrationAttempt, Prediction
 from astrolol.plugins.guider.settings import GuiderSettings
 from astrolol.plugins.guider.view import ViewInfo
 
@@ -33,27 +33,50 @@ def _conflict(exc: Exception) -> HTTPException:
     return HTTPException(status_code=409, detail=str(exc))
 
 
+class MountReport(BaseModel):
+    dec: float | None = None
+    pier_side: str | None = None
+    slewing: bool = False
+
+
 class GuiderReport(BaseModel):
     status: GuiderStatus
     health: GuidingHealth
     last_minute: GuidingStats
     calibration: Calibration | None
+    # The calibration as it applies where the mount points now (declination, pier side).
+    active_calibration: Calibration | None = None
+    calibration_attempt: CalibrationAttempt | None = None  # under way, or the last that failed
     darks: list[DarkInfo]
+    dark_matches: bool = False  # a dark exists for the current exposure and gain
     pixel_scale_source: Literal["settings", "optics"] | None = None  # where status.pixel_scale comes from
+    last_error: str | None = None  # why the last run ended, when it failed
+    mount: MountReport | None = None
+    preferred_star: tuple[float, float] | None = None
+    prediction: Prediction | None = None
 
 
 @router.get("/status", response_model=GuiderReport)
 async def get_status(request: Request) -> GuiderReport:
     g = _guider(request)
     await g.refresh_pixel_scale(max_age=10.0)
+    await g.refresh_mount()
     now = g.mark()
+    m = g.mount
     return GuiderReport(
         status=g.status(),
         health=g.health(),
         last_minute=g.stats(now - 60, now),
         calibration=g.calibration,
+        active_calibration=g.active_calibration,
+        calibration_attempt=g.calibration_attempt,
         darks=g.darks.describe(),
+        dark_matches=g.dark_matches(),
         pixel_scale_source=g.pixel_scale_source,
+        last_error=g.last_error,
+        mount=MountReport(dec=m.dec, pier_side=m.pier_side, slewing=m.slewing) if m else None,
+        preferred_star=g.preferred_star,
+        prediction=g.prediction(),
     )
 
 
@@ -84,6 +107,27 @@ async def start_preview(request: Request) -> None:
 @router.delete("/preview", status_code=204)
 async def stop_preview(request: Request) -> None:
     await _guider(request).stop_preview()
+
+
+class StarPick(BaseModel):
+    x: float  # sensor pixels
+    y: float
+
+
+@router.post("/star", status_code=204)
+async def select_star(body: StarPick, request: Request) -> None:
+    """Guide on the star nearest to (x, y) in the preview."""
+    g = _guider(request)
+    if g.status().active:
+        raise _conflict(GuiderError("Stop guiding to choose another star"))
+    if g.select_star(body.x, body.y) is None:
+        raise HTTPException(status_code=404, detail="No star there")
+
+
+@router.delete("/star", status_code=204)
+async def clear_star(request: Request) -> None:
+    """Let the guider choose the guide star again."""
+    _guider(request).preferred_star = None
 
 
 class GuideBody(BaseModel):
@@ -135,7 +179,7 @@ async def dither(body: DitherBody, request: Request) -> None:
 @router.delete("/calibration", status_code=204)
 async def clear_calibration(request: Request) -> None:
     """Forget the calibration: the next run calibrates again."""
-    _guider(request).calibration = None
+    _guider(request).clear_calibration()
 
 
 class DarkBody(BaseModel):

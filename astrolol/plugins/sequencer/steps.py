@@ -452,7 +452,14 @@ class Steps:
             "GUIDLOSN": (guiding["guiding_losses"], "times guiding was interrupted"),
         }
         if guiding.get("guide_rms_total") is not None:
-            cards["GUIDRMS"] = (guiding["guide_rms_total"], "[arcsec] total guiding RMS")
+            # A guider that does not know its pixel scale reports guide-camera pixels.
+            guider = self._guider()
+            try:
+                in_pixels = guider is not None and not guider.status().pixel_scale
+            except Exception:
+                in_pixels = False
+            unit = "[guide px]" if in_pixels else "[arcsec]"
+            cards["GUIDRMS"] = (guiding["guide_rms_total"], f"{unit} total guiding RMS")
         try:
             await asyncio.to_thread(add_fits_header_cards, fits_path, cards)
         except Exception as exc:

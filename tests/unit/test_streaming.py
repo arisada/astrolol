@@ -101,6 +101,16 @@ class ScriptedCamera(FakeCamera):
         self.aborted = True
 
 
+async def test_looping_stream_leaves_no_files(tmp_path: Path) -> None:
+    stream = LoopingExposureStream(ScriptedCamera(tmp_path))
+    sub = stream.subscribe_frames()
+    await stream.start_stream(StreamParams(exposure=0.5))
+    for _ in range(3):
+        await asyncio.wait_for(sub.get(), 5)
+    await stream.stop_stream()
+    assert list(tmp_path.rglob("*.fits")) == []
+
+
 async def test_looping_stream_publishes_frames(tmp_path: Path) -> None:
     stream = LoopingExposureStream(ScriptedCamera(tmp_path))
     assert isinstance(stream, IStreamingCamera)

@@ -375,7 +375,8 @@ Plugin scopes are collected at startup and exposed via `GET /admin/log_scopes`;
 
 **Slow tests.** The guiding integration tests (`tests/integration/test_indi_guiding.py`) run in
 real time — about 7 minutes — so they carry `@pytest.mark.slow` and are deselected by default
-(`addopts = -m 'not slow'` in `pyproject.toml`). Run them before a release and whenever you
+(`addopts = -m 'not slow'` in `pyproject.toml`); so is the guider's one-minute soak test
+(`test_a_night_of_incidents` in `astrolol/plugins/guider/tests/test_robustness.py`). Run them before a release and whenever you
 change guiding code (`astrolol/core/guiding/`, `astrolol/plugins/guider/`, pulse guiding in the
 INDI/EQMOD adapters, `phd2`):
 
@@ -384,7 +385,7 @@ python3 -m pytest -m slow tests/integration/test_indi_guiding.py -v
 python3 -m pytest tests/ astrolol/plugins/ -m "slow or not slow"   # everything, slow included
 ```
 
-Current count: **696 unit tests**, **49 integration tests** (3 of them slow), **1133 plugin tests**
+Current count: **734 unit tests**, **49 integration tests** (3 of them slow), **1241 plugin tests** (1 slow)
 (all passing).
 
 ### UI unit tests
@@ -536,11 +537,15 @@ astrolol/plugins/
 ├── eqmod/              # Native (non-INDI) Sky-Watcher motor-controller driver: GoTo/sync/
 │                       # tracking/park over EQMOD cable or USB; ships an INDI mount-proxy so
 │                       # PHD2/other INDI clients can guide through it
-├── guider/             # Built-in autoguider (REST API + UI page, first version): star detection,
-│                       # dark frames, windowed tracking, calibration (pulse→pixel matrix),
-│                       # controller, BuiltinGuider implementing core.guiding.Guider.
-│                       # Frames come from IStreamingCamera, pulses go to IPulseGuider on the
-│                       # guide camera (ST4) or the mount — selectable, camera by default
+├── guider/             # Built-in autoguider (REST API + UI page): star detection, dark frames,
+│                       # windowed multi-star tracking, calibration (one least-squares fit →
+│                       # pulse→pixel matrix + quality checks, saved to disk, adjusted to the
+│                       # mount's declination and pier side), controller, BuiltinGuider
+│                       # implementing core.guiding.Guider. Frames come from IStreamingCamera,
+│                       # pulses go to IPulseGuider on the guide camera (ST4) or the mount —
+│                       # selectable, camera by default. The run survives glitches, refused
+│                       # pulses, camera stalls, clouds and wrong flip guesses; tests/rig.py
+│                       # simulates seeing, PE, backlash, flips, failures
 ├── guide_simulator/    # Simulated guider (registers against core/guiding) for testing
 │                       # without PHD2/hardware — noisy steps, settling, injectable faults
 ├── lx200/              # Virtual LX200 telescope TCP server (SkySafari, Cartes du Ciel, etc.)

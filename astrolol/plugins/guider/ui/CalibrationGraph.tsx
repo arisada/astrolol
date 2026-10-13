@@ -1,8 +1,9 @@
 // What the calibration measured: where the star was after every pulse, drawn as it sits on the
 // sensor (pixels, y down). West and East share one colour, North and South the other; the way
-// back is dashed. Hollow points were left out of the fit (the slack at a reversal).
+// back is dashed. Hollow points were left out of the fit (the slack at a reversal). While a
+// calibration runs, or after one failed, there are only points: the axes come with the result.
 import { useTranslation } from 'react-i18next'
-import type { Calibration, CalibrationPhase } from './api'
+import type { Calibration, CalibrationPhase, CalibrationPoint } from './api'
 import { phasePoints, traceBounds } from './calibration'
 
 const SIZE = 320
@@ -15,9 +16,8 @@ const STYLE: Record<'west' | 'east' | 'north' | 'south', { line: string; fill: s
 }
 const SWEEPS = ['west', 'east', 'north', 'south'] as const
 
-export function CalibrationGraph({ calibration }: { calibration: Calibration }) {
+export function CalibrationGraph({ trace, calibration }: { trace: CalibrationPoint[]; calibration?: Calibration | null }) {
   const { t } = useTranslation('guider')
-  const trace = calibration.trace
   if (trace.length === 0) return <p className="text-xs text-slate-500">{t('calibration.noTrace')}</p>
 
   const b = traceBounds(trace)
@@ -34,11 +34,13 @@ export function CalibrationGraph({ calibration }: { calibration: Calibration }) 
     south: t('calibration.phase_south'),
   }
   const start = phasePoints(trace, 'west')[0] ?? trace[0]
-  // The fitted axes, drawn from the start for the span of one sweep step's worth of pulses.
-  const reach = (span / 3) / Math.max(calibration.ra_x ** 2 + calibration.ra_y ** 2, 1e-12) ** 0.5
-  const axis = (vx: number, vy: number) => ({ x: X(start.x + vx * reach), y: Y(start.y + vy * reach) })
-  const ra = axis(calibration.ra_x, calibration.ra_y)
-  const dec = axis(calibration.dec_x, calibration.dec_y)
+  // The fitted axes, drawn from the start over a third of the picture.
+  const axis = (vx: number, vy: number) => {
+    const reach = (span / 3) / Math.max(Math.hypot(vx, vy), 1e-12)
+    return { x: X(start.x + vx * reach), y: Y(start.y + vy * reach) }
+  }
+  const ra = calibration ? axis(calibration.ra_x, calibration.ra_y) : null
+  const dec = calibration ? axis(calibration.dec_x, calibration.dec_y) : null
   const scaleBar = niceBar(span / 4)
 
   return (
@@ -70,11 +72,14 @@ export function CalibrationGraph({ calibration }: { calibration: Calibration }) 
           )
         })}
 
-        {/* the fitted axes */}
-        <line x1={X(start.x)} y1={Y(start.y)} x2={ra.x} y2={ra.y} className="stroke-slate-400" strokeWidth={1} markerEnd="url(#cal-arrow)" />
-        <line x1={X(start.x)} y1={Y(start.y)} x2={dec.x} y2={dec.y} className="stroke-slate-400" strokeWidth={1} markerEnd="url(#cal-arrow)" />
-        <text x={ra.x + 3} y={ra.y - 3} fontSize="9" className="fill-slate-400">{t('calibration.axisRa')}</text>
-        <text x={dec.x + 3} y={dec.y - 3} fontSize="9" className="fill-slate-400">{t('calibration.axisDec')}</text>
+        {ra && dec && (
+          <>
+            <line x1={X(start.x)} y1={Y(start.y)} x2={ra.x} y2={ra.y} className="stroke-slate-400" strokeWidth={1} markerEnd="url(#cal-arrow)" />
+            <line x1={X(start.x)} y1={Y(start.y)} x2={dec.x} y2={dec.y} className="stroke-slate-400" strokeWidth={1} markerEnd="url(#cal-arrow)" />
+            <text x={ra.x + 3} y={ra.y - 3} fontSize="9" className="fill-slate-400">{t('calibration.axisRa')}</text>
+            <text x={dec.x + 3} y={dec.y - 3} fontSize="9" className="fill-slate-400">{t('calibration.axisDec')}</text>
+          </>
+        )}
         <circle cx={X(start.x)} cy={Y(start.y)} r={5} fill="none" className="stroke-slate-200" strokeWidth={1} />
 
         {/* scale */}

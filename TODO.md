@@ -175,44 +175,37 @@ more design/testing than a single sitting allows:
 
 ## Built-in guider — remaining work
 
-Done (first version, `astrolol/plugins/guider/`): native INDI camera streaming (`IStreamingCamera`),
-pulse guiding through the camera's ST4 output or the mount (`IPulseGuider`, selectable,
-camera by default), star detection/selection, dark frames (subtraction + hot pixels),
-windowed tracking, self-calibration (drift-corrected, Dec backlash), controller, dither,
-settle, REST API and UI page. Verified against INDI's Guide Simulator on both routes; the
-quirks found there are listed in the project memory ("guider known quirks") to evaluate by hand.
+Done (`astrolol/plugins/guider/`): native INDI camera streaming (`IStreamingCamera`), pulse
+guiding through the camera's ST4 output or the mount (`IPulseGuider`, selectable, camera by
+default), star detection/selection (saturation-aware, click a star in the UI), dark frames,
+windowed multi-star tracking with re-acquisition (nearest look-alike, then pattern match over
+the full frame), binning, calibration (one global least-squares fit, quality checks, backlash,
+saved to disk, adjusted to the mount's declination and pier side, learned Dec flip), guards
+against glitches (jump check), wrong-way axes (reversal check), refused pulses, camera stalls
+and slews, drift + periodic-error prediction on RA (`predictor.py`), per-axis tuning in the
+UI, dither, settle, REST API and UI page. Verified against INDI's simulators on both routes
+(2026-10-13); the quirks found there are in the project memory ("guider known quirks").
 
-- **Real hardware and a Pi** — never run on a real camera/mount; detection (~90 ms full frame
-  on x86) and the per-frame loop haven't been timed on a Raspberry Pi.
-- **Mount route** — its RA calibration varied between runs on the simulator and guided worse
-  (~2.3 px vs ~0.6 px RMS on the camera ST4 route). Cause unknown.
-- **Persist the calibration** (per camera/mount/exposure/pier side) so a restart or a
-  meridian flip doesn't force a recalibration; flip handling (Dec sign) and Dec compensation
-  for the target's declination.
-- **Simulator test with periodic error** — the Guide Simulator has no drift of its own, so the
-  integration test proves stability, not improvement; use its `EQUATORIAL_PE` properties.
-- **Star re-acquisition** — when the star is lost the tracker keeps looking at its last
-  position; searching a wider area (or a companion star) would recover from a bigger jump.
-- **Guide graph / live star view** in the UI, the star choice (pick a star by hand), and a
-  "bin 2" / ROI-from-the-UI option.
-- **Guiding algorithm ideas** (from PHD2's "Guide algorithms" page; the controller is already its
-  Hysteresis algorithm, and Dec now has ResistSwitch). Put new ones behind one controller interface:
-  - *Min-move from the seeing* — set each axis' minimum move from the measured star-position
-    noise (we already compute it), and expose min move per axis in the UI.
-  - *Per-axis settings in the UI* — aggressiveness, hysteresis, max pulse, Dec mode
-    (auto/north/south) and the resist-switch frame count / fast-switch factor are
-    code-only today.
-  - *Predictive PEC for RA* — a Gaussian-process model of the periodic error, issuing
-    corrections before the error shows (predictive gain + reactive gain, worm period,
-    retained for ~40 % of a period unguided). Needs ~2 worm periods to train, resets on a
-    big slew, survives dithers and pauses. Worth it for mounts with large periodic error and
-    for the RA spikes seen on the simulator; start from the guide log's FFT.
-  - *LowPass2* (linear extension of recent commands) — suited to encoder mounts; low priority.
-  - *Z-filter* — lets a 0.5-1 s exposure act like a longer virtual one; PHD2 itself says it
-    rarely beats LowPass2. Skip unless short exposures matter.
-  - *Dec backlash* — the calibrated value is unreliable on the simulator (0-144 ms between
-    runs); consider measuring it from the guiding history (overshoot after reversals) and
-    keeping the learned share across runs instead of resetting it each time.
+- **Real hardware and a Pi** — never run on a real camera/mount. To do on the first clear
+  night: calibrate near the equator and check the quality warnings; watch the log for
+  `axis_reversed`, `star_moved`, `pulse_failed`; guide over two worm periods to see whether the
+  periodic error is found. Detection and the per-frame loop (incl. the predictor's period
+  search) haven't been timed on a Raspberry Pi.
+- **Meridian flip on a real mount** — the "auto" Dec-flip guess (camera ST4 keeps Dec, mount
+  route reverses it) matches the simulators only; confirm on the user's mount.
+- **Mount route on the simulator** — guides rougher (~1.8 px vs ~0.3 px RMS via camera ST4)
+  because the Telescope Simulator applies pulses late and in batches. Re-measure on a real
+  mount before tuning anything for it.
+- **Integration test with periodic error** — the slow INDI test proves stability, not the gain
+  from prediction; the sims do have PE (~40 px p-p over ~480 s), so a long run could assert the
+  period is found and RMS falls. Costs more than two worm periods of real time.
+- **Min-move from the seeing** — "auto" min move is from the pixel scale (~0.3"); deriving it
+  from the measured star-position noise per axis would adapt to the night.
+- **Dec backlash from guiding history** — compensation is off by default; the learned share
+  resets every run. Measure it from overshoot after reversals and keep it across runs.
+- **Resist-switch frame count / fast-switch factor** are still code constants, not settings.
+- **Other algorithms** — *LowPass2* (encoder mounts, low priority); *Z-filter* (rarely beats
+  LowPass2, skip unless short exposures matter).
 - **Dark capture UX** — the scope has to be covered by hand; no prompt-and-wait flow, and
   darks for the sequencer's own camera aren't shared.
 

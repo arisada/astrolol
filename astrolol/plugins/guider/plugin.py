@@ -37,12 +37,14 @@ class GuiderPlugin:
 
     def setup(self, app: FastAPI, ctx: PluginContext) -> None:
         cfg = ctx.get_plugin_settings("guider", GuiderSettings)
-        darks = DarkLibrary(app_settings.profiles_file.parent / "guider" / "darks")
+        data = app_settings.profiles_file.parent / "guider"
+        darks = DarkLibrary(data / "darks")
         # The devices read the guider's *current* settings, so edits apply without a restart.
         devices = ManagerDevices(ctx.device_manager, lambda: self._guider.settings)  # type: ignore[union-attr]
         guider = BuiltinGuider(
             ctx.event_bus, cfg, devices, darks,
             scale_resolver=lambda camera_id: derive_pixel_scale(app, camera_id),
+            calibration_file=data / "calibration.json",
         )
         self._guider, self._app = guider, app
         app.state.builtin_guider = guider

@@ -4,10 +4,14 @@ from fastapi.testclient import TestClient
 
 from astrolol.core.events import EventBus
 from astrolol.plugins.guider.api import router
+from astrolol.plugins.guider.calibration import Calibration
 from astrolol.plugins.guider.controller import AxisSettings
 from astrolol.plugins.guider.guider import BuiltinGuider
 from astrolol.plugins.guider.settings import GuiderSettings
 from astrolol.plugins.guider.tests.rig import Rig, RigDevices
+
+
+CAL = Calibration(ra_x=0.03, ra_y=0.0, dec_x=0.0, dec_y=0.03)
 
 
 @pytest.fixture
@@ -71,7 +75,7 @@ def test_guide_then_stop(client) -> None:
 
 def test_clear_calibration(client) -> None:
     g = client.app.state.builtin_guider
-    g.calibration = object()  # type: ignore[assignment]
+    g.calibration = CAL
     assert client.delete("/plugins/guider/calibration").status_code == 204
     assert g.calibration is None
 
@@ -79,7 +83,7 @@ def test_clear_calibration(client) -> None:
 def test_changing_exposure_keeps_the_calibration(client) -> None:
     # Pulse length to displacement does not depend on the exposure, so a run can change it live.
     g = client.app.state.builtin_guider
-    g.calibration = object()  # type: ignore[assignment]
+    g.calibration = CAL
     s = client.get("/plugins/guider/settings").json() | {"exposure": 0.05}
     assert client.put("/plugins/guider/settings", json=s).status_code == 200
     assert g.settings.exposure == 0.05 and g.calibration is not None
@@ -115,3 +119,42 @@ def test_preview_is_refused_while_guiding(client) -> None:
     client.post("/plugins/guider/guide")
     assert client.post("/plugins/guider/preview").status_code == 409
     client.post("/plugins/guider/stop")
+
+
+def test_status_reports_what_the_page_needs(client) -> None:
+    body = client.get("/plugins/guider/status").json()
+    for key in ("active_calibration", "calibration_attempt", "dark_matches", "last_error", "mount", "preferred_star"):
+        assert key in body
+    assert body["mount"] == {"dec": None, "pier_side": None, "slewing": False} or body["mount"] is None
+
+
+def test_picking_a_star_in_the_preview(client) -> None:
+    import time
+
+    assert client.post("/plugins/guider/star", json={"x": 150, "y": 110}).status_code == 404  # nothing shown yet
+    client.post("/plugins/guider/preview")
+    try:
+        for _ in range(50):
+            if client.get("/plugins/guider/view").json()["stars"]:
+                break
+            time.sleep(0.1)
+        time.sleep(0.2)
+        x = next(s for s in client.get("/plugins/guider/view").json()["stars"] if abs(s["y"] - 110) < 3)["x"]
+        assert client.post("/plugins/guider/star", json={"x": x + 2, "y": 111}).status_code == 204
+        assert client.get("/plugins/guider/status").json()["preferred_star"] is not None
+        primary = next(s for s in client.get("/plugins/guider/view").json()["stars"] if s["kind"] == "primary")
+        assert abs(primary["y"] - 110) < 3
+        assert client.delete("/plugins/guider/star").status_code == 204
+        assert client.get("/plugins/guider/status").json()["preferred_star"] is None
+    finally:
+        client.delete("/plugins/guider/preview")
+
+
+def test_settings_carry_the_tuning(client) -> None:
+    s = client.get("/plugins/guider/settings").json()
+    assert s["dec_backlash_compensation"] is False and s["lost_timeout_s"] == 0
+    s.update(ra_aggressiveness=0.5, min_move_px=0.3, dec_mode="north", flip_dec_after_meridian_flip="yes")
+    assert client.put("/plugins/guider/settings", json=s).status_code == 200
+    g = client.app.state.builtin_guider
+    assert g.settings.ra_aggressiveness == 0.5 and g.settings.dec_mode == "north"
+    assert client.put("/plugins/guider/settings", json=s | {"ra_aggressiveness": 2}).status_code == 422
