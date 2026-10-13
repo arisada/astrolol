@@ -26,8 +26,11 @@ MIN_PERIODS = 2.0  # history needed before the periodic part is trusted
 # explain well under half of their variance and still be worth predicting.
 SIGNIFICANCE = 6.0
 MIN_EXPLAINED = 0.05
-REFIT_EVERY = 10  # samples between fits
+REFIT_EVERY = 10  # samples between fits...
+REFIT_EVERY_S = 30.0  # ...and seconds: the period search costs, on a Pi, with fast frames
 MAX_HISTORY_S = 3600.0
+FULL_SEARCH_EVERY_S = 300.0  # at most, between searches over every period (else around the one found)
+BIN_S = 4.0  # samples are merged into bins this long before fitting
 RECENCY_PERIODS = 1.5  # time constant of the weight of older samples, in periods
 DRIFT_ALPHA = 0.12
 
@@ -40,6 +43,7 @@ class MotionPredictor:
         self.drift = 0.0  # px/s, a slow average: what is used while there is no periodic model
         self._n = 0
         self._since_fit = 0
+        self._last_fit = self._last_search = float("-inf")
         self._coef: np.ndarray | None = None  # [c, a1, b1, a2, b2, ...]
         self.found_period: float | None = None
         self.explained = 0.0
@@ -48,6 +52,7 @@ class MotionPredictor:
         self._samples.clear()
         self.drift = 0.0
         self._n = self._since_fit = 0
+        self._last_fit = self._last_search = float("-inf")
         self._coef = None
         self.found_period = None
         self.explained = 0.0
@@ -83,8 +88,10 @@ class MotionPredictor:
         while self._samples and end - self._samples[0][0] > MAX_HISTORY_S:
             self._samples.popleft()
         self._since_fit += 1
-        if self._since_fit >= REFIT_EVERY:
+        span = end - self._samples[0][0]
+        if self._since_fit >= REFIT_EVERY and end - self._last_fit >= min(REFIT_EVERY_S, span / 20):
             self._since_fit = 0
+            self._last_fit = end
             self._fit()
 
     def displacement(self, start: float, end: float) -> float:
@@ -96,16 +103,39 @@ class MotionPredictor:
         row = _basis(np.array([start]), np.array([end]), self.found_period)[0]
         return float(row @ self._coef) * (end - start)
 
+    def _binned(self) -> np.ndarray:
+        """The samples merged into bins of at least BIN_S seconds (contiguous ones only): fast
+        frames add samples, not information about a motion that takes minutes."""
+        # Short against the shortest period worth looking for (a few hundredths of the history).
+        span = self._samples[-1][1] - self._samples[0][0]
+        size = min(BIN_S, span / 400)
+        out: list[list[float]] = []
+        for start, end, rate in self._samples:
+            if out and end - out[-1][0] <= size and start - out[-1][1] < 1.0:
+                b = out[-1]
+                moved = b[2] * (b[1] - b[0]) + rate * (end - start)
+                b[1] = end
+                b[2] = moved / (b[1] - b[0])
+            else:
+                out.append([start, end, rate])
+        return np.array(out)
+
     def _fit(self) -> None:
-        s = np.array(self._samples)
+        s = self._binned()
         if len(s) < 20:
             return
         span = s[-1, 1] - s[0, 0]
         starts, ends, rates = s[:, 0], s[:, 1], s[:, 2]
-        weights = ends - starts  # longer intervals average more noise out
-        periods = [self.period_s] if self.period_s else _candidates(float(np.median(weights)), span)
         last = float(ends[-1])
-
+        weights = ends - starts  # longer intervals average more noise out
+        searched = False
+        if self.period_s:
+            periods = [self.period_s]
+        elif self.found_period and last - self._last_search < min(FULL_SEARCH_EVERY_S, 2 * self.found_period):
+            periods = list(np.linspace(self.found_period * 0.95, self.found_period * 1.05, 41))  # follow it
+        else:
+            periods = _candidates(float(np.median(weights)), span)
+            self._last_search, searched = last, True
         def fit(period: float, recent: bool = False) -> tuple[float, float, np.ndarray]:
             # The period is looked for with every sample weighted alike. Its final coefficients
             # weight recent samples more: a period known only to a percent or two then still
@@ -121,12 +151,14 @@ class MotionPredictor:
 
         trials = [fit(period) for period in periods if span >= MIN_PERIODS * period]
         best: tuple[float, float, np.ndarray] | None = None
-        if trials:
+        if trials and searched:
             # Twice the period, with its second harmonic, explains the same motion: take the
             # shortest period that explains nearly as much as the best.
             top = max(t[0] for t in trials)
             best = min((t for t in trials if t[0] >= top - 0.03 * max(top, 0.0)), key=lambda t: t[1])
-        if best is not None and not self.period_s:  # refine around the best of the coarse grid
+        elif trials:
+            best = max(trials, key=lambda t: t[0])
+        if best is not None and searched:  # refine around the best of the coarse grid
             for period in np.linspace(best[1] * 0.96, best[1] * 1.04, 41):
                 if span >= MIN_PERIODS * period:
                     trial = fit(float(period))
