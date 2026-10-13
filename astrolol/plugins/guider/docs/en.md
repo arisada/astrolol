@@ -2,9 +2,9 @@
 
 *Plugin: Built-in Guider.* Keeps a star on the same spot of a guide camera while you image,
 by sending small corrections to the mount. It needs no other program. Do not enable it
-together with [PHD2 Guiding](phd2.md) or the [Guide Simulator](guide-simulator.md).
+together with [PHD2 Guiding](../../phd2/docs/en.md) or the [Guide Simulator](../../guide_simulator/docs/en.md).
 
-![Guider](../images/guider.png)
+![Guider](guider.png)
 
 ## Quick start
 
@@ -97,5 +97,5 @@ exposure and gain. **Delete darks** removes them.
 The guider keeps going through passing clouds, a lost star, a refused correction, a camera that
 stops sending frames for a while or a meridian flip, and tells you why it is not guiding
 (*star lost*, *the mount refuses corrections*, *no frames from the camera*…). The menu entry
-shows a red dot while it needs attention. The [Sequencer](sequencer.md) waits for guiding to
+shows a red dot while it needs attention. The [Sequencer](../../sequencer/docs/en.md) waits for guiding to
 come back before it takes the next frame.

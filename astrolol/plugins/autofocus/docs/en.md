@@ -40,5 +40,5 @@ At the end, the fitted curve is drawn and the focuser moves to the **Optimal pos
 **Result** shows it, with the best HFD/FWHM and how far it is from the starting position; the
 ruler shows the start, the optimum and the current position.
 
-The [Sequencer](sequencer.md) can run autofocus before a target, after each filter change,
+The [Sequencer](../../sequencer/docs/en.md) can run autofocus before a target, after each filter change,
 after a meridian flip, every so many minutes or when the temperature changes.

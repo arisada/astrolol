@@ -18,6 +18,15 @@ build/
 images/
 astrolol.log
 
+# User guide screenshots (docs/images/, astrolol/plugins/<id>/docs/) are not runtime data
+!docs/images/
+!docs/**/*.png
+!docs/**/*.jpg
+!docs/**/*.jpeg
+!astrolol/plugins/*/docs/*.png
+!astrolol/plugins/*/docs/*.jpg
+!astrolol/plugins/*/docs/*.jpeg
+
 # UI
 ui/node_modules/
 ui/dist/

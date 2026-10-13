@@ -35,11 +35,11 @@ date. Once you have edited them, **↺ live** makes the fields follow the mount 
   pages).
 - **Slew** moves the mount there.
 - **Sync** tells the mount it is pointing at these coordinates, which corrects its pointing.
-  Use it only when you know where the telescope really points; [Plate Solving](platesolve.md)
+  Use it only when you know where the telescope really points; [Plate Solving](../../astrolol/plugins/platesolve/docs/en.md)
   does it for you.
 - **Stop** aborts a slew.
 
-The easiest way to set a target is from the [Target](target.md) page.
+The easiest way to set a target is from the [Target](../../astrolol/plugins/target/docs/en.md) page.
 
 ## Tracking
 
@@ -62,12 +62,12 @@ cannot be turned on while the mount is parked.
 - **Flip automatically when HA >** a number of hours past the meridian.
 - **Meridian limit**: how far the RA axis may turn past the meridian, either way. Past it,
   tracking stops and slews are refused. Enforced by mounts that support it (the
-  [EQMOD](eqmod.md) driver); INDI drivers keep their own limits.
+  [EQMOD](../../astrolol/plugins/eqmod/docs/en.md) driver); INDI drivers keep their own limits.
 - **Horizon limit**: a flat horizon in degrees of altitude. GoTos below it are refused. When a
   tracking mount sinks below it, astrolol does once what you chose: **stop tracking**, **park**
   or **do nothing**.
 
-If you image with the [Sequencer](sequencer.md), let it handle flips: it flips between frames
+If you image with the [Sequencer](../../astrolol/plugins/sequencer/docs/en.md), let it handle flips: it flips between frames
 instead of in the middle of one.
 
 ## Nudge

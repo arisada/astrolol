@@ -7,6 +7,7 @@ import { Logs } from './pages/Logs'
 import { Mount } from './pages/Mount'
 import { Options } from './pages/Options'
 import { Profiles } from './pages/Profiles'
+import { HelpPage } from './help/HelpPage'
 import { LoginScreen } from './components/LoginScreen'
 import { useAuth } from '@/auth'
 import { api } from '@/api/client'
@@ -60,6 +61,7 @@ export function App() {
           <Route path="/mount" element={<Mount />} />
           <Route path="/logs" element={<Logs />} />
           <Route path="/options" element={<Options />} />
+          <Route path="/help/:topic" element={<HelpPage />} />
           {enabledPlugins.map((p) => {
             const entry = getPluginEntry(p.id)
             if (!entry) return null

@@ -17,6 +17,9 @@ import { Input } from '@/components/ui/input'
 import { StateBadge } from '@/components/ui/badge'
 import { DevicePropertiesPanel } from '@/components/DevicePropertiesPanel'
 import { Tabs } from '@/components/ui/tabs'
+import { GettingStartedHint } from '@/help/HelpPanel'
+import { useHelpTopic } from '@/help/store'
+import { GETTING_STARTED_TOPIC } from '@/help/paths'
 
 // ---------------------------------------------------------------------------
 // Types & constants
@@ -1425,6 +1428,10 @@ export function Equipment() {
   }
   useEffect(() => { reloadInventory() }, [])
 
+  // Nothing connected and nothing in the inventory yet: help starts at the beginning.
+  const newcomer = connectedDevices.length === 0 && inventoryItems.length === 0
+  useHelpTopic(newcomer ? GETTING_STARTED_TOPIC : null)
+
   // Configs tell which inventory item (if any) a connected device corresponds to
   const connectedKey = connectedDevices.map((d) => d.device_id).sort().join(',')
   useEffect(() => {
@@ -1721,7 +1728,10 @@ export function Equipment() {
           {t('connected')}
         </h2>
         {connectedDevices.length === 0 ? (
-          <p className="text-sm text-slate-500">{t('noDevices')}</p>
+          <div className="flex flex-col gap-1.5">
+            <p className="text-sm text-slate-500">{t('noDevices')}</p>
+            {newcomer && <GettingStartedHint />}
+          </div>
         ) : (
           <div className="flex flex-col gap-3">
             {connectedDevices

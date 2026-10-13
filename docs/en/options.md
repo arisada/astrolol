@@ -16,7 +16,7 @@ and *Night crimson*.
 ## Image Saving
 
 Where and under which name frames are saved when *Save subs* is on (on the
-[Imaging](imaging.md) page) and by the [Sequencer](sequencer.md).
+[Imaging](imaging.md) page) and by the [Sequencer](../../astrolol/plugins/sequencer/docs/en.md).
 
 - **Save directory**: a folder template. Default: `~/astrolol_pictures/%D` (one folder per
   date).

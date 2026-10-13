@@ -143,5 +143,16 @@
     "guest": "Guest",
     "failed": "Sign-in failed",
     "insecure": "This connection is not encrypted: your password would travel in clear text on the network. Use HTTPS (see the deployment guide)."
+  },
+  "help": {
+    "title": "Help",
+    "open": "Help",
+    "close": "Close help",
+    "back": "Back",
+    "contents": "Contents",
+    "newTab": "Open in a new tab",
+    "loading": "Loading…",
+    "missing": "There is no guide page for this screen yet.",
+    "gettingStarted": "New here? Read <link>Getting started</link>."
   }
 }

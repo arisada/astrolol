@@ -18,7 +18,7 @@ Click **Load driver** and follow the wizard.
    - **Browse INDI drivers**: almost all commercial hardware. astrolol starts and stops the INDI
      server by itself (this can be changed in [Options](options.md#indi-server)).
    - **Other adapter**: drivers provided by astrolol plugins, for example `eqmod` (the native
-     Sky-Watcher driver from the [EQMOD](eqmod.md) plugin) or its mount simulator. If no plugin
+     Sky-Watcher driver from the [EQMOD](../../astrolol/plugins/eqmod/docs/en.md) plugin) or its mount simulator. If no plugin
      offers one for the chosen kind, the wizard says so.
 3. For INDI: **Select manufacturer**, then **Select model**. **Enter manually…** lets you type a
    driver name (`indi_asi_ccd`) and, optionally, the name the driver announces the device
@@ -76,11 +76,11 @@ easiest way to get these right is to connect the device once through the wizard 
 
 Things worth filling in:
 
-- **Site**: the mount needs it to compute where things are, and the [Target](target.md) page
+- **Site**: the mount needs it to compute where things are, and the [Target](../../astrolol/plugins/target/docs/en.md) page
   needs it for rise and set times. When the inventory has no site, a reminder offers
   **Add observation site**.
 - **Telescope focal length** and **camera pixel size**: they give the image scale used by
-  [plate solving](platesolve.md) and the [guider](guider.md), and are written into the FITS
+  [plate solving](../../astrolol/plugins/platesolve/docs/en.md) and the [guider](../../astrolol/plugins/guider/docs/en.md), and are written into the FITS
   headers.
 - **Default gain**: the gain the camera starts with. Leaving it to the driver is risky, as some
   drivers start at a gain you would never use.

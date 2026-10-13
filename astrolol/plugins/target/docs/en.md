@@ -3,7 +3,7 @@
 *Plugin: Target.* Find an object by name, see when it is well placed tonight, and point the
 mount at it.
 
-![Target](../images/target_with_moon.png)
+![Target](target_with_moon.png)
 
 ## Searching
 
@@ -26,7 +26,7 @@ fallback when the network is available.
 - **Moon**: how much of it is lit and how far it is from the object. A warning appears when it
   is close enough to brighten the sky around the target.
 
-The location comes from the site in the active [profile](profiles.md). Without one the card
+The location comes from the site in the active [profile](../../../../docs/en/profiles.md). Without one the card
 says *No observer location set*.
 
 ## Actions
@@ -36,7 +36,7 @@ says *No observer location set*.
   connected, choose which one in the list next to the buttons.
 - **Add to Favourites** keeps it in the list below.
 
-After a slew, use [Plate Solving](platesolve.md) to centre the object precisely.
+After a slew, use [Plate Solving](../../platesolve/docs/en.md) to centre the object precisely.
 
 ## Favourites
 
@@ -44,4 +44,4 @@ Your saved objects, one click away. **Save mount position** saves where the moun
 now under a name you choose, for spots that are not in any catalogue (a framing you like, a
 comet you centred by hand). Remove an entry with its bin.
 
-Favourites are also offered when you add a task to the [Sequencer](sequencer.md).
+Favourites are also offered when you add a task to the [Sequencer](../../sequencer/docs/en.md).

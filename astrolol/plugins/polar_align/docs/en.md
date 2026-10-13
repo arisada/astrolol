@@ -5,7 +5,7 @@ polar scope reticle, and a plate-solving wizard that measures the error and guid
 you turn the adjustment knobs. A mount and a camera must be connected, and the site set in the
 active profile.
 
-![Polar Align](../images/polar_align.png)
+![Polar Align](polar_align.png)
 
 ## Polar scope reticle
 
@@ -23,7 +23,7 @@ by 180°. Turn it off only if yours shows the sky upright.
 ## Plate-Solve Wizard
 
 More precise, and it works without seeing the pole (the southern hemisphere has no bright
-pole star). It needs [Plate Solving](platesolve.md) to be set up.
+pole star). It needs [Plate Solving](../../platesolve/docs/en.md) to be set up.
 
 **Settings**
 

@@ -53,8 +53,8 @@ Each path from a telescope down to a camera is an **optical path**. astrolol use
   front of *that* camera;
 - know the focal length in front of each camera (image scale for plate solving, guiding and
   FITS headers);
-- know which filter wheel the [Sequencer](sequencer.md), [Autofocus](autofocus.md) and
-  [Flat Wizard](flat-wizard.md) should drive for a given camera;
+- know which filter wheel the [Sequencer](../../astrolol/plugins/sequencer/docs/en.md), [Autofocus](../../astrolol/plugins/autofocus/docs/en.md) and
+  [Flat Wizard](../../astrolol/plugins/flat_wizard/docs/en.md) should drive for a given camera;
 - give the mount its location and time from the site.
 
 ## Activating

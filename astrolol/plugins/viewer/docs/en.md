@@ -3,7 +3,7 @@
 *Plugin: Viewer.* Browse and preview every frame astrolol has captured, without copying files
 off the telescope computer.
 
-![Viewer](../images/viewer.png)
+![Viewer](viewer.png)
 
 ## Browsing
 

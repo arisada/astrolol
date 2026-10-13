@@ -19,13 +19,13 @@ You do this once; afterwards, an evening starts with one click on **Activate**.
 
 In a browser, go to the address of the telescope computer, for example
 `http://astrolol.local:8000` or `https://astrolol.local` if it sits behind a web server. If you
-turned on the [mDNS](mdns.md) plugin, apps can find it on the network by themselves.
+turned on the [mDNS](../../astrolol/plugins/mdns/docs/en.md) plugin, apps can find it on the network by themselves.
 
 The first page is **Imaging**. With nothing connected it says *No camera connected*. The menu
 on the left lists the screens; the bar at the top shows the state of every device and **live**
 when the browser is receiving updates (see [The interface](interface.md)).
 
-If [Security](security.md) is turned on you are asked to sign in first.
+If [Security](../../astrolol/plugins/security/docs/en.md) is turned on you are asked to sign in first.
 
 ## 2. Turn on the features you want
 
@@ -45,7 +45,7 @@ questions:
    - **Browse INDI drivers** for almost every commercial device. astrolol starts the INDI
      server for you.
    - **Other adapter** for drivers that come with astrolol plugins, such as the native
-     [EQMOD](eqmod.md) driver for Sky-Watcher mounts.
+     [EQMOD](../../astrolol/plugins/eqmod/docs/en.md) driver for Sky-Watcher mounts.
 3. **Select manufacturer**, then **Select model**. If your device is not listed, choose
    **Enter manually…** and type the name of its INDI driver (for example `indi_asi_ccd`).
 4. **Configure & connect.** astrolol shows the settings the driver offers before connecting:
@@ -119,9 +119,9 @@ The profile stays active: when astrolol restarts it reconnects it by itself.
 You are ready. A typical first evening:
 
 1. [Mount](mount.md): unpark, check tracking.
-2. [Polar Align](polar-align.md) if the mount was just set up.
-3. [Target](target.md): find an object, **Slew to Target**.
-4. [Plate Solving](platesolve.md): **Expose & Solve** with *Sync and slew* to centre it.
-5. [Autofocus](autofocus.md).
-6. [Guider](guider.md) or [PHD2](phd2.md): start guiding.
-7. [Imaging](imaging.md) for single frames, or the [Sequencer](sequencer.md) for the night.
+2. [Polar Align](../../astrolol/plugins/polar_align/docs/en.md) if the mount was just set up.
+3. [Target](../../astrolol/plugins/target/docs/en.md): find an object, **Slew to Target**.
+4. [Plate Solving](../../astrolol/plugins/platesolve/docs/en.md): **Expose & Solve** with *Sync and slew* to centre it.
+5. [Autofocus](../../astrolol/plugins/autofocus/docs/en.md).
+6. [Guider](../../astrolol/plugins/guider/docs/en.md) or [PHD2](../../astrolol/plugins/phd2/docs/en.md): start guiding.
+7. [Imaging](imaging.md) for single frames, or the [Sequencer](../../astrolol/plugins/sequencer/docs/en.md) for the night.

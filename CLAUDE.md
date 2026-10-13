@@ -40,6 +40,9 @@ astrolol/plugins/
     │   ├── MyPage.tsx     # React page, imported via @plugins alias
     │   ├── MyChip.tsx     # optional status-bar chip
     │   └── api.ts         # plugin-local fetch helpers (mirrors api.py routes)
+    ├── docs/
+    │   ├── en.md          # user guide page for this plugin (opened by the in-app help button)
+    │   └── *.png|jpg      # its screenshots
     └── tests/
         └── test_my_api.py
 ```
@@ -324,6 +327,29 @@ suffixes for plurals and `<tag>…</tag>` + `<Trans>` for inline markup.
   `{{placeholders}}`/tags; `tests/unit/test_ui_translation_keys.py` checks every literal `t('key')` exists.
   Both run in the normal unit suite.
 
+### User guide and in-app help
+
+The user guide is Markdown that reads the same on GitHub and in the app. Core pages are
+`docs/<lng>/<page>.md` (index `README.md`, `getting-started.md`, one per core screen, shared
+screenshots in `docs/images/`); each plugin's page is `astrolol/plugins/<id>/docs/<lng>.md`,
+with its screenshots next to it. Pages link to each other by **relative path** (from
+`docs/en/` to a plugin: `../../astrolol/plugins/guider/docs/en.md`; from a plugin to core:
+`../../../../docs/en/mount.md`; between plugins: `../../sequencer/docs/en.md`).
+
+`ui/src/help/` bundles all of it at build time (works offline, matches the installed version)
+and renders it in a drawer opened by the **?** in the status bar, plus a `/help/<topic>` page.
+The topic is the page's file name for core pages and the plugin id for plugin pages; the
+button opens the topic of the current route (`topicForRoute` in `help/paths.ts`), so a plugin
+page gets its help just by having `docs/en.md`. A page can point the button elsewhere while
+it is on screen with `useHelpTopic('getting-started')` (`@/help/store`). Missing languages fall
+back to English.
+
+- **A new plugin with a page ships `docs/en.md`**; `tests/unit/test_docs_links.py` fails
+  otherwise, and on any relative link or `#anchor` that does not resolve.
+- **Changing what a screen does means updating its guide page** in the same commit.
+- Guide pages follow the user-facing copy rules above. Compress screenshots (JPEG for
+  photographic content; keep each under ~300 kB).
+
 ### Backend logging
 
 Use `structlog` throughout. Get a logger at module level and log with structured key-value pairs:
@@ -396,7 +422,7 @@ python3 -m pytest -m slow tests/integration/test_indi_guiding.py -v
 python3 -m pytest tests/ astrolol/plugins/ -m "slow or not slow"   # everything, slow included
 ```
 
-Current count: **734 unit tests**, **49 integration tests** (3 of them slow), **1241 plugin tests** (1 slow)
+Current count: **775 unit tests**, **49 integration tests** (3 of them slow), **1241 plugin tests** (1 slow)
 (all passing).
 
 ### UI unit tests
@@ -590,6 +616,7 @@ ui/
 ├── src/
 │   ├── api/            # typed fetch client (core devices only) + hand-written types
 │   ├── hooks/          # useEvents (WebSocket), useLocalStorage
+│   ├── help/           # in-app user guide: bundles docs/ + plugins/*/docs/, drawer, /help page
 │   ├── i18n.ts         # i18next setup; loads core + plugin catalogues
 │   ├── locales/        # core catalogues: <lng>/<namespace>.json
 │   ├── utils/          # formatting.ts — fmtRA, fmtDec

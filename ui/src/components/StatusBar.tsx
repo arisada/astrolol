@@ -11,6 +11,7 @@ import { useAuth } from '@/auth'
 import { getAllPluginEntries } from '@/plugin-registry'
 import type { ConnectedDevice } from '@/api/types'
 import { Chip } from '@/components/ui/badge'
+import { HelpButton } from '@/help/HelpPanel'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -171,6 +172,7 @@ export function StatusBar({ showLogo = false }: { showLogo?: boolean }) {
       {/* Spacer */}
       <div className="flex-1" />
 
+      <HelpButton />
       <UserChip />
 
       {/* WebSocket connection indicator */}

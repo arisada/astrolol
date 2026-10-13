@@ -26,13 +26,13 @@ the current frame; the current task keeps its progress), **Skip** / **Unskip**,
 
 ## Adding a task
 
-![Task editor](../images/tasks.png)
+![Task editor](tasks.png)
 
 **Target.** Four ways to choose it:
 
 - **Search**: a catalogue object or a planet (planets are looked up again when the task starts,
   so the position is current).
-- **Favorites**: from the [Target](target.md) page.
+- **Favorites**: from the [Target](../../target/docs/en.md) page.
 - **Mount pointing**: no slew and no centring; the task images wherever the mount points when
   it starts. Use it for flats, darks, or a framing you set up by hand. The name is optional and
   only labels the frames.
@@ -68,9 +68,9 @@ camera leads.
 **Before imaging**, each optional:
 
 - **Slew to the target**
-- **Center with plate solving** (needs [Plate Solving](platesolve.md))
+- **Center with plate solving** (needs [Plate Solving](../../platesolve/docs/en.md))
 - **Start guiding (wait for settle)** (needs a guider)
-- **Autofocus** (needs [Autofocus](autofocus.md))
+- **Autofocus** (needs [Autofocus](../../autofocus/docs/en.md))
 - **Wait for cameras to reach temperature**
 
 **While imaging**: **Dither every** *n* primary frames, and an optional **Delay between frames**.
@@ -137,7 +137,7 @@ before it continues.
 
 ## Journal
 
-![Journal](../images/journal.png)
+![Journal](journal.png)
 
 A journal is written for every run. The list shows when each run started, how long it lasted,
 its outcome, its targets, the number of frames and the total integration. Click a run to see:

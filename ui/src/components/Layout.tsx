@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { X } from 'lucide-react'
 import { Sidebar, TopNav } from './Sidebar'
 import { StatusBar } from './StatusBar'
+import { HelpPanel } from '@/help/HelpPanel'
 import { useEvents } from '@/hooks/useEvents'
 import { useStatusPolling } from '@/hooks/useStatusPolling'
 import { useStore } from '@/store'
@@ -53,6 +54,7 @@ export function Layout() {
           <Outlet />
         </main>
       </div>
+      <HelpPanel />
       <ErrorToast />
     </div>
   )

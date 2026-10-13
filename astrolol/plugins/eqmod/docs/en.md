@@ -6,7 +6,7 @@ adapter, and also includes a mount simulator.
 
 ## Connecting the mount
 
-In [Equipment](equipment.md), **Load driver** → **Mount** → **Other adapter** → `eqmod`, with
+In [Equipment](../../../../docs/en/equipment.md), **Load driver** → **Mount** → **Other adapter** → `eqmod`, with
 connect params such as:
 
 ```json
@@ -23,7 +23,7 @@ Optional params:
 To try it without a mount, choose the simulator adapter (`eqmod_sim`).
 
 Then import it into the inventory and add it to your profile. The site from the profile gives
-the mount its location; the meridian and horizon limits are set on the [Mount](mount.md) page.
+the mount its location; the meridian and horizon limits are set on the [Mount](../../../../docs/en/mount.md) page.
 
 ## The EQMOD page
 
@@ -46,5 +46,5 @@ expected.
 ## Connect over Bluetooth
 
 For a Bluetooth adapter in place of the cable: pair it first on the
-[Bluetooth Serial](bluetooth-serial.md) page, then here pick it and click **Apply** for your
+[Bluetooth Serial](../../bluetooth_serial/docs/en.md) page, then here pick it and click **Apply** for your
 EQMOD mount. Reconnect the mount (or reload the profile) for it to take effect.

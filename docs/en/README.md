@@ -33,32 +33,33 @@ Most features are plugins. They are off until you turn them on in
 
 | Page | What it is for |
 |---|---|
-| [Target](target.md) | Find an object, see when it is visible, point the mount at it, keep favourites |
-| [Plate Solving](platesolve.md) | Find out where the telescope really points, sync and re-centre |
-| [Polar Align](polar-align.md) | Polar scope reticle and a three-point plate-solve alignment |
-| [Autofocus](autofocus.md) | Find the best focus with a V-curve |
-| [Guider](guider.md) | The built-in autoguider |
-| [PHD2 Guiding](phd2.md) | Use PHD2 as the guider |
-| [Sequencer](sequencer.md) | Plan a night: targets, exposures, guiding, dithering, flips, journal |
-| [Flat Wizard](flat-wizard.md) | Find the right flat exposure for each filter and queue the flats |
-| [Viewer](viewer.md) | Browse every frame you captured |
+| [Target](../../astrolol/plugins/target/docs/en.md) | Find an object, see when it is visible, point the mount at it, keep favourites |
+| [Plate Solving](../../astrolol/plugins/platesolve/docs/en.md) | Find out where the telescope really points, sync and re-centre |
+| [Polar Align](../../astrolol/plugins/polar_align/docs/en.md) | Polar scope reticle and a three-point plate-solve alignment |
+| [Autofocus](../../astrolol/plugins/autofocus/docs/en.md) | Find the best focus with a V-curve |
+| [Guider](../../astrolol/plugins/guider/docs/en.md) | The built-in autoguider |
+| [PHD2 Guiding](../../astrolol/plugins/phd2/docs/en.md) | Use PHD2 as the guider |
+| [Sequencer](../../astrolol/plugins/sequencer/docs/en.md) | Plan a night: targets, exposures, guiding, dithering, flips, journal |
+| [Flat Wizard](../../astrolol/plugins/flat_wizard/docs/en.md) | Find the right flat exposure for each filter and queue the flats |
+| [Viewer](../../astrolol/plugins/viewer/docs/en.md) | Browse every frame you captured |
 
 **Equipment**
 
 | Page | What it is for |
 |---|---|
-| [EQMOD](eqmod.md) | Native driver for Sky-Watcher mounts |
-| [Bluetooth Serial](bluetooth-serial.md) | Pair a Bluetooth serial adapter (e.g. a wireless EQMOD cable) |
-| [Planetarium servers](planetarium.md) | Drive the mount from Stellarium, SkySafari, Cartes du Ciel… |
-| [Guide Simulator](guide-simulator.md) | A pretend guider to rehearse without hardware |
+| [EQMOD](../../astrolol/plugins/eqmod/docs/en.md) | Native driver for Sky-Watcher mounts |
+| [Bluetooth Serial](../../astrolol/plugins/bluetooth_serial/docs/en.md) | Pair a Bluetooth serial adapter (e.g. a wireless EQMOD cable) |
+| [Stellarium Server](../../astrolol/plugins/stellarium/docs/en.md) | Follow and drive the mount from Stellarium |
+| [LX200 Server](../../astrolol/plugins/lx200/docs/en.md) | Follow and drive the mount from SkySafari, Cartes du Ciel and other planetarium programs |
+| [Guide Simulator](../../astrolol/plugins/guide_simulator/docs/en.md) | A pretend guider to rehearse without hardware |
 
 **Settings**
 
 | Page | What it is for |
 |---|---|
-| [Security](security.md) | Accounts, guest access, API tokens |
-| [System](system.md) | Wi-Fi and hotspot, temperature, power, time zone, reboot |
-| [mDNS](mdns.md) | Let apps find astrolol on the local network |
+| [Security](../../astrolol/plugins/security/docs/en.md) | Accounts, guest access, API tokens |
+| [System](../../astrolol/plugins/system/docs/en.md) | Wi-Fi and hotspot, temperature, power, time zone, reboot |
+| [mDNS](../../astrolol/plugins/mdns/docs/en.md) | Let apps find astrolol on the local network |
 
 ## Installing
 

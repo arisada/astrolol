@@ -49,8 +49,8 @@ These settings are remembered per camera.
   **unlinked** (unlinked balances each colour on its own, which removes a colour cast from
   light pollution).
 
-**Guiding / Dither.** When a guider is running ([Guider](guider.md), [PHD2](phd2.md) or the
-[Guide Simulator](guide-simulator.md)), astrolol can dither between frames while looping:
+**Guiding / Dither.** When a guider is running ([Guider](../../astrolol/plugins/guider/docs/en.md), [PHD2](../../astrolol/plugins/phd2/docs/en.md) or the
+[Guide Simulator](../../astrolol/plugins/guide_simulator/docs/en.md)), astrolol can dither between frames while looping:
 **Every N frames** or **Every N minutes** (0 = off; setting one clears the other).
 
 **Buttons**
@@ -60,7 +60,7 @@ These settings are remembered per camera.
   shows *Loop* with the elapsed time.
 - **Halt** aborts the exposure in progress and cancels the loop immediately.
 
-For a planned night with several targets and filters, use the [Sequencer](sequencer.md).
+For a planned night with several targets and filters, use the [Sequencer](../../astrolol/plugins/sequencer/docs/en.md).
 
 ## Focuser
 
@@ -71,7 +71,7 @@ Shown when the profile puts a focuser in front of this camera.
 - **Absolute position**, then **Go**, to move to a given position.
 - **Halt** stops a move.
 
-For automatic focusing, see [Autofocus](autofocus.md).
+For automatic focusing, see [Autofocus](../../astrolol/plugins/autofocus/docs/en.md).
 
 ## Filter Wheel
 

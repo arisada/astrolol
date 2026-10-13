@@ -1,7 +1,7 @@
 # Guide Simulator
 
 *Plugin: Guide Simulator.* A guider without hardware. It stands in for PHD2 or the built-in
-guider, so you can try the [Sequencer](sequencer.md) or dithering at your desk, and rehearse a
+guider, so you can try the [Sequencer](../../sequencer/docs/en.md) or dithering at your desk, and rehearse a
 cloudy night. Do not enable it together with another guider.
 
 ## Using it

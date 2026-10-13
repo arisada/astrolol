@@ -6,7 +6,7 @@ network, but not on a shared network (a star party, a club, a public Wi-Fi).
 
 Use HTTPS when you turn security on: over plain HTTP, passwords travel in clear on the network.
 The page warns you when the connection is not encrypted. See the
-[deployment guide](../raspberry-pi-deployment.md).
+[deployment guide](../../../../docs/raspberry-pi-deployment.md).
 
 ## Levels
 

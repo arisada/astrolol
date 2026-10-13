@@ -4,7 +4,7 @@
 stars against a star catalogue, and can correct the mount with the result. This is how you
 centre a target precisely, whatever the mount's own pointing accuracy.
 
-![Plate Solving](../images/platesolve.png)
+![Plate Solving](platesolve.jpg)
 
 ## Before the first use
 
@@ -20,7 +20,7 @@ a star database. Open the settings (gear at the top of the panel):
 | Pixel size (µm, optional) | Only if the camera does not report it. |
 
 The image scale comes from the telescope's focal length and the camera's pixel size in the
-[inventory](equipment.md#inventory), so fill those in.
+[inventory](../../../../docs/en/equipment.md#inventory), so fill those in.
 
 ## Solving
 
@@ -49,5 +49,5 @@ The **Solved** box shows:
 If a solve fails: check focus, try a longer exposure, check the focal length and pixel size,
 and widen the search radius if the mount may be far off.
 
-Plate solving is also used by [Polar Align](polar-align.md) and by the
-[Sequencer](sequencer.md) to centre each target.
+Plate solving is also used by [Polar Align](../../polar_align/docs/en.md) and by the
+[Sequencer](../../sequencer/docs/en.md) to centre each target.

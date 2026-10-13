@@ -1,6 +1,6 @@
 # Flat Wizard
 
-*Plugin: Flat Wizard (needs the [Sequencer](sequencer.md)).* Finds the right exposure for
+*Plugin: Flat Wizard (needs the [Sequencer](../../sequencer/docs/en.md)).* Finds the right exposure for
 flat frames, for each camera and filter, then queues the flats on the sequencer.
 
 Set up your flat source first (a flat panel, a T-shirt over the dew shield at dawn…) and point
@@ -31,6 +31,6 @@ each attempt (duration, brightness, *saturated*); **Results** shows the duration
 many trials it took.
 
 Each solved combination is added as a task to the sequencer queue (*Queued on the sequencer*),
-with the frame count you chose. Start the [Sequencer](sequencer.md) to take them.
+with the frame count you chose. Start the [Sequencer](../../sequencer/docs/en.md) to take them.
 
 **Abort** stops the trials.

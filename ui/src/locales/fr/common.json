@@ -143,5 +143,16 @@
     "guest": "Invité",
     "failed": "Échec de la connexion",
     "insecure": "Cette connexion n'est pas chiffrée : votre mot de passe circulerait en clair sur le réseau. Utilisez HTTPS (voir le guide de déploiement)."
+  },
+  "help": {
+    "title": "Aide",
+    "open": "Aide",
+    "close": "Fermer l'aide",
+    "back": "Retour",
+    "contents": "Sommaire",
+    "newTab": "Ouvrir dans un nouvel onglet",
+    "loading": "Chargement…",
+    "missing": "Il n'y a pas encore de page d'aide pour cet écran.",
+    "gettingStarted": "Première fois ? Lisez <link>Premiers pas</link>."
   }
 }

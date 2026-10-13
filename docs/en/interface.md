@@ -60,6 +60,6 @@ the top of a panel to open or close it) and the menu becomes a row of tabs.
 
 ## Several people at once
 
-Every browser sees the same state live. If [Security](security.md) is on, each person signs in
+Every browser sees the same state live. If [Security](../../astrolol/plugins/security/docs/en.md) is on, each person signs in
 with their own level: read-only viewers can watch, operators can drive the telescope, admins can
 also change settings, plugins and equipment.
