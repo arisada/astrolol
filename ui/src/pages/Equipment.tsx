@@ -2,13 +2,13 @@ import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   Camera, ChevronLeft, CircleDot, Compass, Crosshair, Focus, Globe,
-  Link2, LoaderPinwheel, MapPin, PackagePlus, Pencil, Plug, PlugZap, Plus, RefreshCw,
+  Link2, LoaderPinwheel, MapPin, PackageCheck, PackagePlus, Pencil, Plug, PlugZap, Plus, RefreshCw,
   Telescope, Trash2, Wind,
 } from 'lucide-react'
 import { DmsInput } from '@/components/ui/dms-input'
 import { api } from '@/api/client'
 import type {
-  ConnectedDevice, DeviceKind, DeviceProperty, DriverEntry,
+  ConnectedDevice, DeviceConfig, DeviceKind, DeviceProperty, DriverEntry,
   EquipmentItem, EquipmentItemType, PreConnectProps,
 } from '@/api/types'
 import { useStore } from '@/store'
@@ -726,6 +726,7 @@ function DeviceRow({
   onReconnect,
   onRemove,
   onImport,
+  inInventory,
   isCompanion = false,
 }: {
   d: ConnectedDevice
@@ -735,6 +736,7 @@ function DeviceRow({
   onReconnect: (id: string) => void
   onRemove: (id: string) => void
   onImport: () => void
+  inInventory: boolean
   isCompanion?: boolean
 }) {
   const { t } = useTranslation('equipment')
@@ -768,9 +770,12 @@ function DeviceRow({
           variant="ghost"
           size="icon"
           onClick={(e) => { e.stopPropagation(); onImport() }}
-          title={t('device.import')}
+          disabled={inInventory}
+          title={inInventory ? t('device.inInventory') : t('device.import')}
         >
-          <PackagePlus size={14} className="text-slate-400" />
+          {inInventory
+            ? <PackageCheck size={14} className="text-slate-600" />
+            : <PackagePlus size={14} className="text-slate-400" />}
         </Button>
         {d.state === 'disconnected' ? (
           <Button
@@ -809,6 +814,38 @@ function DeviceRow({
 // ---------------------------------------------------------------------------
 // Inventory helpers
 // ---------------------------------------------------------------------------
+
+const DEVICE_ITEM_TYPE: Partial<Record<DeviceKind, EquipmentItemType>> = {
+  camera: 'camera', mount: 'mount', focuser: 'focuser',
+  filter_wheel: 'filter_wheel', rotator: 'rotator',
+}
+
+// Key order independent, so params round-tripped through the backend still match.
+function canonicalJson(v: unknown): string {
+  if (Array.isArray(v)) return `[${v.map(canonicalJson).join(',')}]`
+  if (v && typeof v === 'object') {
+    return `{${Object.keys(v).sort()
+      .map((k) => `${JSON.stringify(k)}:${canonicalJson((v as Record<string, unknown>)[k])}`)
+      .join(',')}}`
+  }
+  return JSON.stringify(v)
+}
+
+/** Whether an inventory item describes the connected device with this config. */
+function isInInventory(kind: DeviceKind, config: DeviceConfig, items: EquipmentItem[]): boolean {
+  const type = DEVICE_ITEM_TYPE[kind]
+  if (!type) return false
+  const params = config.params ?? {}
+  const deviceName = typeof params.device_name === 'string' ? params.device_name : null
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { pre_connect_props, ...connectParams } = params
+  return items.some((item) => {
+    if (item.type !== type || !('connect_params' in item)) return false
+    if (deviceName !== null) return item.indi_device_name === deviceName
+    return item.adapter_key === config.adapter_key
+      && canonicalJson(item.connect_params ?? {}) === canonicalJson(connectParams)
+  })
+}
 
 function ItemTypeIcon({ type, size = 16 }: { type: EquipmentItemType; size?: number }) {
   if (type === 'site') return <MapPin size={size} />
@@ -1152,12 +1189,13 @@ function ItemForm({
 // Inventory section
 // ---------------------------------------------------------------------------
 
-function InventorySection({ importItem, onImportDone }: {
+function InventorySection({ items, reload, importItem, onImportDone }: {
+  items: EquipmentItem[]
+  reload: () => void
   importItem?: Omit<EquipmentItem, 'id'> | null
   onImportDone?: () => void
 }) {
   const { t } = useTranslation('equipment')
-  const [items, setItems] = useState<EquipmentItem[]>([])
   const [creating, setCreating] = useState<Omit<EquipmentItem, 'id'> | null>(null)
   const [editing, setEditing] = useState<string | null>(null)  // item id
   const [showTypeMenu, setShowTypeMenu] = useState(false)
@@ -1170,8 +1208,7 @@ function InventorySection({ importItem, onImportDone }: {
     }
   }, [importItem]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const load = () => api.inventory.list().then(setItems).catch(console.error)
-  useEffect(() => { load() }, [])
+  const load = reload
 
   const handleCreate = async (item: EquipmentItem | Omit<EquipmentItem, 'id'>) => {
     await api.inventory.create(item as Omit<EquipmentItem, 'id'>)
@@ -1201,9 +1238,30 @@ function InventorySection({ importItem, onImportDone }: {
   }, {})
 
   const allTypes: EquipmentItemType[] = ['site', 'mount', 'ota', 'camera', 'filter_wheel', 'focuser', 'rotator', 'gps']
+  const hasSite = items.some((item) => item.type === 'site')
 
   return (
     <div className="flex flex-col gap-6">
+      {!hasSite && creating?.type !== 'site' && (
+        <div className="flex items-start gap-3 bg-surface-raised border border-amber-700 rounded px-4 py-3">
+          <MapPin size={16} className="text-amber-400 shrink-0 mt-0.5" />
+          <div className="flex-1 flex flex-col gap-2">
+            <p className="text-sm font-medium text-slate-200">{t('inventory.noSite.title')}</p>
+            <p className="text-xs text-slate-400">{t('inventory.noSite.body')}</p>
+            <div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => { setCreating(emptyForm('site')); setEditing(null) }}
+              >
+                <Plus size={14} className="mr-1.5" />
+                {t('inventory.noSite.add')}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Add button */}
       <div className="flex items-center justify-between">
         <p className="text-xs text-slate-500">
@@ -1323,6 +1381,10 @@ export function Equipment() {
 
   const [activeTab, setActiveTab] = useState<'connections' | 'inventory'>('connections')
   const [importItem, setImportItem] = useState<Omit<EquipmentItem, 'id'> | null>(null)
+  const [inventoryItems, setInventoryItems] = useState<EquipmentItem[]>([])
+  const [deviceConfigs, setDeviceConfigs] = useState<Record<string, DeviceConfig>>({})
+  // Device just connected through the wizard: prompt to add it to the inventory
+  const [justConnectedId, setJustConnectedId] = useState<string | null>(null)
 
   const [step, setStep] = useState<WizardStep>('type')
   const [selectedKind, setSelectedKind] = useState<DeviceKind>('camera')
@@ -1353,6 +1415,32 @@ export function Equipment() {
   }
 
   useEffect(() => { refresh() }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const reloadInventory = () => {
+    api.inventory.list().then(setInventoryItems).catch(console.error)
+  }
+  useEffect(() => { reloadInventory() }, [])
+
+  // Configs tell which inventory item (if any) a connected device corresponds to
+  const connectedKey = connectedDevices.map((d) => d.device_id).sort().join(',')
+  useEffect(() => {
+    let cancelled = false
+    Promise.all(connectedDevices.map((d) =>
+      api.devices.getConfig(d.device_id)
+        .then((c) => [d.device_id, c] as const)
+        .catch(() => null),
+    )).then((entries) => {
+      if (cancelled) return
+      setDeviceConfigs(Object.fromEntries(entries.filter((e) => e !== null)))
+    })
+    return () => { cancelled = true }
+  }, [connectedKey]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const deviceInInventory = (d: ConnectedDevice) => {
+    const config = deviceConfigs[d.device_id]
+    return config !== undefined && isInInventory(d.kind, config, inventoryItems)
+  }
+  const canImport = (d: ConnectedDevice) => DEVICE_ITEM_TYPE[d.kind] !== undefined
 
   useEffect(() => {
     if (step === 'type' || step === 'source' || step === 'generic') return
@@ -1390,12 +1478,13 @@ export function Equipment() {
     setError(null)
     setConnecting(true)
     try {
-      await api.devices.connect({
+      const { device_id } = await api.devices.connect({
         device_id: deviceId || undefined,
         kind: selectedKind,
         adapter_key: adapterKey,
         params,
       })
+      setJustConnectedId(device_id)
       refresh()
       setStep('type')
     } catch (err) {
@@ -1474,7 +1563,7 @@ export function Equipment() {
     setError(null)
     setConnecting(true)
     try {
-      await api.devices.connect({
+      const { device_id } = await api.devices.connect({
         device_id: pendingDeviceId || undefined,
         kind: selectedKind,
         adapter_key: KIND_ADAPTER[selectedKind],
@@ -1484,6 +1573,7 @@ export function Equipment() {
           pre_connect_props: preConnectProps,
         },
       })
+      setJustConnectedId(device_id)
       refresh()
       setStep('type')
     } catch (err) {
@@ -1494,12 +1584,9 @@ export function Equipment() {
   }
 
   const handleImportDevice = async (device: ConnectedDevice) => {
-    const typeMap: Partial<Record<DeviceKind, EquipmentItemType>> = {
-      camera: 'camera', mount: 'mount', focuser: 'focuser',
-      filter_wheel: 'filter_wheel', rotator: 'rotator',
-    }
-    const invType = typeMap[device.kind]
+    const invType = DEVICE_ITEM_TYPE[device.kind]
     if (!invType) return
+    if (justConnectedId === device.device_id) setJustConnectedId(null)
 
     try {
       const config = await api.devices.getConfig(device.device_id)
@@ -1588,6 +1675,8 @@ export function Equipment() {
       {/* Inventory tab */}
       {activeTab === 'inventory' && (
         <InventorySection
+          items={inventoryItems}
+          reload={reloadInventory}
           importItem={importItem}
           onImportDone={() => setImportItem(null)}
         />
@@ -1595,6 +1684,32 @@ export function Equipment() {
 
       {/* Connections tab */}
       {activeTab === 'connections' && <>
+
+      {/* Encourage adding a freshly connected device to the inventory */}
+      {(() => {
+        const fresh = connectedDevices.find((d) => d.device_id === justConnectedId)
+        if (!fresh || !canImport(fresh) || !deviceConfigs[fresh.device_id] || deviceInInventory(fresh)) return null
+        return (
+          <div className="flex items-start gap-3 bg-surface-raised border border-accent rounded px-4 py-3 mb-6">
+            <PackagePlus size={16} className="text-accent shrink-0 mt-0.5" />
+            <div className="flex-1 flex flex-col gap-2">
+              <p className="text-sm font-medium text-slate-200">
+                {t('addToInventory.title', { device: fresh.device_id })}
+              </p>
+              <p className="text-xs text-slate-400">{t('addToInventory.body')}</p>
+              <div className="flex gap-2">
+                <Button variant="ghost" size="sm" onClick={() => handleImportDevice(fresh)}>
+                  <PackagePlus size={14} className="mr-1.5" />
+                  {t('device.import')}
+                </Button>
+                <Button variant="ghost" size="sm" onClick={() => setJustConnectedId(null)}>
+                  {t('addToInventory.later')}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Connected devices */}
       <section className="mb-8">
@@ -1623,6 +1738,7 @@ export function Equipment() {
                       onReconnect={handleReconnect}
                       onRemove={handleRemove}
                       onImport={() => handleImportDevice(primary)}
+                      inInventory={deviceInInventory(primary)}
                     />
                     {companions.map((c: ConnectedDevice) => (
                       <div key={c.device_id} className="ml-6 flex flex-col gap-1">
@@ -1636,6 +1752,7 @@ export function Equipment() {
                           onReconnect={handleReconnect}
                           onRemove={handleRemove}
                           onImport={() => handleImportDevice(c)}
+                          inInventory={deviceInInventory(c)}
                           isCompanion
                         />
                       </div>

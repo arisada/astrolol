@@ -58,7 +58,8 @@
     "import": "Import to inventory",
     "reconnect": "Reconnect",
     "disconnect": "Disconnect (keep registered)",
-    "remove": "Remove device"
+    "remove": "Remove device",
+    "inInventory": "Already in inventory"
   },
   "form": {
     "eg": "e.g. {{example}}",
@@ -97,7 +98,12 @@
     "confirmRemove": "Remove this item from inventory?",
     "edit": "Edit",
     "delete": "Delete",
-    "hint": "Click \"Add equipment\" to build your inventory."
+    "hint": "Click \"Add equipment\" to build your inventory.",
+    "noSite": {
+      "title": "No observation site yet",
+      "body": "Add the place you observe from, then assign it to a profile on the Profiles page. Your location is needed to point the mount and to compute what is visible.",
+      "add": "Add observation site"
+    }
   },
   "title": "Equipment",
   "refresh": "Refresh",
@@ -108,5 +114,10 @@
   "connected": "Connected",
   "noDevices": "No devices connected.",
   "loadDriver": "Load driver",
-  "loading": "Loading driver…"
+  "loading": "Loading driver…",
+  "addToInventory": {
+    "title": "{{device}} is connected — add it to your inventory?",
+    "body": "Devices in the inventory can be put in a profile and connected again in one click.",
+    "later": "Not now"
+  }
 }

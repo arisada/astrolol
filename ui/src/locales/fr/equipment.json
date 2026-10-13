@@ -58,7 +58,8 @@
     "import": "Importer dans l'inventaire",
     "reconnect": "Reconnecter",
     "disconnect": "Déconnecter (garder enregistré)",
-    "remove": "Supprimer l'appareil"
+    "remove": "Supprimer l'appareil",
+    "inInventory": "Déjà dans l'inventaire"
   },
   "form": {
     "eg": "ex. {{example}}",
@@ -97,7 +98,12 @@
     "confirmRemove": "Retirer cet élément de l'inventaire ?",
     "edit": "Modifier",
     "delete": "Supprimer",
-    "hint": "Cliquez sur « Ajouter du matériel » pour constituer votre inventaire."
+    "hint": "Cliquez sur « Ajouter du matériel » pour constituer votre inventaire.",
+    "noSite": {
+      "title": "Aucun site d'observation",
+      "body": "Ajoutez le lieu d'où vous observez, puis associez-le à un profil dans la page Profils. Votre position est nécessaire pour pointer la monture et calculer ce qui est visible.",
+      "add": "Ajouter un site d'observation"
+    }
   },
   "title": "Matériel",
   "refresh": "Actualiser",
@@ -108,5 +114,10 @@
   "connected": "Connectés",
   "noDevices": "Aucun appareil connecté.",
   "loadDriver": "Charger un pilote",
-  "loading": "Chargement du pilote…"
+  "loading": "Chargement du pilote…",
+  "addToInventory": {
+    "title": "{{device}} est connecté — l'ajouter à votre inventaire ?",
+    "body": "Les appareils de l'inventaire peuvent être mis dans un profil et reconnectés en un clic.",
+    "later": "Plus tard"
+  }
 }
