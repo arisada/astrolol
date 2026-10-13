@@ -8,7 +8,7 @@ import {
 import { DmsInput } from '@/components/ui/dms-input'
 import { api } from '@/api/client'
 import type {
-  ConnectedDevice, DeviceConfig, DeviceKind, DeviceProperty, DriverEntry,
+  ConnectedDevice, DeviceConfig, DeviceKind, DeviceProperty, DeviceState, DriverEntry,
   EquipmentItem, EquipmentItemType, PreConnectProps, Profile,
 } from '@/api/types'
 import { useStore } from '@/store'
@@ -20,6 +20,7 @@ import { Tabs } from '@/components/ui/tabs'
 import { GettingStartedHint } from '@/help/HelpPanel'
 import { useHelpTopic } from '@/help/store'
 import { itemsInTree } from '@/utils/profile-tree'
+import { DEVICE_ITEM_TYPE, isInInventory, itemDeviceStates } from '@/utils/inventory-match'
 import { GETTING_STARTED_TOPIC } from '@/help/paths'
 
 // ---------------------------------------------------------------------------
@@ -835,38 +836,6 @@ function DeviceRow({
 // Inventory helpers
 // ---------------------------------------------------------------------------
 
-const DEVICE_ITEM_TYPE: Partial<Record<DeviceKind, EquipmentItemType>> = {
-  camera: 'camera', mount: 'mount', focuser: 'focuser',
-  filter_wheel: 'filter_wheel', rotator: 'rotator',
-}
-
-// Key order independent, so params round-tripped through the backend still match.
-function canonicalJson(v: unknown): string {
-  if (Array.isArray(v)) return `[${v.map(canonicalJson).join(',')}]`
-  if (v && typeof v === 'object') {
-    return `{${Object.keys(v).sort()
-      .map((k) => `${JSON.stringify(k)}:${canonicalJson((v as Record<string, unknown>)[k])}`)
-      .join(',')}}`
-  }
-  return JSON.stringify(v)
-}
-
-/** Whether an inventory item describes the connected device with this config. */
-function isInInventory(kind: DeviceKind, config: DeviceConfig, items: EquipmentItem[]): boolean {
-  const type = DEVICE_ITEM_TYPE[kind]
-  if (!type) return false
-  const params = config.params ?? {}
-  const deviceName = typeof params.device_name === 'string' ? params.device_name : null
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { pre_connect_props, ...connectParams } = params
-  return items.some((item) => {
-    if (item.type !== type || !('connect_params' in item)) return false
-    if (deviceName !== null) return item.indi_device_name === deviceName
-    return item.adapter_key === config.adapter_key
-      && canonicalJson(item.connect_params ?? {}) === canonicalJson(connectParams)
-  })
-}
-
 function ItemTypeIcon({ type, size = 16 }: { type: EquipmentItemType; size?: number }) {
   if (type === 'site') return <MapPin size={size} />
   if (type === 'mount') return <Compass size={size} />
@@ -1208,8 +1177,9 @@ function ItemForm({
 // Inventory section
 // ---------------------------------------------------------------------------
 
-function InventorySection({ items, reload, importItem, onImportDone }: {
+function InventorySection({ items, deviceStates, reload, importItem, onImportDone }: {
   items: EquipmentItem[]
+  deviceStates: Record<string, DeviceState>
   reload: () => void
   importItem?: Omit<EquipmentItem, 'id'> | null
   onImportDone?: () => void
@@ -1348,7 +1318,10 @@ function InventorySection({ items, reload, importItem, onImportDone }: {
                   ) : (
                     <div className="flex items-center justify-between bg-surface-raised border border-surface-border rounded px-4 py-3 group">
                       <div>
-                        <p className="text-sm font-medium text-slate-200">{item.name}</p>
+                        <div className="flex items-center gap-3">
+                          <p className="text-sm font-medium text-slate-200">{item.name}</p>
+                          {deviceStates[item.id] && <StateBadge state={deviceStates[item.id]} />}
+                        </div>
                         {itemSubtitle(item) && (
                           <p className="text-xs text-slate-500 mt-0.5">{itemSubtitle(item)}</p>
                         )}
@@ -1711,6 +1684,7 @@ export function Equipment() {
       {activeTab === 'inventory' && (
         <InventorySection
           items={inventoryItems}
+          deviceStates={itemDeviceStates(inventoryItems, connectedDevices, deviceConfigs)}
           reload={reloadInventory}
           importItem={importItem}
           onImportDone={() => setImportItem(null)}

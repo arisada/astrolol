@@ -77,6 +77,10 @@ The inventory is your equipment list. Each item has a type:
 
 **Add equipment** opens the form; each item has **Edit** and **Delete** buttons.
 
+An item whose device is registered on the Connections tab (see [Connected devices](#connected-devices)) shows its state
+(*connected*, *busy*, *error*, *disconnected*…) next to its name. An item with no state is not
+connected. Sites, telescopes and GPS never show one.
+
 For devices, the **INDI driver** (e.g. `indi_eqmod_telescope`) and the **INDI device name** (as
 the driver announces it, e.g. `EQ6 Mount`) tell astrolol how to connect it. For a non-INDI
 adapter, fill in the **Adapter key** (e.g. `eqmod`) and its **Connect params** instead. The
