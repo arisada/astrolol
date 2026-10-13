@@ -1,6 +1,7 @@
 """The guider through what a night throws at it: glitches, refused pulses, a failing camera,
 clouds, a bumped mount, slews, meridian flips and other declinations."""
 import asyncio
+import contextlib
 import math
 
 import numpy as np
@@ -388,3 +389,48 @@ async def test_a_steady_drift_is_held_on_the_lock(predict) -> None:
         assert mean < 0.2, mean
     else:
         assert mean > 0.3, mean  # the lag prediction removes
+
+
+@pytest.mark.slow
+async def test_a_night_of_incidents(monkeypatch) -> None:  # noqa: ANN001
+    """Seeing, periodic error, drift and backlash, with clouds, glitches, refused pulses, camera
+    failures, bumps and dithers every few seconds: guiding must survive and keep the star."""
+    import random
+
+    monkeypatch.setattr(guider_module, "FULL_SEARCH_AFTER_S", 1.0)
+    monkeypatch.setattr(guider_module, "FULL_SEARCH_EVERY_S", 0.3)
+    rnd = random.Random(7)
+    rig = Rig(seeing_px=0.3, pe=(4.0, 6.0), drift=(1.5, 0.5), dec_backlash_ms=80, seed=7, shape=(240, 320),
+              stars=((150.0, 110.0, 800.0), (110.0, 80.0, 500.0), (200.0, 150.0, 450.0)))
+    g = make_guider(rig, exposure=0.05)
+    queue = g._bus.subscribe()
+    await g.guide(SettleParams(pixels=1.5, time=0, timeout=20))
+    for _ in range(60):
+        await asyncio.sleep(1.0)
+        assert g.status().active, g.last_error
+        r = rnd.random()
+        if r < 0.05:
+            rig.hidden = True
+            await asyncio.sleep(rnd.uniform(0.5, 3))
+            rig.hidden = False
+        elif r < 0.10:
+            rig.flash = (1, rnd.uniform(-20, 20), rnd.uniform(-20, 20))
+        elif r < 0.14:
+            rig.fail_pulses = rnd.randint(1, 8)
+        elif r < 0.17:
+            rig.end_stream(RuntimeError("usb"))
+        elif r < 0.20:
+            rig.offset += (rnd.uniform(-8, 8), rnd.uniform(-8, 8))
+        elif r < 0.27 and g.health().guiding:
+            with contextlib.suppress(GuiderError):
+                await g.dither(rnd.uniform(1, 5), False, SettleParams(pixels=1.5, time=0, timeout=15))
+    await asyncio.sleep(2.0)
+    assert g.health().guiding
+    errors = []
+    while not queue.empty():
+        e = queue.get_nowait()
+        if getattr(e, "type", "") == "guider.step":
+            errors.append(math.hypot(e.ra_dist, e.dec_dist))
+    await g.stop()
+    errors.sort()
+    assert errors[len(errors) // 2] < 1.0  # median, dithers included

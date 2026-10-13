@@ -375,7 +375,8 @@ Plugin scopes are collected at startup and exposed via `GET /admin/log_scopes`;
 
 **Slow tests.** The guiding integration tests (`tests/integration/test_indi_guiding.py`) run in
 real time — about 7 minutes — so they carry `@pytest.mark.slow` and are deselected by default
-(`addopts = -m 'not slow'` in `pyproject.toml`). Run them before a release and whenever you
+(`addopts = -m 'not slow'` in `pyproject.toml`); so is the guider's one-minute soak test
+(`test_a_night_of_incidents` in `astrolol/plugins/guider/tests/test_robustness.py`). Run them before a release and whenever you
 change guiding code (`astrolol/core/guiding/`, `astrolol/plugins/guider/`, pulse guiding in the
 INDI/EQMOD adapters, `phd2`):
 
@@ -384,7 +385,7 @@ python3 -m pytest -m slow tests/integration/test_indi_guiding.py -v
 python3 -m pytest tests/ astrolol/plugins/ -m "slow or not slow"   # everything, slow included
 ```
 
-Current count: **733 unit tests**, **49 integration tests** (3 of them slow), **1229 plugin tests**
+Current count: **733 unit tests**, **49 integration tests** (3 of them slow), **1230 plugin tests** (1 slow)
 (all passing).
 
 ### UI unit tests
