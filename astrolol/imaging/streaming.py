@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import time
+from pathlib import Path
 
 import astropy.io.fits as astropy_fits
 import numpy as np
@@ -27,6 +28,16 @@ def _read_pixels(fits_path: str) -> np.ndarray:
     if data.ndim != 2:
         raise ValueError(f"expected a 2-D image, got shape {data.shape}")
     return np.asarray(data)
+
+
+def _read_and_remove(fits_path: str) -> np.ndarray:
+    """The frame's pixels; the file is deleted once read. A stream's frames live in memory
+    only: kept on disk, a guide camera's 1-2 s frames fill a card within a night."""
+    try:
+        return _read_pixels(fits_path)
+    finally:
+        with contextlib.suppress(OSError):
+            Path(fits_path).unlink()
 
 
 class LoopingExposureStream:
@@ -72,7 +83,7 @@ class LoopingExposureStream:
         try:
             while True:
                 image = await self._camera.expose(request)
-                pixels = await asyncio.to_thread(_read_pixels, image.fits_path)
+                pixels = await asyncio.to_thread(_read_and_remove, image.fits_path)
                 origin = (0, 0)
                 if params.roi is not None:
                     r = params.roi
