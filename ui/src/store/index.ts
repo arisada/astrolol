@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import i18n from '@/i18n'
+import { isDismissed, laterDismissal, loadDismissedAt, saveDismissedAt } from './dismissed-error'
 import type { AstrolollEvent, CameraStatus, ConnectedDevice, FilterWheelStatus, FocuserStatus, ImageStats, MountStatus, PluginInfo } from '@/api/types'
 
 const MAX_LOG_ENTRIES = 1000
@@ -128,7 +129,11 @@ export const useStore = create<AppState>((set, get) => ({
   pluginStates: {},
 
   setWsConnected: (v) => set({ wsConnected: v }),
-  clearLastError: () => set({ lastError: null }),
+  clearLastError: () => {
+    const cur = get().lastError
+    if (cur) saveDismissedAt(laterDismissal(loadDismissedAt(), cur.timestamp))
+    set({ lastError: null })
+  },
   setPluginInfos: (infos) => set({ pluginInfos: infos }),
 
   setConnectedDevices: (devices) => set({ connectedDevices: devices }),
@@ -216,7 +221,8 @@ export const useStore = create<AppState>((set, get) => ({
       eventType: event.type,
     }
     const log = [entry, ...state.log].slice(0, MAX_LOG_ENTRIES)
-    const lastError = isError
+    // Errors replayed from history after a reload stay dismissed if the user closed them.
+    const lastError = isError && !isDismissed(entry.timestamp, loadDismissedAt())
       ? { message: entry.message, timestamp: entry.timestamp, eventType: event.type }
       : state.lastError
 
