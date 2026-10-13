@@ -384,7 +384,7 @@ python3 -m pytest -m slow tests/integration/test_indi_guiding.py -v
 python3 -m pytest tests/ astrolol/plugins/ -m "slow or not slow"   # everything, slow included
 ```
 
-Current count: **696 unit tests**, **49 integration tests** (3 of them slow), **1133 plugin tests**
+Current count: **733 unit tests**, **49 integration tests** (3 of them slow), **1229 plugin tests**
 (all passing).
 
 ### UI unit tests

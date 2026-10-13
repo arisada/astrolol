@@ -47,7 +47,7 @@
     "compensateBacklash": "Compensate Dec backlash",
     "resistReversals": "Resist Dec reversals",
     "pixelScaleOptics": "Calculated from the telescope and the camera.",
-    "mountHint": "Its declination and pier side keep the calibration valid after a slew or a meridian flip.",
+    "mountHint": "Lets the calibration follow slews and meridian flips.",
     "mountAuto": "The connected mount",
     "gain": "Gain",
     "gainHint": "Empty: leave the camera's gain as it is.",
@@ -222,6 +222,6 @@
       "no": "Unchanged"
     },
     "predictDrift": "Predict drift",
-    "predictDriftHint": "Learns how the mount drifts and corrects it ahead, so the star stays on its spot instead of trailing it."
+    "predictDriftHint": "Learns how the mount drifts and corrects it ahead."
   }
 }

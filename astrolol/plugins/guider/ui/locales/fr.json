@@ -47,7 +47,7 @@
     "compensateBacklash": "Compenser le jeu en Dec",
     "resistReversals": "Limiter les inversions en Dec",
     "pixelScaleOptics": "Calculé d’après le télescope et la caméra.",
-    "mountHint": "Sa déclinaison et son côté du pilier gardent la calibration valable après un pointage ou un retournement au méridien.",
+    "mountHint": "Permet à la calibration de suivre les pointages et les retournements au méridien.",
     "mountAuto": "La monture connectée",
     "gain": "Gain",
     "gainHint": "Vide : laisser le gain de la caméra tel quel.",
@@ -222,6 +222,6 @@
       "no": "Inchangée"
     },
     "predictDrift": "Anticiper la dérive",
-    "predictDriftHint": "Apprend comment la monture dérive et la corrige à l'avance : l'étoile reste à sa place au lieu de la suivre avec retard."
+    "predictDriftHint": "Apprend comment la monture dérive et la corrige à l'avance."
   }
 }
