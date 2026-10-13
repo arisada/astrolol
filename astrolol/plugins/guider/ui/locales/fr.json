@@ -53,7 +53,8 @@
     "gainHint": "Vide : laisser le gain de la caméra tel quel.",
     "starsHint": "Plus d'étoiles moyennent la turbulence.",
     "lostTimeout": "Abandonner après",
-    "lostTimeoutHint": "Combien de temps chercher une étoile perdue. 0 : jusqu'à ce qu'elle revienne."
+    "lostTimeoutHint": "Combien de temps chercher une étoile perdue. 0 : jusqu'à ce qu'elle revienne.",
+    "binning": "Binning"
   },
   "status": {
     "title": "Guidage",

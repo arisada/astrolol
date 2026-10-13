@@ -98,6 +98,10 @@ export function SetupPanel({ settings, save, active, cameras, mounts, report, ex
             }} />
         </div>
       </Field>
+      <Field label={t('settings.binning')}>
+        <PillGroup options={[1, 2, 3, 4] as const} value={settings.binning as 1 | 2 | 3 | 4}
+          formatLabel={(v) => `${v}×${v}`} onChange={(v) => save({ binning: v })} />
+      </Field>
       <Field label={t('settings.pixelScale')} hint={fromOptics && pixelScale.trim() === '' ? t('settings.pixelScaleOptics') : undefined}>
         <div className="w-24">
           <Input inputSize="sm" value={pixelScale} placeholder={fromOptics ? fmt(report?.status.pixel_scale, 2) : '—'}

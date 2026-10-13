@@ -53,7 +53,8 @@
     "gainHint": "Empty: leave the camera's gain as it is.",
     "starsHint": "More stars average the seeing out.",
     "lostTimeout": "Give up after",
-    "lostTimeoutHint": "How long to look for a lost star. 0: until it comes back."
+    "lostTimeoutHint": "How long to look for a lost star. 0: until it comes back.",
+    "binning": "Binning"
   },
   "status": {
     "title": "Guiding",

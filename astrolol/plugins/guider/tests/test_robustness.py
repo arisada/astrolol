@@ -452,3 +452,28 @@ async def test_the_periodic_error_is_learnt_while_guiding() -> None:
     await g.stop()
     assert p is not None and p.pe_period_s == pytest.approx(2.5, rel=0.1), p
     assert p.pe_amplitude == pytest.approx(10.0, rel=0.35)  # peak to peak
+
+
+async def test_binning_reaches_the_camera_scale_and_calibration() -> None:
+    async def optics(camera_id: str | None) -> float | None:
+        return 1.5
+
+    rig = Rig()
+    seen: list[int] = []
+    start = rig.start_stream
+
+    async def spy(params):  # noqa: ANN001, ANN202
+        seen.append(params.binning)
+        await start(params)
+
+    rig.start_stream = spy  # type: ignore[method-assign]
+    fine = AxisSettings(min_pulse_ms=2)
+    g = BuiltinGuider(EventBus(), GuiderSettings(exposure=0.03, calibration_steps=5, binning=2), RigDevices(rig),
+                      ra=fine, dec=fine, scale_resolver=optics)
+    await g.guide(EASY_SETTLE)
+    assert set(seen) == {2} and g.status().pixel_scale == 3.0 and g.calibration.binning == 2
+    with pytest.raises(GuiderError, match="binning"):
+        await g.update_settings(g.settings.model_copy(update={"binning": 1}))
+    await g.stop()
+    await g.update_settings(g.settings.model_copy(update={"binning": 1}))
+    assert g.calibration is None  # made binned 2x2: pulses move the star half as many pixels now

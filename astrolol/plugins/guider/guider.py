@@ -298,6 +298,7 @@ class BuiltinGuider:
             for made, now in (
                 (cal.camera_id, cfg.camera_id),
                 (cal.guide_output, cfg.guide_output),
+                (cal.binning, cfg.binning),
                 (cal.mount_id if cfg.guide_output == "mount" else None, cfg.mount_id if cfg.guide_output == "mount" else None),
             )
         )
@@ -428,6 +429,8 @@ class BuiltinGuider:
             self._scale, self.pixel_scale_source = self.settings.pixel_scale, "settings"
         else:
             derived = await self._scale_resolver(self.settings.camera_id) if self._scale_resolver else None
+            if derived:
+                derived *= self.settings.binning  # the optics give the scale of one sensor pixel
             self._scale, self.pixel_scale_source = derived, "optics" if derived else None
         self.view.pixel_scale = self._scale
         return self._scale
@@ -436,9 +439,12 @@ class BuiltinGuider:
         """Take new settings. A change of exposure or gain reaches the camera at once: the
         preview restarts, and a guiding run swaps its stream between two frames. Other
         hardware means another calibration."""
-        old, stream_changed = self.settings, (new.exposure, new.gain) != (self.settings.exposure, self.settings.gain)
+        old = self.settings
+        stream_changed = (new.exposure, new.gain, new.binning) != (old.exposure, old.gain, old.binning)
         if stream_changed and self._capturing_dark:
             raise GuiderBusy("Taking darks")
+        if new.binning != old.binning and self._running:
+            raise GuiderBusy("Stop guiding to change the binning")
         self.settings = new
         self._scale_checked = 0.0
         if self._calibration is not None and not self._calibration_applies(self._calibration):
@@ -453,7 +459,7 @@ class BuiltinGuider:
                     pass
             elif self._running:
                 self._restream = True
-        if (new.pixel_scale, new.camera_id) != (old.pixel_scale, old.camera_id):
+        if (new.pixel_scale, new.camera_id, new.binning) != (old.pixel_scale, old.camera_id, old.binning):
             await self.refresh_pixel_scale()
 
     async def start_preview(self) -> None:
@@ -476,11 +482,10 @@ class BuiltinGuider:
             await task
 
     async def _preview_loop(self, camera: IStreamingCamera) -> None:
-        cfg = self.settings
         sub = camera.subscribe_frames()
         self._restarted_stream()
         try:
-            await camera.start_stream(StreamParams(exposure=cfg.exposure, gain=cfg.gain))
+            await camera.start_stream(self._stream_params())
             analysed = 0.0
             while True:
                 frame = await self._next_frame(sub, 0.0)
@@ -510,14 +515,13 @@ class BuiltinGuider:
             raise GuiderBusy("Stop guiding before taking darks")
         await self.stop_preview()
         camera = self._devices.camera()
-        cfg = self.settings
         self._capturing_dark = True
         self._state = "Capturing dark"
         sub = camera.subscribe_frames()
         try:
             self._restarted_stream()
             since = time.monotonic()
-            await camera.start_stream(StreamParams(exposure=cfg.exposure, gain=cfg.gain))
+            await camera.start_stream(self._stream_params())
             await self._next_frame(sub, since)  # the first frame may predate the stream
             frames = [await self._next_frame(sub, since) for _ in range(count)]
         except StreamClosed as exc:
@@ -554,9 +558,15 @@ class BuiltinGuider:
         )
 
     def dark_matches(self) -> bool:
-        """Is there a dark for the current exposure and gain?"""
+        """Is there a dark for the current exposure, gain and binning?"""
         cfg = self.settings
-        return any(d.exposure == cfg.exposure and d.gain == cfg.gain for d in self.darks.describe())
+        return any(
+            (d.exposure, d.gain, d.binning) == (cfg.exposure, cfg.gain, cfg.binning) for d in self.darks.describe()
+        )
+
+    def _stream_params(self, roi: StreamRoi | None = None) -> StreamParams:
+        cfg = self.settings
+        return StreamParams(exposure=cfg.exposure, gain=cfg.gain, binning=cfg.binning, roi=roi)
 
     # ── The guiding run ──────────────────────────────────────────────────
 
@@ -570,7 +580,7 @@ class BuiltinGuider:
             cfg = self.settings
             self.mount = await self._read_mount()
             self._check_mount_still(self.mount)
-            self._params = StreamParams(exposure=cfg.exposure, gain=cfg.gain)
+            self._params = self._stream_params()
             self._restream, self._roi = False, None
             self._pulse_end = 0.0
             self._lock_shift = np.zeros(2)
@@ -680,7 +690,7 @@ class BuiltinGuider:
             raise
         cal = cal.model_copy(update={
             "pier_side": self.mount.pier_side if self.mount else None,
-            "camera_id": cfg.camera_id, "guide_output": cfg.guide_output,
+            "camera_id": cfg.camera_id, "guide_output": cfg.guide_output, "binning": cfg.binning,
             "mount_id": cfg.mount_id, "created": time.time(),
         })
         self.calibration_attempt = None
@@ -906,13 +916,12 @@ class BuiltinGuider:
     async def _restart_stream(self, roi: StreamRoi | None) -> None:
         """Stop the stream and start it again with the current exposure and gain and *roi*."""
         assert self._camera is not None
-        cfg = self.settings
         if self._sub is not None:
             self._sub.close()
         with contextlib.suppress(Exception):
             await self._camera.stop_stream()
         self._sub = self._camera.subscribe_frames()
-        self._params = StreamParams(exposure=cfg.exposure, gain=cfg.gain, roi=roi)
+        self._params = self._stream_params(roi)
         self._roi = roi
         self._restarted_stream()
         self._pulse_end = time.monotonic()  # the first frame may predate the new setting

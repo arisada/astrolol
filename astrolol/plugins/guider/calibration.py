@@ -88,6 +88,7 @@ class Calibration(BaseModel):
     camera_id: str | None = None
     mount_id: str | None = None
     guide_output: str | None = None
+    binning: int | None = None
     created: float | None = None  # Unix time
     quality: CalibrationQuality | None = None
     # Whether North turned out to move the star the other way after a meridian flip, once

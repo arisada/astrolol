@@ -22,6 +22,7 @@ class GuiderSettings(BaseModel):
     mount_id: str | None = None
     exposure: float = Field(default=1.0, gt=0, description="Guide exposure (s)")
     gain: int | None = None
+    binning: int = Field(default=1, ge=1, le=4)
     pixel_scale: float | None = Field(default=None, gt=0, description="arcsec per guide pixel")
     star_count: int = Field(default=3, ge=1, le=6, description="Guide star plus companions")
     dec_backlash_compensation: bool = Field(

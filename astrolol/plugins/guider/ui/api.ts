@@ -27,6 +27,7 @@ export interface GuiderSettings {
   mount_id: string | null
   exposure: number
   gain: number | null
+  binning: number
   pixel_scale: number | null
   star_count: number
   dec_backlash_compensation: boolean
