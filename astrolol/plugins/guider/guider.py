@@ -255,6 +255,7 @@ class BuiltinGuider:
         self._lock_shift = np.zeros(2)  # dithers so far this run
         self._jump = _JumpCheck()
         self._sensor: tuple[int, int] | None = None  # full frame size, from the run's first frame
+        self._roi_unsupported = False  # the camera ignored a window: full frames for this run
 
     # ── Calibration, kept across restarts ────────────────────────────────
 
@@ -581,7 +582,7 @@ class BuiltinGuider:
             self.mount = await self._read_mount()
             self._check_mount_still(self.mount)
             self._params = self._stream_params()
-            self._restream, self._roi = False, None
+            self._restream, self._roi, self._roi_unsupported = False, None, False
             self._pulse_end = 0.0
             self._lock_shift = np.zeros(2)
             self._jump = _JumpCheck()
@@ -684,9 +685,8 @@ class BuiltinGuider:
         except CalibrationFailed as exc:
             self.calibration_attempt = CalibrationAttempt(running=False, phase="failed", trace=exc.trace, error=str(exc))
             raise
-        except BaseException:
-            attempt = self.calibration_attempt
-            self.calibration_attempt = attempt.model_copy(update={"running": False}) if attempt else None
+        except BaseException:  # stopped: nothing went wrong that is worth showing
+            self.calibration_attempt = None
             raise
         cal = cal.model_copy(update={
             "pier_side": self.mount.pier_side if self.mount else None,
@@ -750,7 +750,11 @@ class BuiltinGuider:
                 self._jump.reset()  # where it was before the loss says nothing now
                 last_axis = None
                 self._controller.reset()
-            await self._fit_roi(tracker)  # a dither or a star found elsewhere may need the window moved
+            try:
+                await self._fit_roi(tracker)  # a dither or a star found elsewhere may need the window moved
+            except (StreamClosed, TimeoutError) as exc:
+                logger.warning("guider.window_move_failed", error=str(exc.__cause__ or exc) or type(exc).__name__)
+                continue  # the next frame restarts the stream
             blurred_frames = 0
             pos = np.array([result.dx, result.dy]) + self._lock_shift
             if not self._jump.accept(pos):
@@ -894,8 +898,8 @@ class BuiltinGuider:
         the run gives up: a USB hiccup must not end a night's guiding."""
         failures = 0
         while True:
-            await self._apply_stream_change(tracker)
             try:
+                await self._apply_stream_change(tracker)
                 return await self._next_frame(self._sub, newer_than)  # type: ignore[arg-type]
             except (StreamClosed, TimeoutError) as exc:
                 cause: BaseException = exc.__cause__ or exc
@@ -949,7 +953,7 @@ class BuiltinGuider:
         Moves the window when a star or its lock gets near its edge (a dither, a drift, a star
         found again elsewhere); falls back to full frames when the driver ignores windows.
         """
-        if self._camera is None or self._sensor is None:
+        if self._camera is None or self._sensor is None or self._roi_unsupported:
             return
         if self._roi is not None and self._inside_roi(tracker, self._roi):
             return
@@ -961,8 +965,10 @@ class BuiltinGuider:
             await self._rereference(tracker)
             return
         if not await self._rereference(tracker):
-            # The driver did not give us the region we asked for: track in full frames.
+            # The driver did not give us the region we asked for: track in full frames, and
+            # do not ask again this run.
             logger.warning("guider.roi_ignored", roi=roi.model_dump())
+            self._roi_unsupported = True
             await self._restart_stream(None)
             await self._rereference(tracker)
 

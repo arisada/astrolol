@@ -477,3 +477,37 @@ async def test_binning_reaches_the_camera_scale_and_calibration() -> None:
     await g.stop()
     await g.update_settings(g.settings.model_copy(update={"binning": 1}))
     assert g.calibration is None  # made binned 2x2: pulses move the star half as many pixels now
+
+
+async def test_stopping_during_calibration_leaves_no_attempt_behind() -> None:
+    g = make_guider(Rig(), exposure=0.1)
+    await g.guide(EASY_SETTLE, wait_settle=False)
+    for _ in range(50):
+        await asyncio.sleep(0.05)
+        if g.calibration_attempt and g.calibration_attempt.trace:
+            break
+    assert g.calibration_attempt is not None and g.calibration_attempt.running
+    await g.stop()
+    assert g.calibration_attempt is None and g.calibration is None
+
+
+async def test_a_camera_that_ignores_windows_is_asked_only_once() -> None:
+    # Stars in the far corner, so a window taken from the sensor's corner misses them.
+    rig = Rig(shape=(240, 320), drift=(0.0, 0.0), stars=((260.0, 185.0, 700.0), (235.0, 170.0, 500.0), (250.0, 160.0, 450.0)))
+    starts: list[object] = []
+    start = rig.start_stream
+
+    async def wrong_windows(params):  # noqa: ANN001, ANN202
+        starts.append(params.roi)
+        roi = params.roi
+        # A driver that sends a window of the size asked for, but from the sensor's corner.
+        await start(params.model_copy(update={"roi": roi and roi.model_copy(update={"x": 0, "y": 0})}))
+
+    rig.start_stream = wrong_windows  # type: ignore[method-assign]
+    g = make_guider(rig)
+    await g.guide(EASY_SETTLE)
+    await asyncio.sleep(0.5)
+    assert g.health().guiding
+    await g.stop()
+    assert sum(r is not None for r in starts) == 1
+    assert len(starts) <= 4  # first frame, the window, back to full frames (and no more)
