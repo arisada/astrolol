@@ -84,7 +84,6 @@
     "pixelSize": "Pixel size (µm)",
     "pixelSizePlaceholder": "e.g. 3.76",
     "defaultGain": "Default gain",
-    "defaultGainPlaceholder": "driver default is risky — set this",
     "filterNames": "Filter names (comma-separated)",
     "saving": "Saving…",
     "save": "Save",

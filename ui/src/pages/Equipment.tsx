@@ -26,6 +26,11 @@ type WizardStep = 'type' | 'source' | 'manufacturer' | 'model' | 'loading' | 'ma
 
 const DEVICE_ID_RE = /^[a-zA-Z0-9][a-zA-Z0-9_-]{0,63}$/
 
+// Drivers report pixel sizes as floats (2.3999999 µm); the input only accepts its 0.01 µm steps.
+function roundPixelSize(um: number | null): number | null {
+  return um == null ? null : Math.round(um * 100) / 100
+}
+
 function suggestDeviceId(kind: DeviceKind, driver: DriverEntry | null): string {
   if (!driver) return ''
   const raw = driver.executable.replace(/^indi_/, '') || driver.manufacturer
@@ -1133,8 +1138,8 @@ function ItemForm({
           <FieldRow label={t('form.pixelSize')}>
             <input
               type="number" step="0.01" min="0"
-              value={(form as { pixel_size_um: number | null }).pixel_size_um ?? ''}
-              onChange={(e) => set('pixel_size_um', e.target.value ? parseFloat(e.target.value) : null)}
+              value={roundPixelSize((form as { pixel_size_um: number | null }).pixel_size_um) ?? ''}
+              onChange={(e) => set('pixel_size_um', e.target.value ? roundPixelSize(parseFloat(e.target.value)) : null)}
               placeholder={t('form.pixelSizePlaceholder')}
               className="bg-surface border border-surface-border rounded-lg px-3 py-1.5 text-sm text-slate-200
                 focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent w-40"
@@ -1145,7 +1150,6 @@ function ItemForm({
               type="number" step="1" min="0"
               value={(form as { default_gain: number | null }).default_gain ?? ''}
               onChange={(e) => set('default_gain', e.target.value ? parseInt(e.target.value, 10) : null)}
-              placeholder={t('form.defaultGainPlaceholder')}
               className="bg-surface border border-surface-border rounded-lg px-3 py-1.5 text-sm text-slate-200
                 focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent w-56"
             />
@@ -1624,7 +1628,7 @@ export function Equipment() {
           const ccdInfo = props.find((p) => p.name === 'CCD_INFO')
           const pixelWidget = ccdInfo?.widgets.find((w) => w.name === 'CCD_PIXEL_SIZE')
           if (typeof pixelWidget?.value === 'number' && pixelWidget.value > 0) {
-            item.pixel_size_um = pixelWidget.value
+            item.pixel_size_um = roundPixelSize(pixelWidget.value)
           }
         } catch { /* properties unavailable — leave null */ }
       }

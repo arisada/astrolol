@@ -84,7 +84,6 @@
     "pixelSize": "Taille de pixel (µm)",
     "pixelSizePlaceholder": "ex. 3.76",
     "defaultGain": "Gain par défaut",
-    "defaultGainPlaceholder": "le gain par défaut du pilote est risqué — renseignez-le",
     "filterNames": "Noms des filtres (séparés par des virgules)",
     "saving": "Enregistrement…",
     "save": "Enregistrer",
