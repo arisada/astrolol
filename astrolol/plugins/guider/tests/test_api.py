@@ -4,10 +4,14 @@ from fastapi.testclient import TestClient
 
 from astrolol.core.events import EventBus
 from astrolol.plugins.guider.api import router
+from astrolol.plugins.guider.calibration import Calibration
 from astrolol.plugins.guider.controller import AxisSettings
 from astrolol.plugins.guider.guider import BuiltinGuider
 from astrolol.plugins.guider.settings import GuiderSettings
 from astrolol.plugins.guider.tests.rig import Rig, RigDevices
+
+
+CAL = Calibration(ra_x=0.03, ra_y=0.0, dec_x=0.0, dec_y=0.03)
 
 
 @pytest.fixture
@@ -71,7 +75,7 @@ def test_guide_then_stop(client) -> None:
 
 def test_clear_calibration(client) -> None:
     g = client.app.state.builtin_guider
-    g.calibration = object()  # type: ignore[assignment]
+    g.calibration = CAL
     assert client.delete("/plugins/guider/calibration").status_code == 204
     assert g.calibration is None
 
@@ -79,7 +83,7 @@ def test_clear_calibration(client) -> None:
 def test_changing_exposure_keeps_the_calibration(client) -> None:
     # Pulse length to displacement does not depend on the exposure, so a run can change it live.
     g = client.app.state.builtin_guider
-    g.calibration = object()  # type: ignore[assignment]
+    g.calibration = CAL
     s = client.get("/plugins/guider/settings").json() | {"exposure": 0.05}
     assert client.put("/plugins/guider/settings", json=s).status_code == 200
     assert g.settings.exposure == 0.05 and g.calibration is not None

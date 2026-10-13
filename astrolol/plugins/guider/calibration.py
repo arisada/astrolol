@@ -90,6 +90,9 @@ class Calibration(BaseModel):
     guide_output: str | None = None
     created: float | None = None  # Unix time
     quality: CalibrationQuality | None = None
+    # Whether North turned out to move the star the other way after a meridian flip, once
+    # guiding has seen it; None until then (a guess applies).
+    flip_dec: bool | None = None
 
     @property
     def matrix(self) -> np.ndarray:
@@ -134,7 +137,7 @@ class Calibration(BaseModel):
             ra_x, ra_y = ra_x * factor, ra_y * factor
         if pier_side and self.pier_side and pier_side != self.pier_side:
             ra_x, ra_y = -ra_x, -ra_y
-            if flip_dec:
+            if self.flip_dec if self.flip_dec is not None else flip_dec:
                 dec_x, dec_y = -dec_x, -dec_y
         if (ra_x, ra_y, dec_x, dec_y) == (self.ra_x, self.ra_y, self.dec_x, self.dec_y) and (
             dec == self.dec or dec is None

@@ -17,7 +17,8 @@ const KIND_TEXT: Record<api.StarKind, string> = {
   lost: 'fill-rose-400',
 }
 
-export function GuiderView({ poll }: { poll: boolean }) {
+/** *onPick*, when given, makes the image clickable: it receives the sensor position clicked. */
+export function GuiderView({ poll, onPick }: { poll: boolean; onPick?: (x: number, y: number) => void }) {
   const { t } = useTranslation('guider')
   const [view, setView] = useState<api.ViewInfo | null>(null)
   const [src, setSrc] = useState<string | null>(null)
@@ -62,7 +63,15 @@ export function GuiderView({ poll }: { poll: boolean }) {
     <div className="flex flex-col gap-2">
       <div className="relative w-full rounded border border-surface-border bg-black overflow-hidden" style={{ aspectRatio: `${view.width} / ${view.height}` }}>
         <img src={src} alt={t('view.alt')} className="absolute inset-0 w-full h-full" />
-        <svg viewBox={`0 0 ${view.width} ${view.height}`} className="absolute inset-0 w-full h-full" preserveAspectRatio="none">
+        <svg
+          viewBox={`0 0 ${view.width} ${view.height}`}
+          className={`absolute inset-0 w-full h-full ${onPick ? 'cursor-crosshair' : ''}`}
+          preserveAspectRatio="none"
+          onClick={onPick ? (e) => {
+            const r = e.currentTarget.getBoundingClientRect()
+            onPick(ox + ((e.clientX - r.left) / r.width) * view.width, oy + ((e.clientY - r.top) / r.height) * view.height)
+          } : undefined}
+        >
           {view.locks.map(([x, y], i) => (
             <path key={`lock-${i}`} d={`M${x - ox - 4},${y - oy} h8 M${x - ox},${y - oy - 4} v8`} className="stroke-slate-100" strokeWidth={stroke} opacity={0.7} vectorEffect="non-scaling-stroke" fill="none" />
           ))}
@@ -103,6 +112,7 @@ export function GuiderView({ poll }: { poll: boolean }) {
           </li>
         ))}
       </ul>
+      {onPick && <p className="text-[11px] text-slate-500">{t('view.pickHint')}</p>}
       <FrameInfo view={view} kindLabel={kindLabel} />
     </div>
   )
@@ -136,7 +146,8 @@ function FrameInfo({ view, kindLabel }: { view: api.ViewInfo; kindLabel: Record<
               <th className="font-normal pr-2">{t('frame.hfd')}</th>
               <th className="font-normal pr-2">{t('frame.fwhm')}</th>
               <th className="font-normal pr-2">{t('frame.snr')}</th>
-              <th className="font-normal">{t('frame.peak')}</th>
+              <th className="font-normal pr-2">{t('frame.peak')}</th>
+              <th className="font-normal" />
             </tr>
           </thead>
           <tbody>
@@ -146,7 +157,10 @@ function FrameInfo({ view, kindLabel }: { view: api.ViewInfo; kindLabel: Record<
                 <td className="pr-2">{size(s.hfd)}</td>
                 <td className="pr-2">{size(s.fwhm)}</td>
                 <td className="pr-2">{n(s.snr, 0)}</td>
-                <td>{n(s.peak, 0)}</td>
+                <td className="pr-2">{n(s.peak, 0)}</td>
+                <td className="text-amber-300">
+                  {s.saturated ? t('frame.saturated') : s.state && s.state !== 'ok' && s.state !== 'lost' ? t(`frame.states.${s.state}`) : ''}
+                </td>
               </tr>
             ))}
           </tbody>

@@ -72,6 +72,7 @@ class Rig:
         self.tracking = True
         self.fail_pulses = 0  # the next this many pulses raise
         self.stalled = False  # no frames while set (a stuck camera)
+        self.flash: tuple[int, float, float] = (0, 0.0, 0.0)  # (frames, dx, dy): a glitch that moves the stars
 
     # -- IStreamingCamera
     def subscribe_frames(self) -> FrameSubscription:
@@ -162,6 +163,10 @@ class Rig:
                 base_sx, sy = self.star_sigma
                 sx = 8.0 if smear else base_sx  # motion during the exposure: long along x, and dimmer
                 jitter = self.rng.normal(0, self.seeing_px, 2) if self.seeing_px else np.zeros(2)
+                frames, fx, fy = self.flash
+                if frames > 0:
+                    jitter = jitter + (fx, fy)
+                    self.flash = (frames - 1, fx, fy)
                 for (x, y), (_, _, amp) in zip(self.star_positions(), self.stars):
                     # Seeing moves the stars of a small field mostly together.
                     jx, jy = jitter + (self.rng.normal(0, self.seeing_px * 0.5, 2) if self.seeing_px else 0)

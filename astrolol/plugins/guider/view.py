@@ -12,7 +12,7 @@ from pydantic import BaseModel
 from astrolol.devices.base.streaming import Frame
 
 StarKind = Literal["primary", "companion", "candidate", "lost"]
-ViewMode = Literal["idle", "preview", "guiding"]
+ViewMode = Literal["idle", "preview", "calibrating", "guiding"]
 
 
 class OverlayStar(BaseModel):
@@ -25,6 +25,8 @@ class OverlayStar(BaseModel):
     peak: float | None = None  # brightest pixel above the background
     flux: float | None = None
     half: int = 8  # half-size of the window the tracker measures
+    saturated: bool = False
+    state: Literal["ok", "blurred", "lost", "outlier"] | None = None  # while guiding
 
 
 class FrameStats(BaseModel):
@@ -94,6 +96,10 @@ class GuideView:
     @property
     def stars(self) -> list[OverlayStar]:
         return self._stars
+
+    @property
+    def frame(self) -> Frame | None:
+        return self._frame
 
     def go_idle(self) -> None:
         """Keep the last image but drop the overlay: its stars no longer mean anything."""
