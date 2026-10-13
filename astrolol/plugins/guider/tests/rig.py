@@ -28,6 +28,14 @@ class Rig:
         smear_frames_after_pulse: int = 0,
         lose_frames_after_pulse: int = 0,
         dec_wobble: tuple[float, float] = (0.0, 1.0),
+        seeing_px: float = 0.0,
+        pe: tuple[float, float] = (0.0, 1.0),
+        star_sigma: tuple[float, float] = (1.8, 1.8),
+        max_adu: int = 65535,
+        dec: float | None = None,
+        pier_side: str | None = None,
+        sky_dec_pulses: bool = False,
+        pulse_latency: float = 0.0,
     ) -> None:
         self.time_scale = time_scale
         self.smear_frames = smear_frames_after_pulse  # stars smeared along x for this many frames
@@ -50,6 +58,20 @@ class Rig:
         self.exposures: list[float] = []  # the exposure of each stream started
         self.hidden = False  # stars invisible (clouds)
         self.drift_enabled = True
+        self.seeing_px = seeing_px  # random jitter of each frame's star positions
+        self.pe = pe  # (amplitude px, period s): periodic error along the RA axis
+        self.star_sigma = star_sigma  # (x, y) Gaussian sigma: unequal for elongated stars
+        self.max_adu = max_adu  # where the camera clips
+        # Pointing, for guiders that ask the mount. Dec in degrees, pier side "East"/"West".
+        self.dec, self.pier_side = dec, pier_side
+        # True: North means the sky's north on either side of the pier (the mount's driver
+        # handles it); False: North drives the Dec motor one fixed way (an ST4 cable).
+        self.sky_dec_pulses = sky_dec_pulses
+        self.pulse_latency = pulse_latency  # seconds before a pulse starts moving the mount
+        self.slewing = False
+        self.tracking = True
+        self.fail_pulses = 0  # the next this many pulses raise
+        self.stalled = False  # no frames while set (a stuck camera)
 
     # -- IStreamingCamera
     def subscribe_frames(self) -> FrameSubscription:
@@ -68,9 +90,35 @@ class Rig:
         self._broadcaster.end()
 
     # -- IPulseGuider
+    def end_stream(self, error: BaseException) -> None:
+        """The camera fails: the stream ends with *error*."""
+        task, self._task = self._task, None
+        if task:
+            task.cancel()
+        self._broadcaster.end(error)
+
+    def flip(self) -> None:
+        """A meridian flip: the camera turns half a turn around the sky with the tube, so a
+        West pulse moves the star the other way on the sensor; North does too when it follows
+        the sky, and stays put when it drives the motor a fixed way."""
+        self.pier_side = {"East": "West", "West": "East"}.get(self.pier_side or "", "West")
+        self.matrix[:, 0] *= -1
+        if not self.sky_dec_pulses:
+            return
+        self.matrix[:, 1] *= -1
+        self._dec_dir = -self._dec_dir
+
+    async def mount_state(self):  # noqa: ANN201
+        from astrolol.plugins.guider.devices import MountState
+
+        return MountState(dec=self.dec, pier_side=self.pier_side, slewing=self.slewing, tracking=self.tracking)
+
     async def pulse_guide(self, direction: str, duration_ms: int) -> None:
+        if self.fail_pulses > 0:
+            self.fail_pulses -= 1
+            raise RuntimeError("pulse refused")
         self.pulses.append((direction, duration_ms))
-        await asyncio.sleep(duration_ms / 1000 * self.time_scale)  # a pulse takes (scaled) time
+        await asyncio.sleep(self.pulse_latency + duration_ms / 1000 * self.time_scale)  # a pulse takes (scaled) time
         ra = {"W": 1, "E": -1}.get(direction, 0) * duration_ms
         dec = {"N": 1, "S": -1}.get(direction, 0) * duration_ms
         if dec:
@@ -90,6 +138,10 @@ class Rig:
         amp, period = self.dec_wobble
         if amp:
             shift = shift + np.array([0.0, amp * math.sin(2 * math.pi * t / period)])
+        amp, period = self.pe
+        if amp:
+            ra = self.matrix[:, 0] / max(float(np.hypot(*self.matrix[:, 0])), 1e-12)
+            shift = shift + ra * amp * math.sin(2 * math.pi * t / period)
         return [(x + shift[0], y + shift[1]) for x, y, _ in self.stars]
 
     async def _produce(self, params: StreamParams) -> None:
@@ -100,18 +152,26 @@ class Rig:
         ys, xs = np.mgrid[0:h, 0:w]
         while True:
             await asyncio.sleep(params.exposure)
+            if self.stalled:
+                continue
             img = 100 + self.rng.normal(0, 3, (h, w))
             glitched, self._glitch = self._glitch > 0, max(self._glitch - 1, 0)
             smear = glitched and self.smear_frames > 0
             hidden = self.hidden or (glitched and self.lose_frames > 0)
             if not hidden:
-                sx = 8.0 if smear else 1.8  # motion during the exposure: long along x, and dimmer
+                base_sx, sy = self.star_sigma
+                sx = 8.0 if smear else base_sx  # motion during the exposure: long along x, and dimmer
+                jitter = self.rng.normal(0, self.seeing_px, 2) if self.seeing_px else np.zeros(2)
                 for (x, y), (_, _, amp) in zip(self.star_positions(), self.stars):
-                    img += amp * (0.4 if smear else 1.0) * np.exp(-((xs - (x - ox)) ** 2 / (2 * sx**2) + (ys - (y - oy)) ** 2 / (2 * 1.8**2)))
+                    # Seeing moves the stars of a small field mostly together.
+                    jx, jy = jitter + (self.rng.normal(0, self.seeing_px * 0.5, 2) if self.seeing_px else 0)
+                    img += amp * (0.4 if smear else 1.0) * np.exp(
+                        -((xs - (x + jx - ox)) ** 2 / (2 * sx**2) + (ys - (y + jy - oy)) ** 2 / (2 * sy**2))
+                    )
             seq += 1
             self._broadcaster.publish(
                 Frame(
-                    pixels=np.clip(img, 0, 65535).astype(np.uint16), seq=seq, timestamp=time.monotonic(),
+                    pixels=np.clip(img, 0, self.max_adu).astype(np.uint16), seq=seq, timestamp=time.monotonic(),
                     exposure=params.exposure, gain=params.gain, binning=params.binning, origin=(ox, oy),
                 )
             )
@@ -128,3 +188,6 @@ class RigDevices:
 
     def pulse_guider(self):  # noqa: ANN201
         return self.camera()
+
+    async def mount_state(self):  # noqa: ANN201
+        return None if self.rig is None else await self.rig.mount_state()

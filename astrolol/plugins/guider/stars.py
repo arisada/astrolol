@@ -36,6 +36,24 @@ def _mad_sigma(values: np.ndarray) -> float:
     return float(1.4826 * np.median(np.abs(values - np.median(values))))
 
 
+FLAT_TOP_PIXELS = 3  # this many pixels sharing the brightest value: the star is clipped
+
+
+def _saturated(win: np.ndarray, bg: float, noise: float, saturation: float | None) -> bool:
+    """Clipped at the top. Without a known saturation level (the bit depth of a guide camera
+    is rarely reported) a star is saturated when several of its pixels share the brightest
+    value: a real star's peak is never that flat."""
+    top = float(win.max())
+    if saturation is not None:
+        return top >= saturation
+    if top - bg < 10 * noise:
+        return False
+    # Clipped pixels differ only by the dark subtracted from them, far less than the photon
+    # noise of an unclipped peak.
+    tolerance = max(0.5, 0.2 * float(np.sqrt(max(top, 0.0))))
+    return int(np.count_nonzero(win >= top - tolerance)) >= FLAT_TOP_PIXELS
+
+
 def measure(
     img: np.ndarray,
     x: float,
@@ -101,7 +119,7 @@ def measure(
             flux=float(np.clip(win - bg, 0.0, None).sum()),
             snr=peak / noise,
             fwhm=fwhm,
-            saturated=saturation is not None and float(win.max()) >= saturation,
+            saturated=_saturated(win, bg, noise, saturation),
             elongation=elongation,
             hfd=hfd,
         )
@@ -158,6 +176,9 @@ def select_guide_stars(
     min_snr: float = 10.0,
     keep: list[Star] | None = None,
     keep_radius: float = 5.0,
+    bounds: tuple[float, float, float, float] | None = None,
+    margin: float = 0.0,
+    prefer: tuple[float, float] | None = None,
 ) -> list[Star]:
     """The primary guide star followed by companions, best first.
 
@@ -168,18 +189,35 @@ def select_guide_stars(
     closer than *min_separation* (the windows would overlap and the pair biases each other)
     are skipped. Brighter is better only up to SNR 100: past that, the centroid is no more
     precise, while a very bright star is nearer to saturating.
+
+    Stars closer than *margin* to the edges of *bounds* (x0, y0, x1, y1, sensor coordinates)
+    come last: calibration and dithers move the star, and it must stay in the frame.
+    *prefer* (a position the user picked) makes the detected star nearest to it the primary,
+    whatever its rank, as long as it is within *keep_radius* × 3.
     """
     def crowded(s: Star) -> bool:
         return any(
             o is not s and np.hypot(o.x - s.x, o.y - s.y) < min_separation for o in stars
         )
 
+    def near_edge(s: Star) -> bool:
+        if bounds is None or margin <= 0:
+            return False
+        x0, y0, x1, y1 = bounds
+        return s.x - x0 < margin or x1 - s.x < margin or s.y - y0 < margin or y1 - s.y < margin
+
     usable = [
         s
         for s in stars
         if not s.saturated and s.snr >= min_snr and s.fwhm <= max_fwhm and not crowded(s)
     ]
-    usable.sort(key=lambda s: (min(s.snr, 100.0), s.flux), reverse=True)
+    usable.sort(key=lambda s: (not near_edge(s), min(s.snr, 100.0), s.flux), reverse=True)
+    if prefer is not None:
+        picked = min(stars, key=lambda s: np.hypot(s.x - prefer[0], s.y - prefer[1]), default=None)
+        if picked is not None and np.hypot(picked.x - prefer[0], picked.y - prefer[1]) <= 3 * keep_radius:
+            keep = [picked] + [s for s in keep or [] if s is not picked]
+            if picked not in usable:  # the user's choice stands, even if we would not have made it
+                usable.insert(0, picked)
     kept: list[Star] = []
     for old in keep or []:
         match = min(

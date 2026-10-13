@@ -238,3 +238,80 @@ def test_guide_star_choice_stays_put_when_brightness_order_flips() -> None:
     assert [round(s.x) for s in select_guide_stars(again, 2)] == [50, 0]  # without keep: reshuffled
     assert [round(s.x) for s in select_guide_stars(again, 2, keep=chosen)] == [0, 50]
     assert [round(s.x) for s in select_guide_stars(again, 2, keep=chosen[:1])] == [0, 50]
+
+
+# --- saturation, edges, the user's choice ---
+
+def test_a_clipped_star_is_saturated_without_knowing_the_bit_depth() -> None:
+    f = field([(100, 80, 9000), (50, 50, 400)])
+    clipped = Frame(pixels=np.minimum(f.pixels, 4095), seq=1, timestamp=0.0, exposure=1.0, gain=50)  # a 12-bit camera
+    stars = detect_stars(clipped)
+    assert next(s for s in stars if round(s.x) == 100).saturated
+    assert not next(s for s in stars if round(s.x) == 50).saturated
+    assert [round(s.x) for s in select_guide_stars(stars)] == [50]
+
+
+def test_stars_near_the_edge_come_last() -> None:
+    stars = detect_stars(field([(20, 80, 900), (100, 80, 500)]), edge=5)
+    chosen = select_guide_stars(stars, 2, bounds=(0, 0, W, H), margin=30)
+    assert [round(s.x) for s in chosen] == [100, 20]  # brighter, but too close to the edge
+
+
+def test_the_star_the_user_picked_is_the_primary() -> None:
+    stars = detect_stars(field([(60, 50, 900), (140, 100, 400)]))
+    chosen = select_guide_stars(stars, 2, prefer=(141, 99))
+    assert [round(s.x) for s in chosen] == [140, 60]
+
+
+# --- tracking real-world stars ---
+
+def test_a_star_that_is_never_round_is_still_guided_on() -> None:
+    first = elongated_field(100, 80, 4, 2)  # coma at the edge of an off-axis guider
+    star = measure(first.pixels.astype(np.float32), 100, 80, half=12)
+    assert star.elongation > 1.8
+    tracker = StarTracker([star], half=12)
+    tracker.refresh(first)
+    result = tracker.update(elongated_field(101, 80, 4, 2, seed=10))
+    assert result.readings[0].state == "ok" and result.dx == pytest.approx(1.0, abs=0.2)
+
+
+def test_a_slowly_fading_star_is_followed() -> None:
+    base = [(100.0, 80.0, 600.0)]
+    tracker = StarTracker(select_guide_stars(detect_stars(field(base))))
+    amp = 600.0
+    for i in range(60):  # down to a fifth over a minute of frames: haze, not a cloud
+        amp *= 0.973
+        assert tracker.update(field([(100.0, 80.0, amp)], seed=20 + i)).found == 1
+
+
+def test_a_much_brighter_star_in_the_window_is_not_the_guide_star() -> None:
+    tracker = StarTracker(select_guide_stars(detect_stars(field([(100.0, 80.0, 400.0)]))))
+    result = tracker.update(field([(102.0, 81.0, 3000.0)], seed=7))
+    assert result.readings[0].state == "lost"
+
+
+def test_several_stars_average_and_an_outlier_is_left_out() -> None:
+    base = [(40.0, 40.0, 600.0), (160.0, 40.0, 600.0), (40.0, 120.0, 600.0), (160.0, 120.0, 600.0)]
+    tracker = StarTracker(select_guide_stars(detect_stars(field(base)), count=4))
+    moved = [(x + 1.0, y, a) for x, y, a in base[:3]] + [(164.0, 121.0, 600.0)]  # one disagrees
+    result = tracker.update(field(moved, seed=8))
+    assert [r.state for r in result.readings].count("outlier") == 1
+    assert result.dx == pytest.approx(1.0, abs=0.1) and result.dy == pytest.approx(0.0, abs=0.1)
+
+
+def test_reacquire_prefers_the_nearest_star_that_looks_the_same() -> None:
+    tracker = StarTracker([detect_stars(field([(100, 80, 600)]))[0]], half=8)
+    moved = field([(120, 80, 600), (90, 60, 4000)], seed=3)  # a bright stranger nearer to the old spot
+    assert tracker.update(moved).readings[0].state == "lost"
+    assert tracker.reacquire(moved, radius=60) == 1
+    assert tracker.update(moved).readings[0].star.x == pytest.approx(120, abs=0.3)
+
+
+def test_relocate_finds_the_pattern_after_a_big_move() -> None:
+    base = [(50.0, 40.0, 700.0), (120.0, 60.0, 500.0), (80.0, 120.0, 450.0)]
+    tracker = StarTracker(select_guide_stars(detect_stars(field(base)), count=3))
+    # Bumped by (+40, -25); an unrelated star of the same brightness shows up as well.
+    moved = [(x + 40, y - 25, a) for x, y, a in base] + [(30.0, 140.0, 700.0)]
+    shift = tracker.relocate(detect_stars(field(moved, seed=11), edge=3))
+    assert shift == pytest.approx((40, -25), abs=0.3)
+    assert tracker.update(field(moved, seed=12)).found == 3
