@@ -22,7 +22,8 @@
     "title": "Equipment tree",
     "saving": "Saving…",
     "empty": "No equipment tree configured.",
-    "add": "Add to tree"
+    "add": "Add to tree",
+    "replace": "Replace with another item"
   },
   "form": {
     "nameRequired": "Name is required.",
@@ -47,6 +48,9 @@
     "active": "active",
     "edit": "Edit",
     "reload": "Reload",
-    "activate": "Activate"
+    "activate": "Activate",
+    "duplicate": "Duplicate profile",
+    "copySuffix": "(copy)",
+    "copySuffixN": "(copy {{n}})"
   }
 }

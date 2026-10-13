@@ -22,6 +22,11 @@ item (normally the site). The **+** next to an item (*Attach child item*) adds s
 it; *Remove from tree* takes it out of the tree (it stays in the inventory). Each inventory item can
 appear only once in a tree.
 
+To change a piece of equipment without rebuilding the tree, hover over it and click the
+*Replace with another item* button. Pick another inventory item of the same kind (another
+telescope, another mount, another camera…): it takes the old one's place and everything attached
+below it stays. On the active profile, click **Reload** afterwards to connect the new device.
+
 What can go under what:
 
 | Item | Can hold |
@@ -74,4 +79,7 @@ When astrolol restarts, it reactivates the last active profile and reconnects it
 ## Other actions
 
 - **Edit**: rename the profile.
+- *Duplicate profile* makes a copy named *… (copy)* with the same equipment tree. Use it to
+  try a variation of a rig, for example another telescope on the same mount, with the
+  *Replace* button.
 - The bin deletes the profile. The inventory items are not affected.

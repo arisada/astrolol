@@ -24,6 +24,12 @@ l'arborescence** ajoute un élément de premier niveau (normalement le site). Le
 l'arborescence* l'enlève de l'arborescence (il reste dans l'inventaire). Chaque élément de
 l'inventaire ne peut figurer qu'une fois dans une arborescence.
 
+Pour changer un équipement sans reconstruire l'arborescence, survolez-le et cliquez sur le
+bouton *Remplacer par un autre élément*. Choisissez un autre élément de l'inventaire du même
+type (un autre télescope, une autre monture, une autre caméra…) : il prend la place de
+l'ancien et tout ce qui est rattaché dessous est conservé. Sur le profil actif, cliquez ensuite
+sur **Recharger** pour connecter le nouvel appareil.
+
 Ce qui peut aller sous quoi :
 
 | Élément | Peut contenir |
@@ -79,4 +85,7 @@ Au redémarrage, astrolol réactive le dernier profil actif et reconnecte ses ap
 ## Autres actions
 
 - **Modifier** : renommer le profil.
+- *Dupliquer le profil* crée une copie nommée *… (copie)* avec la même arborescence. Pratique
+  pour tester une variante d'un setup, par exemple un autre télescope sur la même monture, avec
+  le bouton *Remplacer*.
 - La corbeille supprime le profil. Les éléments de l'inventaire ne sont pas touchés.

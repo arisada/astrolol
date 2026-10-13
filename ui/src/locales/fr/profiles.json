@@ -22,7 +22,8 @@
     "title": "Arborescence du matériel",
     "saving": "Enregistrement…",
     "empty": "Aucune arborescence de matériel configurée.",
-    "add": "Ajouter à l'arborescence"
+    "add": "Ajouter à l'arborescence",
+    "replace": "Remplacer par un autre élément"
   },
   "form": {
     "nameRequired": "Le nom est obligatoire.",
@@ -47,6 +48,9 @@
     "active": "actif",
     "edit": "Modifier",
     "reload": "Recharger",
-    "activate": "Activer"
+    "activate": "Activer",
+    "duplicate": "Dupliquer le profil",
+    "copySuffix": "(copie)",
+    "copySuffixN": "(copie {{n}})"
   }
 }

@@ -12,8 +12,10 @@ import {
   Globe,
   LoaderPinwheel,
   MapPin,
+  Copy,
   Minus,
   Plus,
+  Repeat,
   Telescope as TelescopeIcon,
   Trash2,
   Wind,
@@ -30,6 +32,7 @@ import type {
 } from '@/api/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { cloneTree, copyName, replaceItemAtPath } from '@/utils/profile-tree'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -163,6 +166,7 @@ function TreeNodeRow({
   roots,
   depth,
   onInsert,
+  onReplace,
   onRemove,
 }: {
   node: ProfileNode
@@ -171,10 +175,12 @@ function TreeNodeRow({
   roots: ProfileNode[]
   depth: number
   onInsert: (path: NodePath, item: EquipmentItem) => void
+  onReplace: (path: NodePath, item: EquipmentItem) => void
   onRemove: (path: NodePath) => void
 }) {
   const { t } = useTranslation('profiles')
   const [showPicker, setShowPicker] = useState(false)
+  const [showSwapPicker, setShowSwapPicker] = useState(false)
   const item = inventory.find((i) => i.id === node.item_id)
   const itemType = (item?.type ?? 'camera') as EquipmentItemType
   const validChildren = VALID_CHILD_TYPES[itemType] ?? new Set<string>()
@@ -223,6 +229,29 @@ function TreeNodeRow({
           </div>
         )}
 
+        {/* Replace button: another item of the same kind, everything below it stays */}
+        {item && (
+          <div className="relative">
+            <button
+              className="opacity-0 group-hover:opacity-100 transition-opacity text-slate-600 hover:text-slate-300 p-0.5 rounded"
+              onClick={() => setShowSwapPicker((v) => !v)}
+              title={t('tree.replace')}
+              aria-label={t('tree.replace')}
+            >
+              <Repeat size={11} />
+            </button>
+            {showSwapPicker && (
+              <ItemPicker
+                inventory={inventory.filter((i) => i.id === node.item_id || !used.has(i.id))}
+                allowedTypes={new Set([itemType])}
+                usedItemIds={new Set([node.item_id])}
+                onPick={(other) => { if (other.id !== node.item_id) onReplace(path, other) }}
+                onClose={() => setShowSwapPicker(false)}
+              />
+            )}
+          </div>
+        )}
+
         {/* Remove button */}
         <button
           className="opacity-0 group-hover:opacity-100 transition-opacity text-slate-600 hover:text-status-error p-0.5 rounded transition-colors"
@@ -243,6 +272,7 @@ function TreeNodeRow({
           roots={roots}
           depth={depth + 1}
           onInsert={onInsert}
+          onReplace={onReplace}
           onRemove={onRemove}
         />
       ))}
@@ -288,6 +318,12 @@ function ProfileTreeEditor({
     save(updated)
   }
 
+  const handleReplace = (path: NodePath, item: EquipmentItem) => {
+    const updated = replaceItemAtPath(roots, path, item.id)
+    setRoots(updated)
+    save(updated)
+  }
+
   const handleRemove = (path: NodePath) => {
     const updated = removeAtPath(roots, path)
     setRoots(updated)
@@ -325,6 +361,7 @@ function ProfileTreeEditor({
             roots={roots}
             depth={0}
             onInsert={handleInsert}
+            onReplace={handleReplace}
             onRemove={handleRemove}
           />
         ))}
@@ -484,6 +521,7 @@ function ProfileCard({
   inventory,
   onActivate,
   onEdit,
+  onDuplicate,
   onDelete,
   onTreeSave,
 }: {
@@ -492,6 +530,7 @@ function ProfileCard({
   inventory: EquipmentItem[]
   onActivate: () => void
   onEdit: () => void
+  onDuplicate: () => void
   onDelete: () => void
   onTreeSave: (profileId: string, roots: ProfileNode[]) => Promise<void>
 }) {
@@ -542,6 +581,15 @@ function ProfileCard({
           >
             <Zap size={11} />
             {isActive ? t('card.reload') : t('card.activate')}
+          </Button>
+          <Button
+            size="icon" variant="ghost"
+            className="h-7 w-7 text-slate-500 hover:text-slate-300"
+            onClick={onDuplicate}
+            title={t('card.duplicate')}
+            aria-label={t('card.duplicate')}
+          >
+            <Copy size={13} />
           </Button>
           <Button
             size="icon" variant="ghost"
@@ -604,6 +652,13 @@ export function Profiles() {
     await api.profiles.update(data as Profile)
     reload()
     setView('list')
+  }
+
+  const handleDuplicate = async (source: Profile) => {
+    const name = copyName(source.name, profiles.map((p) => p.name),
+      (n) => (n === 1 ? t('card.copySuffix') : t('card.copySuffixN', { n })))
+    await api.profiles.create({ name, roots: cloneTree(source.roots) })
+    reload()
   }
 
   const handleActivate = async (id: string) => {
@@ -691,6 +746,7 @@ export function Profiles() {
               inventory={inventory}
               onActivate={() => handleActivate(p.id)}
               onEdit={() => setView({ edit: p })}
+              onDuplicate={() => handleDuplicate(p)}
               onDelete={() => handleDelete(p.id)}
               onTreeSave={handleTreeSave}
             />
