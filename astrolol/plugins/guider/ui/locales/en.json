@@ -65,7 +65,9 @@
     "pointing": "Declination",
     "pierSide": "Pier side",
     "drift": "Drift RA {{ra}}{{unit}}/min, Dec {{dec}}{{unit}}/min",
-    "periodicError": "periodic error {{amplitude}}{{unit}} every {{period}} s"
+    "periodicError": "periodic error {{amplitude}}{{unit}} every {{period}} s",
+    "starSnr": "Star SNR",
+    "stars": "Stars"
   },
   "guiding": {
     "start": "Start guiding",

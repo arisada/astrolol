@@ -65,7 +65,9 @@
     "pointing": "Déclinaison",
     "pierSide": "Côté du pilier",
     "drift": "Dérive AD {{ra}}{{unit}}/min, Déc {{dec}}{{unit}}/min",
-    "periodicError": "erreur périodique {{amplitude}}{{unit}} toutes les {{period}} s"
+    "periodicError": "erreur périodique {{amplitude}}{{unit}} toutes les {{period}} s",
+    "starSnr": "RSB de l'étoile",
+    "stars": "Étoiles"
   },
   "guiding": {
     "start": "Lancer le guidage",

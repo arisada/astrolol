@@ -29,6 +29,9 @@ export function GuiderPage() {
   const { t } = useTranslation('guider')
   const devices = useStore((s) => s.connectedDevices)
   const steps = useStore((s) => (s.pluginStates['guider'] as api.GuiderPluginState | null | undefined)?.steps ?? NO_STEPS)
+  const live = useStore((s) => s.pluginStates['guider'] as api.GuiderPluginState | null | undefined)
+  const snr = live?.snr ?? null
+  const starsFound = live?.stars ?? null
   const [rangeOpt, setRangeOpt] = useState<(typeof RANGE_OPTIONS)[number]>('auto')
   const [samples, setSamples] = useState<(typeof SAMPLE_OPTIONS)[number]>(100)
   const [report, setReport] = useState<api.GuiderReport | null>(null)
@@ -205,6 +208,8 @@ export function GuiderPage() {
                   <Stat label={h?.guiding ? t('status.guidingFor') : t('status.unguidedFor')}
                     value={h ? `${fmt(h.guiding ? h.guiding_for_s : h.unguided_for_s, 0)} s` : '—'} />
                   <Stat label={t('status.losses')} value={w ? `${w.losses} / ${fmt(w.unguided_s, 0)} s` : '—'} />
+                  <Stat label={t('status.starSnr')} value={h?.guiding && snr != null ? fmt(snr, 0) : '—'} />
+                  <Stat label={t('status.stars')} value={h?.guiding && starsFound != null ? String(starsFound) : '—'} />
                   <Stat label={t('status.pointing')} value={report?.mount?.dec != null ? `${report.mount.dec.toFixed(0)}°` : '—'} />
                   <Stat label={t('status.pierSide')}
                     value={report?.mount?.pier_side ? t(`pier.${report.mount.pier_side}`, { defaultValue: report.mount.pier_side }) : '—'} />

@@ -144,9 +144,11 @@ export interface GuiderPluginState {
   guiding: boolean | null // null until the guider has said anything
   reason: string | null
   steps: GuideSample[]
+  snr: number | null // the guide star's, in the latest frame
+  stars: number | null // guide stars found in the latest frame
 }
 
-export const DEFAULT_GUIDER_STATE: GuiderPluginState = { guiding: null, reason: null, steps: [] }
+export const DEFAULT_GUIDER_STATE: GuiderPluginState = { guiding: null, reason: null, steps: [], snr: null, stars: null }
 export const MAX_STEPS = 500
 
 export type StarKind = 'primary' | 'companion' | 'candidate' | 'lost'
