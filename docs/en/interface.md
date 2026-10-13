@@ -28,16 +28,23 @@ MOUNT Tracking │ CCD SIMULATOR Idle │ CCD SIMULATOR Cooling -14°C │ GUIDE
   (*Idle*, *Loop*, *Downloading…*, *Cooling*), focuser (*Moving*), rotator.
 - Plugins add their own chip while they are busy: sequencer, guider, autofocus, plate solving,
   polar alignment, flats, power warnings…
-- On the right: who is signed in (with a sign-out button) and the connection state. **live**
+- On the right: who is signed in (with a sign-out button), the **?** help button, and the
+  connection state. **live**
   means updates are arriving; **reconnecting…** means the browser lost the server and is trying
   again. Nothing is lost on the server side: astrolol keeps working while no browser is open.
 
 States are always written in words; the colour is only a second cue, so the bar stays readable
 in the red night palettes.
 
+## Help
+
+The **?** in the status bar opens this guide at the page that explains the screen you are on.
+Links stay inside the help panel; **Back** returns to the previous page, **Contents** to the
+guide's front page, and an icon opens the page in a new tab.
+
 ## Pop-up messages
 
-Errors and confirmations appear briefly at the corner of the screen. Click **Dismiss** to close
+Errors and confirmations appear briefly at the bottom of the screen. Click **Dismiss** to close
 one; it stays closed after a page reload.
 
 ## Device properties

@@ -41,7 +41,7 @@ astrolol/plugins/
     │   ├── MyChip.tsx     # optional status-bar chip
     │   └── api.ts         # plugin-local fetch helpers (mirrors api.py routes)
     ├── docs/
-    │   ├── en.md          # user guide page for this plugin (opened by the in-app help button)
+    │   ├── en.md, fr.md   # user guide page for this plugin (opened by the in-app help button)
     │   └── *.png|jpg      # its screenshots
     └── tests/
         └── test_my_api.py
@@ -344,8 +344,14 @@ page gets its help just by having `docs/en.md`. A page can point the button else
 it is on screen with `useHelpTopic('getting-started')` (`@/help/store`). Missing languages fall
 back to English.
 
-- **A new plugin with a page ships `docs/en.md`**; `tests/unit/test_docs_links.py` fails
-  otherwise, and on any relative link or `#anchor` that does not resolve.
+- **A new plugin with a page ships `docs/en.md` and `docs/fr.md`**; `tests/unit/test_docs_links.py`
+  fails otherwise, when a page exists in one language but not the other, and on any relative link
+  or `#anchor` that does not resolve.
+- Each language links within its own language (`docs/fr/…` → `…/docs/fr.md`). Anchors are
+  GitHub's heading slugs, so a French heading gives a French (accented) anchor: link
+  `#propriétés-des-appareils`, not the English one.
+- Bold UI labels in a guide page must match that language's catalogue (the French guide quotes
+  the French button text).
 - **Changing what a screen does means updating its guide page** in the same commit.
 - Guide pages follow the user-facing copy rules above. Compress screenshots (JPEG for
   photographic content; keep each under ~300 kB).
@@ -422,7 +428,7 @@ python3 -m pytest -m slow tests/integration/test_indi_guiding.py -v
 python3 -m pytest tests/ astrolol/plugins/ -m "slow or not slow"   # everything, slow included
 ```
 
-Current count: **775 unit tests**, **49 integration tests** (3 of them slow), **1241 plugin tests** (1 slow)
+Current count: **803 unit tests**, **49 integration tests** (3 of them slow), **1241 plugin tests** (1 slow)
 (all passing).
 
 ### UI unit tests

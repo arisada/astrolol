@@ -47,3 +47,15 @@ def test_every_plugin_page_has_a_guide_page() -> None:
     with_ui = {p.parent.parent.name for p in PLUGINS.glob("*/ui/index.ts")}
     missing = sorted(pid for pid in with_ui - {"hello"} if not (PLUGINS / pid / "docs" / "en.md").exists())
     assert not missing, f"plugins with a page but no docs/en.md: {missing}"
+
+
+def test_every_page_exists_in_every_language() -> None:
+    """A page added in English is added in the other languages in the same change."""
+    languages = sorted(p.name for p in (ROOT / "docs").iterdir() if p.is_dir() and p.name != "images")
+    missing = []
+    for lng in languages:
+        missing += [f"docs/{lng}/{p.name}" for p in (ROOT / "docs" / "en").glob("*.md")
+                    if not (ROOT / "docs" / lng / p.name).exists()]
+        missing += [str(p.with_name(f"{lng}.md").relative_to(ROOT)) for p in PLUGINS.glob("*/docs/en.md")
+                    if not p.with_name(f"{lng}.md").exists()]
+    assert not missing, missing

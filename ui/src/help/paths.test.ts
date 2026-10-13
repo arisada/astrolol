@@ -36,6 +36,11 @@ describe('resolveHref', () => {
     expect(resolveHref('astrolol/plugins/lx200/docs/en.md', '../../stellarium/docs/en.md'))
       .toEqual({ kind: 'doc', topic: 'stellarium', anchor: '' })
   })
+  it('decodes accented anchors', () => {
+    expect(resolveHref('docs/fr/mount.md', 'interface.md#propri%C3%A9t%C3%A9s-des-appareils'))
+      .toEqual({ kind: 'doc', topic: 'interface', anchor: 'propriétés-des-appareils' })
+    expect(resolveHref('docs/fr/mount.md', '#parcage%20x')).toEqual({ kind: 'anchor', anchor: 'parcage x' })
+  })
   it('tells images, anchors and external links apart', () => {
     expect(resolveHref('docs/en/mount.md', '../images/mount.png')).toEqual({ kind: 'file', repoPath: 'docs/images/mount.png' })
     expect(resolveHref('docs/en/mount.md', '#park')).toEqual({ kind: 'anchor', anchor: 'park' })

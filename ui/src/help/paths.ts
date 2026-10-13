@@ -50,13 +50,18 @@ export type ResolvedHref =
   | { kind: 'doc'; topic: string; anchor: string }
   | { kind: 'file'; repoPath: string }
 
+/** The Markdown parser percent-encodes link targets ("#propriétés" → "#propri%C3%A9t%C3%A9s"). */
+function decode(s: string): string {
+  try { return decodeURIComponent(s) } catch { return s }
+}
+
 /** What a link written in the page at `fromPath` points to. */
 export function resolveHref(fromPath: string, href: string): ResolvedHref {
   if (/^[a-z][a-z0-9+.-]*:/i.test(href) || href.startsWith('//')) return { kind: 'external', url: href }
-  if (href.startsWith('#')) return { kind: 'anchor', anchor: href.slice(1) }
+  if (href.startsWith('#')) return { kind: 'anchor', anchor: decode(href.slice(1)) }
   const hash = href.indexOf('#')
-  const path = hash < 0 ? href : href.slice(0, hash)
-  const anchor = hash < 0 ? '' : href.slice(hash + 1)
+  const path = decode(hash < 0 ? href : href.slice(0, hash))
+  const anchor = decode(hash < 0 ? '' : href.slice(hash + 1))
   const dir = fromPath.includes('/') ? fromPath.slice(0, fromPath.lastIndexOf('/')) : ''
   const repoPath = joinPath(dir, path)
   const ref = docRefFromPath(repoPath)
