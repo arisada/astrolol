@@ -8,7 +8,7 @@ import {
 import { DmsInput } from '@/components/ui/dms-input'
 import { api } from '@/api/client'
 import type {
-  ConnectedDevice, DeviceConfig, DeviceKind, DeviceProperty, DeviceState, DriverEntry,
+  ConnectedDevice, DeviceKind, DeviceProperty, DeviceState, DriverEntry,
   EquipmentItem, EquipmentItemType, PreConnectProps, Profile,
 } from '@/api/types'
 import { useStore } from '@/store'
@@ -19,6 +19,7 @@ import { DevicePropertiesPanel } from '@/components/DevicePropertiesPanel'
 import { Tabs } from '@/components/ui/tabs'
 import { GettingStartedHint } from '@/help/HelpPanel'
 import { useHelpTopic } from '@/help/store'
+import { useDeviceConfigs } from '@/hooks/useDeviceConfigs'
 import { itemsInTree } from '@/utils/profile-tree'
 import { DEVICE_ITEM_TYPE, isInInventory, itemDeviceStates } from '@/utils/inventory-match'
 import { GETTING_STARTED_TOPIC } from '@/help/paths'
@@ -1374,7 +1375,6 @@ export function Equipment() {
   const [activeTab, setActiveTab] = useState<'connections' | 'inventory'>('connections')
   const [importItem, setImportItem] = useState<Omit<EquipmentItem, 'id'> | null>(null)
   const [inventoryItems, setInventoryItems] = useState<EquipmentItem[]>([])
-  const [deviceConfigs, setDeviceConfigs] = useState<Record<string, DeviceConfig>>({})
   // Device just connected through the wizard: prompt to add it to the inventory
   const [justConnectedId, setJustConnectedId] = useState<string | null>(null)
 
@@ -1418,19 +1418,8 @@ export function Equipment() {
   useHelpTopic(newcomer ? GETTING_STARTED_TOPIC : null)
 
   // Configs tell which inventory item (if any) a connected device corresponds to
+  const deviceConfigs = useDeviceConfigs(connectedDevices)
   const connectedKey = connectedDevices.map((d) => d.device_id).sort().join(',')
-  useEffect(() => {
-    let cancelled = false
-    Promise.all(connectedDevices.map((d) =>
-      api.devices.getConfig(d.device_id)
-        .then((c) => [d.device_id, c] as const)
-        .catch(() => null),
-    )).then((entries) => {
-      if (cancelled) return
-      setDeviceConfigs(Object.fromEntries(entries.filter((e) => e !== null)))
-    })
-    return () => { cancelled = true }
-  }, [connectedKey]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const deviceInInventory = (d: ConnectedDevice) => {
     const config = deviceConfigs[d.device_id]

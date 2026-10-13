@@ -73,7 +73,9 @@ Click **Activate** on a profile. astrolol:
 - sends the site's location to the mount;
 - records the telescope and site in the FITS headers of every frame you take.
 
-The active profile is marked **active**. On the active profile the button becomes
+The active profile is marked **active**, and its tree shows the state of each device
+(*connected*, *busy*, *error*, *disconnected*…) next to its name. An item with no state is not
+connected; sites, telescopes and GPS never show one. On the active profile the button becomes
 **Reload**: it reconnects the tree, which is handy after plugging a device back in.
 
 When astrolol restarts, it reactivates the last active profile and reconnects its devices.

@@ -79,7 +79,9 @@ Cliquez sur **Activer** sur un profil. astrolol :
 - envoie la position du site à la monture ;
 - inscrit le télescope et le site dans les en-têtes FITS de chaque image prise.
 
-Le profil actif est marqué **actif**. Sur le profil actif, le bouton devient **Recharger** : il
+Le profil actif est marqué **actif**, et son arborescence affiche l'état de chaque appareil
+(*connecté*, *occupé*, *erreur*, *déconnecté*…) à côté de son nom. Un élément sans état n'est pas
+connecté ; les sites, télescopes et GPS n'en affichent jamais. Sur le profil actif, le bouton devient **Recharger** : il
 reconnecte l'arborescence, pratique après avoir rebranché un appareil.
 
 Au redémarrage, astrolol réactive le dernier profil actif et reconnecte ses appareils.

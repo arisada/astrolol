@@ -25,6 +25,7 @@ import {
 import { api } from '@/api/client'
 import type {
   ActivationResult,
+  DeviceState,
   EquipmentItem,
   EquipmentItemType,
   Profile,
@@ -32,6 +33,10 @@ import type {
 } from '@/api/types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { StateBadge } from '@/components/ui/badge'
+import { useStore } from '@/store'
+import { useDeviceConfigs } from '@/hooks/useDeviceConfigs'
+import { itemDeviceStates } from '@/utils/inventory-match'
 import { cloneTree, copyName, replaceItemAtPath } from '@/utils/profile-tree'
 
 // ---------------------------------------------------------------------------
@@ -167,6 +172,7 @@ function TreeNodeRow({
   inventory,
   roots,
   depth,
+  deviceStates,
   onInsert,
   onReplace,
   onRemove,
@@ -176,6 +182,7 @@ function TreeNodeRow({
   inventory: EquipmentItem[]
   roots: ProfileNode[]
   depth: number
+  deviceStates?: Record<string, DeviceState>
   onInsert: (path: NodePath, item: EquipmentItem) => void
   onReplace: (path: NodePath, item: EquipmentItem) => void
   onRemove: (path: NodePath) => void
@@ -205,6 +212,9 @@ function TreeNodeRow({
           <span>{item ? itemLabel(item) : <span className="text-slate-600 italic">{t('tree.unknown', { id: node.item_id.slice(0, 8) })}</span>}</span>
           {node.role && (
             <span className="text-slate-600 text-[10px] ml-1">· {node.role}</span>
+          )}
+          {deviceStates?.[node.item_id] && (
+            <span className="ml-1"><StateBadge state={deviceStates[node.item_id]} /></span>
           )}
         </div>
 
@@ -273,6 +283,7 @@ function TreeNodeRow({
           inventory={inventory}
           roots={roots}
           depth={depth + 1}
+          deviceStates={deviceStates}
           onInsert={onInsert}
           onReplace={onReplace}
           onRemove={onRemove}
@@ -289,10 +300,12 @@ function TreeNodeRow({
 function ProfileTreeEditor({
   profile,
   inventory,
+  deviceStates,
   onSave,
 }: {
   profile: Profile
   inventory: EquipmentItem[]
+  deviceStates?: Record<string, DeviceState>
   onSave: (roots: ProfileNode[]) => Promise<void>
 }) {
   const { t } = useTranslation('profiles')
@@ -363,6 +376,7 @@ function ProfileTreeEditor({
             inventory={inventory}
             roots={roots}
             depth={0}
+            deviceStates={deviceStates}
             onInsert={handleInsert}
             onReplace={handleReplace}
             onRemove={handleRemove}
@@ -525,6 +539,7 @@ function ProfileCard({
   profile,
   isActive,
   inventory,
+  deviceStates,
   onActivate,
   onEdit,
   onDuplicate,
@@ -534,6 +549,7 @@ function ProfileCard({
   profile: Profile
   isActive: boolean
   inventory: EquipmentItem[]
+  deviceStates: Record<string, DeviceState>
   onActivate: () => void
   onEdit: () => void
   onDuplicate: () => void
@@ -612,6 +628,7 @@ function ProfileCard({
           <ProfileTreeEditor
             profile={profile}
             inventory={inventory}
+            deviceStates={isActive ? deviceStates : undefined}
             onSave={(roots) => onTreeSave(profile.id, roots)}
           />
         </div>
@@ -634,6 +651,10 @@ export function Profiles() {
   const [activationResult, setActivationResult] = useState<ActivationResult | null>(null)
   const [loading, setLoading] = useState(true)
   const [inventory, setInventory] = useState<EquipmentItem[]>([])
+  // What came up when the active profile was activated: only its tree shows device states.
+  const connectedDevices = useStore((s) => s.connectedDevices)
+  const deviceConfigs = useDeviceConfigs(connectedDevices)
+  const deviceStates = itemDeviceStates(inventory, connectedDevices, deviceConfigs)
 
   const reload = () => {
     Promise.all([api.profiles.list(), api.profiles.active(), api.inventory.list()])
@@ -750,6 +771,7 @@ export function Profiles() {
               profile={p}
               isActive={p.id === activeProfileId}
               inventory={inventory}
+              deviceStates={deviceStates}
               onActivate={() => handleActivate(p.id)}
               onEdit={() => setView({ edit: p })}
               onDuplicate={() => handleDuplicate(p)}
