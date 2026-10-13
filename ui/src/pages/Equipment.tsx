@@ -3,13 +3,13 @@ import { useTranslation } from 'react-i18next'
 import {
   Camera, ChevronLeft, CircleDot, Compass, Crosshair, Focus, Globe,
   Link2, LoaderPinwheel, MapPin, PackageCheck, PackagePlus, Pencil, Plug, PlugZap, Plus, RefreshCw,
-  Telescope, Trash2, Wind,
+  Telescope, Trash2, TriangleAlert, Wind,
 } from 'lucide-react'
 import { DmsInput } from '@/components/ui/dms-input'
 import { api } from '@/api/client'
 import type {
   ConnectedDevice, DeviceConfig, DeviceKind, DeviceProperty, DriverEntry,
-  EquipmentItem, EquipmentItemType, PreConnectProps,
+  EquipmentItem, EquipmentItemType, PreConnectProps, Profile,
 } from '@/api/types'
 import { useStore } from '@/store'
 import { Button } from '@/components/ui/button'
@@ -19,6 +19,7 @@ import { DevicePropertiesPanel } from '@/components/DevicePropertiesPanel'
 import { Tabs } from '@/components/ui/tabs'
 import { GettingStartedHint } from '@/help/HelpPanel'
 import { useHelpTopic } from '@/help/store'
+import { itemsInTree } from '@/utils/profile-tree'
 import { GETTING_STARTED_TOPIC } from '@/help/paths'
 
 // ---------------------------------------------------------------------------
@@ -735,6 +736,7 @@ function DeviceRow({
   onRemove,
   onImport,
   inInventory,
+  notInProfile = false,
   isCompanion = false,
 }: {
   d: ConnectedDevice
@@ -745,6 +747,7 @@ function DeviceRow({
   onRemove: (id: string) => void
   onImport: () => void
   inInventory: boolean
+  notInProfile?: boolean
   isCompanion?: boolean
 }) {
   const { t } = useTranslation('equipment')
@@ -773,6 +776,15 @@ function DeviceRow({
         </div>
       </div>
       <div className="flex items-center gap-2">
+        {notInProfile && (
+          <span
+            className="inline-flex items-center gap-1 text-xs text-amber-400"
+            title={inInventory ? t('device.notInProfileHint') : t('device.notInProfileImportHint')}
+          >
+            <TriangleAlert size={12} />
+            {t('device.notInProfile')}
+          </span>
+        )}
         <StateBadge state={d.state} />
         <Button
           variant="ghost"
@@ -1451,6 +1463,18 @@ export function Equipment() {
     const config = deviceConfigs[d.device_id]
     return config !== undefined && isInInventory(d.kind, config, inventoryItems)
   }
+  // Devices outside the active profile's tree: not set up with the site, optics and filters
+  // the rest of astrolol relies on. Nothing is flagged without an active profile.
+  const [activeProfile, setActiveProfile] = useState<Profile | null>(null)
+  useEffect(() => {
+    api.profiles.active().then(setActiveProfile).catch(() => setActiveProfile(null))
+  }, [connectedKey])
+  const profileItems = activeProfile ? itemsInTree(activeProfile.roots, inventoryItems) : null
+  const deviceNotInProfile = (d: ConnectedDevice) => {
+    const config = deviceConfigs[d.device_id]
+    if (profileItems === null || config === undefined || DEVICE_ITEM_TYPE[d.kind] === undefined) return false
+    return !isInInventory(d.kind, config, profileItems)
+  }
   const canImport = (d: ConnectedDevice) => DEVICE_ITEM_TYPE[d.kind] !== undefined
 
   useEffect(() => {
@@ -1753,6 +1777,7 @@ export function Equipment() {
                       onRemove={handleRemove}
                       onImport={() => handleImportDevice(primary)}
                       inInventory={deviceInInventory(primary)}
+                      notInProfile={deviceNotInProfile(primary)}
                     />
                     {companions.map((c: ConnectedDevice) => (
                       <div key={c.device_id} className="ml-6 flex flex-col gap-1">

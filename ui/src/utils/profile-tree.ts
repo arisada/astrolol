@@ -1,4 +1,4 @@
-import type { ProfileNode } from '@/api/types'
+import type { EquipmentItem, ProfileNode } from '@/api/types'
 
 export type NodePath = number[]
 
@@ -22,4 +22,12 @@ export function copyName(name: string, existing: string[], suffix: (n: number) =
 /** Deep copy of a tree, so a duplicated profile never shares nodes with its source. */
 export function cloneTree(roots: ProfileNode[]): ProfileNode[] {
   return roots.map((n) => ({ ...n, children: cloneTree(n.children) }))
+}
+
+/** The inventory items a tree refers to (references to items no longer in the inventory are dropped). */
+export function itemsInTree(roots: ProfileNode[], inventory: EquipmentItem[]): EquipmentItem[] {
+  const ids = new Set<string>()
+  const walk = (nodes: ProfileNode[]) => nodes.forEach((n) => { ids.add(n.item_id); walk(n.children) })
+  walk(roots)
+  return inventory.filter((i) => ids.has(i.id))
 }

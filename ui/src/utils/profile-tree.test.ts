@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { ProfileNode } from '@/api/types'
-import { cloneTree, copyName, replaceItemAtPath } from './profile-tree'
+import type { EquipmentItem, ProfileNode } from '@/api/types'
+import { cloneTree, copyName, itemsInTree, replaceItemAtPath } from './profile-tree'
 
 const n = (item_id: string, children: ProfileNode[] = [], role: string | null = null): ProfileNode => ({
   item_id, role, children,
@@ -46,5 +46,18 @@ describe('cloneTree', () => {
     expect(copy).toEqual(tree)
     expect(copy[0]).not.toBe(tree[0])
     expect(copy[0].children[0]).not.toBe(tree[0].children[0])
+  })
+})
+
+describe('itemsInTree', () => {
+  const item = (id: string) => ({ id, type: 'camera', name: id }) as EquipmentItem
+
+  it('keeps the inventory items the tree refers to, at any depth', () => {
+    const inventory = [item('site'), item('cam'), item('spare'), item('guide-cam')]
+    expect(itemsInTree(tree, inventory).map((i) => i.id)).toEqual(['site', 'cam', 'guide-cam'])
+  })
+
+  it('is empty for an empty tree', () => {
+    expect(itemsInTree([], [item('cam')])).toEqual([])
   })
 })

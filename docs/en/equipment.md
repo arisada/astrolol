@@ -51,6 +51,12 @@ The buttons on each row:
 | Disconnect (keep registered) | Disconnects but keeps the device in the list, ready to reconnect. |
 | Remove device | Disconnects and removes it from the list. |
 
+A device that is not part of the [active profile](profiles.md) is marked **not in profile**.
+Such a device may not work properly with the rest of astrolol, which relies on the profile to know
+how it is mounted (which telescope, filters and site go with it). Hover the mark for what to do:
+import the device to the inventory if needed, then add it to the profile's equipment tree on the
+Profiles page. Nothing is marked while no profile is active.
+
 Right after a device connects, astrolol offers to add it to the inventory if it is not there
 yet.
 

@@ -59,7 +59,10 @@
     "reconnect": "Reconnecter",
     "disconnect": "Déconnecter (garder enregistré)",
     "remove": "Supprimer l'appareil",
-    "inInventory": "Déjà dans l'inventaire"
+    "inInventory": "Déjà dans l'inventaire",
+    "notInProfile": "hors profil",
+    "notInProfileHint": "Absent du profil actif. Ajoutez-le à l'arborescence du profil (page Profils) pour qu'astrolol sache comment il est monté.",
+    "notInProfileImportHint": "Absent du profil actif. Importez-le dans l'inventaire, puis ajoutez-le à l'arborescence du profil (page Profils)."
   },
   "form": {
     "eg": "ex. {{example}}",

@@ -59,7 +59,10 @@
     "reconnect": "Reconnect",
     "disconnect": "Disconnect (keep registered)",
     "remove": "Remove device",
-    "inInventory": "Already in inventory"
+    "inInventory": "Already in inventory",
+    "notInProfile": "not in profile",
+    "notInProfileHint": "Not in the active profile. Add it to the profile's equipment tree (Profiles page) so astrolol knows how it is mounted.",
+    "notInProfileImportHint": "Not in the active profile. Import it to the inventory, then add it to the profile's equipment tree (Profiles page)."
   },
   "form": {
     "eg": "e.g. {{example}}",

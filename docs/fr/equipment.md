@@ -58,6 +58,12 @@ Les boutons de chaque ligne :
 | Déconnecter (garder enregistré) | Déconnecte, mais garde l'appareil dans la liste, prêt à être reconnecté. |
 | Supprimer l'appareil | Déconnecte et retire l'appareil de la liste. |
 
+Un appareil qui ne fait pas partie du [profil actif](profiles.md) est marqué **hors profil**.
+Il risque de ne pas fonctionner correctement avec le reste d'astrolol, qui s'appuie sur le profil
+pour savoir comment il est monté (quel télescope, quels filtres, quel site). Survolez la marque
+pour savoir quoi faire : importer l'appareil dans l'inventaire si besoin, puis l'ajouter à
+l'arborescence du profil dans la page Profils. Rien n'est marqué tant qu'aucun profil n'est actif.
+
 Juste après la connexion d'un appareil, astrolol propose de l'ajouter à l'inventaire s'il n'y
 est pas déjà.
 
