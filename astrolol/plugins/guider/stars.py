@@ -39,19 +39,24 @@ def _mad_sigma(values: np.ndarray) -> float:
 FLAT_TOP_PIXELS = 3  # this many pixels sharing the brightest value: the star is clipped
 
 
-def _saturated(win: np.ndarray, bg: float, noise: float, saturation: float | None) -> bool:
+def _saturated(win: np.ndarray, bg: float, noise: float, saturation: float | None, fwhm: float) -> bool:
     """Clipped at the top. Without a known saturation level (the bit depth of a guide camera
-    is rarely reported) a star is saturated when several of its pixels share the brightest
-    value: a real star's peak is never that flat."""
+    is rarely reported) a star is saturated when it has a plateau: more pixels near its
+    brightest value than an unclipped star of its width would have."""
     top = float(win.max())
     if saturation is not None:
         return top >= saturation
-    if top - bg < 10 * noise:
+    amplitude = top - bg
+    if amplitude < 10 * noise:
         return False
     # Clipped pixels differ only by the dark subtracted from them, far less than the photon
     # noise of an unclipped peak.
     tolerance = max(0.5, 0.2 * float(np.sqrt(max(top, 0.0))))
-    return int(np.count_nonzero(win >= top - tolerance)) >= FLAT_TOP_PIXELS
+    near_top = int(np.count_nonzero(win >= top - tolerance))
+    # A Gaussian star has about 2*pi*sigma^2*f pixels within a fraction f of its peak.
+    sigma = max(fwhm, 1.0) / 2.355
+    expected = 2 * np.pi * sigma**2 * tolerance / amplitude
+    return near_top >= max(FLAT_TOP_PIXELS, 3 * expected + 1)
 
 
 def measure(
@@ -80,7 +85,8 @@ def measure(
         win = img[y0:y1, x0:x1]
         border = np.concatenate((win[0], win[-1], win[1:-1, 0], win[1:-1, -1]))
         bg = float(np.median(border))
-        noise = max(_mad_sigma(border), 1e-3)
+        # Never below the rounding of integer pixels: a simulated sky can be perfectly flat.
+        noise = max(_mad_sigma(border), 0.3)
         # Pixels within one sigma of the background carry noise, not star: dropping them
         # removes the bias towards the window centre.
         weights = np.clip(win - bg - noise, 0.0, None)
@@ -119,7 +125,7 @@ def measure(
             flux=float(np.clip(win - bg, 0.0, None).sum()),
             snr=peak / noise,
             fwhm=fwhm,
-            saturated=_saturated(win, bg, noise, saturation),
+            saturated=_saturated(win, bg, noise, saturation, fwhm),
             elongation=elongation,
             hfd=hfd,
         )
@@ -158,6 +164,12 @@ def detect_stars(
         if not (edge <= px < frame.width - edge and edge <= py < frame.height - edge):
             continue
         star = measure(img, px, py, half=half, saturation=saturation)
+        if star is not None and 1.5 * star.fwhm > half:
+            # A broad (defocused, or bloated by seeing) star fills the window, so its wings
+            # count as background: measure again in a window sized to it.
+            wide = min(int(np.ceil(1.5 * star.fwhm)), 30)
+            if edge <= px - wide and px + wide < frame.width and py - wide >= 0 and py + wide < frame.height:
+                star = measure(img, px, py, half=wide, saturation=saturation) or star
         if star is None or star.fwhm < min_fwhm:
             continue
         stars.append(star.shifted(ox, oy))
@@ -172,7 +184,7 @@ def select_guide_stars(
     count: int = 3,
     *,
     min_separation: float = 20.0,
-    max_fwhm: float = 12.0,
+    max_fwhm: float = 20.0,
     min_snr: float = 10.0,
     keep: list[Star] | None = None,
     keep_radius: float = 5.0,
@@ -206,11 +218,10 @@ def select_guide_stars(
         x0, y0, x1, y1 = bounds
         return s.x - x0 < margin or x1 - s.x < margin or s.y - y0 < margin or y1 - s.y < margin
 
-    usable = [
-        s
-        for s in stars
-        if not s.saturated and s.snr >= min_snr and s.fwhm <= max_fwhm and not crowded(s)
-    ]
+    candidates = [s for s in stars if s.snr >= min_snr and s.fwhm <= max_fwhm and not crowded(s)]
+    usable = [s for s in candidates if not s.saturated]
+    if not usable:
+        usable = candidates  # better a clipped star than none (8-bit cameras clip early)
     usable.sort(key=lambda s: (not near_edge(s), min(s.snr, 100.0), s.flux), reverse=True)
     if prefer is not None:
         picked = min(stars, key=lambda s: np.hypot(s.x - prefer[0], s.y - prefer[1]), default=None)

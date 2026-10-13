@@ -119,3 +119,42 @@ def test_preview_is_refused_while_guiding(client) -> None:
     client.post("/plugins/guider/guide")
     assert client.post("/plugins/guider/preview").status_code == 409
     client.post("/plugins/guider/stop")
+
+
+def test_status_reports_what_the_page_needs(client) -> None:
+    body = client.get("/plugins/guider/status").json()
+    for key in ("active_calibration", "calibration_attempt", "dark_matches", "last_error", "mount", "preferred_star"):
+        assert key in body
+    assert body["mount"] == {"dec": None, "pier_side": None, "slewing": False} or body["mount"] is None
+
+
+def test_picking_a_star_in_the_preview(client) -> None:
+    import time
+
+    assert client.post("/plugins/guider/star", json={"x": 150, "y": 110}).status_code == 404  # nothing shown yet
+    client.post("/plugins/guider/preview")
+    try:
+        for _ in range(50):
+            if client.get("/plugins/guider/view").json()["stars"]:
+                break
+            time.sleep(0.1)
+        time.sleep(0.2)
+        x = next(s for s in client.get("/plugins/guider/view").json()["stars"] if abs(s["y"] - 110) < 3)["x"]
+        assert client.post("/plugins/guider/star", json={"x": x + 2, "y": 111}).status_code == 204
+        assert client.get("/plugins/guider/status").json()["preferred_star"] is not None
+        primary = next(s for s in client.get("/plugins/guider/view").json()["stars"] if s["kind"] == "primary")
+        assert abs(primary["y"] - 110) < 3
+        assert client.delete("/plugins/guider/star").status_code == 204
+        assert client.get("/plugins/guider/status").json()["preferred_star"] is None
+    finally:
+        client.delete("/plugins/guider/preview")
+
+
+def test_settings_carry_the_tuning(client) -> None:
+    s = client.get("/plugins/guider/settings").json()
+    assert s["dec_backlash_compensation"] is False and s["lost_timeout_s"] == 0
+    s.update(ra_aggressiveness=0.5, min_move_px=0.3, dec_mode="north", flip_dec_after_meridian_flip="yes")
+    assert client.put("/plugins/guider/settings", json=s).status_code == 200
+    g = client.app.state.builtin_guider
+    assert g.settings.ra_aggressiveness == 0.5 and g.settings.dec_mode == "north"
+    assert client.put("/plugins/guider/settings", json=s | {"ra_aggressiveness": 2}).status_code == 422

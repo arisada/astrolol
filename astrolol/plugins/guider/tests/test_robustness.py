@@ -350,3 +350,19 @@ def test_rig_flip_matrix() -> None:
     before = rig.matrix.copy()
     rig.flip()
     assert np.allclose(rig.matrix, -before) and rig.pier_side == "West"
+
+
+async def test_the_corrections_follow_the_settings() -> None:
+    rig = Rig(drift=(3.0, 0.0))
+    g = BuiltinGuider(EventBus(), GuiderSettings(
+        exposure=0.03, calibration_steps=5, ra_aggressiveness=0.4, dec_aggressiveness=0.3,
+        min_move_px=0.05, max_pulse_ms=300, min_pulse_ms=2, dec_mode="north", pixel_scale=1.0,
+    ), RigDevices(rig))
+    await g.guide(EASY_SETTLE)
+    c = g._controller
+    assert (c.ra.aggressiveness, c.dec.aggressiveness, c.dec_mode) == (0.4, 0.3, "north")
+    assert c.ra.min_move_px == 0.05 and c.ra.max_pulse_ms == 300 and c.dec.resist_switch
+    n = len(rig.pulses)
+    await asyncio.sleep(0.5)
+    assert not any(d == "S" for d, _ in rig.pulses[n:])  # North only
+    await g.stop()

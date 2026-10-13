@@ -174,6 +174,8 @@ async def test_guiding_figures_are_written_to_fits(tmp_path: Path) -> None:
     frame = rig.of("sequencer.frame_saved")[0]
     header = fits.getheader(frame.fits_path)
     assert (header["GUIDLOST"], header["GUIDLOSN"], header["GUIDRMS"]) == (4.5, 1, 0.8)
+    expected = "[arcsec]" if rig.guider.status().pixel_scale else "[guide px]"
+    assert header.comments["GUIDRMS"].startswith(expected)
 
 
 async def test_no_guider_plugin_is_not_a_stall(tmp_path: Path) -> None:

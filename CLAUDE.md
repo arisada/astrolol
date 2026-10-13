@@ -536,11 +536,15 @@ astrolol/plugins/
 ├── eqmod/              # Native (non-INDI) Sky-Watcher motor-controller driver: GoTo/sync/
 │                       # tracking/park over EQMOD cable or USB; ships an INDI mount-proxy so
 │                       # PHD2/other INDI clients can guide through it
-├── guider/             # Built-in autoguider (REST API + UI page, first version): star detection,
-│                       # dark frames, windowed tracking, calibration (pulse→pixel matrix),
-│                       # controller, BuiltinGuider implementing core.guiding.Guider.
-│                       # Frames come from IStreamingCamera, pulses go to IPulseGuider on the
-│                       # guide camera (ST4) or the mount — selectable, camera by default
+├── guider/             # Built-in autoguider (REST API + UI page): star detection, dark frames,
+│                       # windowed multi-star tracking, calibration (one least-squares fit →
+│                       # pulse→pixel matrix + quality checks, saved to disk, adjusted to the
+│                       # mount's declination and pier side), controller, BuiltinGuider
+│                       # implementing core.guiding.Guider. Frames come from IStreamingCamera,
+│                       # pulses go to IPulseGuider on the guide camera (ST4) or the mount —
+│                       # selectable, camera by default. The run survives glitches, refused
+│                       # pulses, camera stalls, clouds and wrong flip guesses; tests/rig.py
+│                       # simulates seeing, PE, backlash, flips, failures
 ├── guide_simulator/    # Simulated guider (registers against core/guiding) for testing
 │                       # without PHD2/hardware — noisy steps, settling, injectable faults
 ├── lx200/              # Virtual LX200 telescope TCP server (SkySafari, Cartes du Ciel, etc.)
