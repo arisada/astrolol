@@ -464,7 +464,7 @@ class BuiltinGuider:
             return
         camera = self._devices.camera()  # fail here, in the caller's request, if there is none
         await self.refresh_pixel_scale()
-        self._preview_picks = []
+        self._preview_picks, self._preview_found = [], []
         self._preview = asyncio.create_task(self._preview_loop(camera), name="guider_preview")
 
     async def stop_preview(self) -> None:
@@ -784,17 +784,21 @@ class BuiltinGuider:
                 continue
             outcomes = await asyncio.gather(*(pulser.pulse_guide(d, ms) for d, ms in pulses), return_exceptions=True)
             self._pulse_end = time.monotonic()
-            failed = [o for o in outcomes if isinstance(o, BaseException)]
+            failed = {d for (d, _), o in zip(pulses, outcomes) if isinstance(o, BaseException)}
+            # What went out moved the star; what was refused did not.
+            west = 0 if failed & {"W", "E"} else west
+            north = 0 if failed & {"N", "S"} else north
+            self._jump.add_pulse(cal.matrix @ np.array([west, north], dtype=float))
+            sent_axis = np.array([west * cal.ra_rate, north * cal.dec_rate])
             if failed:
-                controller.pulses_failed()
+                controller.pulses_failed(ra=bool(failed & {"W", "E"}), dec=bool(failed & {"N", "S"}))
                 pulse_failures += 1
-                logger.warning("guider.pulse_failed", error=str(failed[0]), in_a_row=pulse_failures)
+                error = next(o for o in outcomes if isinstance(o, BaseException))
+                logger.warning("guider.pulse_failed", error=str(error), in_a_row=pulse_failures)
                 if pulse_failures == PULSE_FAILURES_LOST:
                     await self._lost("pulse_failed")
                 continue
             pulse_failures = 0
-            self._jump.add_pulse(cal.matrix @ np.array([west, north], dtype=float))
-            sent_axis = np.array([west * cal.ra_rate, north * cal.dec_rate])
 
     def _reverse_axis(self, axis: int) -> None:
         """Corrections on *axis* push the star away: turn the axis round and say so."""

@@ -94,9 +94,9 @@ class GuideController:
         for p in self.predictors:
             p.reset()
 
-    def pulses_failed(self) -> None:
-        """The pulses of the last correction did not go out."""
-        self._sent = (0.0, 0.0)
+    def pulses_failed(self, *, ra: bool = True, dec: bool = True) -> None:
+        """The pulses of the last correction on these axes did not go out."""
+        self._sent = (0.0 if ra else self._sent[0], 0.0 if dec else self._sent[1])
 
     def _learn_drift(self, now: float, ra_err: float, dec_err: float) -> None:
         last, self._last = self._last, (now, ra_err, dec_err)
