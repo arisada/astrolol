@@ -220,6 +220,8 @@
       "auto": "Automatic",
       "yes": "Reversed",
       "no": "Unchanged"
-    }
+    },
+    "predictDrift": "Predict drift",
+    "predictDriftHint": "Learns how the mount drifts and corrects it ahead, so the star stays on its spot instead of trailing it."
   }
 }

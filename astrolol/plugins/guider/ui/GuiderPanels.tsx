@@ -119,7 +119,7 @@ export function SetupPanel({ settings, save, active, cameras, mounts, report, ex
 
 export function TuningPanel({ settings, save, autoMinMove }: { settings: api.GuiderSettings; save: Save; autoMinMove: number }) {
   const { t } = useTranslation('guider')
-  const toggle = (key: 'dec_backlash_compensation' | 'dec_resist_reversals', label: string, hint: string) => (
+  const toggle = (key: 'dec_backlash_compensation' | 'dec_resist_reversals' | 'predict_drift', label: string, hint: string) => (
     <Field label={label} hint={hint}>
       <ToggleSwitch label={label} checked={settings[key]} onChange={() => save({ [key]: !settings[key] })} />
     </Field>
@@ -138,6 +138,7 @@ export function TuningPanel({ settings, save, autoMinMove }: { settings: api.Gui
         <NumberStepper value={Math.round(settings.dec_aggressiveness * 100)} min={5} max={100} step={5} unit="%"
           onChange={(v) => save({ dec_aggressiveness: v / 100 }, { soon: true })} />
       </Field>
+      {toggle('predict_drift', t('tuning.predictDrift'), t('tuning.predictDriftHint'))}
       <Field label={t('tuning.minMove')} hint={t('tuning.minMoveHint')}>
         <PillGroup options={['auto', 'set'] as const} value={settings.min_move_px == null ? 'auto' : 'set'}
           formatLabel={(v) => (v === 'auto' ? t('tuning.auto', { value: autoMinMove.toFixed(2) }) : t('tuning.manual'))}

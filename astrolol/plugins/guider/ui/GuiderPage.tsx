@@ -126,7 +126,7 @@ export function GuiderPage() {
             <div className="flex items-center gap-3">
               <StatusPill variant={pillVariant} pulse={pulse}
                 status={stateKey ? t(`state.${stateKey}`, { defaultValue: st!.state }) : '…'} />
-              {h && !h.guiding && active && h.reason && (
+              {h && !h.guiding && active && h.reason && h.reason !== 'not_guiding' && (
                 <span className="text-xs text-slate-500">{t(`reason.${h.reason}`, { defaultValue: h.reason.replace(/_/g, ' ') })}</span>
               )}
             </div>

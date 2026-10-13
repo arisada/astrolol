@@ -137,3 +137,49 @@ def test_resisting_is_off_by_default() -> None:
     c = GuideController(Calibration(ra_x=0.01, ra_y=0.0, dec_x=0.0, dec_y=0.01), FINE, FINE)
     _dec(c, 0.3)
     assert _dec(c, -0.3) == "N"
+
+
+# --- drift prediction ---
+
+def _simulate(predict: bool, drift_px_s: float = 0.5, cycle: float = 4.0, frames: int = 60) -> list[float]:
+    """A star drifting steadily in RA, measured every *cycle* seconds and corrected each time."""
+    cal = Calibration(ra_x=0.01, ra_y=0.0, dec_x=0.0, dec_y=0.01)
+    c = GuideController(cal, AxisSettings(min_pulse_ms=5), AxisSettings(min_pulse_ms=5), predict_drift=predict)
+    x, errors = 0.0, []
+    for i in range(frames):
+        t = i * cycle
+        errors.append(x)
+        for d, ms in c.correct(x, 0.0, now=t):
+            x += {"W": 1, "E": -1}.get(d, 0) * ms * 0.01
+        x += drift_px_s * cycle  # the mount drifts until the next frame
+    return errors[20:]
+
+
+def test_a_steady_drift_leaves_a_lag_without_prediction() -> None:
+    lag = sum(_simulate(False)) / 40
+    assert lag > 0.8  # 2 px per cycle, 70% corrected per frame
+
+
+def test_prediction_removes_the_lag_of_a_steady_drift() -> None:
+    errors = _simulate(True)
+    assert abs(sum(errors) / len(errors)) < 0.15
+    assert max(abs(e) for e in errors) < 0.5
+
+
+def test_the_drift_learnt_survives_a_dither_but_not_a_reversed_axis() -> None:
+    cal = Calibration(ra_x=0.01, ra_y=0.0, dec_x=0.0, dec_y=0.01)
+    c = GuideController(cal, AxisSettings(min_pulse_ms=5), AxisSettings(min_pulse_ms=5))
+    for i in range(10):
+        c.correct(0.5 * i * 0 + 1.0, 0.0, now=4.0 * i)
+    learnt = list(c.drift)
+    c.reset()
+    assert c.drift == learnt
+    c.forget_drift()
+    assert c.drift == [0.0, 0.0]
+
+
+def test_no_time_no_prediction() -> None:
+    cal = Calibration(ra_x=0.01, ra_y=0.0, dec_x=0.0, dec_y=0.01)
+    c = GuideController(cal, AxisSettings(min_pulse_ms=5, aggressiveness=1.0, hysteresis=0.0), AxisSettings(min_pulse_ms=5))
+    for _ in range(10):
+        assert c.correct(1.0, 0.0) == [("E", 100)]

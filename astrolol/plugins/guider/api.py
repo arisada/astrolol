@@ -59,6 +59,7 @@ class GuiderReport(BaseModel):
 async def get_status(request: Request) -> GuiderReport:
     g = _guider(request)
     await g.refresh_pixel_scale(max_age=10.0)
+    await g.refresh_mount()
     now = g.mark()
     m = g.mount
     return GuiderReport(

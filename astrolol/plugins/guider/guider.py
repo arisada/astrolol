@@ -210,6 +210,7 @@ class BuiltinGuider:
         self.active_calibration: Calibration | None = None  # as adjusted to the current pointing
         self.last_error: str | None = None
         self.mount: MountState | None = None  # as last read
+        self._mount_checked = 0.0
         self._health = GuidingHealthTracker()
         self._task: asyncio.Task[None] | None = None
         self._start_lock = asyncio.Lock()
@@ -523,6 +524,14 @@ class BuiltinGuider:
         logger.info("guider.dark_captured", frames=count, hot_pixels=int(dark.hot.sum()))
         return dark
 
+    async def refresh_mount(self, *, max_age: float = 5.0) -> MountState | None:
+        """Read the mount when not guiding (a run keeps it up to date itself), for the page."""
+        now = time.monotonic()
+        if not self._running and now - self._mount_checked >= max_age:
+            self._mount_checked = now
+            self.mount = await self._read_mount()
+        return self.mount
+
     def dark_matches(self) -> bool:
         """Is there a dark for the current exposure and gain?"""
         cfg = self.settings
@@ -607,6 +616,7 @@ class BuiltinGuider:
                 active, *self._axis_settings(),
                 compensate_backlash=cfg.dec_backlash_compensation,
                 last_dec_dir=-1 if fresh_calibration else 0,  # calibration ends with South pulses
+                predict_drift=cfg.predict_drift,
             )
 
             self._state = "Guiding"
@@ -706,6 +716,7 @@ class BuiltinGuider:
                 lost_since = None
                 self._jump.reset()  # where it was before the loss says nothing now
                 last_axis = None
+                self._controller.reset()
             await self._fit_roi(tracker)  # a dither or a star found elsewhere may need the window moved
             blurred_frames = 0
             pos = np.array([result.dx, result.dy]) + self._lock_shift
@@ -732,7 +743,7 @@ class BuiltinGuider:
             if pulse_failures < PULSE_FAILURES_LOST and self._health.on_step(ra_px * scale, dec_px * scale):
                 await self._bus.publish(GuidingStateChanged(guider=self.name, guiding=True))
             await self._update_settle(now, math.hypot(result.dx, result.dy))
-            pulses = controller.correct(result.dx, result.dy)
+            pulses = controller.correct(result.dx, result.dy, frame.timestamp)
             west = sum(ms if d == "W" else -ms for d, ms in pulses if d in "WE")
             north = sum(ms if d == "N" else -ms for d, ms in pulses if d in "NS")
             await self._bus.publish(
@@ -752,6 +763,7 @@ class BuiltinGuider:
             self._pulse_end = time.monotonic()
             failed = [o for o in outcomes if isinstance(o, BaseException)]
             if failed:
+                controller.pulses_failed()
                 pulse_failures += 1
                 logger.warning("guider.pulse_failed", error=str(failed[0]), in_a_row=pulse_failures)
                 if pulse_failures == PULSE_FAILURES_LOST:
@@ -768,7 +780,7 @@ class BuiltinGuider:
         flipped = cal.with_ra_reversed() if axis == 0 else cal.with_dec_reversed()
         self.active_calibration = flipped
         self._controller.calibration = flipped
-        self._controller.reset()
+        self._controller.forget_drift()
         self._jump.reset()
         name = "RA" if axis == 0 else "Dec"
         logger.warning("guider.axis_reversed", axis=name)
@@ -836,7 +848,7 @@ class BuiltinGuider:
             logger.warning("guider.pier_side_changed", pier_side=state.pier_side)
             self.active_calibration = adjusted
             self._controller.calibration = adjusted
-            self._controller.reset()
+            self._controller.forget_drift()
 
     # ── Frames and the stream ────────────────────────────────────────────
 

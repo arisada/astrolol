@@ -42,6 +42,7 @@ export interface GuiderSettings {
   max_pulse_ms: number
   min_pulse_ms: number
   dec_mode: DecMode
+  predict_drift: boolean
 }
 
 export type CalibrationPhase = 'drift' | 'probe' | 'west' | 'east' | 'north' | 'south'

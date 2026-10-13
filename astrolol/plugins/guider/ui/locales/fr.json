@@ -220,6 +220,8 @@
       "auto": "Automatique",
       "yes": "Inversée",
       "no": "Inchangée"
-    }
+    },
+    "predictDrift": "Anticiper la dérive",
+    "predictDriftHint": "Apprend comment la monture dérive et la corrige à l'avance : l'étoile reste à sa place au lieu de la suivre avec retard."
   }
 }

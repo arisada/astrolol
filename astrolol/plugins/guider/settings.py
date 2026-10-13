@@ -49,6 +49,7 @@ class GuiderSettings(BaseModel):
     max_pulse_ms: int = Field(default=2000, ge=50, le=10_000)
     min_pulse_ms: int = Field(default=20, ge=1, le=500)
     dec_mode: Literal["auto", "north", "south", "off"] = "auto"
+    predict_drift: bool = Field(default=True, description="Learn the steady drift and correct it ahead")
 
 
 def auto_min_move_px(pixel_scale: float | None) -> float:

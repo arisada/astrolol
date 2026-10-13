@@ -61,7 +61,9 @@ export function GuiderView({ poll, onPick }: { poll: boolean; onPick?: (x: numbe
   let chosen = 0
   return (
     <div className="flex flex-col gap-2">
-      <div className="relative w-full rounded border border-surface-border bg-black overflow-hidden" style={{ aspectRatio: `${view.width} / ${view.height}` }}>
+      {/* Never taller than most of the screen: a window around the stars can be tall and narrow. */}
+      <div className="relative w-full mx-auto rounded border border-surface-border bg-black overflow-hidden"
+        style={{ aspectRatio: `${view.width} / ${view.height}`, maxHeight: '60vh', maxWidth: `calc(60vh * ${view.width / view.height})` }}>
         <img src={src} alt={t('view.alt')} className="absolute inset-0 w-full h-full" />
         <svg
           viewBox={`0 0 ${view.width} ${view.height}`}

@@ -366,3 +366,25 @@ async def test_the_corrections_follow_the_settings() -> None:
     await asyncio.sleep(0.5)
     assert not any(d == "S" for d, _ in rig.pulses[n:])  # North only
     await g.stop()
+
+
+@pytest.mark.parametrize("predict", [False, True])
+async def test_a_steady_drift_is_held_on_the_lock(predict) -> None:
+    # Slow frames and a steady drift: proportional corrections alone trail it.
+    rig = Rig(drift=(3.0, 0.0))
+    g = make_guider(rig, exposure=0.15, predict_drift=predict)
+    queue = g._bus.subscribe()
+    await g.guide(EASY_SETTLE)
+    await asyncio.sleep(4.0)
+    ras = []
+    while not queue.empty():
+        e = queue.get_nowait()
+        if getattr(e, "type", "") == "guider.step":
+            ras.append(e.ra_dist)
+    await g.stop()
+    late = ras[len(ras) // 2:]
+    mean = abs(sum(late) / len(late))
+    if predict:
+        assert mean < 0.2, mean
+    else:
+        assert mean > 0.3, mean  # the lag prediction removes

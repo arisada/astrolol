@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 from astrolol.devices.base.pulse import PulseDirection
 from astrolol.plugins.guider.calibration import Calibration
 
+DRIFT_ALPHA = 0.12  # weight of each frame in the drift estimate: slow enough to average seeing out
 SWITCH_FRAMES = 3  # consecutive frames asking to reverse before a resisting axis gives in
 FAST_SWITCH_FACTOR = 3.0  # an error this many times the minimum move reverses at once
 OVERSHOOT_SHRINK = 0.6  # backlash share kept after a compensated pulse overshoots
@@ -27,7 +28,16 @@ class AxisSettings(BaseModel):
 
 
 class GuideController:
-    """Per-axis proportional control with hysteresis (a share of the last correction is kept)."""
+    """Per-axis proportional control with hysteresis (a share of the last correction is kept),
+    plus drift prediction.
+
+    A proportional correction alone always trails a steady drift (polar misalignment, a
+    tracking rate slightly off): the star settles at the distance where the share corrected
+    per frame equals the drift per frame, a pixel or more with long cycles. The controller
+    therefore estimates, slowly, how fast the star moves on its own (the change of the error
+    that the pulses sent do not explain) and adds the pulse that cancels that motion until
+    the next frame.
+    """
 
     def __init__(
         self,
@@ -38,6 +48,7 @@ class GuideController:
         *,
         compensate_backlash: bool = False,
         last_dec_dir: int = 0,
+        predict_drift: bool = True,
     ) -> None:
         self.calibration = calibration
         self.ra = ra or AxisSettings()
@@ -55,31 +66,89 @@ class GuideController:
         self._compensated = 0  # direction of the last Dec pulse if it carried compensation
         self._resist_dir = 0  # direction Dec was last allowed to correct in
         self._resist_votes = 0  # consecutive frames asking for the other direction
+        self.predict_drift = predict_drift
+        self.drift = [0.0, 0.0]  # the star's own motion along RA and Dec, axis pixels per second
+        self._drift_samples = 0
+        self._cycle = 0.0  # seconds between corrections
+        self._last: tuple[float, float, float] | None = None  # (time, RA error, Dec error)
+        self._sent = (0.0, 0.0)  # West ms, North ms actually sent after the last measurement
 
     def reset(self) -> None:
+        """Start afresh after a jump of the lock (a dither) or a gap: the drift learnt stays."""
         self._prev = (0.0, 0.0)
         self._compensated = 0
         self._resist_dir = self._resist_votes = 0
+        self._last = None
+        self._sent = (0.0, 0.0)
 
-    def correct(self, dx: float, dy: float) -> list[tuple[PulseDirection, int]]:
-        """Pulses for an error of (dx, dy) pixels. Empty when the error is within tolerance."""
+    def forget_drift(self) -> None:
+        """The axes changed meaning (one was reversed): the drift learnt no longer applies."""
+        self.reset()
+        self.drift = [0.0, 0.0]
+        self._drift_samples = 0
+
+    def pulses_failed(self) -> None:
+        """The pulses of the last correction did not go out."""
+        self._sent = (0.0, 0.0)
+
+    def _learn_drift(self, now: float, ra_err: float, dec_err: float) -> None:
+        last, self._last = self._last, (now, ra_err, dec_err)
+        if last is None:
+            return
+        dt = now - last[0]
+        if not 0 < dt < 60:
+            return
+        self._cycle = dt if self._cycle == 0 else self._cycle + 0.2 * (dt - self._cycle)
+        c = self.calibration
+        # Sending w ms West moves the RA error by w * rate (and North likewise for Dec).
+        own = (
+            (ra_err - last[1] - self._sent[0] * c.ra_rate) / dt,
+            (dec_err - last[2] - self._sent[1] * c.dec_rate) / dt,
+        )
+        self._drift_samples += 1
+        alpha = max(DRIFT_ALPHA, 1.0 / self._drift_samples)  # faster at first, then steady
+        self.drift = [d + alpha * (o - d) for d, o in zip(self.drift, own)]
+
+    def _feed_forward(self) -> tuple[float, float]:
+        """(West ms, North ms) cancelling the drift until the next measurement."""
+        if not self.predict_drift or self._drift_samples < 3 or self._cycle == 0:
+            return 0.0, 0.0
+        c = self.calibration
+        return -self.drift[0] * self._cycle / c.ra_rate, -self.drift[1] * self._cycle / c.dec_rate
+
+    def correct(self, dx: float, dy: float, now: float | None = None) -> list[tuple[PulseDirection, int]]:
+        """Pulses for an error of (dx, dy) pixels measured at *now* (monotonic seconds; without
+        it there is no drift prediction). Empty when there is nothing worth correcting."""
         ra_err, dec_err = self.calibration.axis_error(dx, dy)
+        if now is not None:
+            self._learn_drift(now, ra_err, dec_err)
         west, north = self.calibration.pulses_for(dx, dy)
         self._learn_overshoot(north, abs(dec_err))
         west = self._axis(west, abs(ra_err), self._prev[0], self.ra)
         north = self._axis(north, abs(dec_err), self._prev[1], self.dec)
+        ff_west, ff_north = self._feed_forward()
+        prev = (west, north)
+        west = max(-self.ra.max_pulse_ms, min(self.ra.max_pulse_ms, west + ff_west))
+        north = max(-self.dec.max_pulse_ms, min(self.dec.max_pulse_ms, north + ff_north))
         north = self._resist(north, abs(dec_err))
         if self.dec_mode == "off" or (self.dec_mode == "north" and north < 0) or (
             self.dec_mode == "south" and north > 0
         ):
             north = 0.0
-        self._prev = (west, north)
+        self._prev = (prev[0], prev[1] if north else 0.0)  # hysteresis keeps the proportional part
         north = self._compensate(north)
         pulses: list[tuple[PulseDirection, int]] = []
+        sent_w = sent_n = 0.0
         if abs(west) >= self.ra.min_pulse_ms:
             pulses.append(("W" if west > 0 else "E", int(round(abs(west)))))
+            sent_w = float(round(west))
         if abs(north) >= self.dec.min_pulse_ms:
             pulses.append(("N" if north > 0 else "S", int(round(abs(north)))))
+            sent_n = float(round(north))
+        # Slack taken up by a reversal moves nothing: count only what should move the star.
+        if self._compensated and sent_n:
+            sent_n -= self._compensated * min(self.backlash_share * self.calibration.dec_backlash_ms, abs(sent_n))
+        self._sent = (sent_w, sent_n)
         return pulses
 
     def _resist(self, north: float, err_px: float) -> float:
