@@ -1,5 +1,8 @@
 # Equipment
 
+> **Setting up astrolol for the first time?** Start with [Getting started](getting-started.md):
+> it takes you from connecting your first device to a profile you can connect in one click.
+
 The Equipment page has two tabs:
 
 - **connections**: the devices connected right now, and the wizard to connect new ones.

@@ -1,5 +1,9 @@
 # Guider
 
+> **Experimental.** The built-in guider has mostly been tested with simulators and still needs
+> testing on real equipment. Keep an eye on it during your first nights, and keep
+> [PHD2](../../phd2/docs/en.md) at hand as a fallback. Problems you report help make it reliable.
+
 *Plugin: Built-in Guider.* Keeps a star on the same spot of a guide camera while you image,
 by sending small corrections to the mount. It needs no other program. Do not enable it
 together with [PHD2 Guiding](../../phd2/docs/en.md) or the [Guide Simulator](../../guide_simulator/docs/en.md).
