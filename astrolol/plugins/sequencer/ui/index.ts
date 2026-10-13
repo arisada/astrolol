@@ -1,6 +1,7 @@
 import { ListVideo } from 'lucide-react'
 import { registerPluginEventHandlers, registerSilentEventTypes } from '@/store'
 import type { AstrolollEvent } from '@/api/types'
+import type { NavActivity } from '@/utils/nav-activity'
 import { SequencerPage } from './SequencerPage'
 import { SequencerChip } from './SequencerChip'
 import type { SequencerUiState } from './state'
@@ -36,4 +37,11 @@ export default {
   label: 'Sequencer',
   Component: SequencerPage,
   StatusChip: SequencerChip,
+  // A pause the user did not ask for, or a stalled task, needs attention.
+  navActivity: (cur: unknown): NavActivity => {
+    const status = (cur as SequencerUiState | null | undefined)?.status
+    if (!status || status.run_state === 'idle') return null
+    if (status.stall || (status.run_state === 'paused' && status.pause_reason && status.pause_reason !== 'user')) return 'alert'
+    return status.run_state === 'paused' ? null : 'busy'
+  },
 }

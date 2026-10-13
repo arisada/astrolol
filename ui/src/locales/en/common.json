@@ -10,7 +10,11 @@
       "astronomy": "Astronomy",
       "settings": "Settings"
     },
-    "options": "Options"
+    "options": "Options",
+    "activity": {
+      "busy": "active",
+      "alert": "needs attention"
+    }
   },
   "ws": {
     "live": "live",

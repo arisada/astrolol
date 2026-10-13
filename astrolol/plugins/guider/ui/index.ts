@@ -1,6 +1,7 @@
 import { Crosshair } from 'lucide-react'
 import { registerPluginEventHandlers, registerSilentEventTypes } from '@/store'
 import type { AstrolollEvent } from '@/api/types'
+import type { NavActivity } from '@/utils/nav-activity'
 import { GuiderPage } from './GuiderPage'
 import { GuiderChip } from './GuiderChip'
 import { DEFAULT_GUIDER_STATE, MAX_STEPS, type GuiderPluginState } from './api'
@@ -29,4 +30,11 @@ export default {
   label: 'Guider',
   Component: GuiderPage,
   StatusChip: GuiderChip,
+  // Guiding is busy; having lost the star (anything but a deliberate stop) needs attention.
+  navActivity: (cur: unknown): NavActivity => {
+    const s = cur as GuiderPluginState | null | undefined
+    if (!s || s.guiding === null) return null
+    if (s.guiding) return 'busy'
+    return s.reason === 'stopped' || s.reason === 'disconnected' ? null : 'alert'
+  },
 }

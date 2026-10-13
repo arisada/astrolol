@@ -3,6 +3,7 @@ import { AutofocusPage } from './AutofocusPage'
 import { AutofocusChip } from './AutofocusChip'
 import { registerPluginEventHandlers } from '@/store'
 import type { AstrolollEvent } from '@/api/types'
+import type { NavActivity } from '@/utils/nav-activity'
 
 interface AutofocusRunningState {
   runId: string
@@ -35,4 +36,6 @@ export default {
   label: 'Autofocus',
   Component: AutofocusPage,
   StatusChip: AutofocusChip,
+  // The slice exists only while a run is going.
+  navActivity: (cur: unknown): NavActivity => (cur ? 'busy' : null),
 }

@@ -3,6 +3,7 @@ import { FlatWizardPage } from './FlatWizardPage'
 import { FlatWizardChip } from './FlatWizardChip'
 import { registerPluginEventHandlers } from '@/store'
 import type { AstrolollEvent } from '@/api/types'
+import type { NavActivity } from '@/utils/nav-activity'
 import type { FlatWizardLiveState } from './state'
 
 registerPluginEventHandlers('flat_wizard', {
@@ -48,4 +49,6 @@ export default {
   label: 'Flat Wizard',
   Component: FlatWizardPage,
   StatusChip: FlatWizardChip,
+  // The slice exists only while a run is going.
+  navActivity: (cur: unknown): NavActivity => (cur ? 'busy' : null),
 }

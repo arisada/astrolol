@@ -260,6 +260,17 @@ it as a hairline-separated telemetry readout (`LABEL value`):
 The status text always states the state in words; the colour is only a second cue. Add `pulse`
 for states that are actively progressing.
 
+### Menu activity mark
+
+The plugin's menu entry can carry a mark too: export `navActivity` from `index.ts`, a pure function of
+the plugin's `pluginStates` slice returning `'busy'` (a faint pulsing ring: a run, guiding),
+`'alert'` (a red dot: star lost, a run stalled) or `null`. It must reflect the current state, not
+remember past failures. Folded menu groups show their most serious mark (`ui/src/utils/nav-activity.ts`).
+
+```ts
+navActivity: (cur: unknown): NavActivity => (cur ? 'busy' : null),
+```
+
 ### User-facing copy
 
 Plugin manifest `description`, page headers/body text, button labels, and tooltips are

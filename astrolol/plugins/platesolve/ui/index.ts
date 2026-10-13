@@ -4,6 +4,7 @@ import { PlatesolveChip } from './PlatesolveChip'
 import { registerPluginEventHandlers } from '@/store'
 import { DEFAULT_PLATESOLVE_STATE } from './api'
 import type { AstrolollEvent } from '@/api/types'
+import type { NavActivity } from '@/utils/nav-activity'
 import type { PlateSolvePluginState, SolveResult } from './api'
 
 registerPluginEventHandlers('platesolve', {
@@ -58,4 +59,8 @@ export default {
   label: 'Plate Solving',
   Component: PlatesolvePage,
   StatusChip: PlatesolveChip,
+  navActivity: (cur: unknown): NavActivity =>
+    Object.values((cur as PlateSolvePluginState | null)?.jobs ?? {}).some(
+      (j) => j.status === 'pending' || j.status === 'exposing' || j.status === 'solving',
+    ) ? 'busy' : null,
 }

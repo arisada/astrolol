@@ -4,6 +4,7 @@ import { Phd2Chip } from './Phd2Chip'
 import { registerPluginEventHandlers, registerSilentEventTypes } from '@/store'
 import { DEFAULT_PHD2_STATE, MAX_GUIDE_STEPS } from './api'
 import type { AstrolollEvent } from '@/api/types'
+import type { NavActivity } from '@/utils/nav-activity'
 import type { Phd2PluginState, GuidePoint } from './api'
 
 registerPluginEventHandlers('phd2', {
@@ -48,4 +49,11 @@ export default {
   label: 'PHD2 Guiding',
   Component: Phd2Page,
   StatusChip: Phd2Chip,
+  navActivity: (cur: unknown): NavActivity => {
+    const status = (cur as Phd2PluginState | null | undefined)?.status
+    if (!status?.connected) return null
+    if (status.state === 'Star loss' || status.state === 'LostLock') return 'alert'
+    if (status.state === 'Guiding' || status.state === 'Calibrating' || status.is_dithering) return 'busy'
+    return null
+  },
 }

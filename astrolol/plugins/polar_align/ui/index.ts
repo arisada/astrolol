@@ -3,6 +3,7 @@ import { PolarAlignPage } from './PolarAlignPage'
 import { PolarAlignChip } from './PolarAlignChip'
 import { registerPluginEventHandlers } from '@/store'
 import type { AstrolollEvent } from '@/api/types'
+import type { NavActivity } from '@/utils/nav-activity'
 
 interface PolarAlignRunningState {
   status: 'running' | 'converging'
@@ -45,4 +46,6 @@ export default {
   label: 'Polar Align',
   Component: PolarAlignPage,
   StatusChip: PolarAlignChip,
+  // The slice exists only while a run is going.
+  navActivity: (cur: unknown): NavActivity => (cur ? 'busy' : null),
 }

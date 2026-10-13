@@ -10,7 +10,11 @@
       "astronomy": "Astronomie",
       "settings": "Réglages"
     },
-    "options": "Options"
+    "options": "Options",
+    "activity": {
+      "busy": "en cours",
+      "alert": "à vérifier"
+    }
   },
   "ws": {
     "live": "en direct",
