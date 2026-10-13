@@ -101,12 +101,14 @@ function ItemPicker({
   usedItemIds,
   onPick,
   onClose,
+  noneKey = 'picker.none',
 }: {
   inventory: EquipmentItem[]
   allowedTypes: Set<string>
   usedItemIds: Set<string>
   onPick: (item: EquipmentItem) => void
   onClose: () => void
+  noneKey?: string
 }) {
   const { t } = useTranslation('profiles')
   const ref = useRef<HTMLDivElement>(null)
@@ -124,7 +126,7 @@ function ItemPicker({
   if (candidates.length === 0) {
     return (
       <div ref={ref} className="absolute z-20 mt-1 bg-surface border border-surface-border rounded shadow-lg p-3 text-xs text-slate-500 min-w-48">
-        <Trans t={t} i18nKey="picker.none" components={{ br: <br /> }} />
+        <Trans t={t} i18nKey={noneKey} components={{ br: <br /> }} />
       </div>
     )
   }
@@ -338,7 +340,8 @@ function ProfileTreeEditor({
   }
 
   const used = usedIds(roots)
-  const allTypes = new Set(['site', 'mount', 'ota', 'camera', 'filter_wheel', 'focuser', 'rotator', 'gps'])
+  // A tree starts at its observing site, and has only one.
+  const rootTypes = new Set(['site'])
 
   return (
     <div>
@@ -367,23 +370,26 @@ function ProfileTreeEditor({
         ))}
       </div>
 
-      <div className="relative mt-1">
-        <button
-          className="flex items-center gap-1 text-[11px] text-slate-600 hover:text-slate-400 transition-colors"
-          onClick={() => setShowRootPicker((v) => !v)}
-        >
-          <Plus size={11} /> {t('tree.add')}
-        </button>
-        {showRootPicker && (
-          <ItemPicker
-            inventory={inventory}
-            allowedTypes={allTypes}
-            usedItemIds={used}
-            onPick={(item) => { handleAddRoot(item); setShowRootPicker(false) }}
-            onClose={() => setShowRootPicker(false)}
-          />
-        )}
-      </div>
+      {roots.length === 0 && (
+        <div className="relative mt-1">
+          <button
+            className="flex items-center gap-1 text-[11px] text-slate-600 hover:text-slate-400 transition-colors"
+            onClick={() => setShowRootPicker((v) => !v)}
+          >
+            <Plus size={11} /> {t('tree.add')}
+          </button>
+          {showRootPicker && (
+            <ItemPicker
+              inventory={inventory}
+              allowedTypes={rootTypes}
+              usedItemIds={used}
+              noneKey="picker.noSite"
+              onPick={(item) => { handleAddRoot(item); setShowRootPicker(false) }}
+              onClose={() => setShowRootPicker(false)}
+            />
+          )}
+        </div>
+      )}
     </div>
   )
 }

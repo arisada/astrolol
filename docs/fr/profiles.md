@@ -18,8 +18,10 @@ matériel.
 
 ## Arborescence du matériel
 
-L'arborescence reproduit la façon dont votre matériel est physiquement assemblé. **Ajouter à
-l'arborescence** ajoute un élément de premier niveau (normalement le site). Le **+** à côté d'un
+L'arborescence reproduit la façon dont votre matériel est physiquement assemblé. Une arborescence
+commence par son site d'observation : sur une arborescence vide, **Ajouter à l'arborescence**
+propose les sites de votre [inventaire](equipment.md#inventaire) (créez-en d'abord un si vous
+n'en avez pas), et il n'y en a qu'un. Le **+** à côté d'un
 élément (*Rattacher un élément enfant*) ajoute quelque chose dessous ; *Retirer de
 l'arborescence* l'enlève de l'arborescence (il reste dans l'inventaire). Chaque élément de
 l'inventaire ne peut figurer qu'une fois dans une arborescence.

@@ -12,7 +12,8 @@
   },
   "picker": {
     "none": "No matching items in inventory.<br/>Add them in Equipment → Inventory first.",
-    "used": "already in tree"
+    "used": "already in tree",
+    "noSite": "No observation site in the inventory yet.<br/>Create one in Equipment → Inventory first."
   },
   "tree": {
     "unknown": "Unknown ({{id}})",

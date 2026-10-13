@@ -12,7 +12,8 @@
   },
   "picker": {
     "none": "Aucun élément correspondant dans l'inventaire.<br/>Ajoutez-les d'abord dans Matériel → Inventaire.",
-    "used": "déjà dans l'arborescence"
+    "used": "déjà dans l'arborescence",
+    "noSite": "Aucun site d'observation dans l'inventaire pour l'instant.<br/>Créez-en un d'abord dans Matériel → Inventaire."
   },
   "tree": {
     "unknown": "Inconnu ({{id}})",

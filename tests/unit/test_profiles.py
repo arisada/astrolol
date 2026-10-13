@@ -847,3 +847,52 @@ async def test_cleared_mount_target_stays_cleared_after_restart(tmp_path):
 
     restarted = MountManager(device_manager=None, event_bus=EventBus(), profile_store=ProfileStore(path))
     assert restarted.get_target("m1") is None
+
+
+# ===========================================================================
+# A tree has a single root: its site
+# ===========================================================================
+
+
+@pytest.fixture
+async def api_with_inventory(tmp_path):
+    app = create_app()
+    app.state.profile_store = ProfileStore(tmp_path / "profiles.json")
+    inventory = EquipmentStore(tmp_path / "inventory.json")
+    app.state.equipment_store = inventory
+    site = inventory.create(SiteItem(name="Home", latitude=48.0, longitude=2.0))
+    mount = inventory.create(MountItem(name="EQ6"))
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        yield client, site, mount
+
+
+def _body(name, *item_ids):
+    return {"name": name, "roots": [{"item_id": i, "role": None, "children": []} for i in item_ids]}
+
+
+@pytest.mark.asyncio
+async def test_tree_may_be_empty_or_start_at_a_site(api_with_inventory):
+    client, site, _ = api_with_inventory
+    assert (await client.post("/profiles", json=_body("empty"))).status_code == 201
+    assert (await client.post("/profiles", json=_body("rig", site.id))).status_code == 201
+
+
+@pytest.mark.asyncio
+async def test_tree_cannot_have_a_site_and_a_mount_as_roots(api_with_inventory):
+    client, site, mount = api_with_inventory
+    resp = await client.post("/profiles", json=_body("rig", site.id, mount.id))
+    assert resp.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_tree_root_must_be_a_site(api_with_inventory):
+    client, _, mount = api_with_inventory
+    assert (await client.post("/profiles", json=_body("rig", mount.id))).status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_update_refuses_a_second_root(api_with_inventory):
+    client, site, mount = api_with_inventory
+    created = (await client.post("/profiles", json=_body("rig", site.id))).json()
+    created["roots"].append({"item_id": mount.id, "role": None, "children": []})
+    assert (await client.put(f"/profiles/{created['id']}", json=created)).status_code == 422

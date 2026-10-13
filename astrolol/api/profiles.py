@@ -35,6 +35,21 @@ def _store(request: Request) -> ProfileStore:
 # CRUD
 # ---------------------------------------------------------------------------
 
+def _check_roots(profile: Profile, request: Request) -> None:
+    """A tree starts at its observing site: one root, and that root is a site."""
+    if len(profile.roots) > 1:
+        raise HTTPException(status_code=422, detail="An equipment tree has a single root: its observing site.")
+    equipment_store = getattr(request.app.state, "equipment_store", None)
+    if not profile.roots or equipment_store is None:
+        return
+    try:
+        item = equipment_store.get(profile.roots[0].item_id)
+    except KeyError:
+        return  # a dangling reference is shown as "unknown" in the UI, not refused here
+    if item.type != "site":
+        raise HTTPException(status_code=422, detail="The root of an equipment tree must be an observing site.")
+
+
 @router.get("", response_model=list[Profile])
 async def list_profiles(request: Request) -> list[Profile]:
     return _store(request).list()
@@ -42,6 +57,7 @@ async def list_profiles(request: Request) -> list[Profile]:
 
 @router.post("", response_model=Profile, status_code=201)
 async def create_profile(profile: Profile, request: Request) -> Profile:
+    _check_roots(profile, request)
     return _store(request).create(profile)
 
 
@@ -74,6 +90,7 @@ async def get_profile(profile_id: str, request: Request) -> Profile:
 async def update_profile(profile_id: str, profile: Profile, request: Request) -> Profile:
     if profile.id != profile_id:
         raise HTTPException(status_code=400, detail="Profile id in URL and body must match.")
+    _check_roots(profile, request)
     try:
         return _store(request).update(profile)
     except KeyError:

@@ -17,8 +17,10 @@ Items come from the [inventory](equipment.md#inventory): add equipment there fir
 
 ## The equipment tree
 
-The tree mirrors how your equipment is physically attached. **Add to tree** adds a top-level
-item (normally the site). The **+** next to an item (*Attach child item*) adds something under
+The tree mirrors how your equipment is physically attached. A tree starts at its
+observation site: on an empty tree, **Add to tree** offers the sites of your
+[inventory](equipment.md#inventory) (create one there first if you have none), and a tree has only
+one. The **+** next to an item (*Attach child item*) adds something under
 it; *Remove from tree* takes it out of the tree (it stays in the inventory). Each inventory item can
 appear only once in a tree.
 
