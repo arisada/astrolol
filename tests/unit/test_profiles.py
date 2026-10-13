@@ -812,3 +812,38 @@ async def test_restore_last_profile_without_last_profile_is_a_noop(tmp_path):
     state = SimpleNamespace(profile_store=ProfileStore(tmp_path / "profiles.json"), active_profile=None)
     await restore_last_profile(state)
     assert state.active_profile is None
+
+
+# ===========================================================================
+# Mount target persistence
+# ===========================================================================
+
+
+@pytest.mark.asyncio
+async def test_mount_target_survives_restart(tmp_path):
+    from astropy.coordinates import SkyCoord
+    import astropy.units as u
+
+    path = tmp_path / "profiles.json"
+    mm = MountManager(device_manager=None, event_bus=EventBus(), profile_store=ProfileStore(path))
+    await mm.set_target("m1", SkyCoord(ra=10 * u.deg, dec=20 * u.deg, frame="icrs"), name="M42", source="user")
+
+    restarted = MountManager(device_manager=None, event_bus=EventBus(), profile_store=ProfileStore(path))
+    target = restarted.get_target("m1")
+    assert target is not None
+    assert (target.ra, target.dec, target.name, target.source) == (10.0, 20.0, "M42", "user")
+    assert restarted.get_target("other") is None
+
+
+@pytest.mark.asyncio
+async def test_cleared_mount_target_stays_cleared_after_restart(tmp_path):
+    from astropy.coordinates import SkyCoord
+    import astropy.units as u
+
+    path = tmp_path / "profiles.json"
+    mm = MountManager(device_manager=None, event_bus=EventBus(), profile_store=ProfileStore(path))
+    await mm.set_target("m1", SkyCoord(ra=10 * u.deg, dec=20 * u.deg, frame="icrs"))
+    await mm.clear_target("m1")
+
+    restarted = MountManager(device_manager=None, event_bus=EventBus(), profile_store=ProfileStore(path))
+    assert restarted.get_target("m1") is None

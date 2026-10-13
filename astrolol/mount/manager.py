@@ -114,6 +114,10 @@ class MountManager:
         ctrl._target_name = name
         ctrl._target_source = source
         ctrl._target_set_at = now
+        if self._profile_store is not None:
+            self._profile_store.set_mount_target(
+                device_id, Target(ra=coord.icrs.ra.deg, dec=coord.icrs.dec.deg, name=name, source=source, set_at=now)
+            )
 
         icrs = coord.icrs
         await self._event_bus.publish(
@@ -130,8 +134,8 @@ class MountManager:
 
     def get_target(self, device_id: str) -> Target | None:
         """Return the current target, or None if not set."""
-        ctrl = self._controllers.get(device_id)
-        if ctrl is None or ctrl._target is None:
+        ctrl = self._get_or_create(device_id)
+        if ctrl._target is None:
             return None
         return Target(
             ra=ctrl._target.ra.deg,
@@ -148,6 +152,8 @@ class MountManager:
         ctrl._target_name = None
         ctrl._target_source = None
         ctrl._target_set_at = None
+        if self._profile_store is not None:
+            self._profile_store.set_mount_target(device_id, None)
         logger.info("mount.target_cleared", device_id=device_id)
 
     async def slew(self, device_id: str) -> None:
@@ -514,7 +520,14 @@ class MountManager:
 
     def _get_or_create(self, device_id: str) -> MountController:
         if device_id not in self._controllers:
-            self._controllers[device_id] = MountController(device_id=device_id)
+            ctrl = MountController(device_id=device_id)
+            saved = self._profile_store.get_mount_target(device_id) if self._profile_store else None
+            if saved is not None:  # the target set before the last restart
+                ctrl._target = saved.skycoord
+                ctrl._target_name = saved.name
+                ctrl._target_source = saved.source
+                ctrl._target_set_at = saved.set_at
+            self._controllers[device_id] = ctrl
         return self._controllers[device_id]
 
     def _require_idle(self, ctrl: MountController) -> None:

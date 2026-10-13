@@ -661,6 +661,12 @@ class _SettingsStore:
     def get_user_settings(self) -> UserSettings:
         return self.settings
 
+    def get_mount_target(self, device_id: str):
+        return None
+
+    def set_mount_target(self, device_id: str, target) -> None:
+        pass
+
 
 class _AltitudeMount(FakeMount):
     """Reports a settable altitude and records the meridian limit it was given."""

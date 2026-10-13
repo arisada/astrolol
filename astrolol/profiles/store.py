@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 
 from astrolol.config.user_settings import UserSettings
+from astrolol.devices.base.models import Target
 from astrolol.profiles.models import Profile
 
 _DEFAULT_SETTINGS = UserSettings()
@@ -15,6 +16,7 @@ class ProfileStore:
         self._path = path
         self._profiles: dict[str, Profile] = {}
         self._last_active_id: str | None = None
+        self._mount_targets: dict[str, Target] = {}
         self._user_settings: UserSettings = _DEFAULT_SETTINGS
         self._load()
 
@@ -30,6 +32,10 @@ class ProfileStore:
                 for p in data.get("profiles", [])
             }
             self._last_active_id = data.get("last_active_profile_id")
+            self._mount_targets = {
+                device_id: Target.model_validate(t)
+                for device_id, t in data.get("mount_targets", {}).items()
+            }
             # Pick up any UserSettings fields present in the JSON; unknown keys are
             # ignored and missing keys fall back to model defaults automatically.
             settings_data = {
@@ -44,6 +50,7 @@ class ProfileStore:
         payload = {
             "profiles": [p.model_dump() for p in self._profiles.values()],
             "last_active_profile_id": self._last_active_id,
+            "mount_targets": {k: t.model_dump(mode="json") for k, t in self._mount_targets.items()},
             # Spread all UserSettings fields so new fields are auto-persisted
             **self._user_settings.model_dump(),
         }
@@ -85,6 +92,20 @@ class ProfileStore:
 
     def set_last_active_id(self, profile_id: str | None) -> None:
         self._last_active_id = profile_id
+        self._save()
+
+    # --- Mount targets ---
+
+    def get_mount_target(self, device_id: str) -> Target | None:
+        return self._mount_targets.get(device_id)
+
+    def set_mount_target(self, device_id: str, target: Target | None) -> None:
+        """Remember (or, with None, forget) a mount's target so it survives a restart."""
+        if target is None:
+            if self._mount_targets.pop(device_id, None) is None:
+                return
+        else:
+            self._mount_targets[device_id] = target
         self._save()
 
     # --- User settings ---
