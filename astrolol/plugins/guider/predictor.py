@@ -20,6 +20,7 @@ import numpy as np
 
 HARMONICS = 2
 MIN_PERIODS = 2.0  # history needed before the periodic part is trusted
+EDGE_SHARE = 0.85  # a period found in the top 15% of the searchable range is not trusted yet
 # The fit must explain this many times the share of the variance that fitting pure noise
 # with the same number of terms would (2 per harmonic over N samples), and at least 5%.
 # Rates are noisy (a position error over a short interval), so a real periodic error can
@@ -158,6 +159,10 @@ class MotionPredictor:
             best = min((t for t in trials if t[0] >= top - 0.03 * max(top, 0.0)), key=lambda t: t[1])
         elif trials:
             best = max(trials, key=lambda t: t[0])
+        if best is not None and searched and best[1] > EDGE_SHARE * span / MIN_PERIODS:
+            # At the long end of what the history can show: a longer period not yet visible
+            # pulls the fit there. Wait for more history rather than predict a wrong one.
+            best = None
         if best is not None and searched:  # refine around the best of the coarse grid
             for period in np.linspace(best[1] * 0.96, best[1] * 1.04, 41):
                 if span >= MIN_PERIODS * period:

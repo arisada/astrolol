@@ -84,3 +84,18 @@ def test_predicting_the_periodic_error_beats_correcting_it_afterwards() -> None:
     plain = _guided_rms(False)
     predicted = _guided_rms(True)
     assert predicted < 0.6 * plain, (plain, predicted)
+
+
+def test_a_period_too_long_for_the_history_is_not_guessed_short() -> None:
+    # 650 s of a 480 s error: periods up to 325 s are searchable, and the best of them is a
+    # wrong one at the edge of that range.
+    p = MotionPredictor()
+    rng = np.random.default_rng(3)
+    t, at_650 = 0.0, "unset"
+    while t < 3 * 480:
+        p.add(t, t + 4, pe_rate(t + 2) + rng.normal(0, 0.1 * math.sqrt(2) / 4))
+        t += 4
+        if at_650 == "unset" and t >= 650:
+            at_650 = p.active_period
+    assert at_650 is None
+    assert p.active_period == pytest.approx(480, rel=0.03)
