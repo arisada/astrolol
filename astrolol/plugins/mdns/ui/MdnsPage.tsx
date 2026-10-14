@@ -7,18 +7,17 @@ import * as api from './api'
 import type { MdnsSettings } from './api'
 
 const EMPTY: MdnsSettings = {
-  advertised_host: null,
   advertised_port: null,
   scheme: 'http',
   instance_name: null,
 }
 
-function currentPageAddress(): { host: string; port: number; scheme: 'http' | 'https' } {
+function currentPageAddress(): { port: number; scheme: 'http' | 'https' } {
   const scheme = window.location.protocol === 'https:' ? 'https' : 'http'
   const port = window.location.port
     ? Number(window.location.port)
     : scheme === 'https' ? 443 : 80
-  return { host: window.location.hostname, port, scheme }
+  return { port, scheme }
 }
 
 export function MdnsPage() {
@@ -39,8 +38,8 @@ export function MdnsPage() {
   }
 
   const handleAutofill = () => {
-    const { host, port, scheme } = currentPageAddress()
-    update({ advertised_host: host, advertised_port: port, scheme })
+    const { port, scheme } = currentPageAddress()
+    update({ advertised_port: port, scheme })
   }
 
   const handleSave = async () => {
@@ -119,16 +118,6 @@ export function MdnsPage() {
             placeholder={t('instanceNamePlaceholder')}
             onChange={(e) => update({ instance_name: e.target.value || null })}
           />
-        </div>
-
-        <div>
-          <label className="text-xs text-slate-400 block mb-1">{t('host')}</label>
-          <Input
-            value={s.advertised_host ?? ''}
-            placeholder={t('hostPlaceholder')}
-            onChange={(e) => update({ advertised_host: e.target.value || null })}
-          />
-          <p className="text-xs text-slate-600 mt-1">{t('hostHint')}</p>
         </div>
 
         <div>

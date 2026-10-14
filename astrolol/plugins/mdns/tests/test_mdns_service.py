@@ -1,61 +1,82 @@
-"""Tests for build_service_info — the part with actual branching logic.
-
-Doesn't touch the network: MdnsAdvertiser.start()/stop() (which do) are covered via
-test_mdns_api.py's no-port case, which never reaches AsyncZeroconf.
+"""Tests for build_service_info and the interface filtering — no network is touched:
+MdnsAdvertiser.start()/stop() are the only parts that open sockets.
 """
 from __future__ import annotations
 
-import socket
+from types import SimpleNamespace
 
-from astrolol.plugins.mdns.models import MdnsSettings
+import pytest
+
+from astrolol.plugins.mdns import service
+from astrolol.plugins.mdns.models import DEFAULT_PORT, MdnsSettings
 from astrolol.plugins.mdns.service import SERVICE_TYPE, build_service_info
 
 
-def test_no_port_means_nothing_to_advertise() -> None:
-    assert build_service_info(MdnsSettings()) is None
+def _adapters(**interfaces: list[str]):
+    return [
+        SimpleNamespace(
+            name=name,
+            ips=[SimpleNamespace(ip=ip, is_IPv4=True) for ip in ips],
+        )
+        for name, ips in interfaces.items()
+    ]
 
 
-def test_default_settings_advertise_local_hostname() -> None:
+@pytest.fixture
+def host(monkeypatch):
+    monkeypatch.setattr(service.socket, "gethostname", lambda: "astropi.lan")
+    monkeypatch.setattr(service.ifaddr, "get_adapters", lambda: _adapters(eth0=["192.168.1.50"]))
+
+
+def test_advertises_this_machine_as_hostname_dot_local(host) -> None:
     info = build_service_info(MdnsSettings(advertised_port=8000))
-    assert info is not None
-    assert info.port == 8000
-    assert info.server == f"{socket.gethostname()}.local."
+    assert info.server == "astropi.local."
     assert info.type == SERVICE_TYPE
-
-
-def test_ip_override_is_used_as_the_address() -> None:
-    info = build_service_info(MdnsSettings(advertised_host="192.168.1.50", advertised_port=443))
-    assert info is not None
     assert info.parsed_addresses() == ["192.168.1.50"]
-    assert info.server == f"{socket.gethostname()}.local."
 
 
-def test_hostname_override_becomes_the_server_name() -> None:
-    info = build_service_info(
-        MdnsSettings(advertised_host="astrolol.example.lan", advertised_port=443)
-    )
-    assert info is not None
-    assert info.server == "astrolol.example.lan."
+def test_port_defaults_to_the_one_astrolol_binds(host) -> None:
+    assert build_service_info(MdnsSettings()).port == DEFAULT_PORT
+    assert build_service_info(MdnsSettings(advertised_port=443)).port == 443
 
 
-def test_instance_name_defaults_to_hostname() -> None:
-    info = build_service_info(MdnsSettings(advertised_port=8000))
-    assert info is not None
-    assert info.name == f"{socket.gethostname()}.{SERVICE_TYPE}"
+def test_instance_name_defaults_to_hostname(host) -> None:
+    assert build_service_info(MdnsSettings()).name == f"astropi.{SERVICE_TYPE}"
 
 
-def test_instance_name_override() -> None:
-    info = build_service_info(
-        MdnsSettings(advertised_port=8000, instance_name="Backyard Rig")
-    )
-    assert info is not None
+def test_instance_name_override(host) -> None:
+    info = build_service_info(MdnsSettings(instance_name="Backyard Rig"))
     assert info.name == f"Backyard Rig.{SERVICE_TYPE}"
 
 
-def test_properties_carry_version_info() -> None:
-    info = build_service_info(MdnsSettings(advertised_port=8000, scheme="https"))
-    assert info is not None
-    props = info.properties
+def test_properties_carry_version_info(host) -> None:
+    props = build_service_info(MdnsSettings(scheme="https")).properties
     assert props[b"scheme"] == b"https"
     assert b"protocol_version" in props
     assert b"server_version" in props
+
+
+def test_virtual_interfaces_are_not_advertised(monkeypatch) -> None:
+    monkeypatch.setattr(service.ifaddr, "get_adapters", lambda: _adapters(
+        lo=["127.0.0.1"],
+        eth0=["192.168.1.50"],
+        wlan0=["10.42.0.1"],
+        docker0=["172.17.0.1"],
+        **{"br-1a2b3c": ["172.18.0.1"], "tailscale0": ["100.64.0.2"], "veth12": ["172.19.0.1"]},
+    ))
+    assert service._local_addresses() == ["192.168.1.50", "10.42.0.1"]
+
+
+def test_link_local_addresses_are_kept(monkeypatch) -> None:
+    monkeypatch.setattr(service.ifaddr, "get_adapters", lambda: _adapters(eth0=["169.254.12.7"]))
+    assert service._local_addresses() == ["169.254.12.7"]
+
+
+def test_all_virtual_falls_back_to_them_rather_than_nothing(monkeypatch) -> None:
+    monkeypatch.setattr(service.ifaddr, "get_adapters", lambda: _adapters(docker0=["172.17.0.1"]))
+    assert service._local_addresses() == ["172.17.0.1"]
+
+
+def test_no_interface_at_all_falls_back_to_loopback(monkeypatch) -> None:
+    monkeypatch.setattr(service.ifaddr, "get_adapters", lambda: _adapters(lo=["127.0.0.1"]))
+    assert service._local_addresses() == ["127.0.0.1"]

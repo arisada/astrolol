@@ -147,10 +147,9 @@ more design/testing than a single sitting allows:
   into one notification, or only notify on a state *transition* into "lost") before this
   reaches the UI as a toast/push notification.
 - **mDNS didn't advertise on the production Pi** — worked fine on the dev machine; to
-  investigate on real hardware. First boot that night also logged `mdns.not_advertising`
-  (`reason: advertised_port is not set`) before the port setting took effect — check
-  whether the plugin should fall back to the app's own listening port instead of requiring
-  an explicit `advertised_port`.
+  investigate on real hardware. (The "advertised_port is not set" case that first boot hit is
+  gone: the port now defaults to 8000.) Suspect: Avahi already owns `<hostname>.local` on the
+  Pi while zeroconf also publishes records for it — check for a name conflict in the logs.
 - **Sequencer camera temperature/ramp settings are unused** — the task editor doesn't let
   you set a target sensor temperature or cooling ramp rate; add to `ExposureGroup`/`Lane`
   and apply it at task setup.

@@ -65,13 +65,12 @@ a bug.
 
 ### mDNS discovery (`astrolol/plugins/mdns/`, optional)
 
-When enabled and configured, the server advertises itself via mDNS as
+When enabled, the server advertises itself via mDNS as
 `<instance_name>._astrolol._tcp.local.`, with a TXT record carrying `protocol_version`,
-`server_version`, and `scheme` (`http`/`https`). This is opt-in and requires explicit
-settings (`advertised_host`/`advertised_port`/`scheme` under
-`GET/PUT /plugins/mdns/settings`) — astrolol cannot infer the network-visible address or
-port on its own, since a reverse proxy commonly sits between the network and whatever
-port astrolol actually binds. No advertisement is made until `advertised_port` is set.
+`server_version`, and `scheme` (`http`/`https`). The host is this machine's name
+(`<hostname>.local`); `advertised_port` (default: astrolol's own port, 8000) and `scheme` under
+`GET/PUT /plugins/mdns/settings` override what a reverse proxy in front of astrolol exposes —
+astrolol cannot infer that on its own.
 A client should still treat mDNS purely as a convenience for finding a candidate
 address — it must confirm compatibility with `GET /health` (§2) before relying on it,
 since the TXT record's `protocol_version` is a hint, not a substitute for asking the

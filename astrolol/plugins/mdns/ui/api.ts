@@ -1,5 +1,4 @@
 export interface MdnsSettings {
-  advertised_host: string | null
   advertised_port: number | null
   scheme: 'http' | 'https'
   instance_name: string | null
