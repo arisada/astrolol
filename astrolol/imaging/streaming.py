@@ -11,7 +11,7 @@ import astropy.io.fits as astropy_fits
 import numpy as np
 import structlog
 
-from astrolol.devices.base.interfaces import ICamera
+from astrolol.devices.base.interfaces import ICamera, IStreamingCamera
 from astrolol.devices.base.models import ExposureParams
 from astrolol.devices.base.streaming import (
     Frame,
@@ -108,3 +108,14 @@ class LoopingExposureStream:
         except Exception as exc:
             logger.error("stream.failed", error=str(exc), exc_info=True)
             self._broadcaster.end(exc)
+
+
+def streaming_camera(camera: object, wrappers: dict[int, LoopingExposureStream]) -> IStreamingCamera:
+    """*camera* itself when it streams natively, else back-to-back exposures as a stream.
+
+    *wrappers* belongs to the caller and keeps one wrapper per camera, so subscriptions survive
+    between calls.
+    """
+    if isinstance(camera, IStreamingCamera) and getattr(camera, "can_stream", True):
+        return camera
+    return wrappers.setdefault(id(camera), LoopingExposureStream(camera))  # type: ignore[arg-type]

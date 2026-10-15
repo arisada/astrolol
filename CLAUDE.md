@@ -211,6 +211,7 @@ Use components from `ui/src/components/ui/` rather than re-implementing them per
 | `Input` | `@/components/ui/input` | Styled text/number input |
 | `ToggleSwitch` | `@/components/ui/toggle-switch` | Labelled boolean toggle |
 | `Card`, `SidebarSection` | `@/components/ui/card` | Container variants |
+| `StarImage` | `@/components/ui/star-image` | Camera frame (JPEG) with a box around each star and an SVG slot for more overlay (guider view, polar-alignment star view) |
 | `Badge`, `Chip`, `StatusPill` | `@/components/ui/badge` | Status indicators |
 | `Tabs` | `@/components/ui/tabs` | Segmented tab switcher |
 | `DmsInput` | `@/components/ui/dms-input` | Dec/RA/lat/lon entry: joined DMS/HMS block, up/down per field, carry and clamping |
@@ -557,6 +558,10 @@ astrolol/
 │   └── manager.py      # FocuserManager — move tasks, halt, events
 ├── imaging/
 │   ├── imager.py       # ImagerManager — per-camera expose/loop tasks
+│   ├── streaming.py    # LoopingExposureStream (any camera as a frame stream), streaming_camera()
+│   ├── stars.py        # star detection/measurement (shared by guider, polar-align star view)
+│   ├── darks.py        # dark-frame library + hot-pixel healing used by stars.py
+│   ├── frameview.py    # frame → stretched JPEG, FrameStats, OverlayStar
 │   ├── models.py       # ExposureRequest, ExposureResult, ImagerState
 │   └── preview.py      # FITS → JPEG (percentile auto-stretch, astropy + Pillow)
 ├── mount/

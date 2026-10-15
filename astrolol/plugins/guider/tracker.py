@@ -14,8 +14,8 @@ import numpy as np
 from scipy.ndimage import gaussian_filter, maximum_filter
 
 from astrolol.devices.base.streaming import Frame
-from astrolol.plugins.guider.darks import DarkLibrary, heal_hot_pixels
-from astrolol.plugins.guider.stars import Star, measure
+from astrolol.imaging.darks import DarkLibrary, heal_hot_pixels
+from astrolol.imaging.stars import Star, measure
 
 
 ReadingState = Literal["ok", "blurred", "lost", "outlier"]

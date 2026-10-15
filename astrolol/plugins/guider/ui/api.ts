@@ -1,5 +1,5 @@
 // Fetch helpers mirroring plugins/guider/api.py.
-import type { GuiderStatus, GuidingHealth, GuidingStats, SettleParams } from '@/api/types'
+import type { FrameStats, GuiderStatus, OverlayStar, GuidingHealth, GuidingStats, SettleParams } from '@/api/types'
 import type { GuideSample } from '@/utils/guiding'
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
@@ -151,30 +151,7 @@ export interface GuiderPluginState {
 export const DEFAULT_GUIDER_STATE: GuiderPluginState = { guiding: null, reason: null, steps: [], snr: null, stars: null }
 export const MAX_STEPS = 500
 
-export type StarKind = 'primary' | 'companion' | 'candidate' | 'lost'
-
-export interface OverlayStar {
-  x: number
-  y: number
-  kind: StarKind
-  snr: number | null
-  fwhm: number | null
-  hfd: number | null // half-flux diameter, pixels
-  peak: number | null
-  flux: number | null
-  half: number
-  saturated: boolean
-  state: 'ok' | 'blurred' | 'lost' | 'outlier' | null
-}
-
-export interface FrameStats {
-  seq: number
-  exposure: number
-  period: number | null // seconds between frames
-  background: number
-  noise: number
-  brightest: number
-}
+export type { FrameStats, OverlayStar, StarKind } from '@/api/types'
 
 export interface ViewInfo {
   mode: 'idle' | 'preview' | 'calibrating' | 'guiding'

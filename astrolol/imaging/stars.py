@@ -13,7 +13,7 @@ import numpy as np
 from scipy.ndimage import gaussian_filter, maximum_filter
 
 from astrolol.devices.base.streaming import Frame
-from astrolol.plugins.guider.darks import DarkLibrary, heal_hot_pixels
+from astrolol.imaging.darks import DarkLibrary, heal_hot_pixels
 
 
 @dataclass(frozen=True)

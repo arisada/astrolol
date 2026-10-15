@@ -2,8 +2,8 @@ import numpy as np
 import pytest
 
 from astrolol.devices.base.streaming import Frame
-from astrolol.plugins.guider.darks import DarkLibrary, make_dark
-from astrolol.plugins.guider.stars import detect_stars, measure, select_guide_stars
+from astrolol.imaging.darks import DarkLibrary, make_dark
+from astrolol.imaging.stars import detect_stars, measure, select_guide_stars
 from astrolol.plugins.guider.tracker import StarTracker
 
 W, H = 200, 160
@@ -227,7 +227,7 @@ def test_reacquire_does_not_invent_a_star() -> None:
 
 
 def test_guide_star_choice_stays_put_when_brightness_order_flips() -> None:
-    from astrolol.plugins.guider.stars import Star, select_guide_stars
+    from astrolol.imaging.stars import Star, select_guide_stars
 
     def star(x: float, snr: float) -> Star:
         return Star(x=x, y=50.0, peak=100.0, flux=snr * 100, snr=snr, fwhm=3.0)

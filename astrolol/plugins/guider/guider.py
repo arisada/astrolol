@@ -43,11 +43,11 @@ from astrolol.devices.base.pulse import PulseDirection
 from astrolol.devices.base.streaming import Frame, FrameSubscription, StreamClosed, StreamParams, StreamRoi
 from astrolol.plugins.guider.calibration import Calibration, CalibrationFailed, CalibrationPoint, calibrate
 from astrolol.plugins.guider.controller import AxisSettings, DecMode, GuideController
-from astrolol.plugins.guider.darks import Dark, DarkLibrary, make_dark
+from astrolol.imaging.darks import Dark, DarkLibrary, make_dark
 from astrolol.plugins.guider.devices import MountState
 from astrolol.plugins.guider.events import GuiderStep
 from astrolol.plugins.guider.settings import GuiderSettings, auto_min_move_px
-from astrolol.plugins.guider.stars import Star, detect_stars, select_guide_stars
+from astrolol.imaging.stars import Star, detect_stars, select_guide_stars
 from astrolol.plugins.guider.tracker import StarTracker, TrackerResult
 from astrolol.plugins.guider.view import GuideView, OverlayStar
 

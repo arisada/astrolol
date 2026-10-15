@@ -16,7 +16,7 @@ from astrolol.core.guiding import (
     SettleParams,
 )
 from astrolol.plugins.guider.calibration import Calibration
-from astrolol.plugins.guider.darks import DarkInfo
+from astrolol.imaging.darks import DarkInfo
 from astrolol.plugins.guider.guider import BuiltinGuider, CalibrationAttempt, Prediction
 from astrolol.plugins.guider.settings import GuiderSettings
 from astrolol.plugins.guider.view import ViewInfo

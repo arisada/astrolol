@@ -11,7 +11,7 @@ import structlog
 from astrolol.core.guiding.errors import GuiderNotConnected
 from astrolol.devices.base.interfaces import IPulseGuider, IStreamingCamera
 from astrolol.devices.base.pulse import PulseGuideNotSupported
-from astrolol.imaging.streaming import LoopingExposureStream
+from astrolol.imaging.streaming import LoopingExposureStream, streaming_camera
 from astrolol.plugins.guider.settings import GuiderSettings, pick_pulse_guider
 
 logger = structlog.get_logger()
@@ -55,12 +55,7 @@ class ManagerDevices:
             raise GuiderNotConnected(f"The mount '{mount_id}' is not connected") from exc
 
     def camera(self) -> IStreamingCamera:
-        camera = self._raw_camera()
-        if isinstance(camera, IStreamingCamera) and getattr(camera, "can_stream", True):
-            return camera
-        # No native stream: expose back-to-back exposures as one (one wrapper per camera,
-        # so its subscriptions survive between calls).
-        return self._wrapped.setdefault(id(camera), LoopingExposureStream(camera))  # type: ignore[arg-type]
+        return streaming_camera(self._raw_camera(), self._wrapped)
 
     def pulse_guider(self) -> IPulseGuider:
         output = self._settings().guide_output

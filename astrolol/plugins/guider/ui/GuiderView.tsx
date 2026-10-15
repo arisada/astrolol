@@ -2,20 +2,7 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import * as api from './api'
-
-// Each kind differs by shape and line style as well as colour: the night palettes are red.
-const KIND_STYLE: Record<api.StarKind, { stroke: string; dash?: string; shape: 'square' | 'circle' }> = {
-  primary: { stroke: 'stroke-emerald-300', shape: 'square' },
-  companion: { stroke: 'stroke-sky-300', shape: 'square', dash: '6 3' },
-  candidate: { stroke: 'stroke-amber-300', shape: 'circle' },
-  lost: { stroke: 'stroke-rose-400', shape: 'square', dash: '2 3' },
-}
-const KIND_TEXT: Record<api.StarKind, string> = {
-  primary: 'fill-emerald-300',
-  companion: 'fill-sky-300',
-  candidate: 'fill-amber-300',
-  lost: 'fill-rose-400',
-}
+import { STAR_KIND_STYLE as KIND_STYLE, StarImage } from '@/components/ui/star-image'
 
 /** *onPick*, when given, makes the image clickable: it receives the sensor position clicked. */
 export function GuiderView({ poll, onPick }: { poll: boolean; onPick?: (x: number, y: number) => void }) {
@@ -56,52 +43,14 @@ export function GuiderView({ poll, onPick }: { poll: boolean; onPick?: (x: numbe
     candidate: t('view.kind_candidate'),
     lost: t('view.kind_lost'),
   }
-  const font = Math.max(9, view.width / 55)
-  const stroke = Math.max(1, view.width / 400)
-  let chosen = 0
   return (
     <div className="flex flex-col gap-2">
-      {/* Never taller than most of the screen: a window around the stars can be tall and narrow. */}
-      <div className="relative w-full mx-auto rounded border border-surface-border bg-black overflow-hidden"
-        style={{ aspectRatio: `${view.width} / ${view.height}`, maxHeight: '60vh', maxWidth: `calc(60vh * ${view.width / view.height})` }}>
-        <img src={src} alt={t('view.alt')} className="absolute inset-0 w-full h-full" />
-        <svg
-          viewBox={`0 0 ${view.width} ${view.height}`}
-          className={`absolute inset-0 w-full h-full ${onPick ? 'cursor-crosshair' : ''}`}
-          preserveAspectRatio="none"
-          onClick={onPick ? (e) => {
-            const r = e.currentTarget.getBoundingClientRect()
-            onPick(ox + ((e.clientX - r.left) / r.width) * view.width, oy + ((e.clientY - r.top) / r.height) * view.height)
-          } : undefined}
-        >
-          {view.locks.map(([x, y], i) => (
-            <path key={`lock-${i}`} d={`M${x - ox - 4},${y - oy} h8 M${x - ox},${y - oy - 4} v8`} className="stroke-slate-100" strokeWidth={stroke} opacity={0.7} vectorEffect="non-scaling-stroke" fill="none" />
-          ))}
-          {view.stars.map((s, i) => {
-            const st = KIND_STYLE[s.kind]
-            const x = s.x - ox
-            const y = s.y - oy
-            const label = s.kind === 'candidate' ? null : ++chosen
-            // Never smaller than a readable mark, whatever the size of the frame.
-            const half = Math.max(s.half, view.width / 90)
-            return (
-              <g key={i}>
-                {st.shape === 'square' ? (
-                  <rect x={x - half} y={y - half} width={2 * half} height={2 * half} fill="none" className={st.stroke} strokeWidth={s.kind === 'primary' ? 2 * stroke : stroke} strokeDasharray={st.dash} vectorEffect="non-scaling-stroke" />
-                ) : (
-                  <circle cx={x} cy={y} r={half} fill="none" className={st.stroke} strokeWidth={stroke} vectorEffect="non-scaling-stroke" />
-                )}
-                {s.kind === 'lost' && (
-                  <path d={`M${x - half},${y - half} L${x + half},${y + half} M${x + half},${y - half} L${x - half},${y + half}`} className={st.stroke} strokeWidth={stroke} vectorEffect="non-scaling-stroke" fill="none" />
-                )}
-                {label != null && (
-                  <text x={x + half + 3} y={y - half + font} fontSize={font} className={KIND_TEXT[s.kind]}>{label}</text>
-                )}
-              </g>
-            )
-          })}
-        </svg>
-      </div>
+      <StarImage src={src} alt={t('view.alt')} width={view.width} height={view.height} origin={view.origin}
+        stars={view.stars} onPick={onPick}>
+        {view.locks.map(([x, y], i) => (
+          <path key={`lock-${i}`} d={`M${x - ox - 4},${y - oy} h8 M${x - ox},${y - oy - 4} v8`} className="stroke-slate-100" strokeWidth={Math.max(1, view.width / 400)} opacity={0.7} vectorEffect="non-scaling-stroke" fill="none" />
+        ))}
+      </StarImage>
       <ul className="flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-slate-500">
         {(['primary', 'companion', 'candidate', 'lost'] as const).map((k) => (
           <li key={k} className="flex items-center gap-1.5">

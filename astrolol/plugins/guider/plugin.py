@@ -8,7 +8,7 @@ from astrolol.config.settings import settings as app_settings
 from astrolol.core.guiding import register_guider, unregister_guider
 from astrolol.core.plugin_api import LogScope, Plugin, PluginContext, PluginManifest
 from astrolol.plugins.guider.api import router
-from astrolol.plugins.guider.darks import DarkLibrary
+from astrolol.imaging.darks import DarkLibrary
 from astrolol.plugins.guider.devices import ManagerDevices
 from astrolol.plugins.guider.guider import BuiltinGuider
 from astrolol.plugins.guider.scale import derive_pixel_scale

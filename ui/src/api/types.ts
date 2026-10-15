@@ -285,6 +285,33 @@ export interface FlatWizardRun {
   completed_at: string | null
 }
 
+// ── Star frames (mirrors imaging/frameview.py), shared by the guider and polar alignment ──
+
+export type StarKind = 'primary' | 'companion' | 'candidate' | 'lost'
+
+export interface OverlayStar {
+  x: number
+  y: number
+  kind: StarKind
+  snr: number | null
+  fwhm: number | null
+  hfd: number | null // half-flux diameter, pixels
+  peak: number | null
+  flux: number | null
+  half: number
+  saturated: boolean
+  state: 'ok' | 'blurred' | 'lost' | 'outlier' | null
+}
+
+export interface FrameStats {
+  seq: number
+  exposure: number
+  period: number | null // seconds between frames
+  background: number
+  noise: number
+  brightest: number
+}
+
 // ── Polar alignment (mirrors plugins/polar_align) ──────────────────────────────
 
 // Part 2 — plate-solve wizard (wizard.py)
@@ -319,6 +346,30 @@ export interface WizardRequest {
 
 export interface AutoRefreshRequest {
   interval_s: number
+}
+
+export interface StarViewRequest {
+  exposure_s?: number
+}
+
+export type StarViewState = 'idle' | 'starting' | 'tracking' | 'lost' | 'failed'
+
+export interface StarViewInfo {
+  state: StarViewState
+  version: number
+  width: number
+  height: number
+  origin: [number, number]
+  star: OverlayStar | null
+  az_via: [number, number] | null
+  target: [number, number] | null
+  tolerance_px: number
+  alt_error_arcmin: number | null
+  az_error_arcmin: number | null
+  arrived: boolean
+  pixel_scale: number | null
+  error: string | null
+  stats: FrameStats | null
 }
 
 export interface WizardPoint {
