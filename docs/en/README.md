@@ -60,6 +60,7 @@ Most features are plugins. They are off until you turn them on in
 | [Security](../../astrolol/plugins/security/docs/en.md) | Accounts, guest access, API tokens |
 | [System](../../astrolol/plugins/system/docs/en.md) | Wi-Fi and hotspot, temperature, power, time zone, reboot |
 | [mDNS](../../astrolol/plugins/mdns/docs/en.md) | Let apps find astrolol on the local network |
+| [AI assistants](../../astrolol/plugins/mcp/docs/en.md) | Let Claude and other AI assistants look at and operate the rig |
 
 ## Installing
 

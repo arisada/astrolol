@@ -70,7 +70,9 @@ def test_no_mutating_route_is_open_to_viewers(tmp_path, monkeypatch):
         update={"enabled_plugins": [p for p in discover_plugins() if p != "guider"]}))  # guider and guide_simulator exclude each other
     app = create_app()
 
-    viewer_ok = {("POST", "/plugins/security/me/password")}
+    # MCP calls are all POSTs; each tool then needs the caller's own level on the REST route it uses
+    # (astrolol/plugins/mcp/tests/test_mcp.py checks a viewer cannot operate through it).
+    viewer_ok = {("POST", "/plugins/security/me/password"), ("POST", "/plugins/mcp")}
     public_ok = {("POST", "/auth/login"), ("POST", "/auth/logout")}
     low, seen = [], 0
     for path, methods in app.openapi()["paths"].items():

@@ -62,6 +62,7 @@ dans [Options → Modules](options.md#modules) puis redémarrez astrolol.
 | [Sécurité](../../astrolol/plugins/security/docs/fr.md) | Comptes, accès invité, jetons d'API |
 | [Système](../../astrolol/plugins/system/docs/fr.md) | Wi-Fi et point d'accès, température, alimentation, fuseau horaire, redémarrage |
 | [mDNS](../../astrolol/plugins/mdns/docs/fr.md) | Permettre aux applications de trouver astrolol sur le réseau local |
+| [Assistants IA](../../astrolol/plugins/mcp/docs/fr.md) | Laisser Claude et d'autres assistants IA regarder et piloter l'installation |
 
 ## Installation
 

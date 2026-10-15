@@ -596,6 +596,12 @@ astrolol/plugins/
 │                       # can find it without a typed-in IP, as <hostname>.local; port/scheme are
 │                       # settings since astrolol can't know what a reverse proxy in front of
 │                       # it exposes
+├── mcp/                # MCP server (streamable HTTP, POST /plugins/mcp) for Claude & other AI assistants:
+│                       # ~50 curated tools, each a few REST calls made in-process with the caller's own
+│                       # credentials (so the ACL applies unchanged; the endpoint itself is viewer-level
+│                       # because every MCP call is a POST). Waits for slews/parks via the EventBus.
+│                       # Ships the SKILL.md (skill/astrolol-observing/, served at /plugins/mcp/skill).
+│                       # Add a tool = one @tool function in tools.py + a test
 ├── object_resolver/    # Offline-first name → J2000 coords resolver (NGC/IC/Messier/
 │                       # Sharpless/Hipparcos + common names), SIMBAD fallback, solar system
 ├── phd2/               # PHD2 autoguider client — implements core.guiding.Guider, guide

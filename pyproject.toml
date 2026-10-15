@@ -28,6 +28,7 @@ dependencies = [
     "zeroconf>=0.131",
     "ifaddr>=0.2",
     "dbus-next>=0.2.3",
+    "httpx>=0.27",
 ]
 
 [project.scripts]

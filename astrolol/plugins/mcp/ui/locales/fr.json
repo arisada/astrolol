@@ -1,0 +1,22 @@
+{
+  "label": "Assistants IA",
+  "title": "Assistants IA",
+  "unreachable": "Impossible de joindre le serveur",
+  "intro": "Permet à Claude et à d'autres assistants IA de regarder votre installation et de la piloter : vérifier la monture, prendre et examiner des images, faire la mise au point, guider et lancer des séquences. Ils agissent avec le niveau d'accès du compte que vous leur donnez.",
+  "connect": "Connecter un assistant",
+  "address": "Adresse",
+  "claudeCode": "Claude Code",
+  "tokenHint": "Remplacez <token> par un jeton d'accès créé dans la page Sécurité. Un jeton lecteur permet à l'assistant de regarder, pas de piloter.",
+  "copy": "Copier",
+  "copied": "Copié",
+  "skill": "Skill",
+  "skillHint": "Un court guide pour Claude sur l'observation avec ces outils : le déroulé d'une nuit, les unités, et quand s'arrêter pour demander. Enregistrez-le sous le nom SKILL.md dans un dossier de skills, par ex. ~/.claude/skills/astrolol-observing/.",
+  "skillDownload": "Télécharger SKILL.md",
+  "tools_one": "{{count}} outil",
+  "tools_other": "{{count}} outils",
+  "readOnly": "lecture seule",
+  "manifest": {
+    "name": "Assistants IA",
+    "description": "Permet à Claude et à d'autres assistants IA d'observer et de piloter le télescope."
+  }
+}

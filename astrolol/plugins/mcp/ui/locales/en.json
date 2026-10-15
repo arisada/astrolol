@@ -1,0 +1,22 @@
+{
+  "label": "AI assistants",
+  "title": "AI assistants",
+  "unreachable": "Cannot reach backend",
+  "intro": "Lets Claude and other AI assistants look at your rig and operate it: check the mount, take and review images, focus, guide and run sequences. They act with the access level of the sign-in you give them.",
+  "connect": "Connect an assistant",
+  "address": "Address",
+  "claudeCode": "Claude Code",
+  "tokenHint": "Replace <token> with an access token created on the Security page. A viewer token lets the assistant look but not operate.",
+  "copy": "Copy",
+  "copied": "Copied",
+  "skill": "Skill",
+  "skillHint": "A short guide for Claude on observing with these tools: the order of a night, units, and when to stop and ask. Save it as SKILL.md in a skills folder, e.g. ~/.claude/skills/astrolol-observing/.",
+  "skillDownload": "Download SKILL.md",
+  "tools_one": "{{count}} tool",
+  "tools_other": "{{count}} tools",
+  "readOnly": "read only",
+  "manifest": {
+    "name": "AI assistants",
+    "description": "Lets Claude and other AI assistants observe and operate the telescope."
+  }
+}
