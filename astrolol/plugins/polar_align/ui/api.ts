@@ -1,4 +1,4 @@
-import type { AutoRefreshRequest, ReticleState, WizardRequest, WizardRun } from '@/api/types'
+import type { AutoRefreshRequest, ReticleState, StarViewInfo, StarViewRequest, WizardRequest, WizardRun } from '@/api/types'
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const res = await fetch(path, {
@@ -33,6 +33,18 @@ export const startAutoRefresh = (req: AutoRefreshRequest) =>
 
 export const stopAutoRefresh = () =>
   request<void>('/plugins/polar_align/wizard/auto_refresh', { method: 'DELETE' })
+
+// ── Live star view ──────────────────────────────────────────────────────────────
+
+export const startStarView = (req: StarViewRequest) =>
+  request<StarViewInfo>('/plugins/polar_align/wizard/star_view', { method: 'POST', body: JSON.stringify(req) })
+
+export const getStarView = () => request<StarViewInfo>('/plugins/polar_align/wizard/star_view')
+
+export const stopStarView = () =>
+  request<void>('/plugins/polar_align/wizard/star_view', { method: 'DELETE' })
+
+export const starViewFrameUrl = (version: number) => `/plugins/polar_align/wizard/star_view/frame.jpg?v=${version}`
 
 // ── Part 1: polar scope reticle ─────────────────────────────────────────────────
 

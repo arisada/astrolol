@@ -30,6 +30,7 @@ from astrolol.plugins.polar_align.wizard import (
     WizardRequest,
     WizardRun,
     plan_targets,
+    recheck_search_radius_deg,
 )
 
 LATITUDE = 45.0
@@ -624,7 +625,10 @@ async def test_recheck_updates_live_offset(tmp_path) -> None:
     # re-establish from scratch" design.
     assert imager.expose_count == expose_count_before + 1
     last_solve_call = solve_manager.solve_calls[-1]
-    assert last_solve_call["radius"] == run.request.converge_search_radius_deg
+    assert last_solve_call["radius"] == recheck_search_radius_deg(
+        run.request.converge_search_radius_deg,
+        run.result.alt_error_arcmin, run.result.az_error_arcmin,
+    )
     reference = run.points[run.convergence_reference_index]
     assert last_solve_call["ra_hint"] == pytest.approx(reference.solved_ra_hours * 15.0)
 
@@ -930,3 +934,18 @@ async def test_engine_start_rejects_while_converging(tmp_path) -> None:
         await engine.start(_req())
 
     await engine.cancel()  # clean up
+
+
+def test_recheck_radius_stays_tight_for_a_small_error() -> None:
+    assert recheck_search_radius_deg(0.5, 5.0, 3.0) == 0.5
+
+
+def test_recheck_radius_widens_with_a_large_error() -> None:
+    # 30' off -> the field moves ~0.5deg while the knobs are turned; twice that is searched.
+    assert recheck_search_radius_deg(0.5, 30.0, 0.0) == pytest.approx(1.0)
+    assert recheck_search_radius_deg(0.5, 18.0, 24.0) == pytest.approx(1.0)
+
+
+def test_recheck_radius_is_capped() -> None:
+    assert recheck_search_radius_deg(0.5, 600.0, 600.0) == 3.0
+    assert recheck_search_radius_deg(5.0, 0.0, 0.0) == 3.0

@@ -81,12 +81,15 @@ def _parse_wcs(fits_path: str) -> SolveResult:
         ra = float(h["CRVAL1"])
         dec = float(h["CRVAL2"])
 
+        cd: tuple[float, float, float, float] | None = None
         if "CD1_1" in h:
             cd1_1 = float(h["CD1_1"])
             cd1_2 = float(h.get("CD1_2", 0))
             cd2_1 = float(h.get("CD2_1", 0))
             pixel_scale_deg = math.sqrt(cd1_1 ** 2 + cd2_1 ** 2)
             rotation = math.degrees(math.atan2(-cd1_2, cd1_1)) % 360
+            cd2_2 = float(h.get("CD2_2", 0))
+            cd = (cd1_1, cd1_2, cd2_1, cd2_2)
         else:
             pixel_scale_deg = abs(float(h.get("CDELT1", 0)))
             rotation = float(h.get("CROTA2", 0))
@@ -104,6 +107,7 @@ def _parse_wcs(fits_path: str) -> SolveResult:
             pixel_scale=round(pixel_scale, 4),
             field_w=round(field_w, 4),
             field_h=round(field_h, 4),
+            cd=cd,
         )
 
 

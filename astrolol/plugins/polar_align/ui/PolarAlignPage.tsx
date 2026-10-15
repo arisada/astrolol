@@ -4,16 +4,27 @@ import type { TFunction } from 'i18next'
 import { Compass, RefreshCw, StopCircle } from 'lucide-react'
 import * as polarAlignApi from './api'
 import { ReticleDial } from './ReticleDial'
+import { KnobArrows } from './KnobArrows'
+import { StarViewPanel } from './StarViewPanel'
 import { useStore } from '@/store'
 import { useLocalStorage } from '@/hooks/useLocalStorage'
 import { ToggleSwitch } from '@/components/ui/toggle-switch'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
+import { DurationStepper } from '@/components/ui/duration-stepper'
 import { Input } from '@/components/ui/input'
 import { PillGroup } from '@/components/ui/pill-group'
 import { StatusPill } from '@/components/ui/badge'
 import type { StatusPillVariant } from '@/components/ui/badge'
 import type { ReticleState, WizardRun, WizardStatus } from '@/api/types'
+
+// Exposure lengths that make sense for a plate solve of a bright-enough field.
+const FIT_EXPOSURE_STEPS = [0.5, 1, 1.5, 2, 3, 4, 5, 6, 8, 10, 15, 20, 30]
+const RECHECK_EXPOSURE_STEPS = [0.1, 0.25, 0.5, 1, 1.5, 2, 3, 4, 5, 8, 10]
+const RADIUS_STEPS = [0.25, 0.5, 1, 1.5, 2, 3]
+const AUTO_REFRESH_STEPS = [1, 2, 3, 5, 10, 15, 20, 30, 60]
+const fmtDeg = (v: number) => `${v}°`
+const fmtSeconds = (v: number) => `${v} s`
 
 const RUN_PILL_VARIANT: Record<WizardStatus, StatusPillVariant> = {
   running: 'amber', converging: 'accent', completed: 'green', failed: 'red', cancelled: 'slate',
@@ -120,11 +131,10 @@ export function PolarAlignPage() {
   const [decInput, setDecInput] = useState('')
   const decOverride = decInput.trim() === '' ? null : Number(decInput)
   const decInvalid = decOverride !== null && (!Number.isFinite(decOverride) || Math.abs(decOverride) > 80)
-  // Recheck (CONVERGING-phase) settings -- '' = reuse the main fit's own exposure_s,
-  // same default as the backend (WizardRequest.converge_exposure_s: None).
-  const [convergeExposureInput, setConvergeExposureInput] = useState('')
-  const convergeExposureS = convergeExposureInput.trim() === '' ? null : Number(convergeExposureInput)
-  const [convergeSearchRadiusDeg, setConvergeSearchRadiusDeg] = useState(3)
+  // Recheck (CONVERGING-phase) settings: short exposure, tight search (the backend widens
+  // the radius by itself when the initial error turns out to be large).
+  const [convergeExposureS, setConvergeExposureS] = useState(2)
+  const [convergeSearchRadiusDeg, setConvergeSearchRadiusDeg] = useState(0.5)
 
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
@@ -174,6 +184,8 @@ export function PolarAlignPage() {
   }, [mountId, cameraId, exposureS, binning, decOverride, decInvalid, convergeExposureS,
       convergeSearchRadiusDeg, fetchRun, setWizardError, t])
 
+  // The live star view owns the camera while it runs: rechecks wait for it.
+  const [starViewActive, setStarViewActive] = useState(false)
   const [rechecking, setRechecking] = useState(false)
   const handleRecheck = useCallback(async () => {
     setRechecking(true)
@@ -190,7 +202,7 @@ export function PolarAlignPage() {
     }
   }, [fetchRun])
 
-  const [autoRefreshIntervalInput, setAutoRefreshIntervalInput] = useState(20)
+  const [autoRefreshIntervalInput, setAutoRefreshIntervalInput] = useState(3)
   const [autoRefreshBusy, setAutoRefreshBusy] = useState(false)
   const handleToggleAutoRefresh = useCallback(async () => {
     setAutoRefreshBusy(true)
@@ -290,11 +302,8 @@ export function PolarAlignPage() {
                   </select>
                 )}
               </div>
-              <div className="flex flex-col gap-1">
-                <label className="text-xs text-slate-400">{t('wizard.exposure')}</label>
-                <Input inputSize="sm" type="number" min={0.1} step={0.5}
-                  value={exposureS} onChange={(e) => setExposureS(Number(e.target.value) || 1)} />
-              </div>
+              <DurationStepper label={t('wizard.exposure')} steps={FIT_EXPOSURE_STEPS}
+                value={exposureS} onChange={setExposureS} />
             </div>
 
             <PillGroup options={[1, 2, 3, 4]} value={binning} onChange={setBinning}
@@ -312,17 +321,11 @@ export function PolarAlignPage() {
             <div className="rounded border border-surface-border bg-surface-overlay/30 p-2.5 space-y-2">
               <p className="text-xs text-slate-400">{t('wizard.recheck')}</p>
               <div className="grid grid-cols-2 gap-3">
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs text-slate-500">{t('wizard.exposure')}</label>
-                  <Input inputSize="sm" type="number" min={0.1} step={0.5} placeholder={t('wizard.sameExposure', { value: exposureS })}
-                    value={convergeExposureInput} onChange={(e) => setConvergeExposureInput(e.target.value)} />
-                </div>
-                <div className="flex flex-col gap-1">
-                  <label className="text-xs text-slate-500">{t('wizard.radius')}</label>
-                  <Input inputSize="sm" type="number" min={0.5} step={0.5}
-                    value={convergeSearchRadiusDeg}
-                    onChange={(e) => setConvergeSearchRadiusDeg(Number(e.target.value) || 0.5)} />
-                </div>
+                <DurationStepper label={t('wizard.exposure')} steps={RECHECK_EXPOSURE_STEPS}
+                  value={convergeExposureS} onChange={setConvergeExposureS} />
+                <DurationStepper label={t('wizard.radius')} steps={RADIUS_STEPS} format={fmtDeg}
+                  decTitle={t('wizard.smaller')} incTitle={t('wizard.larger')}
+                  value={convergeSearchRadiusDeg} onChange={setConvergeSearchRadiusDeg} />
               </div>
               <p className="text-[10px] text-slate-600">
                 {t('wizard.recheckHint')}
@@ -380,6 +383,9 @@ export function PolarAlignPage() {
                   <p className="text-xs text-slate-400">{t('wizard.initial')}</p>
                   <QualityBadge altArcmin={run.result.alt_error_arcmin} azArcmin={run.result.az_error_arcmin} />
                 </div>
+                <KnobArrows altErrorArcmin={run.result.alt_error_arcmin}
+                  azErrorArcmin={run.result.az_error_arcmin}
+                  altLabel={t('wizard.altitude')} azLabel={t('wizard.azimuth')} />
                 <p className="text-xs text-slate-200">{altHint(t, run.result.alt_error_arcmin)}</p>
                 <p className="text-xs text-slate-200">{azHint(t, run.result.az_error_arcmin)}</p>
               </div>
@@ -393,8 +399,9 @@ export function PolarAlignPage() {
                       <p className="text-xs text-amber-300">{t('wizard.latest')}</p>
                       <QualityBadge altArcmin={run.live_offset.alt_error_arcmin} azArcmin={run.live_offset.az_error_arcmin} />
                     </div>
-                    <p className="text-xs text-slate-200">{altHint(t, run.live_offset.alt_error_arcmin)}</p>
-                    <p className="text-xs text-slate-200">{azHint(t, run.live_offset.az_error_arcmin)}</p>
+                    <KnobArrows altErrorArcmin={run.live_offset.alt_error_arcmin}
+                      azErrorArcmin={run.live_offset.az_error_arcmin}
+                      altLabel={t('wizard.altitude')} azLabel={t('wizard.azimuth')} />
                   </div>
                 ) : (
                   <p className="text-xs text-slate-500">
@@ -413,8 +420,10 @@ export function PolarAlignPage() {
                   </p>
                 )}
 
+                <StarViewPanel disabled={rechecking} onActiveChange={setStarViewActive} />
+
                 <div className="flex gap-2">
-                  <Button size="sm" onClick={handleRecheck} disabled={rechecking} className="flex-1">
+                  <Button size="sm" onClick={handleRecheck} disabled={rechecking || starViewActive} className="flex-1">
                     <RefreshCw size={13} className="mr-1.5" />
                     {rechecking ? t('wizard.rechecking') : t('wizard.recheckNow')}
                   </Button>
@@ -433,14 +442,11 @@ export function PolarAlignPage() {
                     )}
                   </div>
                   <div className="flex items-center gap-2">
-                    <Input inputSize="sm" type="number" min={5} max={600} step={5}
-                      value={autoRefreshIntervalInput}
-                      disabled={run.auto_refresh_interval_s != null}
-                      onChange={(e) => setAutoRefreshIntervalInput(Number(e.target.value) || 5)}
-                      className="w-20" />
-                    <span className="text-xs text-slate-500">{t('wizard.seconds')}</span>
+                    <DurationStepper steps={AUTO_REFRESH_STEPS} format={fmtSeconds}
+                      label={t('wizard.interval')}
+                      value={autoRefreshIntervalInput} onChange={setAutoRefreshIntervalInput} />
                     <Button size="sm" variant={run.auto_refresh_interval_s != null ? 'outline' : 'default'}
-                      onClick={handleToggleAutoRefresh} disabled={autoRefreshBusy} className="flex-1">
+                      onClick={handleToggleAutoRefresh} disabled={autoRefreshBusy || starViewActive} className="flex-1">
                       {run.auto_refresh_interval_s != null ? t('wizard.stopAuto') : t('wizard.startAuto')}
                     </Button>
                   </div>

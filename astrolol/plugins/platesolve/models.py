@@ -23,6 +23,12 @@ class SolveResult(BaseModel):
     pixel_scale: float  # arcsec/pixel
     field_w: float      # degrees
     field_h: float      # degrees
+    cd: tuple[float, float, float, float] | None = Field(
+        default=None,
+        description="WCS matrix (CD1_1, CD1_2, CD2_1, CD2_2) in degrees per pixel: maps a pixel "
+        "offset (x, y) of the solved image to a sky offset (east, north). Unlike rotation, it also "
+        "tells whether the image is mirrored.",
+    )
     duration_ms: int = 0
 
 

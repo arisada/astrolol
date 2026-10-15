@@ -522,3 +522,42 @@ def update_pole_offset(
         alt_error_arcmin=(new_alt - true_alt) * 60.0,
         az_error_arcmin=np.degrees(_wrap_pm_pi(np.radians(new_az - true_az))) * 60.0,
     )
+
+
+def _signed_angle_about(u: np.ndarray, v: np.ndarray, axis: np.ndarray) -> float:
+    u_perp = u - np.dot(u, axis) * axis
+    v_perp = v - np.dot(v, axis) * axis
+    return float(np.arctan2(np.dot(axis, np.cross(u_perp, v_perp)), np.dot(u_perp, v_perp)))
+
+
+def correction_displacements(
+    alt_error_arcmin: float,
+    az_error_arcmin: float,
+    pointing_earth: np.ndarray,
+    latitude_deg: float,
+) -> tuple[np.ndarray, np.ndarray]:
+    """How the telescope's pointing moves when the two knobs remove the remaining error.
+
+    *pointing_earth* is where the telescope points now, as an Earth-frame unit vector (see
+    _earth_vector). Returns the displacement (east, north, up vectors) caused by the azimuth
+    knob and then by the altitude knob, applied in that order, as a user would: the azimuth
+    knob tips the mount about the vertical, the altitude knob about the horizontal axis
+    perpendicular to the (by then corrected) azimuth bearing. The sum of the two is the
+    move of the pointing; each alone says which way that knob pushes the field.
+    """
+    true_alt, true_az = alt_az(0.0, 90.0 if latitude_deg >= 0 else -90.0, latitude_deg)
+    alt, az = np.radians(true_alt + alt_error_arcmin / 60.0), np.radians(true_az + az_error_arcmin / 60.0)
+    axis_v = np.array([np.cos(alt) * np.sin(az), np.cos(alt) * np.cos(az), np.sin(alt)])
+    pole = _earth_to_altaz(_radec_to_vector(0.0, 90.0 if latitude_deg >= 0 else -90.0), latitude_deg)
+    zenith = np.array([0.0, 0.0, 1.0])
+
+    d_az = _signed_angle_about(axis_v, pole, zenith)
+    axis_1 = _rodrigues(zenith, d_az, axis_v)
+    az_1 = np.arctan2(axis_1[0], axis_1[1])
+    alt_axis = np.array([np.cos(az_1), -np.sin(az_1), 0.0])
+    d_alt = _signed_angle_about(axis_1, pole, alt_axis)
+
+    p0 = _earth_to_altaz(pointing_earth, latitude_deg)
+    p1 = _rodrigues(zenith, d_az, p0)
+    p2 = _rodrigues(alt_axis, d_alt, p1)
+    return p1 - p0, p2 - p1

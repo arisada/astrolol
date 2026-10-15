@@ -23,11 +23,15 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import math
 import uuid
+from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
-from typing import Any, Literal
+from typing import TYPE_CHECKING, Any, Literal
 
+import astropy.io.fits as astropy_fits
 import astropy.units as u
+import numpy as np
 import structlog
 from astropy.coordinates import SkyCoord
 from pydantic import BaseModel, Field
@@ -58,13 +62,20 @@ from astrolol.plugins.polar_align.solver import (
     update_pole_offset,
 )
 
+if TYPE_CHECKING:
+    from astrolol.plugins.polar_align.starview import StarViewRequest
+
 logger = structlog.get_logger()
 
 SLEW_TIMEOUT_S = 300.0
 MAX_SOLVE_ATTEMPTS = 3
 MAX_DEC_DRIFT_ARCMIN = 1.0
-MIN_AUTO_REFRESH_INTERVAL_S = 5.0
+MIN_AUTO_REFRESH_INTERVAL_S = 1.0
 MAX_AUTO_REFRESH_INTERVAL_S = 600.0
+MAX_RECHECK_RADIUS_DEG = 3.0
+# Turning the knobs moves the field by about the error being removed; twice that covers an
+# overshoot, so a mount that started far off still gets found.
+RECHECK_RADIUS_ERROR_FACTOR = 2.0
 
 # Target planning (see plan_targets). Auto-picked Dec candidates, as |Dec| (signed by the
 # site's hemisphere): well clear of the pole (where precession puts the JNow pole ~9' from
@@ -114,12 +125,21 @@ class WizardRequest(BaseModel):
     converge_exposure_s: float | None = Field(default=None, gt=0)
     converge_binning: int | None = Field(default=None, ge=1)
     converge_search_radius_deg: float = Field(
-        default=3.0, gt=0,
-        description="ASTAP search radius for a recheck solve. Small and tight on purpose: "
-        "the mount hasn't been slewed, only the knobs turned a little, so the true position "
-        "is known to within a couple of degrees of the reference -- a small radius is what "
-        "actually makes a recheck solve fast.",
+        default=0.5, gt=0,
+        description="Minimum ASTAP search radius for a recheck solve. Small on purpose: the "
+        "mount hasn't been slewed, only the knobs turned a little, so the true position is "
+        "known to within a fraction of a degree of the reference -- a small radius is what "
+        "actually makes a recheck solve fast. Widened automatically when the initial fit "
+        "found a large error (see recheck_search_radius_deg).",
     )
+
+
+def recheck_search_radius_deg(configured_deg: float, alt_error_arcmin: float, az_error_arcmin: float) -> float:
+    """Search radius for a recheck solve: the configured minimum, or -- when the initial fit
+    found a large error -- enough to still contain the field after the knobs have removed it
+    (the field moves by about the error), capped at MAX_RECHECK_RADIUS_DEG."""
+    error_deg = math.hypot(alt_error_arcmin, az_error_arcmin) / 60.0
+    return min(MAX_RECHECK_RADIUS_DEG, max(configured_deg, RECHECK_RADIUS_ERROR_FACTOR * error_deg))
 
 
 class TargetPlan(BaseModel):
@@ -211,6 +231,24 @@ def plan_targets(
             "Try a different Dec, or point the mount at the other side of the meridian first."
         )
     return best[1]
+
+
+@dataclass(frozen=True)
+class PointingReading:
+    """One solve at the converging reference pointing."""
+
+    observation: Observation
+    solve: Any  # the platesolve plugin's SolveResult (duck-typed: plugins don't import each other)
+    binning: int
+    exposure_s: float
+    pixels: np.ndarray | None = None  # the solved frame, when asked for
+
+
+def _read_fits_pixels(path: str) -> np.ndarray:
+    data = astropy_fits.getdata(path)
+    if data.ndim != 2:
+        raise ValueError(f"expected a 2-D image, got shape {data.shape}")
+    return np.asarray(data)
 
 
 class WizardPoint(BaseModel):
@@ -525,13 +563,10 @@ class PolarAlignWizard:
             f"Plate solve failed for point {index} after {MAX_SOLVE_ATTEMPTS} attempts: {last_error}"
         )
 
-    async def recheck(self, run: WizardRun) -> None:
-        """One CONVERGING-phase reading: expose, solve once (tight hint + small radius --
-        see WizardRequest.converge_*, and the module docstring on why), and measure how far
-        that implies the knobs have moved the axis since the fixed reference. Raises on a
-        bad reading (solve failure, or an update_pole_offset conditioning/ambiguity guard)
-        without touching run.status -- a single bad recheck isn't fatal to the run, the
-        caller just doesn't get an updated live_offset this time and can try again."""
+    async def read_pointing(self, run: WizardRun, *, keep_frame: bool = False) -> "PointingReading":
+        """Expose and solve once at the converging reference pointing (tight hint + small radius
+        -- see WizardRequest.converge_*, and the module docstring on why). Everything a
+        recheck needs, plus the frame itself when *keep_frame* (the star view starts from it)."""
         if run.status != "converging":
             raise ValueError("Polar alignment is not in the converging phase")
         if run.result is None or not run.points:
@@ -546,7 +581,6 @@ class PolarAlignWizard:
         site = self._site(app)
         if site is None:
             raise ValueError("No site location configured for the active profile")
-
         mm = getattr(app.state, "mount_manager", None)
         if mm is None:
             raise RuntimeError("Polar alignment needs the mount manager")
@@ -556,52 +590,83 @@ class PolarAlignWizard:
         exposure_s = req.converge_exposure_s or req.exposure_s
         binning = req.converge_binning or req.binning
 
+        # The mount's own reported RA now: update_pole_offset carries the reference
+        # forward by the motor rotation since it was taken (tracking, in the normal case).
+        status = await mm.get_status(req.mount_id)
+        t0 = _now()
+        exposure = await im.expose(
+            req.camera_id,
+            ExposureRequest(duration=exposure_s, binning=binning, gain=req.gain, save=False),
+        )
+        when = t0 + timedelta(seconds=exposure_s / 2.0)
+        result = await solve_manager.solve(
+            fits_path=str(exposure.fits_path),
+            ra_hint=reference.solved_ra_hours * 15.0,
+            dec_hint=reference.solved_dec_deg,
+            radius=recheck_search_radius_deg(
+                req.converge_search_radius_deg,
+                run.result.alt_error_arcmin,
+                run.result.az_error_arcmin,
+            ),
+        )
+        icrs_coord = SkyCoord(ra=result.ra * u.deg, dec=result.dec * u.deg, frame="icrs")
+        new_ra_h, new_dec = icrs_to_jnow(icrs_coord, when)
+        pixels = None
+        if keep_frame:
+            pixels = await asyncio.to_thread(_read_fits_pixels, str(exposure.fits_path))
+        return PointingReading(
+            observation=Observation(
+                solved_ra_hours=new_ra_h, solved_dec_deg=new_dec,
+                mount_ra_hours=status.ra_jnow, when=when,
+            ),
+            solve=result, binning=binning, exposure_s=exposure_s, pixels=pixels,
+        )
+
+    def measure_offset(self, run: WizardRun, observation: Observation) -> ConvergenceUpdate:
+        """How far the knobs have moved the axis, given where the reference pointing is now."""
+        assert run.result is not None
+        site = self._site(self._app)
+        assert site is not None
+        reference = run.points[-1]
+        return update_pole_offset(
+            run.result.axis_ha_hours,
+            run.result.axis_dec_deg,
+            Observation(
+                solved_ra_hours=reference.solved_ra_hours,
+                solved_dec_deg=reference.solved_dec_deg,
+                mount_ra_hours=reference.mount_ra_hours,
+                when=reference.when,
+            ),
+            observation,
+            site.latitude,
+            site.longitude,
+        )
+
+    async def recheck(self, run: WizardRun) -> None:
+        """One CONVERGING-phase reading: expose, solve once, and measure how far that implies
+        the knobs have moved the axis since the fixed reference. Raises on a bad reading
+        (solve failure, or an update_pole_offset conditioning/ambiguity guard) without
+        touching run.status -- a single bad recheck isn't fatal to the run, the caller just
+        doesn't get an updated live_offset this time and can try again."""
+        if run.status != "converging":
+            raise ValueError("Polar alignment is not in the converging phase")
         # Recorded on the run itself (not just raised to the caller) so a failure from
         # the auto-refresh loop -- which has no caller watching -- is still visible to
         # anyone polling GET /wizard, not just whoever clicked Recheck.
         run.last_recheck_at = _now()
         try:
-            # The mount's own reported RA now: update_pole_offset carries the reference
-            # forward by the motor rotation since it was taken (tracking, in the normal case).
-            status = await mm.get_status(req.mount_id)
-            t0 = _now()
-            exposure = await im.expose(
-                req.camera_id,
-                ExposureRequest(duration=exposure_s, binning=binning, gain=req.gain, save=False),
-            )
-            when = t0 + timedelta(seconds=exposure_s / 2.0)
-            result = await solve_manager.solve(
-                fits_path=str(exposure.fits_path),
-                ra_hint=reference.solved_ra_hours * 15.0,
-                dec_hint=reference.solved_dec_deg,
-                radius=req.converge_search_radius_deg,
-            )
-            icrs_coord = SkyCoord(ra=result.ra * u.deg, dec=result.dec * u.deg, frame="icrs")
-            new_ra_h, new_dec = icrs_to_jnow(icrs_coord, when)
-
-            run.live_offset = update_pole_offset(
-                run.result.axis_ha_hours,
-                run.result.axis_dec_deg,
-                Observation(
-                    solved_ra_hours=reference.solved_ra_hours,
-                    solved_dec_deg=reference.solved_dec_deg,
-                    mount_ra_hours=reference.mount_ra_hours,
-                    when=reference.when,
-                ),
-                Observation(
-                    solved_ra_hours=new_ra_h,
-                    solved_dec_deg=new_dec,
-                    mount_ra_hours=status.ra_jnow,
-                    when=when,
-                ),
-                site.latitude,
-                site.longitude,
-            )
+            reading = await self.read_pointing(run)
+            run.live_offset = self.measure_offset(run, reading.observation)
         except asyncio.CancelledError:
             raise
         except Exception as exc:
             run.last_recheck_error = str(exc)
             raise
+        await self.publish_offset(run)
+
+    async def publish_offset(self, run: WizardRun) -> None:
+        """Record a successful reading (run.live_offset already set) and announce it."""
+        assert run.live_offset is not None
         run.last_recheck_error = None
         logger.info(
             "polar_align.error_updated", run_id=run.id,
@@ -636,7 +701,10 @@ class WizardEngine:
     time, server-wide. Mirrors plugins/autofocus/engine.py's AutofocusEngine."""
 
     def __init__(self, app: Any, event_bus: Any) -> None:
+        from astrolol.plugins.polar_align.starview import StarView  # starview imports this module
+
         self._wizard = PolarAlignWizard(app, event_bus)
+        self.star_view = StarView(app, self._wizard)
         self._current_run: WizardRun | None = None
         self._task: asyncio.Task[None] | None = None
         self._auto_refresh_task: asyncio.Task[None] | None = None
@@ -655,6 +723,7 @@ class WizardEngine:
         if self._current_run is not None and self._current_run.status == "converging":
             raise ValueError("Polar alignment is still converging. Finish or cancel it first.")
         await self._stop_auto_refresh_task()
+        await self.star_view.stop()
         run = WizardRun(id=uuid.uuid4().hex[:12], request=req, started_at=_now())
         self._current_run = run
         self._task = asyncio.create_task(self._wizard.run(run), name=f"polar_align_{run.id}")
@@ -663,6 +732,8 @@ class WizardEngine:
     async def recheck(self) -> WizardRun:
         if self._current_run is None:
             raise ValueError("No polar alignment run has been started")
+        if self.star_view.running:
+            raise ValueError("The star view is using the camera. Stop it first.")
         try:
             await self._wizard.recheck(self._current_run)
         except Exception as exc:
@@ -685,6 +756,8 @@ class WizardEngine:
             raise ValueError("No polar alignment run has been started")
         if self._current_run.status != "converging":
             raise ValueError("Polar alignment is not in the converging phase")
+        if self.star_view.running:
+            raise ValueError("The star view is using the camera. Stop it first.")
         await self._stop_auto_refresh_task()
         self._current_run.auto_refresh_interval_s = interval_s
         run_id = self._current_run.id
@@ -700,6 +773,17 @@ class WizardEngine:
         await self._stop_auto_refresh_task()
         self._current_run.auto_refresh_interval_s = None
         return self._current_run
+
+    async def start_star_view(self, req: StarViewRequest) -> None:
+        """Follow one star on the camera stream instead of re-solving (see starview.py)."""
+        if self._current_run is None:
+            raise ValueError("No polar alignment run has been started")
+        await self._stop_auto_refresh_task()
+        self._current_run.auto_refresh_interval_s = None
+        await self.star_view.start(self._current_run, req)
+
+    async def stop_star_view(self) -> None:
+        await self.star_view.stop()
 
     async def _auto_refresh_loop(self, interval_s: float) -> None:
         run = self._current_run
@@ -730,6 +814,7 @@ class WizardEngine:
         """Stop the current run. During CONVERGING this is a completion, not an abort --
         see PolarAlignWizard.finish_converging."""
         await self._stop_auto_refresh_task()
+        await self.star_view.stop()
         if self._current_run is not None:
             self._current_run.auto_refresh_interval_s = None
         if self._current_run is not None and self._current_run.status == "converging":

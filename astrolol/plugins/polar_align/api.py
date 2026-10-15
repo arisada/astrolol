@@ -6,11 +6,12 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 import structlog
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, Response
 from pydantic import BaseModel, Field
 
 from astrolol.equipment.optical_path import find_profile_site
 from astrolol.plugins.polar_align.reticle import ReticleState, compute_reticle_state
+from astrolol.plugins.polar_align.starview import StarViewInfo, StarViewRequest
 from astrolol.plugins.polar_align.wizard import (
     MAX_AUTO_REFRESH_INTERVAL_S,
     MIN_AUTO_REFRESH_INTERVAL_S,
@@ -109,6 +110,39 @@ async def stop_auto_refresh(request: Request) -> None:
         await _engine(request).stop_auto_refresh()
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+
+@router.post("/wizard/star_view", status_code=202, response_model=StarViewInfo)
+async def start_star_view(body: StarViewRequest, request: Request) -> StarViewInfo:
+    """Start the live star view during CONVERGING: one solve, then a star followed on the
+    camera stream. Returns at once; poll GET for the state (the first solve takes a moment)."""
+    engine = _engine(request)
+    try:
+        await engine.start_star_view(body)
+    except ValueError as exc:
+        raise HTTPException(status_code=404 if "No polar" in str(exc) else 422, detail=str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return engine.star_view.info()
+
+
+@router.get("/wizard/star_view", response_model=StarViewInfo)
+async def get_star_view(request: Request) -> StarViewInfo:
+    return _engine(request).star_view.info()
+
+
+@router.get("/wizard/star_view/frame.jpg")
+async def get_star_view_frame(request: Request, v: int | None = None) -> Response:
+    """The latest star-view image, stretched. *v* (the info's version) only busts caches."""
+    data = _engine(request).star_view.jpeg()
+    if data is None:
+        raise HTTPException(status_code=404, detail="No frame yet")
+    return Response(content=data, media_type="image/jpeg", headers={"Cache-Control": "no-store"})
+
+
+@router.delete("/wizard/star_view", status_code=204)
+async def stop_star_view(request: Request) -> None:
+    await _engine(request).stop_star_view()
 
 
 @router.delete("/wizard", status_code=204)
