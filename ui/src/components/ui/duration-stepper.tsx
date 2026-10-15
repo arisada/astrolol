@@ -19,11 +19,15 @@ export function fmtDuration(s: number): string {
   return rem === 0 ? `${m} m` : `${m} m ${rem} s`
 }
 
-export function DurationStepper({ steps, value, onChange, label }: {
+export function DurationStepper({ steps, value, onChange, label, format = fmtDuration, decTitle, incTitle }: {
   steps: number[]
   value: number
   onChange: (v: number) => void
   label?: string
+  /** Renders the value; defaults to a duration. Lets the same stepper take another unit (degrees). */
+  format?: (v: number) => string
+  decTitle?: string
+  incTitle?: string
 }) {
   const { t } = useTranslation()
   const [editing, setEditing] = useState(false)
@@ -51,8 +55,8 @@ export function DurationStepper({ steps, value, onChange, label }: {
       label={label ?? t('duration.label')}
       decDisabled={idx === 0}
       incDisabled={idx === steps.length - 1}
-      decTitle={t('duration.shorter')}
-      incTitle={t('duration.longer')}
+      decTitle={decTitle ?? t('duration.shorter')}
+      incTitle={incTitle ?? t('duration.longer')}
       onDec={() => { setEditing(false); onChange(steps[idx - 1]) }}
       onInc={() => { setEditing(false); onChange(steps[idx + 1]) }}
     >
@@ -67,7 +71,7 @@ export function DurationStepper({ steps, value, onChange, label }: {
         />
       ) : (
         <button type="button" onClick={startEdit} title={t('duration.custom')} className={`${stepperValueClass} hover:text-slate-50`}>
-          {fmtDuration(value)}
+          {format(value)}
         </button>
       )}
     </StepperShell>
