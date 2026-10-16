@@ -6,7 +6,7 @@ working on.
 
 ## Opening it
 
-Click the small tab on the right edge of the screen. On a wide screen the page makes room for the
+Click the small tab on the right edge of the screen (at the bottom of the screen on a phone held upright, where the dock opens as a sheet over the bottom of the page). On a wide screen the page makes room for the
 dock; on a narrower one the dock slides over the page (press **Esc** or the close button to put it
 away). Whether it is open is remembered by each browser.
 

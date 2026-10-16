@@ -6,7 +6,7 @@ sur laquelle vous travaillez.
 
 ## L'ouvrir
 
-Cliquez sur la petite languette au bord droit de l'écran. Sur un grand écran, la page lui laisse la
+Cliquez sur la petite languette au bord droit de l'écran (en bas de l'écran sur un téléphone tenu à la verticale, où le dock s'ouvre en feuille par-dessus le bas de la page). Sur un grand écran, la page lui laisse la
 place ; sur un écran plus étroit, le dock glisse par-dessus la page (appuyez sur **Échap** ou sur le
 bouton de fermeture pour le ranger). Chaque navigateur retient s'il est ouvert.
 

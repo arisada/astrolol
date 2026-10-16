@@ -1,9 +1,9 @@
 import { useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { ChevronDown, ChevronRight, ChevronUp, PanelRightClose, PanelRightOpen, Pencil, Check, Plus, X } from 'lucide-react'
+import { ChevronDown, ChevronRight, ChevronUp, PanelBottomClose, PanelBottomOpen, PanelRightClose, PanelRightOpen, Pencil, Check, Plus, X } from 'lucide-react'
 import { useStore } from '@/store'
-import { useMediaQuery } from '@/hooks/useMediaQuery'
+import { PORTRAIT_NARROW, useMediaQuery } from '@/hooks/useMediaQuery'
 import { getAllDockWidgets, getDockWidget, type DockWidgetDef } from './registry'
 import { useDock } from './store'
 import './coreWidgets'
@@ -81,24 +81,28 @@ export function Dock() {
   const setEditing = useDock((s) => s.setEditing)
   const load = useDock((s) => s.load)
   const wide = useMediaQuery(WIDE)
+  const portrait = useMediaQuery(PORTRAIT_NARROW)   // phone held upright: a sheet at the bottom
   const available = useAvailable()
 
   useEffect(() => { void load() }, [load])
   useEffect(() => {
-    if (!open || wide) return
+    if (!open || (wide && !portrait)) return
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [open, wide, setOpen])
+  }, [open, wide, portrait, setOpen])
 
   const label = open ? t('dock.close') : t('dock.open')
   // One handle, fixed in the same place whether the dock is open or not (it may cover a widget).
   const handle = (
     <button type="button" onClick={() => setOpen(!open)} aria-label={label} title={label} aria-expanded={open}
-      className="fixed right-0 top-1/2 -translate-y-1/2 z-50 flex h-16 w-5 items-center justify-center
-                 rounded-l-md border border-r-0 border-surface-border bg-surface-raised text-slate-500
-                 hover:text-slate-200 hover:w-6 transition-all">
-      {open ? <PanelRightClose size={14} /> : <PanelRightOpen size={14} />}
+      className={`fixed z-50 flex items-center justify-center border border-surface-border bg-surface-raised
+                  text-slate-500 hover:text-slate-200 transition-all ${portrait
+        ? 'bottom-0 left-1/2 -translate-x-1/2 h-5 w-16 rounded-t-md border-b-0'
+        : 'right-0 top-1/2 -translate-y-1/2 h-16 w-5 rounded-l-md border-r-0 hover:w-6'}`}>
+      {portrait
+        ? (open ? <PanelBottomClose size={14} /> : <PanelBottomOpen size={14} />)
+        : (open ? <PanelRightClose size={14} /> : <PanelRightOpen size={14} />)}
     </button>
   )
 
@@ -113,8 +117,10 @@ export function Dock() {
   return (
     <>
     <aside aria-label={t('dock.title')}
-      className={`flex flex-col border-l border-surface-border bg-surface ${
-        wide ? 'w-80 shrink-0' : 'fixed right-0 top-0 bottom-0 z-40 w-[min(92vw,22rem)] shadow-2xl'}`}>
+      className={`flex flex-col border-surface-border bg-surface ${
+        portrait ? 'fixed inset-x-0 bottom-0 z-40 max-h-[60dvh] border-t shadow-2xl'
+          : wide ? 'w-80 shrink-0 border-l'
+          : 'fixed right-0 top-0 bottom-0 z-40 w-[min(92vw,22rem)] border-l shadow-2xl'}`}>
       <div className="h-9 shrink-0 flex items-center gap-1 border-b border-surface-border px-2">
         <span className="flex-1 label-caps text-slate-500 px-1">{t('dock.title')}</span>
         <button type="button" className={`${iconBtn} ${editing ? 'text-accent' : ''}`} onClick={() => setEditing(!editing)}
@@ -122,7 +128,7 @@ export function Dock() {
           {editing ? <Check size={14} /> : <Pencil size={14} />}
         </button>
       </div>
-      <div className="flex-1 overflow-y-auto p-2 flex flex-col gap-2">
+      <div className={`flex-1 overflow-y-auto p-2 flex flex-col gap-2 ${portrait ? 'pb-7' : ''}`}>
         {shown.length === 0 && !editing && <p className="p-2 text-xs text-slate-500">{t('dock.empty')}</p>}
         {shown.map(({ def, collapsed }, i) => (
           <Frame key={def.id} def={def} index={i} count={shown.length} collapsed={collapsed} editing={editing} />
