@@ -172,5 +172,12 @@
     "noMount": "Aucune monture connectée",
     "noFocuser": "Aucun focuseur connecté",
     "noFilterWheel": "Aucune roue à filtres connectée"
+  },
+  "log": {
+    "show": "Afficher le journal",
+    "hide": "Replier le journal",
+    "resize": "Glisser pour redimensionner",
+    "latest": "Dernier",
+    "empty": "Rien dans le journal pour l'instant"
   }
 }

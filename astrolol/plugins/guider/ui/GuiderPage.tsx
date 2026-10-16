@@ -3,7 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
-import { EventLog } from '@/components/ui/event-log'
+import { LogPanel } from '@/components/ui/log-panel'
 import { GuideGraph } from '@/components/ui/guide-graph'
 import { GuideTarget } from '@/components/ui/guide-target'
 import { NumberStepper } from '@/components/ui/number-stepper'
@@ -263,7 +263,7 @@ export function GuiderPage() {
             </div>
           )}
         </Page>
-      <EventLog filter={['guider', 'guiding']} />
+      <LogPanel filter={['guider', 'guiding']} />
     </div>
   )
 }

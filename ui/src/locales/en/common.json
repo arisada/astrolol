@@ -172,5 +172,12 @@
     "noMount": "No mount connected",
     "noFocuser": "No focuser connected",
     "noFilterWheel": "No filter wheel connected"
+  },
+  "log": {
+    "show": "Show the log",
+    "hide": "Fold the log",
+    "resize": "Drag to resize",
+    "latest": "Latest",
+    "empty": "Nothing logged yet"
   }
 }

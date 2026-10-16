@@ -204,7 +204,8 @@ Use components from `ui/src/components/ui/` rather than re-implementing them per
 
 | Component | Import | Description |
 |---|---|---|
-| `EventLog` | `@/components/ui/event-log` | Scrollable log panel filtered by component name(s) |
+| `LogPanel` | `@/components/ui/log-panel` | The page log: a strip at the bottom that overlays the page (never resizes it), unfolds for a few seconds on new entries, drag-resizable, pinned open from its handle (bottom left). Place it as the page's last child inside a `relative` box that reaches the bottom of the area it covers (the content area by default) |
+| `LogList`, `useLogEntries` | `@/components/ui/log-list` | Inline log list, oldest first, following the bottom until scrolled up (used by the dock's Warnings widget) |
 | `PillGroup` | `@/components/ui/pill-group` | Segmented button group for enum-like or numeric options |
 | `DurationStepper` | `@/components/ui/duration-stepper` | Number input with +/− stepper buttons |
 | `CountStepper` | `@/components/ui/count-stepper` | Frame-count stepper (0,1,2,3,5,10,… steps), editable inline |
@@ -223,10 +224,10 @@ Use components from `ui/src/components/ui/` rather than re-implementing them per
 | `GuideGraph`, `GuideTarget` | `@/components/ui/guide-graph`, `guide-target` | Guide error over time (RA/Dec lines, RMS band) and the recent positions around the aim point; take `GuideSample[]` (`ra`, `dec`, `ts`), a `range` and a `unit`. Helpers in `@/utils/guiding` |
 
 ```tsx
-import { EventLog } from '@/components/ui/event-log'
+import { LogPanel } from '@/components/ui/log-panel'
 import { PillGroup } from '@/components/ui/pill-group'
 
-<EventLog filter={['my_feature', 'indi']} />
+<LogPanel filter={['my_feature', 'indi']} />
 <PillGroup options={[1, 2, 4]} value={binning} onChange={setBinning} label="Binning" />
 ```
 
@@ -666,7 +667,7 @@ ui/
 │   ├── store/          # Zustand — core device state + pluginStates + registerPluginEventHandlers
 │   ├── plugin-registry.ts  # runtime map: plugin id → { route, icon, Component, StatusChip? }
 │   ├── components/
-│   │   └── ui/         # EventLog, PillGroup, DurationStepper, Input, ToggleSwitch,
+│   │   └── ui/         # LogPanel, LogList, PillGroup, DurationStepper, Input, ToggleSwitch,
 │   │                   # Card, SidebarSection, Badge, Chip, StatusPill, Button
 │   └── pages/          # Equipment, Profiles, Imaging, Mount, Logs, Options
 └── vite.config.ts      # @plugins alias + vite-plugin-checker + proxy

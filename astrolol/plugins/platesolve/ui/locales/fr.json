@@ -48,10 +48,6 @@
     "install": "Installer d05",
     "installing": "Installation…"
   },
-  "log": {
-    "resize": "Faites glisser pour redimensionner",
-    "empty": "Journal de résolution"
-  },
   "viewer": {
     "alt": "Dernière pose",
     "none": "Pas encore d'image"

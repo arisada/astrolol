@@ -48,10 +48,6 @@
     "install": "Install d05",
     "installing": "Installing…"
   },
-  "log": {
-    "resize": "Drag to resize",
-    "empty": "Plate-solve log"
-  },
   "viewer": {
     "alt": "Latest exposure",
     "none": "No image yet"

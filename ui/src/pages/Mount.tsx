@@ -18,7 +18,7 @@ import { useLocalStorage } from '@/hooks/useLocalStorage'
 import { useMountSite } from '@/hooks/useMountSite'
 import { useMountSettings } from '@/hooks/useMountSettings'
 import { NudgePad } from '@/components/NudgePad'
-import { EventLog } from '@/components/ui/event-log'
+import { LogPanel } from '@/components/ui/log-panel'
 import { DevicePropertiesPanel } from '@/components/DevicePropertiesPanel'
 import { Page } from '@/components/Page'
 
@@ -440,7 +440,7 @@ function MountControls({ deviceId }: { deviceId: string }) {
 
         {error && <p className="text-xs text-status-error">{error}</p>}
       </Page>
-    <EventLog filter={['mount', 'indi']} />
+    <LogPanel filter={['mount', 'indi']} />
     </div>
   )
 }

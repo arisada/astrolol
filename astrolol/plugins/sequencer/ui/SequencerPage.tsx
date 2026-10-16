@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { FolderOpen, Plus, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { EventLog } from '@/components/ui/event-log'
+import { LogPanel } from '@/components/ui/log-panel'
 import { useStore } from '@/store'
 import type {
   SequencerBoundary,
@@ -179,7 +179,7 @@ export function SequencerPage() {
             </>
           )}
         </Page>
-      <EventLog filter={['sequencer']} />
+      <LogPanel filter={['sequencer']} />
 
       {showSequences && (
         <SequencesDialog

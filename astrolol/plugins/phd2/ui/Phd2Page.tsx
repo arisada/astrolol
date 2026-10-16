@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ToggleSwitch } from '@/components/ui/toggle-switch'
 import { Card } from '@/components/ui/card'
-import { EventLog } from '@/components/ui/event-log'
+import { LogPanel } from '@/components/ui/log-panel'
 import { GuideGraph } from '@/components/ui/guide-graph'
 import type { Phd2Settings } from '@/api/types'
 import * as phd2Api from './api'
@@ -328,7 +328,7 @@ export function Phd2Page() {
         </p>
       )}
     </Page>
-    <EventLog filter={['phd2']} />
+    <LogPanel filter={['phd2']} />
     </div>
   )
 }

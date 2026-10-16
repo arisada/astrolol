@@ -47,6 +47,15 @@ guide's front page, and an icon opens the page in a new tab.
 Errors and confirmations appear briefly at the bottom of the screen. Click **Dismiss** to close
 one; it stays closed after a page reload.
 
+## The log on each page
+
+Pages that run something (Imaging, Mount, Guider, Sequencer, PHD2, Plate Solving) have a thin strip
+at the bottom showing the latest line of their log. When something new is logged the log unfolds over
+the page for a few seconds (longer for warnings and errors), then folds again; the page itself never
+moves. The arrow at the bottom left keeps it open until you fold it again. Drag its top edge to make
+it taller; it follows the newest line unless you scroll up, and **Latest** takes you back. The
+[Logs](logs.md) page lists everything.
+
 ## Device properties
 
 On the Imaging and Mount pages, the small gear next to a device name opens

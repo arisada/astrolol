@@ -50,6 +50,16 @@ d'accueil du guide, et une icône ouvre la page dans un nouvel onglet.
 Les erreurs et confirmations s'affichent brièvement en bas de l'écran. Cliquez sur **Fermer**
 pour en masquer une ; elle reste masquée après un rechargement de la page.
 
+## Le journal de chaque page
+
+Les pages qui exécutent quelque chose (Imagerie, Monture, Guideur, Séquenceur, PHD2, Résolution
+astrométrique) ont une fine bande en bas qui montre la dernière ligne de leur journal. Quand
+quelque chose de nouveau est écrit, le journal se déplie par-dessus la page quelques secondes (plus
+longtemps pour les alertes et les erreurs) puis se replie ; la page, elle, ne bouge jamais. La flèche
+en bas à gauche le garde ouvert jusqu'à ce que vous le repliez. Glissez son bord supérieur pour
+l'agrandir ; il suit la ligne la plus récente sauf si vous remontez, et **Dernier** vous y ramène. La
+page [Journaux](logs.md) liste tout.
+
 ## Propriétés des appareils
 
 Sur les pages Imagerie et Monture, la petite roue dentée à côté du nom d'un appareil ouvre les

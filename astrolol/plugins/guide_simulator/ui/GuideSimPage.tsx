@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Button } from '@/components/ui/button'
-import { EventLog } from '@/components/ui/event-log'
+import { LogPanel } from '@/components/ui/log-panel'
 import { Input } from '@/components/ui/input'
 import { ToggleSwitch } from '@/components/ui/toggle-switch'
 import * as sim from './api'
@@ -148,7 +148,7 @@ export function GuideSimPage() {
             </Section>
           )}
         </Page>
-      <EventLog filter={['guide_simulator', 'guiding']} />
+      <LogPanel filter={['guide_simulator', 'guiding']} />
     </div>
   )
 }

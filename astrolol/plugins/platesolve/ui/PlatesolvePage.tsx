@@ -5,6 +5,7 @@ import { AlertTriangle, Camera, Download, ScanSearch, Settings, StopCircle, X } 
 import { api } from '@/api/client'
 import { useStore } from '@/store'
 import { CollapsibleSidebar } from '@/components/ui/collapsible-sidebar'
+import { LogPanel } from '@/components/ui/log-panel'
 import { Button } from '@/components/ui/button'
 import { SidebarSection } from '@/components/ui/card'
 import { DurationStepper } from '@/components/ui/duration-stepper'
@@ -193,82 +194,6 @@ function DbWarningBanner({ dbPath, onInstall, installing }: {
         <Download size={12} className="mr-1" />
         {installing ? t('db.installing') : t('db.install')}
       </Button>
-    </div>
-  )
-}
-
-// ── Plate-solve log panel ──────────────────────────────────────────────────────
-
-function SolveLog() {
-  const { t } = useTranslation('platesolve')
-  const log = useStore((s) => s.log.filter((e) => e.component === 'platesolve'))
-  const containerRef  = useRef<HTMLDivElement>(null)
-  const atBottomRef   = useRef(false)
-  const [height, setHeight] = useState(300)
-  const dragStart     = useRef<{ y: number; h: number } | null>(null)
-
-  const onScroll = () => {
-    const el = containerRef.current
-    if (!el) return
-    atBottomRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 24
-  }
-
-  useEffect(() => {
-    const el = containerRef.current
-    if (!el) return
-    el.scrollTop = el.scrollHeight
-    atBottomRef.current = true
-  }, [])
-
-  useEffect(() => {
-    const el = containerRef.current
-    if (!el || !atBottomRef.current) return
-    el.scrollTop = el.scrollHeight
-  }, [log.length])
-
-  const onDragMouseDown = (e: React.MouseEvent) => {
-    e.preventDefault()
-    dragStart.current = { y: e.clientY, h: height }
-    const onMove = (ev: MouseEvent) => {
-      if (!dragStart.current) return
-      const delta = dragStart.current.y - ev.clientY
-      setHeight(Math.max(64, dragStart.current.h + delta))
-    }
-    const onUp = () => {
-      dragStart.current = null
-      window.removeEventListener('mousemove', onMove)
-      window.removeEventListener('mouseup', onUp)
-    }
-    window.addEventListener('mousemove', onMove)
-    window.addEventListener('mouseup', onUp)
-  }
-
-  return (
-    <div className="shrink-0 border-t border-surface-border" style={{ height }}>
-      <div
-        onMouseDown={onDragMouseDown}
-        className="h-1.5 cursor-ns-resize bg-surface-border hover:bg-accent/50 active:bg-accent transition-colors"
-        title={t('log.resize')}
-      />
-      <div
-        ref={containerRef}
-        onScroll={onScroll}
-        className="bg-surface overflow-y-auto px-3 py-2 font-mono"
-        style={{ height: height - 6 }}
-      >
-        {log.length === 0 ? (
-          <span className="text-xs text-slate-700">{t('log.empty')}</span>
-        ) : (
-          [...log].reverse().map((e) => (
-            <div key={e.id} className="flex gap-2 text-xs leading-5">
-              <span className="text-slate-600 shrink-0">{e.timestamp.slice(11, 19)}</span>
-              <span className={`whitespace-pre-wrap break-all ${e.level === 'error' ? 'text-status-error' : e.level === 'warning' ? 'text-yellow-400' : 'text-slate-400'}`}>
-                {e.message}
-              </span>
-            </div>
-          ))
-        )}
-      </div>
     </div>
   )
 }
@@ -463,9 +388,9 @@ export function PlatesolvePage() {
     <div className="flex h-full overflow-hidden">
 
       {/* Centre: image + log */}
-      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+      <div className="relative flex-1 flex flex-col min-w-0 overflow-hidden">
         <ImageViewer image={latestImage} />
-        <SolveLog />
+        <LogPanel filter={['platesolve']} />
       </div>
 
       {/* Right sidebar: controls */}

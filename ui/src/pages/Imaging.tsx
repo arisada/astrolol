@@ -17,7 +17,7 @@ import { NumberStepper } from '@/components/ui/number-stepper'
 import { Input } from '@/components/ui/input'
 import { SidebarSection } from '@/components/ui/card'
 import { DurationStepper, EXPOSURE_STEPS } from '@/components/ui/duration-stepper'
-import { EventLog } from '@/components/ui/event-log'
+import { LogPanel } from '@/components/ui/log-panel'
 import { PillGroup } from '@/components/ui/pill-group'
 import { DevicePropertiesPanel } from '@/components/DevicePropertiesPanel'
 import { CollapsibleSidebar } from '@/components/ui/collapsible-sidebar'
@@ -754,9 +754,9 @@ export function Imaging() {
     <>
     <div className="flex h-full">
       {/* Image viewer */}
-      <div className="flex-1 flex flex-col min-w-0">
+      <div className="relative flex-1 flex flex-col min-w-0">
         <ImageViewer ref={viewerRef} deviceId={deviceId} histoAuto={histoAuto} previewParams={previewParams} />
-        <EventLog filter={['imager', 'indi', 'phd2']} />
+        <LogPanel filter={['imager', 'indi', 'phd2']} />
       </div>
 
       {/* Right sidebar */}
