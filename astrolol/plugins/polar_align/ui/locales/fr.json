@@ -95,14 +95,19 @@
     "exposure": "Pose",
     "start": "Lancer la vue en direct",
     "stop": "Arrêter la vue en direct",
-    "starting": "Résolution du champ et choix d'une étoile…",
+    "starting": "Résolution du champ et choix d'une étoile. Ne touchez pas aux vis avant l'apparition de l'image…",
     "lost": "L'étoile est perdue. En attente de son retour.",
     "arrived": "Sur la cible. La mise en station est à moins de 30″.",
     "az": "Az",
     "alt": "Haut.",
-    "legend": "Flèche bleue pleine : vis d'azimut. Flèche violette en pointillés : vis de hauteur. L'anneau est l'endroit où l'étoile doit arriver.",
     "startFailed": "Échec du lancement de la vue en direct",
     "stopFailed": "Échec de l'arrêt de la vue en direct",
-    "alt_text": "Vue de la caméra autour de l'étoile"
+    "alt_text": "Vue de la caméra autour de l'étoile",
+    "weak": "L'étoile est faible, donc les mesures sont bruitées. Augmentez la pose, ou arrêtez puis relancez pour choisir une autre étoile.",
+    "source": "Étoile",
+    "legendStar": "Étoile suivie",
+    "legendAz": "Vis d'azimut",
+    "legendAlt": "Vis de hauteur",
+    "legendTarget": "Où l'étoile doit arriver"
   }
 }

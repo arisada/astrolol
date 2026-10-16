@@ -27,6 +27,7 @@ from astrolol.devices.base.streaming import Frame, StreamClosed, StreamParams, S
 from astrolol.imaging.frameview import FrameStats, OverlayStar, frame_stats, render_jpeg
 from astrolol.imaging.stars import Star, detect_stars, measure, select_guide_stars
 from astrolol.imaging.streaming import LoopingExposureStream, streaming_camera
+from astrolol.plugins.polar_align.smoothing import OneEuroFilter
 from astrolol.plugins.polar_align.shift import Cd, pointing_after_star_shift, star_moves
 from astrolol.plugins.polar_align.solver import Observation
 from astrolol.plugins.polar_align.wizard import PolarAlignWizard, WizardRun
@@ -40,11 +41,19 @@ MAX_JUMP_PX = 60.0  # a star that moved further than this between frames is a di
 LOST_AFTER_FRAMES = 5
 FRAME_TIMEOUT_S = 30.0
 MIN_SNR = 3.0
+MIN_SEPARATION_PX = 18.0  # a neighbour closer than this could be taken for the star
 MIN_WINDOW_PX = 96
 WINDOW_PADDING = 0.35  # of the star-to-target distance, on top of PAD_MIN_PX
 PAD_MIN_PX = 40
 RECENTRE_MARGIN = 0.15  # of the window: a star this close to its edge gets a new window
 PUBLISH_INTERVAL_S = 1.0
+# The position of the star at the start is the average of this many frames of the stream itself:
+# the frame the field was solved on came from another path (exposure, not stream) and may differ
+# by a fraction of a pixel in centring, scaling and orientation.
+INIT_FRAMES = 3
+# A star this faint gives a centroid that wobbles by a pixel or more, and the readings with it.
+WEAK_SNR = 20.0
+WEAK_FLUX = 150.0
 
 
 def _now() -> datetime:
@@ -75,6 +84,7 @@ class StarViewInfo(BaseModel):
     alt_error_arcmin: float | None = None
     az_error_arcmin: float | None = None
     arrived: bool = False
+    weak: bool = Field(default=False, description="The star is faint: its readings will be noisy")
     pixel_scale: float | None = None  # arcsec per pixel of this image
     error: str | None = None
     stats: FrameStats | None = None
@@ -83,11 +93,13 @@ class StarViewInfo(BaseModel):
 class _Geometry:
     """What the solve at the start of the view fixes for the rest of it."""
 
-    def __init__(self, ra_hours: float, dec_deg: float, cd: Cd, binning: int, star_unbinned: tuple[float, float]) -> None:
+    def __init__(self, ra_hours: float, dec_deg: float, cd: Cd, binning: int) -> None:
         self.ra_hours, self.dec_deg = ra_hours, dec_deg
         self.cd = cd  # degrees per unbinned pixel
         self.binning = binning
-        self.star0 = star_unbinned
+        # Where the star is (unbinned sensor pixels) at the moment of the solve; measured in the
+        # first frames of the stream (see INIT_FRAMES).
+        self.star0: tuple[float, float] | None = None
 
 
 def _window_around(
@@ -191,9 +203,7 @@ class StarView:
                 obs.solved_ra_hours, obs.solved_dec_deg, obs.when, site.latitude, site.longitude, cd,
             )
             star = await asyncio.to_thread(self._pick_star, reading.pixels, reading.exposure_s, binning, first_moves.total)
-            geometry = _Geometry(
-                obs.solved_ra_hours, obs.solved_dec_deg, cd, binning, (star.x * binning, star.y * binning)
-            )
+            geometry = _Geometry(obs.solved_ra_hours, obs.solved_dec_deg, cd, binning)
             # Stream coordinates: the binned sensor, as the solved frame was.
             sensor_w, sensor_h = width, height
             target = (star.x + first_moves.total[0] / binning, star.y + first_moves.total[1] / binning)
@@ -231,7 +241,10 @@ class StarView:
     ) -> Star:
         """The best star that stays in the frame while the knobs bring it to its mark."""
         frame = Frame(pixels=pixels, seq=0, timestamp=0.0, exposure=exposure_s, binning=binning)
-        stars = detect_stars(frame)
+        stars: list[Star] = []
+        for s in detect_stars(frame):  # the detector can report one star twice
+            if not any(math.hypot(s.x - o.x, s.y - o.y) < 3.0 for o in stars):
+                stars.append(s)
         height, width = pixels.shape
         mx, my = move_unbinned[0] / binning, move_unbinned[1] / binning
         margin = 24
@@ -239,7 +252,10 @@ class StarView:
             s for s in stars
             if margin <= s.x + mx < width - margin and margin <= s.y + my < height - margin
         ]
-        ranked = select_guide_stars(reachable, count=1, min_separation=30.0)
+        ranked = select_guide_stars(reachable, count=len(reachable), min_separation=MIN_SEPARATION_PX)
+        # The brightest: a stream can be far dimmer than the exposure the stars were found in
+        # (8-bit frames), and a faint star's position is too noisy to read an error from.
+        ranked.sort(key=lambda s: (not s.saturated, s.flux), reverse=True)
         if not ranked:
             raise RuntimeError(
                 "No star is both bright enough and able to stay in the frame while the knobs are "
@@ -269,6 +285,8 @@ class StarView:
         lost = 0
         last_publish = 0.0
         tracked: Star = star
+        filter_x, filter_y = OneEuroFilter(), OneEuroFilter()
+        initial: list[tuple[float, float]] = []
         while True:
             frame: Frame = await asyncio.wait_for(sub.get(), FRAME_TIMEOUT_S)
             ox, oy = frame.origin
@@ -284,11 +302,24 @@ class StarView:
                         update={"state": "lost", "error": "The star is lost", "version": self._info.version + 1}
                     )
                 continue
+            if lost >= LOST_AFTER_FRAMES:
+                filter_x.reset()
+                filter_y.reset()
             lost = 0
             x, y = found.x, found.y
             tracked = found
 
-            dx, dy = x * binning - geometry.star0[0], y * binning - geometry.star0[1]
+            if geometry.star0 is None:
+                initial.append((x * binning, y * binning))
+                if len(initial) < INIT_FRAMES:
+                    continue
+                geometry.star0 = (
+                    float(np.median([p[0] for p in initial])), float(np.median([p[1] for p in initial]))
+                )
+            # From here on the smoothed position: it is what the readings are made from.
+            sx, sy = filter_x(x, frame.timestamp), filter_y(y, frame.timestamp)
+
+            dx, dy = sx * binning - geometry.star0[0], sy * binning - geometry.star0[1]
             ra, dec = pointing_after_star_shift(geometry.ra_hours, geometry.dec_deg, geometry.cd, dx, dy)
             status = await mm.get_status(run.request.mount_id)
             when = _now() - timedelta(seconds=frame.exposure / 2.0)
@@ -308,14 +339,14 @@ class StarView:
                 moves = star_moves(
                     offset.alt_error_arcmin, offset.az_error_arcmin, ra, dec, when, latitude, longitude, geometry.cd
                 )
-                tx, ty = x + moves.total[0] / binning, y + moves.total[1] / binning
-                via = (x + moves.az[0] / binning, y + moves.az[1] / binning)
+                tx, ty = sx + moves.total[0] / binning, sy + moves.total[1] / binning
+                via = (sx + moves.az[0] / binning, sy + moves.az[1] / binning)
                 scale = math.hypot(geometry.cd[0], geometry.cd[2]) * 3600.0 * binning
                 tolerance = max(6.0, ARRIVED_ARCMIN * 60.0 / scale) if scale > 0 else 6.0
                 total_error = math.hypot(offset.alt_error_arcmin, offset.az_error_arcmin)
 
-                wanted = _window_around((x, y), (tx, ty), sensor[0], sensor[1])
-                if wanted != window and self._leaving(window, (x, y), (tx, ty)):
+                wanted = _window_around((sx, sy), (tx, ty), sensor[0], sensor[1])
+                if wanted != window and self._leaving(window, (sx, sy), (tx, ty)):
                     window = wanted
                     sub.close()
                     await camera.stop_stream()
@@ -332,12 +363,13 @@ class StarView:
                     version=self._info.version + 1,
                     width=view.width, height=view.height, origin=(vx, vy),
                     star=OverlayStar(
-                        x=x, y=y, kind="primary", snr=tracked.snr, fwhm=tracked.fwhm, hfd=tracked.hfd,
+                        x=sx, y=sy, kind="primary", snr=tracked.snr, fwhm=tracked.fwhm, hfd=tracked.hfd,
                         peak=tracked.peak, flux=tracked.flux, saturated=tracked.saturated,
                     ),
                     az_via=via, target=(tx, ty), tolerance_px=tolerance,
                     alt_error_arcmin=offset.alt_error_arcmin, az_error_arcmin=offset.az_error_arcmin,
                     arrived=total_error < ARRIVED_ARCMIN,
+                    weak=tracked.snr < WEAK_SNR or tracked.flux < WEAK_FLUX,
                     pixel_scale=scale or None,
                     stats=frame_stats(frame),
                 )

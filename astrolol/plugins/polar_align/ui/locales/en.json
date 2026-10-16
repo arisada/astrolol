@@ -95,14 +95,19 @@
     "exposure": "Exposure",
     "start": "Start live view",
     "stop": "Stop live view",
-    "starting": "Solving the field and choosing a star…",
+    "starting": "Solving the field and choosing a star. Leave the knobs alone until the picture appears…",
     "lost": "The star is lost. Waiting for it to come back.",
     "arrived": "On the mark. The polar alignment is within 30″.",
     "az": "Az",
     "alt": "Alt",
-    "legend": "Blue solid arrow: azimuth knob. Violet dashed arrow: altitude knob. The ring is where the star has to end up.",
     "startFailed": "Failed to start the live view",
     "stopFailed": "Failed to stop the live view",
-    "alt_text": "Camera view around the star"
+    "alt_text": "Camera view around the star",
+    "weak": "The star is faint, so the readings are noisy. Raise the exposure, or stop and start again to pick another star.",
+    "source": "Star",
+    "legendStar": "Star followed",
+    "legendAz": "Azimuth knob",
+    "legendAlt": "Altitude knob",
+    "legendTarget": "Where the star has to end up"
   }
 }

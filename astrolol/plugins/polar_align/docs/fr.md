@@ -62,9 +62,10 @@ Cliquez sur **Lancer la vue en direct** : l'assistant résout le champ une fois,
 - La flèche bleue pleine montre comment la vis d'azimut déplace l'étoile, la flèche violette en
   pointillés comment le fait la vis de hauteur. Les flèches sous l'image donnent l'angle restant,
   comme plus haut.
+- Ne touchez pas aux vis avant l'apparition de l'image : la vue part de la position de l'étoile à ce moment-là.
 - Quand l'étoile est sur la cible, la page l'indique (à moins de 30″).
 - Si des nuages cachent l'étoile, la vue attend et la retrouve à son retour.
-- **Pose** est la durée de chaque image : augmentez-la si l'étoile est faible.
+- **Pose** est la durée de chaque image : augmentez-la si l'étoile est faible. La page prévient quand l'étoile est trop faible pour des mesures stables. Un petit tremblement des valeurs est lissé.
 
 Si l'erreur est encore grande, aucune étoile ne reste dans l'image pendant que vous tournez les
 vis : la vue le dit. Utilisez les revérifications jusqu'à ce que l'erreur diminue. La vue en

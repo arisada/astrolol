@@ -58,9 +58,10 @@ second.
 - The **ring** is where the star has to end up. Turn the knobs until the star is inside it.
 - The blue solid arrow shows how the azimuth knob moves the star, the violet dashed arrow how
   the altitude knob does. The arrows below the picture give the remaining angle, as above.
+- Leave the knobs alone until the picture appears: the view starts from where the star is then.
 - When the star is on the mark, the page says so (within 30″).
 - If clouds hide the star, the view waits and picks it up again when it returns.
-- **Exposure** is the length of each frame: raise it if the star is faint.
+- **Exposure** is the length of each frame: raise it if the star is faint. The page warns when the star is too faint for steady readings. A little jitter in the numbers is smoothed out.
 
 If the error is still large, no star stays in the frame while the knobs are turned: the view says
 so. Use rechecks until the error is smaller. The live view and rechecks share the camera, so

@@ -50,13 +50,29 @@ def frame_stats(frame: Frame, period: float | None = None) -> FrameStats:
     )
 
 
+# A sky spanning fewer ADU than this is noise from the quantisation, not from photons.
+LOW_RANGE_ADU = 12.0
+
+
 def render_jpeg(pixels: np.ndarray, max_width: int = 960, quality: int = 80) -> bytes:
     """A stretched 8-bit JPEG: star fields are mostly dark, so the range is cut at the
-    background and a bright percentile, and compressed with a square root."""
+    background and a bright percentile, and compressed with a square root.
+
+    Low-range frames (an 8-bit stream: background 0-2, a star at 10-60) need care: cutting
+    at the 99.8th percentile would stretch the quantisation noise of the sky to full contrast
+    and bury the stars. The range is therefore never narrower than a few noise levels (at
+    least one ADU: integers have no finer noise) and, when the sky itself spans only a few
+    ADU, reaches up to a share of the brightest star.
+    """
     img = pixels.astype(np.float32)
-    lo, hi = np.percentile(img[:: max(1, img.shape[0] // 256), :: max(1, img.shape[1] // 256)], (5, 99.8))
-    if hi <= lo:
-        hi = lo + 1.0
+    sample = img[:: max(1, img.shape[0] // 256), :: max(1, img.shape[1] // 256)]
+    background = float(np.median(sample))
+    sigma = max(float(1.4826 * np.median(np.abs(sample - background))), 1.0)
+    lo = min(float(np.percentile(sample, 5)), background)
+    hi = max(float(np.percentile(sample, 99.8)), lo + 8 * sigma)
+    peak = float(img.max())
+    if hi - lo < LOW_RANGE_ADU and peak - background > hi - lo:
+        lo, hi = background, max(hi, background + 0.3 * (peak - background))
     scaled = np.sqrt(np.clip((img - lo) / (hi - lo), 0.0, 1.0))
     image = Image.fromarray((scaled * 255).astype(np.uint8), mode="L")
     if image.width > max_width:

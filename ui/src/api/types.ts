@@ -367,6 +367,7 @@ export interface StarViewInfo {
   alt_error_arcmin: number | null
   az_error_arcmin: number | null
   arrived: boolean
+  weak: boolean
   pixel_scale: number | null
   error: string | null
   stats: FrameStats | null

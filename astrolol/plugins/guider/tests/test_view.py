@@ -28,3 +28,21 @@ def test_large_frames_are_reduced() -> None:
 
 def test_flat_image_does_not_crash() -> None:
     assert render_jpeg(np.full((50, 60), 7, dtype=np.uint16))[:2] == b"\xff\xd8"
+
+
+def test_stars_stand_out_of_the_quantisation_noise_of_an_8_bit_stream() -> None:
+    """Background of 0-2 ADU and stars of 10-30: the sky must not become black and white speckle."""
+    from io import BytesIO
+
+    from PIL import Image
+
+    rng = np.random.default_rng(1)
+    img = rng.choice([0, 1, 1, 1, 2], size=(97, 97)).astype(np.uint8)
+    img[40:43, 50:53] = 30
+    img[10:12, 20:22] = 12
+    px = np.asarray(Image.open(BytesIO(render_jpeg(img)))).astype(float)
+    sky = np.ones(img.shape, bool)
+    sky[40:43, 50:53] = sky[10:12, 20:22] = False
+    assert px[40:43, 50:53].mean() > 200  # the bright star is near white
+    assert px[10:12, 20:22].mean() > px[sky].mean() + 60  # the faint one clearly above the sky
+    assert px[sky].mean() < 40 and np.percentile(px[sky], 99) < 100  # the sky stays dark, with no white specks

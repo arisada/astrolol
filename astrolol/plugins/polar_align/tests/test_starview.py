@@ -33,11 +33,11 @@ START = (400.0, 300.0)
 
 
 def _frame_pixels(star_xy: tuple[float, float], width: int = WIDTH, height: int = HEIGHT,
-                  x0: int = 0, y0: int = 0, seed: int = 1) -> np.ndarray:
+                  x0: int = 0, y0: int = 0, seed: int = 1, amplitude: float = 4000.0, noise: float = 3.0) -> np.ndarray:
     rng = np.random.default_rng(seed)
     ys, xs = np.mgrid[y0:y0 + height, x0:x0 + width]
-    img = 200.0 + rng.normal(0.0, 3.0, size=(height, width))
-    img += 4000.0 * np.exp(-((xs - star_xy[0]) ** 2 + (ys - star_xy[1]) ** 2) / (2 * 2.0**2))
+    img = 200.0 + rng.normal(0.0, noise, size=(height, width))
+    img += amplitude * np.exp(-((xs - star_xy[0]) ** 2 + (ys - star_xy[1]) ** 2) / (2 * 2.0**2))
     return img.astype(np.float32)
 
 
@@ -46,6 +46,8 @@ class FakeStreamCamera:
 
     def __init__(self) -> None:
         self.star = START
+        self.amplitude = 4000.0
+        self.noise = 3.0
         self.params: StreamParams | None = None
         self.started = 0
         self._broadcaster = FrameBroadcaster()
@@ -78,7 +80,8 @@ class FakeStreamCamera:
             x0, y0 = (roi.x, roi.y) if roi else (0, 0)
             w, h = (roi.width, roi.height) if roi else (WIDTH, HEIGHT)
             self._broadcaster.publish(Frame(
-                pixels=_frame_pixels(self.star, w, h, x0, y0, seed=self.seq), seq=self.seq,
+                pixels=_frame_pixels(self.star, w, h, x0, y0, seed=self.seq, amplitude=self.amplitude, noise=self.noise),
+                seq=self.seq,
                 timestamp=asyncio.get_event_loop().time(), exposure=params.exposure,
                 binning=params.binning, origin=(x0, y0),
             ))
@@ -93,11 +96,12 @@ class FakeStreamCamera:
 
 
 class FakeImager:
-    def __init__(self, path) -> None:
+    def __init__(self, path, star: tuple[float, float] = START) -> None:
         self.path = path
+        self.star = star  # where the star is in the exposure; the stream may disagree a little
 
     async def expose(self, camera_id, req):
-        fits.PrimaryHDU(_frame_pixels(START)).writeto(self.path, overwrite=True)
+        fits.PrimaryHDU(_frame_pixels(self.star)).writeto(self.path, overwrite=True)
         return SimpleNamespace(fits_path=str(self.path))
 
 
@@ -106,7 +110,8 @@ class FakeMount:
         return SimpleNamespace(ra_jnow=_MOUNT_RA_HOURS)
 
 
-def _setup(tmp_path, monkeypatch, alt_err0: float, az_err0: float, d_az: float = 0.0, d_alt: float = 0.0):
+def _setup(tmp_path, monkeypatch, alt_err0: float, az_err0: float, d_az: float = 0.0, d_alt: float = 0.0,
+           exposure_star: tuple[float, float] = START):
     """A converging run for a mount with the given error, the knob turn the user will make
     afterwards, and the pixel shift that turn gives the star."""
     monkeypatch.setattr(wizard_module, "_now", lambda: WHEN)
@@ -125,7 +130,7 @@ def _setup(tmp_path, monkeypatch, alt_err0: float, az_err0: float, d_az: float =
             )
 
     app = SimpleNamespace(state=SimpleNamespace(
-        mount_manager=FakeMount(), imager_manager=FakeImager(tmp_path / "f.fits"), solve_manager=Solver(),
+        mount_manager=FakeMount(), imager_manager=FakeImager(tmp_path / "f.fits", exposure_star), solve_manager=Solver(),
         device_manager=SimpleNamespace(get_camera=lambda _id: camera),
         active_profile=profile, equipment_store=store, profile_store=None,
     ))
@@ -237,3 +242,43 @@ def test_window_contains_star_and_target_and_stays_on_the_sensor() -> None:
     # Near a corner it is pushed back onto the sensor, keeping its size.
     x0, y0, x1, y1 = _window_around((5.0, 5.0), (20.0, 12.0), WIDTH, HEIGHT)
     assert (x0, y0) == (0, 0) and x1 - x0 >= 96 and y1 - y0 >= 96
+
+
+@pytest.mark.asyncio
+async def test_the_start_does_not_depend_on_where_the_exposure_put_the_star(tmp_path, monkeypatch) -> None:
+    """The stream and the exposure the field was solved on may disagree by a pixel or two (8-bit
+    streams, windows, centring conventions): the readings start from the stream's own position."""
+    view, run, _camera, _moved, _expected = _setup(
+        tmp_path, monkeypatch, 5.0, 4.0, exposure_star=(START[0] + 12.0, START[1] - 9.0)
+    )
+    await view.start(run, StarViewRequest(exposure_s=0.2))
+    try:
+        await _wait_until(lambda: view.info().state == "tracking")
+        info = view.info()
+        assert info.alt_error_arcmin == pytest.approx(5.0, abs=0.6)
+        assert info.az_error_arcmin == pytest.approx(4.0, abs=0.6)
+    finally:
+        await view.stop()
+
+
+@pytest.mark.asyncio
+async def test_a_faint_star_is_flagged(tmp_path, monkeypatch) -> None:
+    view, run, camera, _moved, _expected = _setup(tmp_path, monkeypatch, 5.0, 4.0)
+    camera.amplitude, camera.noise = 5.0, 0.5  # a dim star in a quiet sky
+    await view.start(run, StarViewRequest(exposure_s=0.2))
+    try:
+        await _wait_until(lambda: view.info().state == "tracking")
+        assert view.info().weak
+        camera.amplitude = 4000.0
+        await _wait_until(lambda: not view.info().weak)
+    finally:
+        await view.stop()
+
+
+@pytest.mark.asyncio
+async def test_the_brightest_star_is_picked(tmp_path) -> None:
+    pixels = _frame_pixels((200.0, 200.0))
+    pixels += _frame_pixels((500.0, 400.0), amplitude=15000.0) - 200.0 - 0  # a brighter one, not clipped
+    pixels = pixels.astype(np.float32)
+    star = StarView._pick_star(StarView.__new__(StarView), pixels, 1.0, 1, (10.0, 10.0))
+    assert (round(star.x), round(star.y)) == (500, 400)
