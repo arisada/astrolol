@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { LogEntry } from '@/store'
-import { PEEK_ALERT_MS, PEEK_INFO_MS, peekDuration, selectEntries } from './log'
+import { PEEK_ALERT_MS, PEEK_INFO_MS, logPageKey, peekDuration, selectEntries } from './log'
 
 const e = (id: string, component: string, level = 'info'): LogEntry =>
   ({ id, timestamp: '2026-10-16T12:00:00Z', level, component, message: id, eventType: 'x.y' })
@@ -30,5 +30,13 @@ describe('peekDuration', () => {
     expect(peekDuration('debug')).toBe(PEEK_INFO_MS)
     expect(peekDuration('warning')).toBe(PEEK_ALERT_MS)
     expect(peekDuration('error')).toBe(PEEK_ALERT_MS)
+  })
+})
+
+describe('logPageKey', () => {
+  it('is the first segment of the route', () => {
+    expect(logPageKey('/mount')).toBe('mount')
+    expect(logPageKey('/imaging/cam1')).toBe('imaging')
+    expect(logPageKey('/')).toBe('home')
   })
 })

@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ChevronDown, ChevronUp } from 'lucide-react'
+import { useLocation } from 'react-router-dom'
+import { PanelBottomClose, PanelBottomOpen } from 'lucide-react'
 import { useLocalStorage } from '@/hooks/useLocalStorage'
-import { peekDuration } from '@/utils/log'
+import { logPageKey, peekDuration } from '@/utils/log'
 import { LogList, LogRow, useLogEntries } from './log-list'
 
 const STRIP_H = 28          // px: the folded bar, always in the page's flow
@@ -23,7 +24,9 @@ const maxHeight = () => Math.max(MIN_H, Math.round(window.innerHeight * MAX_SCRE
 export function LogPanel({ filter, levels }: { filter?: string[]; levels?: string[] }) {
   const { t } = useTranslation()
   const entries = useLogEntries(filter, levels)
-  const [pinned, setPinned] = useLocalStorage('astrolol.log.open', false)
+  // Open or folded is a choice about this page: opening the log on Mount does not open it elsewhere.
+  const page = logPageKey(useLocation().pathname)
+  const [pinned, setPinned] = useLocalStorage(`astrolol.log.open.${page}`, false)
   const [height, setHeight] = useLocalStorage('astrolol.log.height', DEFAULT_H)
   const [peek, setPeek] = useState(false)
   const open = pinned || peek
@@ -90,15 +93,18 @@ export function LogPanel({ filter, levels }: { filter?: string[]; levels?: strin
             <LogList entries={entries} style={{ height: h }} onFollowChange={(f) => { following.current = f }} />
           </>
         )}
-        <div className="flex shrink-0 items-center gap-1 px-1" style={{ height: STRIP_H }}>
-          <button type="button" onClick={toggle} aria-expanded={open} aria-label={label} title={label}
-            className="p-1 rounded text-slate-500 hover:text-slate-200 hover:bg-surface-overlay transition-colors">
-            {open ? <ChevronDown size={14} /> : <ChevronUp size={14} />}
-          </button>
+        {/* Folded: the latest line, beside the handle */}
+        <div className="flex shrink-0 items-center pl-24 pr-2" style={{ height: STRIP_H }}>
           {!open && (last
             ? <div className="min-w-0 flex-1 font-mono"><LogRow entry={last} /></div>
             : <span className="text-xs text-slate-600">{t('log.empty')}</span>)}
         </div>
+        {/* The same tab as the dock's handle, at the bottom left whether the log is open or not */}
+        <button type="button" onClick={toggle} aria-expanded={open} aria-label={label} title={label}
+          className="absolute bottom-0 left-3 flex h-5 w-16 items-center justify-center rounded-t-md border border-b-0
+                     border-surface-border bg-surface-raised text-slate-500 hover:h-6 hover:text-slate-200 transition-all">
+          {open ? <PanelBottomClose size={14} /> : <PanelBottomOpen size={14} />}
+        </button>
       </div>
     </>
   )

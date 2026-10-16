@@ -55,8 +55,8 @@ pour en masquer une ; elle reste masquée après un rechargement de la page.
 Les pages qui exécutent quelque chose (Imagerie, Monture, Guideur, Séquenceur, PHD2, Résolution
 astrométrique) ont une fine bande en bas qui montre la dernière ligne de leur journal. Quand
 quelque chose de nouveau est écrit, le journal se déplie par-dessus la page quelques secondes (plus
-longtemps pour les alertes et les erreurs) puis se replie ; la page, elle, ne bouge jamais. La flèche
-en bas à gauche le garde ouvert jusqu'à ce que vous le repliez. Glissez son bord supérieur pour
+longtemps pour les alertes et les erreurs) puis se replie ; la page, elle, ne bouge jamais. L'onglet
+en bas à gauche le garde ouvert jusqu'à ce que vous le repliez ; chaque page le retient séparément. Glissez son bord supérieur pour
 l'agrandir ; il suit la ligne la plus récente sauf si vous remontez, et **Dernier** vous y ramène. La
 page [Journaux](logs.md) liste tout.
 

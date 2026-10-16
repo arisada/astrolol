@@ -21,3 +21,6 @@ export function selectEntries(log: LogEntry[], filter?: string[], levels?: strin
   }
   return out
 }
+
+/** The page a log belongs to, from the route: "/mount" -> "mount", "/imaging/cam1" -> "imaging". */
+export const logPageKey = (pathname: string): string => pathname.split('/').filter(Boolean)[0] ?? 'home'

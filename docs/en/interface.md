@@ -52,7 +52,7 @@ one; it stays closed after a page reload.
 Pages that run something (Imaging, Mount, Guider, Sequencer, PHD2, Plate Solving) have a thin strip
 at the bottom showing the latest line of their log. When something new is logged the log unfolds over
 the page for a few seconds (longer for warnings and errors), then folds again; the page itself never
-moves. The arrow at the bottom left keeps it open until you fold it again. Drag its top edge to make
+moves. The tab at the bottom left keeps it open until you fold it again; each page remembers that on its own. Drag its top edge to make
 it taller; it follows the newest line unless you scroll up, and **Latest** takes you back. The
 [Logs](logs.md) page lists everything.
 
