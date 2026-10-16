@@ -7,6 +7,7 @@ import { getEphemeris, getSettings, putSettings, setMountTarget, slewMount } fro
 import { SearchBox, type ObjectMatch } from './SearchBox'
 import { ObjectCard } from './ObjectCard'
 import { FavoritesList } from './FavoritesList'
+import { Page } from '@/components/Page'
 
 // crypto.randomUUID() only exists in secure contexts (HTTPS or localhost) — it's
 // undefined when astrolol is reached over plain HTTP by hostname/IP (e.g.
@@ -187,7 +188,7 @@ export function TargetPage() {
   }
 
   return (
-    <div className="relative flex flex-col gap-5 p-5 max-w-2xl mx-auto">
+    <Page width="medium" className="relative flex flex-col gap-5">
       {/* Toast */}
       {toast && (
         <div className={`fixed top-4 right-4 z-50 px-4 py-2.5 rounded-lg shadow-lg text-sm font-medium transition-all ${
@@ -281,6 +282,6 @@ export function TargetPage() {
           />
         </section>
       )}
-    </div>
+    </Page>
   )
 }

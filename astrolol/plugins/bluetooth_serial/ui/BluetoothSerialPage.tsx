@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input'
 import { api } from '@/api/client'
 import type { PairedSerialDevice } from '@/api/types'
 import { type DiscoveredDevice, forget, pair, rename, scan } from './api'
+import { Page } from '@/components/Page'
 
 function PairedRow({ device, onChanged }: { device: PairedSerialDevice; onChanged: () => void }) {
   const { t } = useTranslation('bluetooth_serial')
@@ -146,7 +147,7 @@ export function BluetoothSerialPage() {
   }, [])
 
   return (
-    <div className="p-6 max-w-2xl flex flex-col gap-4">
+    <Page width="medium" className="flex flex-col gap-4">
       <h1 className="text-lg font-semibold text-slate-100">{t('title')}</h1>
       <p className="text-xs text-slate-500">
         {t('intro')}
@@ -162,6 +163,6 @@ export function BluetoothSerialPage() {
         ))}
       </div>
       <ScanPanel onPaired={load} />
-    </div>
+    </Page>
   )
 }

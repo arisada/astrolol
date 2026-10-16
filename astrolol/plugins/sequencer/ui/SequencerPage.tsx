@@ -18,6 +18,7 @@ import { TaskCard } from './TaskCard'
 import { TaskEditor } from './TaskEditor'
 import { patchSequencerState, useSequencer } from './state'
 import { Tabs } from '@/components/ui/tabs'
+import { Page } from '@/components/Page'
 
 type Tab = 'queue' | 'journal' | 'settings'
 
@@ -92,8 +93,7 @@ export function SequencerPage() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex-1 overflow-y-auto p-6">
-        <div className="max-w-4xl flex flex-col gap-4">
+      <Page width="wide" className="flex flex-col gap-4">
           <div className="flex items-center gap-4">
             <h1 className="text-lg font-semibold text-slate-100">{t('page.title')}</h1>
             <Tabs
@@ -178,8 +178,7 @@ export function SequencerPage() {
               </section>
             </>
           )}
-        </div>
-      </div>
+        </Page>
       <EventLog filter={['sequencer']} />
 
       {showSequences && (

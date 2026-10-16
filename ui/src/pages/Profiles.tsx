@@ -38,6 +38,7 @@ import { useStore } from '@/store'
 import { useDeviceConfigs } from '@/hooks/useDeviceConfigs'
 import { itemDeviceStates } from '@/utils/inventory-match'
 import { cloneTree, copyName, replaceItemAtPath } from '@/utils/profile-tree'
+import { Page } from '@/components/Page'
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -711,24 +712,24 @@ export function Profiles() {
 
   if (view === 'create') {
     return (
-      <div className="p-6 max-w-2xl">
+      <Page width="medium">
         <h1 className="text-lg font-semibold text-slate-100 mb-6">{t('newTitle')}</h1>
         <ProfileForm onSave={handleCreate} onCancel={() => setView('list')} />
-      </div>
+      </Page>
     )
   }
 
   if (typeof view === 'object' && 'edit' in view) {
     return (
-      <div className="p-6 max-w-2xl">
+      <Page width="medium">
         <h1 className="text-lg font-semibold text-slate-100 mb-6">{t('editTitle')}</h1>
         <ProfileForm initial={view.edit} onSave={handleUpdate} onCancel={() => setView('list')} />
-      </div>
+      </Page>
     )
   }
 
   return (
-    <div className="p-6 max-w-2xl">
+    <Page width="medium">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-lg font-semibold text-slate-100">{t('title')}</h1>
@@ -781,6 +782,6 @@ export function Profiles() {
           ))}
         </div>
       )}
-    </div>
+    </Page>
   )
 }

@@ -12,6 +12,7 @@ import type { Phd2Settings } from '@/api/types'
 import * as phd2Api from './api'
 import type { Phd2PluginState } from './api'
 import { DEFAULT_PHD2_STATE } from './api'
+import { Page } from '@/components/Page'
 
 // ── Graph options ──────────────────────────────────────────────────────────────
 
@@ -162,7 +163,7 @@ export function Phd2Page() {
 
   return (
     <div className="flex flex-col h-full">
-    <div className="p-4 max-w-2xl mx-auto w-full flex flex-col gap-4 flex-1 overflow-y-auto">
+    <Page width="medium" className="flex flex-col gap-4">
 
       {/* Header */}
       <div className="flex items-center justify-between">
@@ -326,7 +327,7 @@ export function Phd2Page() {
           {t('notConnected')}
         </p>
       )}
-    </div>
+    </Page>
     <EventLog filter={['phd2']} />
     </div>
   )

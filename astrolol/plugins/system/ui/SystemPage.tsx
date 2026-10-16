@@ -41,6 +41,7 @@ import type {
 import { ToggleSwitch } from '@/components/ui/toggle-switch'
 import { DurationStepper } from '@/components/ui/duration-stepper'
 import * as api from './api'
+import { Page } from '@/components/Page'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -534,7 +535,7 @@ export function SystemPage() {
   const nmcliOk   = netStatus?.nmcli_available ?? false
 
   return (
-    <div className="p-4 md:p-6 max-w-2xl space-y-4 overflow-y-auto h-full">
+    <Page width="medium" className="space-y-4">
       <div className="flex items-center justify-between">
         <h1 className="text-lg font-semibold text-slate-100">{t('title')}</h1>
         {sysStatus && (
@@ -1034,6 +1035,6 @@ export function SystemPage() {
           </div>
         </Section>
       )}
-    </div>
+    </Page>
   )
 }

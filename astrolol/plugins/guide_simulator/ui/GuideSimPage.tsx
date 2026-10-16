@@ -6,6 +6,7 @@ import { EventLog } from '@/components/ui/event-log'
 import { Input } from '@/components/ui/input'
 import { ToggleSwitch } from '@/components/ui/toggle-switch'
 import * as sim from './api'
+import { Page } from '@/components/Page'
 
 const FIELD_KEYS: Record<string, string> = {
   rms_arcsec: 'rms', step_interval_s: 'interval', settle_extra_s: 'settleExtra', pixel_scale: 'pixelScale', time_scale: 'timeScale',
@@ -59,8 +60,7 @@ export function GuideSimPage() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex-1 overflow-y-auto p-6">
-        <div className="max-w-3xl flex flex-col gap-6">
+      <Page width="medium" className="flex flex-col gap-6">
           <div>
             <h1 className="text-lg font-semibold text-slate-100">{t('title')}</h1>
             <p className="text-xs text-slate-500 mt-1">
@@ -147,8 +147,7 @@ export function GuideSimPage() {
               </div>
             </Section>
           )}
-        </div>
-      </div>
+        </Page>
       <EventLog filter={['guide_simulator', 'guiding']} />
     </div>
   )

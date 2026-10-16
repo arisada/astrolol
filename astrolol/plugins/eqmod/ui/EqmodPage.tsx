@@ -10,6 +10,7 @@ import {
   getDiagnostics, getIndiProxy, getSettings, putSettings,
   type AxisDiagnostics, type EqmodSettings, type IndiProxyStatus, type MountDiagnostics,
 } from './api'
+import { Page } from '@/components/Page'
 
 const STATUS_FLAGS = ['running', 'tracking_mode', 'fast', 'ccw', 'blocked', 'initialized', 'level_switch']
 
@@ -100,7 +101,7 @@ function MountCard({ d }: { d: MountDiagnostics }) {
                 : t('mount.noSync')}
             />
           </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 gap-3">
             {Object.entries(d.axes).map(([name, axis]) => (
               <AxisCard key={name} name={name} axis={axis} />
             ))}
@@ -318,7 +319,7 @@ export function EqmodPage() {
   }, [])
 
   return (
-    <div className="p-6 max-w-4xl flex flex-col gap-4">
+    <Page width="narrow" className="flex flex-col gap-4">
       <h1 className="text-lg font-semibold text-slate-100">{t('page.title')}</h1>
       {error && <p className="text-xs text-status-error">{error}</p>}
       {mounts !== null && mounts.length === 0 && (
@@ -332,6 +333,6 @@ export function EqmodPage() {
       {mounts?.map((d) => <MountCard key={d.device_id} d={d} />)}
       <BluetoothConnectHelper />
       <SettingsCard />
-    </div>
+    </Page>
   )
 }

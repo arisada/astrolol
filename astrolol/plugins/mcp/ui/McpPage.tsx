@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { Card } from '@/components/ui/card'
 import * as api from './api'
 import type { McpInfo } from './api'
+import { Page } from '@/components/Page'
 
 function CopyBlock({ text }: { text: string }) {
   const { t } = useTranslation('mcp')
@@ -53,7 +54,7 @@ export function McpPage() {
     : ''
 
   return (
-    <div className="p-4 md:p-6 max-w-2xl space-y-4 overflow-y-auto h-full">
+    <Page width="medium" className="space-y-4">
       <h1 className="text-lg font-semibold text-slate-100">{t('title')}</h1>
       <p className="text-xs text-slate-500">{t('intro')}</p>
 
@@ -105,6 +106,6 @@ export function McpPage() {
           </Card>
         </>
       )}
-    </div>
+    </Page>
   )
 }

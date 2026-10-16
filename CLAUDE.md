@@ -246,6 +246,15 @@ active palette, so the chip recipes below keep working. Rules:
 - Text on an accent background is `text-accent-fg`, not `text-white`.
 - Never convey state by colour alone — the red night palettes make hues indistinguishable.
 
+### Page layout
+
+A page that reads as a column is built with `<Page width="narrow|medium|wide">`
+(`@/components/Page`): one scroll container, a centred column (28 / 42 / 64 rem) that shrinks with the
+window, and the same padding everywhere. Never hand-roll `max-w-*` / `p-6` / `overflow-y-auto` on a page
+root: it misbehaves next to the dock and on a phone. Pages built as workspaces that fill the screen
+(a viewer with a sidebar, the log) are listed in `tests/unit/test_ui_page_layout.py`, which fails for any
+other page that does not use `<Page>`.
+
 ### Dock widgets
 
 The dock (`ui/src/dock/`) is a right-hand sidebar (a bottom sheet in portrait) of widgets the

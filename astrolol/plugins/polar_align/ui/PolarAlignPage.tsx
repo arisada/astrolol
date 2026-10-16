@@ -17,6 +17,7 @@ import { PillGroup } from '@/components/ui/pill-group'
 import { StatusPill } from '@/components/ui/badge'
 import type { StatusPillVariant } from '@/components/ui/badge'
 import type { ReticleState, WizardRun, WizardStatus } from '@/api/types'
+import { Page } from '@/components/Page'
 
 // Exposure lengths that make sense for a plate solve of a bright-enough field.
 const FIT_EXPOSURE_STEPS = [0.5, 1, 1.5, 2, 3, 4, 5, 6, 8, 10, 15, 20, 30]
@@ -238,7 +239,7 @@ export function PolarAlignPage() {
   const isTerminal = run && (run.status === 'completed' || run.status === 'failed' || run.status === 'cancelled')
 
   return (
-    <div className="p-4 md:p-6 max-w-2xl space-y-4 overflow-y-auto h-full">
+    <Page width="medium" className="space-y-4">
       <h1 className="text-lg font-semibold text-slate-100 flex items-center gap-2">
         <Compass size={18} /> {t('title')}
       </h1>
@@ -472,6 +473,6 @@ export function PolarAlignPage() {
           </div>
         )}
       </Card>
-    </div>
+    </Page>
   )
 }

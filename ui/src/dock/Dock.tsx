@@ -10,7 +10,9 @@ import { hasWidget } from './layout'
 import { useDock } from './store'
 import './coreWidgets'
 
-const WIDE = '(min-width: 1280px)'
+// Wide enough for the menu (12 rem), the dock (20 rem) and a page of at least ~25 rem: the page makes
+// room for the dock. Narrower, the dock slides over the page instead.
+const WIDE = '(min-width: 900px)'
 
 const iconBtn = 'p-1 rounded text-slate-500 hover:text-slate-200 hover:bg-surface-overlay transition-colors disabled:opacity-30 disabled:pointer-events-none'
 

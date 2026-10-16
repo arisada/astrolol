@@ -16,6 +16,7 @@ import { niceRange } from '@/utils/guiding'
 import * as api from './api'
 import { GuiderView } from './GuiderView'
 import { CalibrationPanel, DarksPanel, SetupPanel, Stat, TuningPanel, fmt, type Save } from './GuiderPanels'
+import { Page } from '@/components/Page'
 
 const RANGE_OPTIONS = ['auto', 2, 4, 8, 16] as const
 const SAMPLE_OPTIONS = [50, 100, 200, 500] as const
@@ -119,8 +120,7 @@ export function GuiderPage() {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex-1 overflow-y-auto p-6">
-        <div className="max-w-6xl flex flex-col gap-5">
+      <Page width="wide" className="flex flex-col gap-5">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <h1 className="text-lg font-semibold text-slate-100">{t('title')}</h1>
@@ -262,8 +262,7 @@ export function GuiderPage() {
               </Card>
             </div>
           )}
-        </div>
-      </div>
+        </Page>
       <EventLog filter={['guider', 'guiding']} />
     </div>
   )

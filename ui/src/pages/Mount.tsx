@@ -20,6 +20,7 @@ import { useMountSettings } from '@/hooks/useMountSettings'
 import { NudgePad } from '@/components/NudgePad'
 import { EventLog } from '@/components/ui/event-log'
 import { DevicePropertiesPanel } from '@/components/DevicePropertiesPanel'
+import { Page } from '@/components/Page'
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -150,8 +151,7 @@ function MountControls({ deviceId }: { deviceId: string }) {
 
   return (
     <div className="h-full flex flex-col">
-    <div className="flex-1 overflow-y-auto p-4">
-      <div className="max-w-md mx-auto flex flex-col gap-4">
+    <Page width="narrow" className="flex flex-col gap-4">
 
         {/* Header */}
         <div className="flex items-center justify-between">
@@ -439,8 +439,7 @@ function MountControls({ deviceId }: { deviceId: string }) {
         </Card>
 
         {error && <p className="text-xs text-status-error">{error}</p>}
-      </div>
-    </div>
+      </Page>
     <EventLog filter={['mount', 'indi']} />
     </div>
   )

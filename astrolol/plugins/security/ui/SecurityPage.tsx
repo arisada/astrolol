@@ -9,6 +9,7 @@ import { PillGroup } from '@/components/ui/pill-group'
 import { ToggleSwitch } from '@/components/ui/toggle-switch'
 import * as api from './api'
 import type { Level, SecuritySettings, TokenCreated, TokenOut, UserOut } from './api'
+import { Page } from '@/components/Page'
 
 const LEVELS = ['viewer', 'operator', 'admin'] as const
 
@@ -112,7 +113,7 @@ export function SecurityPage() {
   const fmtDate = (iso: string | null) => (iso ? new Intl.DateTimeFormat(undefined, { dateStyle: 'medium' }).format(new Date(iso)) : '—')
 
   return (
-    <div className="p-4 md:p-6 max-w-2xl space-y-4 overflow-y-auto h-full">
+    <Page width="medium" className="space-y-4">
       <h1 className="text-lg font-semibold text-slate-100">{t('title')}</h1>
       <p className="text-xs text-slate-500">{t('intro')}</p>
 
@@ -268,6 +269,6 @@ export function SecurityPage() {
           </Card>
         </>
       )}
-    </div>
+    </Page>
   )
 }

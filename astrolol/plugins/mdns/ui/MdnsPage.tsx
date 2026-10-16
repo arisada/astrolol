@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input'
 import { PillGroup } from '@/components/ui/pill-group'
 import * as api from './api'
 import type { MdnsSettings } from './api'
+import { Page } from '@/components/Page'
 
 const EMPTY: MdnsSettings = {
   advertised_port: null,
@@ -77,7 +78,7 @@ export function MdnsPage() {
   const s = settings ?? EMPTY
 
   return (
-    <div className="p-4 md:p-6 max-w-lg space-y-4 overflow-y-auto h-full">
+    <Page width="medium" className="space-y-4">
       <h1 className="text-lg font-semibold text-slate-100">{t('title')}</h1>
       <p className="text-xs text-slate-500">{t('intro')}</p>
 
@@ -146,6 +147,6 @@ export function MdnsPage() {
           {saving ? t('saving') : t('save')}
         </button>
       </Card>
-    </div>
+    </Page>
   )
 }

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Trans, useTranslation } from 'react-i18next'
+import { Page } from '@/components/Page'
 
 interface StellariumStatus {
   running: boolean
@@ -57,7 +58,7 @@ export function StellariumPage() {
   if (!status) return <div className="p-6 text-slate-500 text-sm">{t('loading')}</div>
 
   return (
-    <div className="p-6 max-w-xl">
+    <Page width="medium">
       <h1 className="text-lg font-semibold text-slate-100 mb-6">{t('title')}</h1>
 
       <div className="bg-surface-raised rounded-lg p-4 space-y-3 mb-6">
@@ -94,6 +95,6 @@ export function StellariumPage() {
         </ol>
         <p className="text-xs text-slate-600 pt-2">{t('howto.footer')}</p>
       </div>
-    </div>
+    </Page>
   )
 }

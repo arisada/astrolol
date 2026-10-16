@@ -8,6 +8,7 @@ import { ToggleSwitch } from '@/components/ui/toggle-switch'
 import { Input } from '@/components/ui/input'
 import { SUPPORTED_LANGUAGES, setLanguage } from '@/i18n'
 import { THEMES, setTheme } from '@/theme'
+import { Page } from '@/components/Page'
 
 interface IndiSettings {
   manageServer: boolean
@@ -246,7 +247,7 @@ export function Options() {
   }
 
   return (
-    <div className="p-6 max-w-xl">
+    <Page width="medium">
       <h1 className="text-lg font-semibold text-slate-100 mb-6">{t('title')}</h1>
 
       <Section title={t('language.title')}>
@@ -502,6 +503,6 @@ export function Options() {
           <p className="text-xs text-status-error mt-2">{t('server.indiStopFailed')}</p>
         )}
       </Section>
-    </div>
+    </Page>
   )
 }

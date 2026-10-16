@@ -23,6 +23,7 @@ import { useDeviceConfigs } from '@/hooks/useDeviceConfigs'
 import { itemsInTree } from '@/utils/profile-tree'
 import { DEVICE_ITEM_TYPE, isInInventory, itemDeviceStates } from '@/utils/inventory-match'
 import { GETTING_STARTED_TOPIC } from '@/help/paths'
+import { Page } from '@/components/Page'
 
 // ---------------------------------------------------------------------------
 // Types & constants
@@ -1651,7 +1652,7 @@ export function Equipment() {
 
   return (
     <>
-    <div className="p-6 max-w-3xl">
+    <Page width="medium">
       <div className="flex items-center justify-between mb-4">
         <h1 className="text-lg font-semibold text-slate-100">{t('title')}</h1>
         {activeTab === 'connections' && (
@@ -1846,7 +1847,7 @@ export function Equipment() {
         </div>
       </section>
       </>}
-    </div>
+    </Page>
     {propertiesDeviceId && (
       <DevicePropertiesPanel
         deviceId={propertiesDeviceId}

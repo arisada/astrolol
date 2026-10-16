@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Trans, useTranslation } from 'react-i18next'
+import { Page } from '@/components/Page'
 
 interface Lx200Status {
   running: boolean
@@ -91,7 +92,7 @@ export function Lx200Page() {
   }
 
   return (
-    <div className="p-6 max-w-xl">
+    <Page width="medium">
       <h1 className="text-lg font-semibold text-slate-100 mb-6">{t('title')}</h1>
 
       <div className="bg-surface-raised rounded-lg p-4 space-y-3">
@@ -123,6 +124,6 @@ export function Lx200Page() {
       </div>
 
       <SetupInstructions port={status.port} />
-    </div>
+    </Page>
   )
 }
