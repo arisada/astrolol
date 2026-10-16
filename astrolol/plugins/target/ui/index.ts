@@ -3,6 +3,8 @@ import { TargetPage } from './TargetPage'
 import { TargetChip } from './TargetChip'
 import { registerPluginEventHandlers } from '@/store'
 import type { AstrolollEvent } from '@/api/types'
+import i18n from '@/i18n'
+import { TargetVisibilityWidget } from './TargetWidgets'
 
 interface TargetState {
   name: string | null
@@ -23,4 +25,7 @@ export default {
   label: 'Target',
   Component: TargetPage,
   StatusChip: TargetChip,
+  widgets: [
+    { id: 'visibility', title: () => i18n.t('widget.visibility', { ns: 'target' }), Component: TargetVisibilityWidget },
+  ],
 }

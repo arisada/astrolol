@@ -4,7 +4,7 @@ import type { AstrolollEvent } from '@/api/types'
 import type { NavActivity } from '@/utils/nav-activity'
 import { GuiderPage } from './GuiderPage'
 import { GuiderChip } from './GuiderChip'
-import { GuiderGraphWidget, GuiderTargetWidget } from './GuiderWidgets'
+import { GuiderGraphWidget, GuiderStatusWidget, GuiderTargetWidget } from './GuiderWidgets'
 import i18n from '@/i18n'
 import { DEFAULT_GUIDER_STATE, MAX_STEPS, type GuiderPluginState } from './api'
 
@@ -33,6 +33,7 @@ export default {
   Component: GuiderPage,
   StatusChip: GuiderChip,
   widgets: [
+    { id: 'status', title: () => i18n.t('widget.status', { ns: 'guider' }), icon: Crosshair, Component: GuiderStatusWidget },
     { id: 'target', title: () => i18n.t('widget.target', { ns: 'guider' }), icon: Crosshair, Component: GuiderTargetWidget },
     { id: 'graph', title: () => i18n.t('widget.graph', { ns: 'guider' }), icon: Crosshair, Component: GuiderGraphWidget },
   ],

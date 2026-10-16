@@ -32,3 +32,22 @@ def test_dock_rejects_odd_widget_ids(bad):
 def test_dock_is_bounded():
     with pytest.raises(ValidationError):
         DockSettings(widgets=[DockWidget(id=f"a.w{i}") for i in range(51)])
+
+
+def test_same_widget_can_be_pinned_for_two_devices(tmp_path):
+    path = tmp_path / "settings.json"
+    dock = DockSettings(widgets=[
+        DockWidget(id="focuser.position", device_id="esatto"),
+        DockWidget(id="focuser.position", device_id="moonlite", collapsed=True),
+        DockWidget(id="logs.warnings"),
+    ])
+    UserSettingsStore(path).update(UserSettings(dock=dock))
+    widgets = UserSettingsStore(path).get().dock.widgets
+    assert [(w.id, w.device_id) for w in widgets] == [
+        ("focuser.position", "esatto"), ("focuser.position", "moonlite"), ("logs.warnings", None)]
+
+
+def test_widget_device_id_is_optional_and_not_empty():
+    assert DockWidget(id="a.b").device_id is None
+    with pytest.raises(ValidationError):
+        DockWidget(id="a.b", device_id="")

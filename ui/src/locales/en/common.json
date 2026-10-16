@@ -161,16 +161,16 @@
     "close": "Close the dock",
     "edit": "Edit the dock",
     "done": "Done editing",
-    "empty": "Nothing pinned yet. Choose edit, then add widgets from this list or with the + on a page.",
+    "empty": "Nothing pinned yet. Add widgets to keep them in view on every page.",
     "add": "Add a widget",
     "allPinned": "Every widget is already pinned.",
-    "pin": "Pin to the dock",
-    "unpin": "Remove from the dock",
     "remove": "Remove",
     "moveUp": "Move up",
     "moveDown": "Move down",
     "collapse": "Collapse",
     "expand": "Expand",
-    "noMount": "No mount connected"
+    "noMount": "No mount connected",
+    "noFocuser": "No focuser connected",
+    "noFilterWheel": "No filter wheel connected"
   }
 }

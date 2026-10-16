@@ -84,5 +84,11 @@
     "position": "position {{value}}",
     "optimal": "optimale {{value}}",
     "initial": "départ {{value}}"
+  },
+  "widget": {
+    "curve": "Courbe de focus",
+    "none": "Aucune mise au point pour l'instant.",
+    "step": "Étape {{step}} sur {{total}}",
+    "best": "Meilleure {{position}}"
   }
 }

@@ -80,5 +80,9 @@
     "start": "Poser et résoudre",
     "halt": "Arrêter"
   },
-  "recent": "Résolutions récentes"
+  "recent": "Résolutions récentes",
+  "widget": {
+    "result": "Dernière résolution",
+    "none": "Rien de résolu pour l'instant."
+  }
 }

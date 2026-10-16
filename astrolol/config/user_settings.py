@@ -28,6 +28,9 @@ class MountDeviceSettings(BaseModel):
 class DockWidget(BaseModel):
     """One widget pinned to the dock sidebar. Order in the list is the order shown."""
     id: str = Field(pattern=r"^[a-z0-9_]{1,40}\.[a-z0-9_]{1,40}$")   # "<plugin or page>.<widget>"
+    # Which device a per-device widget (focuser, filter wheel, mount) shows. None = the first
+    # connected one. The same widget may be pinned once per device.
+    device_id: str | None = Field(default=None, min_length=1, max_length=100)
     collapsed: bool = False
 
 

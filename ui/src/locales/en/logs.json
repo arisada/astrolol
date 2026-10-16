@@ -8,5 +8,9 @@
   "debug": "debug",
   "empty": "No events yet.",
   "noMatch": "No events match the selected filters.",
-  "footer": "Last {{count}} events in memory · Full history in <code>astrolol.log</code>"
+  "footer": "Last {{count}} events in memory · Full history in <code>astrolol.log</code>",
+  "widget": {
+    "warnings": "Warnings",
+    "hint": "Warnings and errors from every component."
+  }
 }

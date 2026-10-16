@@ -5,6 +5,8 @@ import type { NavActivity } from '@/utils/nav-activity'
 import { SequencerPage } from './SequencerPage'
 import { SequencerChip } from './SequencerChip'
 import type { SequencerUiState } from './state'
+import i18n from '@/i18n'
+import { SequencerProgressWidget } from './SequencerWidgets'
 
 const EMPTY: SequencerUiState = { status: null, entries: null }
 
@@ -37,6 +39,9 @@ export default {
   label: 'Sequencer',
   Component: SequencerPage,
   StatusChip: SequencerChip,
+  widgets: [
+    { id: 'progress', title: () => i18n.t('widget.progress', { ns: 'sequencer' }), Component: SequencerProgressWidget },
+  ],
   // A pause the user did not ask for, or a stalled task, needs attention.
   navActivity: (cur: unknown): NavActivity => {
     const status = (cur as SequencerUiState | null | undefined)?.status

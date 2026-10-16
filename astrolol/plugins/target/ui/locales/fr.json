@@ -74,5 +74,10 @@
     "setTarget": "Définir la cible",
     "slew": "Pointer la cible",
     "addFavorite": "Ajouter aux favoris"
+  },
+  "widget": {
+    "visibility": "Visibilité de la cible",
+    "none": "Aucune cible définie.",
+    "peak": "max. {{alt}}°"
   }
 }

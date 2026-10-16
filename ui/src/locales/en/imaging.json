@@ -52,5 +52,9 @@
     "filter": "Filter {{slot}}",
     "moving": "Moving…"
   },
-  "noCamera": "No camera connected."
+  "noCamera": "No camera connected.",
+  "widget": {
+    "focuser": "Focuser",
+    "filterWheel": "Filter wheel"
+  }
 }

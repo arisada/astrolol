@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import type { TFunction } from 'i18next'
 import { fmtRA, fmtDec } from '@/utils/formatting'
+import { fmtHA, fmtMeridianDistance } from '@/utils/meridian'
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Crosshair, RefreshCw, RotateCw, Settings, StopCircle } from 'lucide-react'
 import { api } from '@/api/client'
 import { useStore } from '@/store'
@@ -16,7 +16,6 @@ import { HorizontalSky } from '@/components/ui/mount-horizontal'
 import { PillGroup } from '@/components/ui/pill-group'
 import { useLocalStorage } from '@/hooks/useLocalStorage'
 import { useMountSite } from '@/hooks/useMountSite'
-import { Dockable } from '@/dock/Dockable'
 import { EventLog } from '@/components/ui/event-log'
 import { DevicePropertiesPanel } from '@/components/DevicePropertiesPanel'
 
@@ -36,24 +35,6 @@ const TRACKING_MODES: TrackingMode[] = ['sidereal', 'lunar', 'solar']
 // ---------------------------------------------------------------------------
 // Pure formatting helpers
 // ---------------------------------------------------------------------------
-
-function fmtHA(ha: number | null | undefined): string {
-  if (ha == null) return '—'
-  const sign = ha >= 0 ? '+' : '−'
-  const abs = Math.abs(ha)
-  const h = Math.floor(abs)
-  const m = Math.floor((abs - h) * 60)
-  if (h === 0) return `${sign}${m}m`
-  return `${sign}${h}h ${String(m).padStart(2, '0')}m`
-}
-
-function fmtMeridianDistance(ha: number, t: TFunction): string {
-  const abs = Math.abs(ha)
-  const h = Math.floor(abs)
-  const m = Math.floor((abs - h) * 60)
-  const parts = h > 0 ? `${h}h ${m}m` : `${m}m`
-  return t(ha < 0 ? 'meridianDistance.before' : 'meridianDistance.after', { time: parts })
-}
 
 // ---------------------------------------------------------------------------
 // Helpers for HH:MM ↔ decimal-hours conversion (used for HA threshold)
@@ -264,7 +245,6 @@ function MountControls({ deviceId }: { deviceId: string }) {
         )}
 
         {/* Live position */}
-        <Dockable id="mount.position">
         <Card title={t('position.title')} action={<FrameToggle jnow={positionJnow} onChange={setPositionJnow} />} className="p-4 flex flex-col gap-3">
           <div className="grid grid-cols-2 gap-x-8 gap-y-1 font-mono text-sm">
             <span className="text-slate-500 text-xs">{t('position.ra')}</span>
@@ -310,7 +290,6 @@ function MountControls({ deviceId }: { deviceId: string }) {
             </div>
           )}
         </Card>
-        </Dockable>
 
         {/* Target */}
         <Card title={t('target.title')} action={<FrameToggle jnow={targetJnow} onChange={setTargetJnow} />} className="p-4 flex flex-col gap-3">

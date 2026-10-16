@@ -4,14 +4,18 @@ import type { LogEntry } from '@/store'
 
 export function EventLog({
   filter,
+  levels,
   className = '',
   style,
 }: {
-  filter: string[]
+  /** Components to show; all when omitted. */
+  filter?: string[]
+  /** Levels to show (e.g. ['warning', 'error']); all when omitted. */
+  levels?: string[]
   className?: string
   style?: React.CSSProperties
 }) {
-  const log = useStore((s) => s.log.filter((e: LogEntry) => filter.includes(e.component)))
+  const log = useStore((s) => s.log.filter((e: LogEntry) => (!filter || filter.includes(e.component)) && (!levels || levels.includes(e.level))))
   const ref = useRef<HTMLDivElement>(null)
   const pinned = useRef(true)
 

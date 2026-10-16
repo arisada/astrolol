@@ -236,6 +236,11 @@
   },
   "widget": {
     "target": "Cible de guidage",
-    "graph": "Courbe de guidage"
+    "graph": "Courbe de guidage",
+    "status": "Guidage",
+    "idle": "Pas de guidage.",
+    "snr": "SNR",
+    "stars": "Étoiles",
+    "lastError": "Erreur"
   }
 }

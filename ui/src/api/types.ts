@@ -105,6 +105,8 @@ export interface ExposureRequest {
 
 export interface DockWidgetEntry {
   id: string
+  /** Device a per-device widget shows; null = the first connected one. */
+  device_id?: string | null
   collapsed: boolean
 }
 

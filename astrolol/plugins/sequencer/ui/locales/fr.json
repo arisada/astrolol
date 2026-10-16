@@ -542,5 +542,13 @@
       "total": " Environ {{time}} au total."
     },
     "waitTemperature": "Attendre que les caméras atteignent la température"
+  },
+  "widget": {
+    "progress": "Séquence",
+    "idle": "Aucune séquence en cours.",
+    "stalled": "Bloquée",
+    "frames": "{{done}} / {{total}} images",
+    "tasks": "Tâche {{done}} sur {{total}}",
+    "eta": "{{time}} restantes"
   }
 }

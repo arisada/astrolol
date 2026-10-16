@@ -3,8 +3,10 @@ import { Link } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { ChevronDown, ChevronRight, ChevronUp, PanelBottomClose, PanelBottomOpen, PanelRightClose, PanelRightOpen, Pencil, Check, Plus, X } from 'lucide-react'
 import { useStore } from '@/store'
+import type { DockWidgetEntry } from '@/api/types'
 import { PORTRAIT_NARROW, useMediaQuery } from '@/hooks/useMediaQuery'
-import { getAllDockWidgets, getDockWidget, type DockWidgetDef } from './registry'
+import { getAllDockWidgets, type DockWidgetDef } from './registry'
+import { hasWidget } from './layout'
 import { useDock } from './store'
 import './coreWidgets'
 
@@ -18,17 +20,21 @@ function useAvailable(): DockWidgetDef[] {
   return getAllDockWidgets().filter((d) => !d.plugin || infos.some((p) => p.id === d.plugin && p.enabled))
 }
 
-function Frame({ def, index, count, collapsed, editing }: {
-  def: DockWidgetDef; index: number; count: number; collapsed: boolean; editing: boolean
-}) {
+interface Entry { def: DockWidgetDef; device_id: string | null; collapsed: boolean }
+
+const deviceLabel = (def: DockWidgetDef, device: string | null) => (def.perDevice && device ? `${def.title()} · ${device}` : def.title())
+
+function Frame({ entry, index, count, editing }: { entry: Entry; index: number; count: number; editing: boolean }) {
   const { t } = useTranslation()
   const dock = useDock()
+  const { def, collapsed } = entry
+  const key = { id: def.id, device_id: entry.device_id }
   const Icon = def.icon
-  const title = def.title()
+  const title = deviceLabel(def, entry.device_id)
   return (
     <section className="rounded-[10px] border border-surface-border bg-surface-raised">
       <header className="flex items-center gap-1 px-2 py-1.5">
-        <button type="button" className={iconBtn} onClick={() => dock.toggleCollapsed(def.id)}
+        <button type="button" className={iconBtn} onClick={() => dock.toggleCollapsed(key)}
           aria-expanded={!collapsed} aria-label={collapsed ? t('dock.expand') : t('dock.collapse')}>
           {collapsed ? <ChevronRight size={14} /> : <ChevronDown size={14} />}
         </button>
@@ -38,18 +44,30 @@ function Frame({ def, index, count, collapsed, editing }: {
           : <h3 className="flex-1 min-w-0 truncate label-caps text-slate-500">{title}</h3>}
         {editing && (
           <>
-            <button type="button" className={iconBtn} disabled={index === 0} onClick={() => dock.move(def.id, -1)} aria-label={t('dock.moveUp')}><ChevronUp size={14} /></button>
-            <button type="button" className={iconBtn} disabled={index === count - 1} onClick={() => dock.move(def.id, 1)} aria-label={t('dock.moveDown')}><ChevronDown size={14} /></button>
-            <button type="button" className={iconBtn} onClick={() => dock.remove(def.id)} aria-label={t('dock.remove')}><X size={14} /></button>
+            <button type="button" className={iconBtn} disabled={index === 0} onClick={() => dock.move(key, -1)} aria-label={t('dock.moveUp')}><ChevronUp size={14} /></button>
+            <button type="button" className={iconBtn} disabled={index === count - 1} onClick={() => dock.move(key, 1)} aria-label={t('dock.moveDown')}><ChevronDown size={14} /></button>
+            <button type="button" className={iconBtn} onClick={() => dock.remove(key)} aria-label={t('dock.remove')}><X size={14} /></button>
           </>
         )}
       </header>
-      {!collapsed && <div className="px-3 pb-3"><def.Component /></div>}
+      {!collapsed && <div className="px-3 pb-3"><def.Component deviceId={entry.device_id ?? undefined} /></div>}
     </section>
   )
 }
 
-function Picker({ choices }: { choices: DockWidgetDef[] }) {
+/** What can still be added: a per-device widget is offered once per connected device. */
+function useChoices(available: DockWidgetDef[], pinned: DockWidgetEntry[]) {
+  const devices = useStore((s) => s.connectedDevices)
+  return available.flatMap((def) => {
+    const ids = def.perDevice ? devices.filter((d) => d.kind === def.perDevice).map((d) => d.device_id) : []
+    const options: (string | null)[] = ids.length > 0 ? ids : [null]
+    return options
+      .filter((device_id) => !hasWidget(pinned, { id: def.id, device_id }))
+      .map((device_id) => ({ def, device_id }))
+  })
+}
+
+function Picker({ choices }: { choices: { def: DockWidgetDef; device_id: string | null }[] }) {
   const { t } = useTranslation()
   const add = useDock((s) => s.add)
   return (
@@ -57,12 +75,12 @@ function Picker({ choices }: { choices: DockWidgetDef[] }) {
       <h3 className="label-caps text-slate-500 px-1 pb-1">{t('dock.add')}</h3>
       {choices.length === 0 && <p className="px-1 text-xs text-slate-500">{t('dock.allPinned')}</p>}
       <ul className="flex flex-col">
-        {choices.map((d) => (
-          <li key={d.id}>
-            <button type="button" onClick={() => add(d.id)}
+        {choices.map(({ def, device_id }) => (
+          <li key={`${def.id}@${device_id ?? ''}`}>
+            <button type="button" onClick={() => add({ id: def.id, device_id })}
               className="w-full flex items-center gap-2 rounded px-1 py-1.5 text-left text-sm text-slate-300 hover:bg-surface-overlay">
               <Plus size={14} className="text-accent shrink-0" />
-              <span className="truncate">{d.title()}</span>
+              <span className="truncate">{deviceLabel(def, device_id)}</span>
             </button>
           </li>
         ))}
@@ -83,6 +101,7 @@ export function Dock() {
   const wide = useMediaQuery(WIDE)
   const portrait = useMediaQuery(PORTRAIT_NARROW)   // phone held upright: a sheet at the bottom
   const available = useAvailable()
+  const choices = useChoices(available, widgets)
 
   useEffect(() => { void load() }, [load])
   useEffect(() => {
@@ -108,11 +127,10 @@ export function Dock() {
 
   if (!open) return handle
 
-  const shown = widgets.flatMap((w) => {
-    const def = available.find((d) => d.id === w.id) ?? (getDockWidget(w.id)?.plugin ? undefined : getDockWidget(w.id))
-    return def ? [{ def, collapsed: w.collapsed }] : []
+  const shown = widgets.flatMap((w): Entry[] => {
+    const def = available.find((d) => d.id === w.id)
+    return def ? [{ def, device_id: w.device_id ?? null, collapsed: w.collapsed }] : []
   })
-  const choices = available.filter((d) => !widgets.some((w) => w.id === d.id))
 
   return (
     <>
@@ -129,9 +147,17 @@ export function Dock() {
         </button>
       </div>
       <div className={`flex-1 overflow-y-auto p-2 flex flex-col gap-2 ${portrait ? 'pb-7' : ''}`}>
-        {shown.length === 0 && !editing && <p className="p-2 text-xs text-slate-500">{t('dock.empty')}</p>}
-        {shown.map(({ def, collapsed }, i) => (
-          <Frame key={def.id} def={def} index={i} count={shown.length} collapsed={collapsed} editing={editing} />
+        {shown.length === 0 && !editing && (
+          <div className="p-2 flex flex-col items-start gap-2">
+            <p className="text-xs text-slate-500">{t('dock.empty')}</p>
+            <button type="button" onClick={() => setEditing(true)}
+              className="inline-flex items-center gap-1.5 rounded border border-surface-border px-2 py-1 text-xs text-slate-300 hover:bg-surface-overlay">
+              <Plus size={13} className="text-accent" /> {t('dock.add')}
+            </button>
+          </div>
+        )}
+        {shown.map((entry, i) => (
+          <Frame key={`${entry.def.id}@${entry.device_id ?? ''}`} entry={entry} index={i} count={shown.length} editing={editing} />
         ))}
         {editing && <Picker choices={choices} />}
       </div>

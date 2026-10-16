@@ -213,6 +213,7 @@ Use components from `ui/src/components/ui/` rather than re-implementing them per
 | `Card`, `SidebarSection` | `@/components/ui/card` | Container variants |
 | `StarImage` | `@/components/ui/star-image` | Camera frame (JPEG) with a box around each star and an SVG slot for more overlay (guider view, polar-alignment star view) |
 | `Badge`, `Chip`, `StatusPill` | `@/components/ui/badge` | Status indicators |
+| `ProgressBar` | `@/components/ui/progress-bar` | Thin "n of m" bar (pair it with text) |
 | `Tabs` | `@/components/ui/tabs` | Segmented tab switcher |
 | `DmsInput` | `@/components/ui/dms-input` | Dec/RA/lat/lon entry: joined DMS/HMS block, up/down per field, carry and clamping |
 | `EquatorialSky`, `HorizontalSky` | `@/components/ui/mount-equatorial`, `mount-horizontal` | Mount position on the sky (centred on the pole, or on the zenith); take `latitude`, `lst`, `ra`, `dec` |
@@ -243,6 +244,19 @@ active palette, so the chip recipes below keep working. Rules:
   colours: `cat-1` … `cat-6`.
 - Text on an accent background is `text-accent-fg`, not `text-white`.
 - Never convey state by colour alone — the red night palettes make hues indistinguishable.
+
+### Dock widgets
+
+The dock (`ui/src/dock/`) is a right-hand sidebar (a bottom sheet in portrait) of read-only widgets the
+user pins from any page; the layout is `UserSettings.dock`. A widget is a prop-less component that reads
+the store (WebSocket + status polling), so it renders the same on its page and in the dock. A plugin lists
+them under `widgets` in `ui/index.ts` (`{ id, title: () => i18n.t(...), icon?, Component }`; the registry
+prefixes `<plugin>.`); core pages call `registerDockWidget` in `dock/coreWidgets.ts`. Prefer event-driven
+state over a timer: if a widget must fetch, refetch on a store change, or poll only while mounted (it is
+unmounted when the dock is closed or the widget folded). A widget that shows one device (focuser, filter
+wheel, mount) sets `perDevice: '<kind>'` and takes a `deviceId` prop (`useDevice` in
+`dock/widgets/`): the picker lists it once per connected device and the layout stores the device id.
+Widgets are added only from the dock's own picker, never from the pages.
 
 ### Status-bar chips
 

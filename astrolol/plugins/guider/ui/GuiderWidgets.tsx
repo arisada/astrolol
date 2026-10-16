@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { GuideGraph } from '@/components/ui/guide-graph'
 import { GuideTarget } from '@/components/ui/guide-target'
+import { StatusPill, type StatusPillVariant } from '@/components/ui/badge'
 import { useStore } from '@/store'
 import { niceRange } from '@/utils/guiding'
 import * as api from './api'
@@ -45,4 +46,31 @@ export function GuiderTargetWidget() {
 export function GuiderGraphWidget() {
   const { points, range, unit, rms } = useGuiding()
   return <GuideGraph points={points} range={range} rmsTotal={rms?.rms_total} unit={unit} />
+}
+
+/** Guiding or not, the star's signal and the last correction: all from the event stream. */
+export function GuiderStatusWidget() {
+  const { t } = useTranslation('guider')
+  const live = useStore((s) => s.pluginStates['guider'] as api.GuiderPluginState | null | undefined)
+  if (!live || live.guiding === null) return <p className="text-xs text-slate-500">{t('widget.idle')}</p>
+
+  const last = live.steps[live.steps.length - 1]
+  const stopped = !live.guiding && (live.reason === 'stopped' || live.reason === 'disconnected')
+  const [text, variant]: [string, StatusPillVariant] = live.guiding ? [t('chip.guiding'), 'green']
+    : stopped ? [t('state.stopped'), 'slate'] : [t('chip.lost'), 'red']
+  return (
+    <div className="flex flex-col gap-2">
+      <div className="flex items-baseline justify-between gap-2">
+        <StatusPill status={text} variant={variant} />
+        {!live.guiding && live.reason && !stopped && (
+          <span className="truncate text-xs text-slate-500">{t(`reason.${live.reason}`, { defaultValue: live.reason.replace(/_/g, ' ') })}</span>
+        )}
+      </div>
+      <div className="grid grid-cols-3 gap-2 text-sm">
+        <Stat label={t('widget.snr')} value={fmt(live.snr, 1)} />
+        <Stat label={t('widget.stars')} value={live.stars != null ? String(live.stars) : '—'} />
+        <Stat label={t('widget.lastError')} value={last ? fmt(Math.hypot(last.ra, last.dec)) : '—'} />
+      </div>
+    </div>
+  )
 }

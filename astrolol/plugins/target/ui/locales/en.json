@@ -74,5 +74,10 @@
     "setTarget": "Set Target",
     "slew": "Slew to Target",
     "addFavorite": "Add to Favourites"
+  },
+  "widget": {
+    "visibility": "Target visibility",
+    "none": "No target set.",
+    "peak": "peak {{alt}}°"
   }
 }

@@ -161,16 +161,16 @@
     "close": "Fermer le dock",
     "edit": "Modifier le dock",
     "done": "Terminer",
-    "empty": "Rien d'épinglé pour l'instant. Choisissez modifier, puis ajoutez des widgets depuis cette liste ou avec le + sur une page.",
+    "empty": "Rien d'épinglé pour l'instant. Ajoutez des widgets pour les garder sous les yeux sur chaque page.",
     "add": "Ajouter un widget",
     "allPinned": "Tous les widgets sont déjà épinglés.",
-    "pin": "Épingler au dock",
-    "unpin": "Retirer du dock",
     "remove": "Retirer",
     "moveUp": "Monter",
     "moveDown": "Descendre",
     "collapse": "Replier",
     "expand": "Déplier",
-    "noMount": "Aucune monture connectée"
+    "noMount": "Aucune monture connectée",
+    "noFocuser": "Aucun focuseur connecté",
+    "noFilterWheel": "Aucune roue à filtres connectée"
   }
 }

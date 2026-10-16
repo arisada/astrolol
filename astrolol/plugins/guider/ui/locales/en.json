@@ -236,6 +236,11 @@
   },
   "widget": {
     "target": "Guide target",
-    "graph": "Guide graph"
+    "graph": "Guide graph",
+    "status": "Guiding",
+    "idle": "Not guiding.",
+    "snr": "SNR",
+    "stars": "Stars",
+    "lastError": "Error"
   }
 }

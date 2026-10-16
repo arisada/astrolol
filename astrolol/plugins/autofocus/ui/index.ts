@@ -4,6 +4,8 @@ import { AutofocusChip } from './AutofocusChip'
 import { registerPluginEventHandlers } from '@/store'
 import type { AstrolollEvent } from '@/api/types'
 import type { NavActivity } from '@/utils/nav-activity'
+import i18n from '@/i18n'
+import { AutofocusCurveWidget } from './AutofocusWidgets'
 
 interface AutofocusRunningState {
   runId: string
@@ -36,6 +38,9 @@ export default {
   label: 'Autofocus',
   Component: AutofocusPage,
   StatusChip: AutofocusChip,
+  widgets: [
+    { id: 'curve', title: () => i18n.t('widget.curve', { ns: 'autofocus' }), Component: AutofocusCurveWidget },
+  ],
   // The slice exists only while a run is going.
   navActivity: (cur: unknown): NavActivity => (cur ? 'busy' : null),
 }

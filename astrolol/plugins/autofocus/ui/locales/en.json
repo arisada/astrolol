@@ -84,5 +84,11 @@
     "position": "position {{value}}",
     "optimal": "optimal {{value}}",
     "initial": "started at {{value}}"
+  },
+  "widget": {
+    "curve": "Focus curve",
+    "none": "No focus run yet.",
+    "step": "Step {{step}} of {{total}}",
+    "best": "Best {{position}}"
   }
 }

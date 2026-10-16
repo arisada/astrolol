@@ -6,6 +6,8 @@ import { DEFAULT_PLATESOLVE_STATE } from './api'
 import type { AstrolollEvent } from '@/api/types'
 import type { NavActivity } from '@/utils/nav-activity'
 import type { PlateSolvePluginState, SolveResult } from './api'
+import i18n from '@/i18n'
+import { PlatesolveResultWidget } from './PlatesolveWidgets'
 
 registerPluginEventHandlers('platesolve', {
   'platesolve.started': (event: AstrolollEvent, cur: unknown): PlateSolvePluginState => {
@@ -59,6 +61,9 @@ export default {
   label: 'Plate Solving',
   Component: PlatesolvePage,
   StatusChip: PlatesolveChip,
+  widgets: [
+    { id: 'result', title: () => i18n.t('widget.result', { ns: 'platesolve' }), Component: PlatesolveResultWidget },
+  ],
   navActivity: (cur: unknown): NavActivity =>
     Object.values((cur as PlateSolvePluginState | null)?.jobs ?? {}).some(
       (j) => j.status === 'pending' || j.status === 'exposing' || j.status === 'solving',

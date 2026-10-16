@@ -80,5 +80,9 @@
     "start": "Expose & Solve",
     "halt": "Halt"
   },
-  "recent": "Recent solves"
+  "recent": "Recent solves",
+  "widget": {
+    "result": "Last solve",
+    "none": "Nothing solved yet."
+  }
 }
