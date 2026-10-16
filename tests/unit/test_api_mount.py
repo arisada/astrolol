@@ -15,11 +15,17 @@ class _GuidingMount(FakeMount):
         self.pulses.append((direction, duration_ms))
 
 
+class _RefusingMount(FakeMount):
+    async def start_move(self, direction: str, rate: str) -> None:
+        raise ValueError(f"Unknown nudge rate {rate!r}")
+
+
 @pytest.fixture
 def app():
     application = create_app()
     application.state.registry.register_mount("guiding", _GuidingMount)  # type: ignore[arg-type]
     application.state.registry.register_mount("plain", FakeMount)  # type: ignore[arg-type]
+    application.state.registry.register_mount("refusing", _RefusingMount)  # type: ignore[arg-type]
     return application
 
 
@@ -117,3 +123,25 @@ async def test_mount_limit_settings_validation(limits_app, body: dict) -> None:
     async with AsyncClient(transport=ASGITransport(app=limits_app), base_url="http://test") as c:
         r = await c.put("/mount/m/settings", json=body)
     assert r.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_move_refused_by_the_mount_is_409(client: AsyncClient) -> None:
+    async with client as c:
+        await _connect(c, "refusing")
+        r = await c.post("/mount/m/move", json={"direction": "N", "rate": "fast"})
+    assert r.status_code == 409
+    assert "fast" in r.json()["detail"]
+
+
+@pytest.mark.asyncio
+async def test_move_passes_the_speed_and_stop_move_stops_it(app, client: AsyncClient) -> None:
+    async with client as c:
+        await _connect(c, "plain")
+        r = await c.post("/mount/m/move", json={"direction": "W", "rate": "800x"})
+        assert r.status_code == 204
+        r = await c.delete("/mount/m/move")
+        assert r.status_code == 204
+    mount = app.state.device_manager.get_mount("m")
+    assert mount.moves == [("W", "800x")]
+    assert mount.move_stops == 1

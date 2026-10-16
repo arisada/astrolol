@@ -23,6 +23,8 @@ class MountDeviceSettings(BaseModel):
     # Flat horizon: GOTOs below it are refused; crossing it while tracking triggers the action.
     horizon_min_alt_deg: float = Field(default=0.0, ge=-10.0, le=60.0)
     horizon_action: Literal["none", "stop_tracking", "park"] = "stop_tracking"
+    # Speed of the nudge pad: "<n>x" sidereal, or the name of one of the driver's own slew rates.
+    nudge_rate: str = Field(default="16x", min_length=1, max_length=32, pattern=r"^[A-Za-z0-9_.+-]+$")
 
 
 class DockWidget(BaseModel):

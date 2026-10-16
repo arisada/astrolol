@@ -56,6 +56,7 @@ export interface MountDeviceSettings {
   meridian_limit_deg: number      // RA axis travel allowed past the meridian, either way (0–60)
   horizon_min_alt_deg: number     // flat horizon (−10–60): lower GOTOs refused
   horizon_action: 'none' | 'stop_tracking' | 'park'  // when a tracking mount sinks below it
+  nudge_rate: string              // nudge pad speed: "16x" sidereal, or a driver slew-rate name
 }
 
 export interface MountStatus {

@@ -113,12 +113,20 @@ class FakeMount:
         self.last_tracking_mode = None
         self._pier_side: str | None = "West"
         self._hour_angle: float | None = None
+        self.moves: list[tuple[str, str]] = []   # (direction, rate) of started nudges
+        self.move_stops = 0
 
     async def connect(self) -> None:
         self.connected = True
 
     async def disconnect(self) -> None:
         self.connected = False
+
+    async def start_move(self, direction: str, rate: str) -> None:
+        self.moves.append((direction, rate))
+
+    async def stop_move(self) -> None:
+        self.move_stops += 1
 
     async def slew(self, coord: SkyCoord) -> None:
         await asyncio.sleep(0.05)

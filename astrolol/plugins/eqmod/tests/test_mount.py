@@ -287,7 +287,25 @@ async def test_max_rate_uses_high_speed_mode() -> None:
     await mount.start_move("W", "max")
     a = ctrl.axes[1]
     assert a.fast
-    assert a.period == step_period_for_rate(400 * SIDEREAL_DEG_PER_SEC, CPR, TIMER_FREQ, HS_RATIO)
+    assert a.period == step_period_for_rate(800 * SIDEREAL_DEG_PER_SEC, CPR, TIMER_FREQ, HS_RATIO)
+
+
+@pytest.mark.parametrize("rate,x", [("1x", 1), ("2x", 2), ("128x", 128), ("512x", 512), ("800x", 800)])
+async def test_nudge_speed_in_multiples_of_sidereal(rate: str, x: int) -> None:
+    mount, ctrl = await _connected()
+    await mount.start_move("W", rate)
+    a = ctrl.axes[1]
+    fast = x * SIDEREAL_DEG_PER_SEC > 128 * SIDEREAL_DEG_PER_SEC
+    assert a.fast is fast
+    assert a.period == step_period_for_rate(x * SIDEREAL_DEG_PER_SEC, CPR, TIMER_FREQ, HS_RATIO if fast else 1)
+
+
+@pytest.mark.parametrize("rate", ["", "fast", "0x", "801x", "-4x", "x"])
+async def test_nudge_rejects_unknown_or_out_of_range_rates(rate: str) -> None:
+    mount, ctrl = await _connected()
+    with pytest.raises(ValueError):
+        await mount.start_move("W", rate)
+    assert not ctrl.axes[1].running
 
 
 async def test_nudge_unparks() -> None:

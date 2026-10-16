@@ -20,6 +20,7 @@ from astropy.coordinates import SkyCoord
 
 from astrolol.devices.base.models import DeviceState, MountStatus, TrackingMode
 from astrolol.mount.sky import alt_az, icrs_to_jnow, jnow_to_icrs, local_sidereal_time_h
+from astrolol.plugins.eqmod.rates import nudge_speed_x_sidereal
 from astrolol.plugins.eqmod.geometry import MountGeometry, PierSide, SyncOffset, opposite, pier_side_of
 from astrolol.plugins.eqmod.protocol import (
     HIGH_SPEED_THRESHOLD_DEG_PER_SEC,
@@ -40,14 +41,14 @@ TRACKING_RATES_DEG_PER_SEC = {
     TrackingMode.SOLAR: 15.0 / 3600.0,
 }
 # Multiples of sidereal; "max" exceeds 128x so it uses the controller's high-speed mode.
-NUDGE_RATES_X_SIDEREAL = {"guide": 0.5, "centering": 16.0, "find": 64.0, "max": 400.0}
 DEFAULT_GUIDE_RATE = 0.5          # x sidereal, EQMOD's default
 MIN_GUIDE_RATE, MAX_GUIDE_RATE = 0.1, 1.0
 MAX_PULSE_MS = 10_000
 # How far the RA axis may turn past counterweight-horizontal, either way (MountDeviceSettings).
 DEFAULT_MERIDIAN_LIMIT_DEG = 20.0
 MIN_MERIDIAN_LIMIT_DEG, MAX_MERIDIAN_LIMIT_DEG = 0.0, 60.0
-LIMIT_STOP_MARGIN_DEG = 0.5       # a nudge is stopped this far before the limit (deceleration room)
+LIMIT_STOP_MARGIN_DEG = 0.5       # a nudge is stopped this far before the limit (deceleration room)...
+LIMIT_STOP_MARGIN_SPEED_X = 400.0  # ...up to this speed (x sidereal); beyond it the margin grows in proportion
 AXIS_STOP_TIMEOUT = 10.0          # seconds
 AXIS_STOP_POLL_INTERVAL = 0.1     # seconds
 GOTO_TIMEOUT = 240.0              # seconds, per pass
@@ -303,7 +304,8 @@ class EqmodMount:
 
     async def start_move(self, direction: str, rate: str) -> None:
         axis, positive = await self._resolve_direction(direction)
-        speed = NUDGE_RATES_X_SIDEREAL.get(rate, NUDGE_RATES_X_SIDEREAL["centering"]) * SIDEREAL_DEG_PER_SEC
+        speed_x = nudge_speed_x_sidereal(rate)
+        speed = speed_x * SIDEREAL_DEG_PER_SEC
         room_deg = None
         if axis is Axis.RA:
             room_deg = self._room_to_limit_deg((await self._read_counts())[0], positive)
@@ -315,7 +317,9 @@ class EqmodMount:
         await self._run_axis(axis, speed, positive)
         self._nudging.add(axis)
         if room_deg is not None:
-            delay = max(0.0, room_deg - LIMIT_STOP_MARGIN_DEG) / speed
+            # The faster the axis turns, the more room it needs to decelerate.
+            margin = LIMIT_STOP_MARGIN_DEG * max(1.0, speed_x / LIMIT_STOP_MARGIN_SPEED_X)
+            delay = max(0.0, room_deg - margin) / speed
             self._limit_guard = asyncio.create_task(self._stop_nudge_at_limit(delay, positive, self._motion_epoch))
         logger.info("eqmod.nudge_started", axis=axis.name, direction=direction, rate=rate)
 

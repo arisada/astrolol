@@ -1,10 +1,4 @@
 {
-  "rates": {
-    "guide": "Guide",
-    "centering": "Center",
-    "find": "Find",
-    "max": "Max"
-  },
   "tracking": {
     "sidereal": "Sidereal",
     "lunar": "Lunar",
@@ -84,8 +78,11 @@
   },
   "nudge": {
     "title": "Nudge",
-    "rate": "Rate",
-    "hold": "Hold to move, release to stop",
+    "speedX": "{{n}}×",
+    "speedXTitle": "{{n}}× sidereal rate",
+    "slower": "Slower",
+    "faster": "Faster",
+    "stopTitle": "Stop all nudge movement",
     "north": "North",
     "south": "South",
     "east": "East",

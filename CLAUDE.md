@@ -214,6 +214,7 @@ Use components from `ui/src/components/ui/` rather than re-implementing them per
 | `StarImage` | `@/components/ui/star-image` | Camera frame (JPEG) with a box around each star and an SVG slot for more overlay (guider view, polar-alignment star view) |
 | `Badge`, `Chip`, `StatusPill` | `@/components/ui/badge` | Status indicators |
 | `ProgressBar` | `@/components/ui/progress-bar` | Thin "n of m" bar (pair it with text) |
+| `ChoiceStepper` | `@/components/ui/choice-stepper` | −/+ through an ordered list of choices, the current one named in the middle (speeds, ladders) |
 | `Tabs` | `@/components/ui/tabs` | Segmented tab switcher |
 | `DmsInput` | `@/components/ui/dms-input` | Dec/RA/lat/lon entry: joined DMS/HMS block, up/down per field, carry and clamping |
 | `EquatorialSky`, `HorizontalSky` | `@/components/ui/mount-equatorial`, `mount-horizontal` | Mount position on the sky (centred on the pole, or on the zenith); take `latitude`, `lst`, `ra`, `dec` |

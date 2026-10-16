@@ -31,7 +31,7 @@ Design points carried over from planning:
   called (e.g. no active profile has a Site item), those fields stay None —
   that's correct, not a bug: there's nothing to compute them from.
 - Slew and nudge move incrementally over a simulated realistic duration
-  (see _SLEW_RATE_DEG_PER_SEC / _NUDGE_RATES_DEG_PER_SEC) rather than
+  (see _SLEW_RATE_DEG_PER_SEC and rates.py) rather than
   teleporting, pushing intermediate positions so the UI shows real motion.
 - State is persisted per state_key under ~/.astrolol/eqmod/ (or
   $ASTROLOL_DATA_DIR/eqmod/) so a restarted astrolol process reconnects
@@ -69,6 +69,8 @@ from astropy.coordinates import TETE, AltAz, EarthLocation, SkyCoord
 from astropy.time import Time
 
 from astrolol.devices.base.models import DeviceState, MountStatus, TrackingMode
+from astrolol.plugins.eqmod.protocol import SIDEREAL_DEG_PER_SEC
+from astrolol.plugins.eqmod.rates import nudge_speed_x_sidereal
 
 logger = structlog.get_logger()
 
@@ -79,12 +81,6 @@ _SLEW_RATE_DEG_PER_SEC = 3.0  # plausible GOTO speed for a mid-size GEM
 _SLEW_STEP_INTERVAL = 0.2     # seconds between intermediate slew position pushes
 _SLEW_MIN_DURATION = 0.5      # floor so even a tiny slew still "moves"
 
-_NUDGE_RATES_DEG_PER_SEC = {
-    "guide": 0.01,
-    "centering": 0.5,
-    "find": 2.0,
-    "max": 4.0,
-}
 _NUDGE_STEP_INTERVAL = 0.2  # seconds between intermediate nudge position pushes
 _GUIDE_RATE_X_SIDEREAL = 0.5
 
@@ -349,7 +345,7 @@ class EqmodSimMount:
         await self._cancel_task("_nudge_task")
         self._moving_direction = direction
         self._is_parked = False
-        speed = _NUDGE_RATES_DEG_PER_SEC.get(rate, _NUDGE_RATES_DEG_PER_SEC["centering"])
+        speed = nudge_speed_x_sidereal(rate) * SIDEREAL_DEG_PER_SEC
 
         async def _run() -> None:
             try:

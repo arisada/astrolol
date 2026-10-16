@@ -1,10 +1,4 @@
 {
-  "rates": {
-    "guide": "Guidage",
-    "centering": "Centrage",
-    "find": "Recherche",
-    "max": "Max"
-  },
   "tracking": {
     "sidereal": "Sidéral",
     "lunar": "Lunaire",
@@ -84,8 +78,11 @@
   },
   "nudge": {
     "title": "Corrections",
-    "rate": "Vitesse",
-    "hold": "Maintenir pour déplacer, relâcher pour arrêter",
+    "speedX": "{{n}}×",
+    "speedXTitle": "{{n}}× la vitesse sidérale",
+    "slower": "Plus lent",
+    "faster": "Plus rapide",
+    "stopTitle": "Arrêter tout déplacement",
     "north": "Nord",
     "south": "Sud",
     "east": "Est",

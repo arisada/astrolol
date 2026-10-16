@@ -173,7 +173,9 @@ async def set_park_position(device_id: str, request: Request) -> None:
 
 class MoveRequest(BaseModel):
     direction: str   # "N" | "S" | "E" | "W"
-    rate: str = "centering"  # "guide" | "centering" | "find" | "max"
+    # "<n>x" sidereal (e.g. "16x", up to "800x"), "guide" | "centering" | "find" | "max", or a
+    # driver's own slew-rate name (INDI)
+    rate: str = "centering"
 
 
 @router.post("/{device_id}/move", status_code=204)
@@ -183,6 +185,8 @@ async def start_move(device_id: str, body: MoveRequest, request: Request) -> Non
         await _manager(request).start_move(device_id, body.direction, body.rate)
     except (DeviceNotFoundError, DeviceKindError) as exc:
         raise HTTPException(status_code=404, detail=str(exc))
+    except ValueError as exc:  # unknown rate, or a limit that forbids moving this way
+        raise HTTPException(status_code=409, detail=str(exc))
 
 
 @router.delete("/{device_id}/move", status_code=204)

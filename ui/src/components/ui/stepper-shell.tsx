@@ -2,8 +2,14 @@
 const stepBtn = `w-9 shrink-0 bg-surface-overlay text-slate-400 text-base leading-none transition-colors
   hover:text-slate-100 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-slate-400`
 
-export function StepperShell({ label, onDec, onInc, decDisabled, incDisabled, decTitle, incTitle, children }: {
+const stepBtnLarge = `w-12 shrink-0 bg-surface-overlay text-slate-400 text-xl leading-none transition-colors
+  hover:text-slate-100 disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:text-slate-400`
+
+export function StepperShell({ label, onDec, onInc, decDisabled, incDisabled, decTitle, incTitle, large = false, className = '', children }: {
   label?: string
+  /** Thumb-sized buttons (48 px) for touch controls. */
+  large?: boolean
+  className?: string
   onDec: () => void
   onInc: () => void
   decDisabled?: boolean
@@ -13,14 +19,14 @@ export function StepperShell({ label, onDec, onInc, decDisabled, incDisabled, de
   children: React.ReactNode
 }) {
   return (
-    <div className="flex flex-col gap-1">
+    <div className={`flex flex-col gap-1 ${className}`}>
       {label && <span className="label-caps text-slate-400">{label}</span>}
       <div className="inline-flex w-fit max-w-full items-stretch overflow-hidden rounded-lg border border-surface-border bg-surface
         transition-colors focus-within:border-accent">
-        <button type="button" className={`${stepBtn} border-r border-surface-border`} disabled={decDisabled}
+        <button type="button" className={`${large ? stepBtnLarge : stepBtn} border-r border-surface-border`} disabled={decDisabled}
           onClick={onDec} title={decTitle} aria-label={decTitle}>{'−'}</button>
         {children}
-        <button type="button" className={`${stepBtn} border-l border-surface-border`} disabled={incDisabled}
+        <button type="button" className={`${large ? stepBtnLarge : stepBtn} border-l border-surface-border`} disabled={incDisabled}
           onClick={onInc} title={incTitle} aria-label={incTitle}>{'+'}</button>
       </div>
     </div>
