@@ -1,37 +1,29 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { fmtRA, fmtDec } from '@/utils/formatting'
 import { fmtHA, fmtMeridianDistance } from '@/utils/meridian'
-import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Crosshair, RefreshCw, RotateCw, Settings, StopCircle } from 'lucide-react'
+import { Crosshair, RefreshCw, RotateCw, Settings, StopCircle } from 'lucide-react'
 import { api } from '@/api/client'
 import { useStore } from '@/store'
-import type { CoordFrame, DeviceProperty, MountDeviceSettings, TrackingMode } from '@/api/types'
+import type { CoordFrame, MountDeviceSettings, TrackingMode } from '@/api/types'
 import { Button } from '@/components/ui/button'
 import { DmsInput } from '@/components/ui/dms-input'
 import { StateBadge } from '@/components/ui/badge'
 import { ToggleSwitch } from '@/components/ui/toggle-switch'
 import { Card } from '@/components/ui/card'
-import { ChoiceStepper } from '@/components/ui/choice-stepper'
 import { EquatorialSky } from '@/components/ui/mount-equatorial'
 import { HorizontalSky } from '@/components/ui/mount-horizontal'
 import { PillGroup } from '@/components/ui/pill-group'
 import { useLocalStorage } from '@/hooks/useLocalStorage'
 import { useMountSite } from '@/hooks/useMountSite'
+import { useMountSettings } from '@/hooks/useMountSettings'
+import { NudgePad } from '@/components/NudgePad'
 import { EventLog } from '@/components/ui/event-log'
 import { DevicePropertiesPanel } from '@/components/DevicePropertiesPanel'
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
-
-/** Nudge speeds in × sidereal, slow to fast, for mounts that do not list their own. */
-const NUDGE_SPEEDS = [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 800]
-const DEFAULT_NUDGE_RATE = '16x'
-
-/** Extract rate options from a TELESCOPE_SLEW_RATE switch property. */
-function slewRatesFromProperty(prop: DeviceProperty): { label: string; title?: string; rate: string }[] {
-  return prop.widgets.map((w) => ({ label: String(w.label || w.name), rate: String(w.name) }))
-}
 
 const TRACKING_MODES: TrackingMode[] = ['sidereal', 'lunar', 'solar']
 
@@ -52,17 +44,6 @@ function hoursToHHMM(h: number): string {
 function hhmmToHours(hhmm: string): number {
   const [h, m] = hhmm.split(':').map(Number)
   return (h || 0) + (m || 0) / 60
-}
-
-const DEFAULT_MOUNT_SETTINGS: MountDeviceSettings = {
-  auto_park_enabled: false,
-  auto_park_time: null,
-  auto_flip_enabled: false,
-  auto_flip_ha_hours: 1.0,
-  meridian_limit_deg: 20,
-  horizon_min_alt_deg: 0,
-  horizon_action: 'stop_tracking',
-  nudge_rate: DEFAULT_NUDGE_RATE,
 }
 
 // ---------------------------------------------------------------------------
@@ -133,40 +114,7 @@ function MountControls({ deviceId }: { deviceId: string }) {
   const [positionJnow, setPositionJnow] = useState(true)   // Position section: default JNow
   const [targetJnow, setTargetJnow] = useState(false)      // Target section: default J2000
   const [error, setError] = useState<string | null>(null)
-  const movingRef = useRef(false)
-
-  const [mountSettings, setMountSettings] = useState<MountDeviceSettings>(DEFAULT_MOUNT_SETTINGS)
-  const [slewRateProp, setSlewRateProp] = useState<DeviceProperty | null>(null)
-
-  // Load mount settings and slew rate property on first render
-  useEffect(() => {
-    api.mount.getSettings(deviceId)
-      .then(setMountSettings)
-      .catch(() => {/* use defaults */})
-    api.devices.properties(deviceId)
-      .then((props) => {
-        const prop = props.find((p) => p.name === 'TELESCOPE_SLEW_RATE')
-        setSlewRateProp(prop ?? null)
-      })
-      .catch(() => {/* fall back to defaults */})
-  }, [deviceId])
-
-  // The driver's own list when it has one (INDI), else plain multiples of the sidereal rate.
-  const moveRates = useMemo(
-    () => slewRateProp
-      ? slewRatesFromProperty(slewRateProp)
-      : NUDGE_SPEEDS.map((n) => ({ label: t('nudge.speedX', { n }), title: t('nudge.speedXTitle', { n }), rate: `${n}x` })),
-    [slewRateProp, t],
-  )
-  // The saved speed; a driver list that does not contain it starts at its second-slowest entry.
-  const nudgeRate = moveRates.some((r) => r.rate === mountSettings.nudge_rate)
-    ? mountSettings.nudge_rate
-    : moveRates[Math.min(1, moveRates.length - 1)]?.rate ?? DEFAULT_NUDGE_RATE
-
-  const saveMountSettings = useCallback((updated: MountDeviceSettings) => {
-    setMountSettings(updated)
-    api.mount.putSettings(deviceId, updated).catch(() => {})
-  }, [deviceId])
+  const [mountSettings, saveMountSettings] = useMountSettings(deviceId)
 
   // Keep target inputs in sync with live position when the user hasn't edited them
   useEffect(() => {
@@ -180,32 +128,6 @@ function MountControls({ deviceId }: { deviceId: string }) {
     setError(null)
     try { await fn() } catch (e) { setError((e as Error).message) }
   }, [])
-
-  const handleMoveStart = useCallback(async (direction: string) => {
-    if (movingRef.current) return
-    movingRef.current = true
-    await act(() => api.mount.startMove(deviceId, direction, nudgeRate))
-  }, [deviceId, nudgeRate, act])
-
-  const handleMoveStop = useCallback(async () => {
-    if (!movingRef.current) return
-    movingRef.current = false
-    await act(() => api.mount.stopMove(deviceId))
-  }, [deviceId, act])
-
-  // Stops whatever nudge is running, even when the page lost track of it (a lost touch, a reload).
-  const handleStopAll = useCallback(async () => {
-    movingRef.current = false
-    await act(() => api.mount.stopMove(deviceId))
-  }, [deviceId, act])
-
-  // A nudge must not outlive the page being left or hidden.
-  useEffect(() => {
-    const release = () => { void handleMoveStop() }
-    window.addEventListener('blur', release)
-    document.addEventListener('visibilitychange', release)
-    return () => { window.removeEventListener('blur', release); document.removeEventListener('visibilitychange', release) }
-  }, [handleMoveStop])
 
   const isTracking = status?.is_tracking ?? false
   const isParked   = status?.is_parked   ?? false
@@ -225,19 +147,6 @@ function MountControls({ deviceId }: { deviceId: string }) {
     ? pierSide !== ((((ha + 12) % 24 + 24) % 24 - 12) >= 0 ? 'East' : 'West')
     : null
   const canFlip    = ha != null && !isParked && !isSlewing && (flipDue ?? (ha > 0 && ha <= 2.0))
-
-  // Common props for d-pad buttons (hold to move)
-  const dpadBtn = (dir: string, title: string) => ({
-    onMouseDown: () => handleMoveStart(dir),
-    onMouseUp: handleMoveStop,
-    onMouseLeave: handleMoveStop,
-    onTouchStart: (e: React.TouchEvent) => { e.preventDefault(); handleMoveStart(dir) },
-    onTouchEnd: handleMoveStop,
-    onTouchCancel: handleMoveStop,
-    onContextMenu: (e: React.MouseEvent) => e.preventDefault(),
-    disabled: !status || isParked,
-    title,
-  })
 
   return (
     <div className="h-full flex flex-col">
@@ -525,38 +434,8 @@ function MountControls({ deviceId }: { deviceId: string }) {
         </Card>
 
         {/* Nudge */}
-        <Card title={t('nudge.title')} className="p-4 flex flex-col gap-3">
-          <ChoiceStepper
-            large className="self-center"
-            choices={moveRates.map((r) => ({ value: r.rate, label: r.label, title: r.title }))}
-            value={nudgeRate}
-            onChange={(rate) => saveMountSettings({ ...mountSettings, nudge_rate: rate })}
-            decTitle={t('nudge.slower')}
-            incTitle={t('nudge.faster')}
-          />
-          {/* Pad: hold a direction to move, the red button in the middle stops everything */}
-          <div className="grid grid-cols-3 gap-1 self-center select-none">
-            <span />
-            <Button size="icon" variant="outline" className="h-12 w-12" {...dpadBtn('N', t('nudge.north'))}>
-              <ArrowUp size={20} />
-            </Button>
-            <span />
-            <Button size="icon" variant="outline" className="h-12 w-12" {...dpadBtn('W', t('nudge.west'))}>
-              <ArrowLeft size={20} />
-            </Button>
-            <Button size="icon" variant="danger" className="h-12 w-12" disabled={!status}
-              onClick={handleStopAll} title={t('nudge.stopTitle')} aria-label={t('nudge.stopTitle')}>
-              <StopCircle size={20} />
-            </Button>
-            <Button size="icon" variant="outline" className="h-12 w-12" {...dpadBtn('E', t('nudge.east'))}>
-              <ArrowRight size={20} />
-            </Button>
-            <span />
-            <Button size="icon" variant="outline" className="h-12 w-12" {...dpadBtn('S', t('nudge.south'))}>
-              <ArrowDown size={20} />
-            </Button>
-            <span />
-          </div>
+        <Card title={t('nudge.title')} className="p-4">
+          <NudgePad deviceId={deviceId} />
         </Card>
 
         {error && <p className="text-xs text-status-error">{error}</p>}

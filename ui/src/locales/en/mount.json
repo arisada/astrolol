@@ -106,6 +106,7 @@
       "slewing": "Slewing",
       "tracking": "Tracking",
       "stopped": "Not tracking"
-    }
+    },
+    "nudge": "Nudge"
   }
 }

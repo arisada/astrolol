@@ -248,7 +248,7 @@ active palette, so the chip recipes below keep working. Rules:
 
 ### Dock widgets
 
-The dock (`ui/src/dock/`) is a right-hand sidebar (a bottom sheet in portrait) of read-only widgets the
+The dock (`ui/src/dock/`) is a right-hand sidebar (a bottom sheet in portrait) of widgets the
 user pins from any page; the layout is `UserSettings.dock`. A widget is a prop-less component that reads
 the store (WebSocket + status polling), so it renders the same on its page and in the dock. A plugin lists
 them under `widgets` in `ui/index.ts` (`{ id, title: () => i18n.t(...), icon?, Component }`; the registry
@@ -257,7 +257,9 @@ state over a timer: if a widget must fetch, refetch on a store change, or poll o
 unmounted when the dock is closed or the widget folded). A widget that shows one device (focuser, filter
 wheel, mount) sets `perDevice: '<kind>'` and takes a `deviceId` prop (`useDevice` in
 `dock/widgets/`): the picker lists it once per connected device and the layout stores the device id.
-Widgets are added only from the dock's own picker, never from the pages.
+Widgets are added only from the dock's own picker, never from the pages. Most are read-outs; one that
+acts on hardware (the mount nudge pad) is the same component the page uses, so the ACL applies unchanged,
+and it must stop what it started when it unmounts (the dock closing or the widget folding unmounts it).
 
 ### Status-bar chips
 

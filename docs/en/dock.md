@@ -29,6 +29,7 @@ reloaded.
 |---|---|---|
 | Position | [Mount](mount.md) | Coordinates and the mount on the sky |
 | Horizon | [Mount](mount.md) | The mount over the local horizon |
+| Nudge | [Mount](mount.md#nudge) | Speed, direction arrows and a stop button to move the mount by hand |
 | Mount state | [Mount](mount.md) | Parked, slewing or tracking, pier side, time to the meridian |
 | Focuser | [Imaging](imaging.md) | Focuser position on a ruler |
 | Filter wheel | [Imaging](imaging.md) | The filter in the beam |
@@ -40,4 +41,5 @@ reloaded.
 | Last solve | [Plate Solving](../../astrolol/plugins/platesolve/docs/en.md) | Last solved position and its offset from the mount |
 | System health | [System](../../astrolol/plugins/system/docs/en.md) | Processor, memory, disk, temperature, power |
 
-Widgets of a feature you have switched off are not offered.
+Most widgets only show information. The nudge pad also moves the mount, so it needs the same permission as the
+Mount page. Widgets of a feature you have switched off are not offered.

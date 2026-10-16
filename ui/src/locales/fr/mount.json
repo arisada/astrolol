@@ -106,6 +106,7 @@
       "slewing": "En déplacement",
       "tracking": "Suivi actif",
       "stopped": "Suivi arrêté"
-    }
+    },
+    "nudge": "Corrections"
   }
 }

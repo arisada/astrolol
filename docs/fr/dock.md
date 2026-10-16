@@ -30,6 +30,7 @@ celui-ci revient à l'état enregistré au rechargement de la page.
 |---|---|---|
 | Position | [Monture](mount.md) | Coordonnées et monture sur le ciel |
 | Horizon | [Monture](mount.md) | La monture au-dessus de l'horizon local |
+| Corrections | [Monture](mount.md#corrections) | Vitesse, flèches et bouton d'arrêt pour déplacer la monture à la main |
 | État de la monture | [Monture](mount.md) | Parquée, en déplacement ou en suivi, côté du pilier, temps avant le méridien |
 | Focuseur | [Imagerie](imaging.md) | Position du focuseur sur une règle |
 | Roue à filtres | [Imagerie](imaging.md) | Le filtre dans le faisceau |
@@ -41,4 +42,6 @@ celui-ci revient à l'état enregistré au rechargement de la page.
 | Dernière résolution | [Résolution astrométrique](../../astrolol/plugins/platesolve/docs/fr.md) | Dernière position résolue et son écart avec la monture |
 | État du système | [Système](../../astrolol/plugins/system/docs/fr.md) | Processeur, mémoire, disque, température, alimentation |
 
-Les widgets d'une fonction désactivée ne sont pas proposés.
+La plupart des widgets ne font qu'afficher des informations. Le pavé de corrections déplace aussi la
+monture : il demande la même autorisation que la page Monture. Les widgets d'une fonction désactivée ne
+sont pas proposés.
