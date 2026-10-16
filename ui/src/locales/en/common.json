@@ -154,5 +154,23 @@
     "loading": "Loading…",
     "missing": "There is no guide page for this screen yet.",
     "gettingStarted": "New here? Read <link>Getting started</link>."
+  },
+  "dock": {
+    "title": "Dock",
+    "open": "Open the dock",
+    "close": "Close the dock",
+    "edit": "Edit the dock",
+    "done": "Done editing",
+    "empty": "Nothing pinned yet. Choose edit, then add widgets from this list or with the + on a page.",
+    "add": "Add a widget",
+    "allPinned": "Every widget is already pinned.",
+    "pin": "Pin to the dock",
+    "unpin": "Remove from the dock",
+    "remove": "Remove",
+    "moveUp": "Move up",
+    "moveDown": "Move down",
+    "collapse": "Collapse",
+    "expand": "Expand",
+    "noMount": "No mount connected"
   }
 }

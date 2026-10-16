@@ -233,5 +233,9 @@
     "wormPeriod": "RA worm period",
     "wormPeriodHint": "The time of one turn of the RA worm, if you know it.",
     "findIt": "Find it"
+  },
+  "widget": {
+    "target": "Guide target",
+    "graph": "Guide graph"
   }
 }

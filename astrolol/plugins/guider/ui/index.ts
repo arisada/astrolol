@@ -4,6 +4,8 @@ import type { AstrolollEvent } from '@/api/types'
 import type { NavActivity } from '@/utils/nav-activity'
 import { GuiderPage } from './GuiderPage'
 import { GuiderChip } from './GuiderChip'
+import { GuiderGraphWidget, GuiderTargetWidget } from './GuiderWidgets'
+import i18n from '@/i18n'
 import { DEFAULT_GUIDER_STATE, MAX_STEPS, type GuiderPluginState } from './api'
 
 const current = (cur: unknown) => (cur as GuiderPluginState | null) ?? DEFAULT_GUIDER_STATE
@@ -30,6 +32,10 @@ export default {
   label: 'Guider',
   Component: GuiderPage,
   StatusChip: GuiderChip,
+  widgets: [
+    { id: 'target', title: () => i18n.t('widget.target', { ns: 'guider' }), icon: Crosshair, Component: GuiderTargetWidget },
+    { id: 'graph', title: () => i18n.t('widget.graph', { ns: 'guider' }), icon: Crosshair, Component: GuiderGraphWidget },
+  ],
   // Guiding is busy; having lost the star (anything but a deliberate stop) needs attention.
   navActivity: (cur: unknown): NavActivity => {
     const s = cur as GuiderPluginState | null | undefined

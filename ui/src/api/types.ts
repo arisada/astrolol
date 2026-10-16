@@ -103,6 +103,11 @@ export interface ExposureRequest {
   dither?: DitherConfig | null
 }
 
+export interface DockWidgetEntry {
+  id: string
+  collapsed: boolean
+}
+
 export interface UserSettings {
   save_dir_template: string
   save_filename_template: string
@@ -113,6 +118,7 @@ export interface UserSettings {
   low_memory_mode: boolean
   language: string
   theme: string
+  dock?: { widgets: DockWidgetEntry[] }
   plugin_settings: Record<string, Record<string, unknown>>
   imager_settings: Record<string, Record<string, unknown>>
 }

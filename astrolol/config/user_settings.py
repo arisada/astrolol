@@ -25,6 +25,17 @@ class MountDeviceSettings(BaseModel):
     horizon_action: Literal["none", "stop_tracking", "park"] = "stop_tracking"
 
 
+class DockWidget(BaseModel):
+    """One widget pinned to the dock sidebar. Order in the list is the order shown."""
+    id: str = Field(pattern=r"^[a-z0-9_]{1,40}\.[a-z0-9_]{1,40}$")   # "<plugin or page>.<widget>"
+    collapsed: bool = False
+
+
+class DockSettings(BaseModel):
+    """The dock layout follows the user across browsers, so it lives with the other settings."""
+    widgets: list[DockWidget] = Field(default_factory=list, max_length=50)
+
+
 class UserSettings(BaseModel):
     save_dir_template: str = "~/astrolol_pictures/%D"
     save_filename_template: str = "%F_%N_%Es_%Gg"
@@ -35,6 +46,7 @@ class UserSettings(BaseModel):
     low_memory_mode: bool = False
     language: str = "en"                      # UI language (BCP-47 code, e.g. "en", "fr")
     theme: str = Field(default="midnight", pattern=r"^[a-z0-9_-]{1,32}$")  # UI palette id (ui/scripts/gen-themes.mjs)
+    dock: DockSettings = Field(default_factory=DockSettings)  # widgets pinned to the UI dock
     plugin_settings: dict[str, dict] = {}     # opaque per-plugin settings, keyed by plugin id
     imager_settings: dict[str, dict] = {}     # per-device imager settings, keyed by device_id
     mount_settings: dict[str, dict] = {}      # per-device mount settings, keyed by device_id

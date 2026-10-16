@@ -4,6 +4,7 @@
 // No manual registration is needed when adding a new plugin.
 import type { ComponentType } from 'react'
 import type { NavActivity } from '@/utils/nav-activity'
+import { registerDockWidget, type DockWidgetDef } from '@/dock/registry'
 
 /** Any icon component: Lucide, another icon set, or an inline SVG that draws with `currentColor`. */
 export type NavIcon = ComponentType<{ size?: number | string; className?: string }>
@@ -17,6 +18,8 @@ export interface PluginRegistryEntry {
   StatusChip?: ComponentType
   /** Optional mark on the plugin's menu entry, worked out from its `pluginStates` slice. */
   navActivity?: (state: unknown) => NavActivity
+  /** Optional read-outs that can be pinned to the dock; `id` is local to the plugin. */
+  widgets?: Omit<DockWidgetDef, 'plugin' | 'route'>[]
 }
 
 // Eagerly import all plugin index files.  Vite resolves this glob at build time.
@@ -34,8 +37,11 @@ for (const [path, mod] of Object.entries(modules)) {
   const match = path.match(/\/([^/]+)\/ui\/index\.ts$/)
   if (!match) continue
   const id = match[1]
-  const { icon, label, Component, StatusChip, navActivity } = mod.default
+  const { icon, label, Component, StatusChip, navActivity, widgets } = mod.default
   PLUGIN_REGISTRY[id] = { to: `/${id}`, icon, label, Component, StatusChip, navActivity }
+  for (const w of widgets ?? []) {
+    registerDockWidget({ ...w, id: `${id}.${w.id}`, plugin: id, route: `/${id}`, icon: w.icon ?? icon })
+  }
 }
 
 export function getPluginEntry(id: string): PluginRegistryEntry | undefined {

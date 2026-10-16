@@ -24,6 +24,7 @@ direct chez toutes les autres.
 | [Imagerie](imaging.md) | Une page par caméra : poser, boucler, refroidir, faire la mise au point, changer de filtre |
 | [Monture](mount.md) | Position, GoTo, synchronisation, suivi, parcage, limites du méridien et d'horizon, corrections |
 | [Journaux](logs.md) | Tout ce qui s'est passé, avec une verbosité réglable par composant |
+| [Dock](dock.md) | Panneau latéral qui garde quelques indicateurs sous les yeux sur chaque page |
 | [Options](options.md) | Langue, palette, emplacement des images, serveur INDI, modules |
 
 ## Fonctions (modules)

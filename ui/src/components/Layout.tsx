@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { X } from 'lucide-react'
 import { Sidebar, TopNav } from './Sidebar'
 import { StatusBar } from './StatusBar'
+import { Dock } from '@/dock/Dock'
 import { HelpPanel } from '@/help/HelpPanel'
 import { useEvents } from '@/hooks/useEvents'
 import { useStatusPolling } from '@/hooks/useStatusPolling'
@@ -53,6 +54,7 @@ export function Layout() {
         <main className="flex-1 overflow-auto">
           <Outlet />
         </main>
+        <Dock />
       </div>
       <HelpPanel />
       <ErrorToast />

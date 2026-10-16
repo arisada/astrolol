@@ -12,6 +12,7 @@ import { Tabs } from '@/components/ui/tabs'
 import { ToggleSwitch } from '@/components/ui/toggle-switch'
 import { StatusPill, type StatusPillVariant } from '@/components/ui/badge'
 import { useStore } from '@/store'
+import { Dockable } from '@/dock/Dockable'
 import { niceRange } from '@/utils/guiding'
 import * as api from './api'
 import { GuiderView } from './GuiderView'
@@ -177,7 +178,7 @@ export function GuiderPage() {
                   <GuiderView poll={active || previewing} onPick={previewing ? pick : undefined} />
                 </div>
               </Card>
-              <Card className="p-3" title={t('graph.title', { unit: unitName })} action={
+              <Dockable id="guider.graph"><Card className="p-3" title={t('graph.title', { unit: unitName })} action={
                 <div className="flex flex-wrap gap-2">
                   <PillGroup options={RANGE_OPTIONS} value={rangeOpt} onChange={setRangeOpt}
                     formatLabel={(v) => (v === 'auto' ? t('graph.auto') : `±${v / 2}`)} />
@@ -188,11 +189,11 @@ export function GuiderPage() {
                 <div className="mt-2">
                   <GuideGraph points={points} range={range} rmsTotal={w?.rms_total} unit={unit} />
                 </div>
-              </Card>
+              </Card></Dockable>
             </div>
 
             <div className="flex flex-col gap-5">
-              <Card className="p-3" title={t('target.title')}>
+              <Dockable id="guider.target"><Card className="p-3" title={t('target.title')}>
                 <div className="flex flex-col items-center gap-3 mt-2">
                   <GuideTarget points={points} range={range} rmsTotal={w?.rms_total} unit={unit} />
                   <div className="grid grid-cols-3 gap-2 w-full text-sm">
@@ -202,7 +203,7 @@ export function GuiderPage() {
                   </div>
                   <p className="text-[11px] text-slate-600">{t('target.unit', { unit: unitName })}</p>
                 </div>
-              </Card>
+              </Card></Dockable>
               <Card className="p-3" title={t('status.title')}>
                 <div className="grid grid-cols-2 gap-2 text-sm mt-2">
                   <Stat label={h?.guiding ? t('status.guidingFor') : t('status.unguidedFor')}

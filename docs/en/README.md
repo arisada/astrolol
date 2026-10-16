@@ -22,6 +22,7 @@ at once; what one of them does is shown live to everyone.
 | [Imaging](imaging.md) | One page per camera: expose, loop, cool, focus, change filters |
 | [Mount](mount.md) | Position, GoTo, sync, tracking, park, meridian and horizon limits, nudge |
 | [Logs](logs.md) | Everything that happened, with per-component verbosity |
+| [Dock](dock.md) | Side panel that keeps a few read-outs in view on every page |
 | [Options](options.md) | Language, palette, where images are saved, INDI server, plugins |
 
 ## Features (plugins)

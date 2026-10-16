@@ -207,6 +207,12 @@ UI, dither, settle, REST API and UI page. Verified against INDI's simulators on 
   LowPass2, skip unless short exposures matter).
 - **Dark capture UX** — the scope has to be covered by hand; no prompt-and-wait flow, and
   darks for the sequencer's own camera aren't shared.
+- **Guiding data in the event stream, not polled** — the dock's guide target/graph widgets
+  (`astrolol/plugins/guider/ui/GuiderWidgets.tsx`) and the guider page poll `GET /status`
+  (every 2 s / 1 s) for the last-minute RMS and the pixel scale (px vs arcsec). Put them on the
+  stream instead: add the pixel scale and the running RMS (RA/Dec/total) to `guider.step` (or a
+  periodic `guider.stats` event), keep them in the plugin's `pluginStates` slice, and drop the
+  polling from the widgets. The page's other polled data (calibration, settings) can follow.
 
 ## Sequencer — remaining work
 

@@ -5,7 +5,7 @@ import { fmtRA, fmtDec } from '@/utils/formatting'
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, Crosshair, RefreshCw, RotateCw, Settings, StopCircle } from 'lucide-react'
 import { api } from '@/api/client'
 import { useStore } from '@/store'
-import type { CoordFrame, DeviceProperty, EquipmentItem, MountDeviceSettings, ProfileNode, SiteEquipmentItem, TrackingMode } from '@/api/types'
+import type { CoordFrame, DeviceProperty, MountDeviceSettings, TrackingMode } from '@/api/types'
 import { Button } from '@/components/ui/button'
 import { DmsInput } from '@/components/ui/dms-input'
 import { StateBadge } from '@/components/ui/badge'
@@ -15,6 +15,8 @@ import { EquatorialSky } from '@/components/ui/mount-equatorial'
 import { HorizontalSky } from '@/components/ui/mount-horizontal'
 import { PillGroup } from '@/components/ui/pill-group'
 import { useLocalStorage } from '@/hooks/useLocalStorage'
+import { useMountSite } from '@/hooks/useMountSite'
+import { Dockable } from '@/dock/Dockable'
 import { EventLog } from '@/components/ui/event-log'
 import { DevicePropertiesPanel } from '@/components/DevicePropertiesPanel'
 
@@ -135,30 +137,7 @@ function MountControls({ deviceId }: { deviceId: string }) {
   const { t } = useTranslation('mount')
   const status = useStore((s) => s.mountStatuses[deviceId] ?? null)
   const [showIndiPanel, setShowIndiPanel] = useState(false)
-  // The observing site this mount is attached to (from the active profile's equipment tree).
-  // Falls back to the first site in the profile when the mount is not under a camera.
-  const [site, setSite] = useState<SiteEquipmentItem | null>(null)
-  useEffect(() => {
-    Promise.all([
-      api.profiles.activeOpticalPaths().catch(() => []),
-      api.profiles.active().catch(() => null),
-      api.inventory.list().catch(() => [] as EquipmentItem[]),
-    ]).then(([paths, profile, items]) => {
-      const viaPath = paths.find((p) => p.mount_device_id === deviceId)?.site
-      if (viaPath) { setSite(viaPath); return }
-      const byId = new Map(items.map((i) => [i.id, i]))
-      const firstSite = (nodes: ProfileNode[]): SiteEquipmentItem | null => {
-        for (const n of nodes) {
-          const item = byId.get(n.item_id)
-          if (item?.type === 'site') return item as SiteEquipmentItem
-          const inner = firstSite(n.children)
-          if (inner) return inner
-        }
-        return null
-      }
-      setSite(firstSite(profile?.roots ?? []))
-    })
-  }, [deviceId])
+  const site = useMountSite(deviceId)
   const [skyView, setSkyView] = useLocalStorage<'equatorial' | 'horizontal'>('astrolol.mountSky', 'equatorial')
 
   const [slewRa, setSlewRa] = useState(0)
@@ -285,6 +264,7 @@ function MountControls({ deviceId }: { deviceId: string }) {
         )}
 
         {/* Live position */}
+        <Dockable id="mount.position">
         <Card title={t('position.title')} action={<FrameToggle jnow={positionJnow} onChange={setPositionJnow} />} className="p-4 flex flex-col gap-3">
           <div className="grid grid-cols-2 gap-x-8 gap-y-1 font-mono text-sm">
             <span className="text-slate-500 text-xs">{t('position.ra')}</span>
@@ -330,6 +310,7 @@ function MountControls({ deviceId }: { deviceId: string }) {
             </div>
           )}
         </Card>
+        </Dockable>
 
         {/* Target */}
         <Card title={t('target.title')} action={<FrameToggle jnow={targetJnow} onChange={setTargetJnow} />} className="p-4 flex flex-col gap-3">

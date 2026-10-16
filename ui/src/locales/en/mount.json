@@ -98,5 +98,8 @@
     "mount": "mount",
     "pole": "celestial pole",
     "zenith": "zenith"
+  },
+  "widget": {
+    "position": "Position"
   }
 }

@@ -154,5 +154,23 @@
     "loading": "Chargement…",
     "missing": "Il n'y a pas encore de page d'aide pour cet écran.",
     "gettingStarted": "Première fois ? Lisez <link>Premiers pas</link>."
+  },
+  "dock": {
+    "title": "Dock",
+    "open": "Ouvrir le dock",
+    "close": "Fermer le dock",
+    "edit": "Modifier le dock",
+    "done": "Terminer",
+    "empty": "Rien d'épinglé pour l'instant. Choisissez modifier, puis ajoutez des widgets depuis cette liste ou avec le + sur une page.",
+    "add": "Ajouter un widget",
+    "allPinned": "Tous les widgets sont déjà épinglés.",
+    "pin": "Épingler au dock",
+    "unpin": "Retirer du dock",
+    "remove": "Retirer",
+    "moveUp": "Monter",
+    "moveDown": "Descendre",
+    "collapse": "Replier",
+    "expand": "Déplier",
+    "noMount": "Aucune monture connectée"
   }
 }

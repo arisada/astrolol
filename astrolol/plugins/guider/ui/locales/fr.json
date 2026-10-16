@@ -233,5 +233,9 @@
     "wormPeriod": "Période de la vis sans fin AD",
     "wormPeriodHint": "La durée d'un tour de la vis sans fin en AD, si vous la connaissez.",
     "findIt": "La trouver"
+  },
+  "widget": {
+    "target": "Cible de guidage",
+    "graph": "Courbe de guidage"
   }
 }
