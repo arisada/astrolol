@@ -23,6 +23,25 @@ from astrolol.plugins.system.models import NetworkMode, NetworkStatus, SavedWifi
 logger = structlog.get_logger()
 
 _HOTSPOT_CON_NAME = "astrolol-hotspot"
+# Fixed so clients (and bookmarks) always find the Pi at the same address.
+_HOTSPOT_ADDRESS = "10.42.0.1/24"
+
+
+def split_terse(line: str) -> list[str]:
+    """Split a ``nmcli -t`` line on unescaped ':' (nmcli escapes ':' and '\\' in values)."""
+    parts: list[str] = []
+    cur: list[str] = []
+    it = iter(line)
+    for ch in it:
+        if ch == "\\":
+            cur.append(next(it, ""))
+        elif ch == ":":
+            parts.append("".join(cur))
+            cur = []
+        else:
+            cur.append(ch)
+    parts.append("".join(cur))
+    return parts
 
 
 def nmcli_available() -> bool:
@@ -52,10 +71,43 @@ async def detect_wifi_interface() -> str | None:
     if rc != 0:
         return None
     for line in out.splitlines():
-        parts = line.split(":")
+        parts = split_terse(line)
         if len(parts) >= 2 and parts[1] == "wifi":
             return parts[0]
     return None
+
+
+async def _wifi_profile(name: str) -> tuple[str | None, str | None]:
+    """Return (mode, ssid) of a Wi-Fi connection profile ("infrastructure", "ap", …)."""
+    rc, out, _ = await _run(
+        "nmcli", "-t", "-f", "802-11-wireless.mode,802-11-wireless.ssid", "connection", "show", name
+    )
+    if rc != 0:
+        return None, None
+    mode: str | None = None
+    ssid: str | None = None
+    for line in out.splitlines():
+        key, _, value = line.partition(":")
+        value = split_terse(value)[0].strip() if value else ""
+        if key == "802-11-wireless.mode":
+            mode = value or None
+        elif key == "802-11-wireless.ssid":
+            ssid = value or None
+    return mode, ssid
+
+
+async def ethernet_connected() -> bool:
+    """True when a wired interface is connected (the host is reachable without Wi-Fi)."""
+    if not nmcli_available():
+        return False
+    rc, out, _ = await _run("nmcli", "-t", "-f", "TYPE,STATE", "device", "status")
+    if rc != 0:
+        return False
+    for line in out.splitlines():
+        parts = split_terse(line)
+        if len(parts) >= 2 and parts[0] == "ethernet" and parts[1] == "connected":
+            return True
+    return False
 
 
 async def get_network_status() -> NetworkStatus:
@@ -76,7 +128,7 @@ async def get_network_status() -> NetworkStatus:
 
     # Check active connections
     rc, out, _ = await _run(
-        "nmcli", "-t", "-f", "NAME,TYPE,DEVICE,MODE-FLAG", "connection", "show", "--active"
+        "nmcli", "-t", "-f", "NAME,TYPE,DEVICE", "connection", "show", "--active"
     )
     active_ssid: str | None = None
     is_hotspot = False
@@ -84,25 +136,16 @@ async def get_network_status() -> NetworkStatus:
 
     if rc == 0:
         for line in out.splitlines():
-            parts = line.split(":")
+            parts = split_terse(line)
             if len(parts) < 3:
                 continue
-            name, conn_type, device = parts[0], parts[1], parts[2]
-            mode_flag = parts[3] if len(parts) > 3 else ""
+            name, conn_type = parts[0], parts[1]
             if conn_type != "802-11-wireless":
                 continue
-            if name == _HOTSPOT_CON_NAME or "AP" in mode_flag:
+            wifi_mode, ssid = await _wifi_profile(name)
+            if name == _HOTSPOT_CON_NAME or wifi_mode == "ap":
                 is_hotspot = True
-                hotspot_ssid = name if name != _HOTSPOT_CON_NAME else None
-                if hotspot_ssid is None:
-                    # Read SSID from the connection profile
-                    rc2, ssid_out, _ = await _run(
-                        "nmcli", "-t", "-f", "802-11-wireless.ssid", "connection", "show", name
-                    )
-                    if rc2 == 0:
-                        for l in ssid_out.splitlines():
-                            if "ssid:" in l.lower():
-                                hotspot_ssid = l.split(":", 1)[-1].strip()
+                hotspot_ssid = ssid or (name if name != _HOTSPOT_CON_NAME else None)
             else:
                 active_ssid = name
 
@@ -259,8 +302,14 @@ async def start_hotspot(ssid: str, password: str, interface: str | None = None) 
         "autoconnect", "no",
         "ssid", ssid,
         "mode", "ap",
+        "802-11-wireless.band", "bg",
         "ipv4.method", "shared",
+        "ipv4.addresses", _HOTSPOT_ADDRESS,
+        "ipv6.method", "ignore",
         "wifi-sec.key-mgmt", "wpa-psk",
+        "wifi-sec.proto", "rsn",
+        "wifi-sec.pairwise", "ccmp",
+        "wifi-sec.group", "ccmp",
         "wifi-sec.psk", password,
         sudo=True,
     )
@@ -302,7 +351,7 @@ async def list_saved_wifi_connections() -> list[SavedWifiConnection]:
         return []
     results: list[SavedWifiConnection] = []
     for line in out.splitlines():
-        parts = line.split(":")
+        parts = split_terse(line)
         if len(parts) < 4:
             continue
         name, conn_type, device, autoconnect = parts[0], parts[1], parts[2], parts[3]

@@ -494,3 +494,17 @@ def test_plugin_protocol() -> None:
     from astrolol.core.plugin_api import Plugin
     plugin = get_plugin()
     assert isinstance(plugin, Plugin)
+
+
+def test_stop_hotspot_tells_the_watchdog_not_to_restart_it(client: TestClient) -> None:
+    app = client.app
+    with patch("astrolol.plugins.system.api._net.stop_hotspot", AsyncMock()):
+        r = client.post("/plugins/system/network/hotspot/stop")
+    assert r.status_code == 200
+    assert app.state.system_network_watchdog._suppressed is True
+
+
+def test_settings_default_to_automatic_network(client: TestClient) -> None:
+    data = client.get("/plugins/system/settings").json()
+    assert data["network_policy"] == "auto"
+    assert data["boot_wifi_window_seconds"] == 60

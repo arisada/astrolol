@@ -116,7 +116,16 @@
     "interface": "Interface",
     "save": "Save",
     "cancel": "Cancel",
-    "edit": "Edit"
+    "edit": "Edit",
+    "policy": "Network at startup",
+    "policies": {
+      "auto": "Automatic",
+      "wifi": "Wi-Fi only",
+      "hotspot": "Hotspot"
+    },
+    "bootWindow": "Wi-Fi first for",
+    "lostGrace": "Wait after losing Wi-Fi",
+    "seconds": "{{count}} s"
   },
   "hostname": {
     "title": "Hostname",

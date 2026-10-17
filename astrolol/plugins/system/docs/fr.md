@@ -26,6 +26,15 @@ Nécessite NetworkManager sur l'ordinateur.
   n'y a pas de réseau : connectez votre téléphone dessus et ouvrez astrolol. **Arrêter le
   hotspot** revient au réseau habituel. **Réglages du hotspot** : nom du réseau, mot de passe,
   interface.
+- **Réseau au démarrage** choisit ce qui se passe sans vous : **Automatique** rejoint un réseau
+  Wi-Fi connu (à la maison) et ouvre le hotspot quand aucun n'est à portée (sur le terrain) ;
+  **Wi-Fi seul** ne l'ouvre jamais de lui-même ; **Hotspot** l'ouvre toujours. Après chaque
+  démarrage, **Wi-Fi d'abord pendant** garde le hotspot fermé pour que votre réseau maison puisse
+  toujours se connecter : c'est votre porte d'entrée si le hotspot dysfonctionne. Si le Wi-Fi
+  est perdu en cours de route, il attend **Attente après perte du Wi-Fi** avant d'ouvrir le
+  hotspot. Une connexion par câble compte comme connectée. Un hotspot que vous avez arrêté
+  vous-même n'est pas rouvert tant que vous ne changez pas ce réglage. De retour à la maison,
+  redémarrez l'ordinateur ou appuyez sur **Arrêter le hotspot** pour revenir à votre réseau.
 - **Connexions WiFi enregistrées** : les réseaux connus, en connexion automatique ou manuelle ;
   supprimez ceux dont vous n'avez plus besoin.
 

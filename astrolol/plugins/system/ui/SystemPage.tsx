@@ -38,6 +38,7 @@ import type {
   UsbDevice,
   WifiNetwork,
 } from '@/api/types'
+import { PillGroup } from '@/components/ui/pill-group'
 import { ToggleSwitch } from '@/components/ui/toggle-switch'
 import { DurationStepper } from '@/components/ui/duration-stepper'
 import * as api from './api'
@@ -880,6 +881,36 @@ export function SystemPage() {
                   className="rounded-lg bg-surface border border-surface-border px-2 py-1 text-slate-200 font-mono focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent"
                 />
               ) : <span className="text-slate-200 font-mono">{draftSettings.hotspot_interface}</span>}
+
+              <label className="text-slate-400">{t('hotspot.policy')}</label>
+              {editingSettings ? (
+                <PillGroup
+                  options={['auto', 'wifi', 'hotspot'] as const}
+                  value={draftSettings.network_policy}
+                  onChange={(v) => setDraftSettings({ ...draftSettings, network_policy: v })}
+                  formatLabel={(v) => t(`hotspot.policies.${v}`)}
+                />
+              ) : <span className="text-slate-200">{t(`hotspot.policies.${draftSettings.network_policy}`)}</span>}
+
+              <label className="text-slate-400">{t('hotspot.bootWindow')}</label>
+              {editingSettings ? (
+                <input
+                  type="number" min={0} max={600}
+                  value={draftSettings.boot_wifi_window_seconds}
+                  onChange={(e) => setDraftSettings({ ...draftSettings, boot_wifi_window_seconds: Math.max(0, Number(e.target.value) || 0) })}
+                  className="w-24 rounded-lg bg-surface border border-surface-border px-2 py-1 text-slate-200 font-mono focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent"
+                />
+              ) : <span className="text-slate-200 font-mono">{t('hotspot.seconds', { count: draftSettings.boot_wifi_window_seconds })}</span>}
+
+              <label className="text-slate-400">{t('hotspot.lostGrace')}</label>
+              {editingSettings ? (
+                <input
+                  type="number" min={0} max={3600}
+                  value={draftSettings.lost_wifi_grace_seconds}
+                  onChange={(e) => setDraftSettings({ ...draftSettings, lost_wifi_grace_seconds: Math.max(0, Number(e.target.value) || 0) })}
+                  className="w-24 rounded-lg bg-surface border border-surface-border px-2 py-1 text-slate-200 font-mono focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent"
+                />
+              ) : <span className="text-slate-200 font-mono">{t('hotspot.seconds', { count: draftSettings.lost_wifi_grace_seconds })}</span>}
             </div>
 
             <div className="flex gap-2 pt-1">

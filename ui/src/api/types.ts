@@ -1313,6 +1313,9 @@ export interface SystemSettings {
   hotspot_ssid: string
   hotspot_password: string
   hotspot_interface: string
+  network_policy: 'auto' | 'wifi' | 'hotspot'
+  boot_wifi_window_seconds: number
+  lost_wifi_grace_seconds: number
   throttle_monitor_enabled: boolean
   throttle_check_interval_seconds: number
 }

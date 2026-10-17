@@ -63,10 +63,22 @@ class HotspotStartRequest(BaseModel):
     interface: str | None = None
 
 
+class NetworkPolicy(str, Enum):
+    auto = "auto"          # known Wi-Fi when in range, hotspot otherwise
+    wifi = "wifi"          # never start the hotspot by itself
+    hotspot = "hotspot"    # always the hotspot (after the boot window)
+
+
 class SystemSettings(BaseModel):
     hotspot_ssid: str = Field(default="AstroLOL")
     hotspot_password: str = Field(default="astronomy123")
     hotspot_interface: str = Field(default="wlan0")
+    network_policy: NetworkPolicy = Field(default=NetworkPolicy.auto)
+    # After a boot the hotspot is held back this long so a known Wi-Fi network (home) always
+    # gets a chance to connect: a way in if the hotspot ever misbehaves.
+    boot_wifi_window_seconds: int = Field(default=60, ge=0, le=600)
+    # Wi-Fi lost while running: wait this long before falling back to the hotspot.
+    lost_wifi_grace_seconds: int = Field(default=120, ge=0, le=3600)
     throttle_monitor_enabled: bool = Field(default=True)
     # Under-voltage dips are typically brief (a few seconds), so this defaults
     # low — a sysfs read is cheap (no subprocess spawn) and safe to do often.

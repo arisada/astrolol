@@ -24,6 +24,14 @@ Needs NetworkManager on the computer.
 - **Start Hotspot** turns the computer into a Wi-Fi access point, for the field where there is
   no network: connect your phone to it and open astrolol. **Stop Hotspot** returns to the usual
   network. **Hotspot Settings**: network name, password, interface.
+- **Network at startup** chooses what happens without you: **Automatic** joins a known Wi-Fi
+  network (at home) and opens the hotspot when none is in range (in the field); **Wi-Fi only**
+  never opens it by itself; **Hotspot** always opens it. After each boot, **Wi-Fi first for**
+  keeps the hotspot closed so your home network can always connect: that is your way in if the
+  hotspot ever misbehaves. If Wi-Fi is lost while running, it waits **Wait after losing Wi-Fi**
+  before opening the hotspot. A cable connection counts as connected. A hotspot you stopped
+  yourself is not reopened until you change this setting. Back home, restart the computer or
+  press **Stop Hotspot** to return to your home network.
 - **Saved WiFi Connections**: networks it knows, with auto-connect or manual; delete those you
   no longer need.
 

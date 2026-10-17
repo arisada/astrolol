@@ -116,7 +116,16 @@
     "interface": "Interface",
     "save": "Enregistrer",
     "cancel": "Annuler",
-    "edit": "Modifier"
+    "edit": "Modifier",
+    "policy": "Réseau au démarrage",
+    "policies": {
+      "auto": "Automatique",
+      "wifi": "Wi-Fi seul",
+      "hotspot": "Hotspot"
+    },
+    "bootWindow": "Wi-Fi d'abord pendant",
+    "lostGrace": "Attente après perte du Wi-Fi",
+    "seconds": "{{count}} s"
   },
   "hostname": {
     "title": "Nom d'hôte",

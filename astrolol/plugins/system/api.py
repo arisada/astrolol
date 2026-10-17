@@ -139,12 +139,15 @@ async def start_hotspot(body: HotspotStartRequest, request: Request) -> dict[str
 
 
 @router.post("/network/hotspot/stop", status_code=200)
-async def stop_hotspot() -> dict[str, str]:
+async def stop_hotspot(request: Request) -> dict[str, str]:
     """Stop the WiFi hotspot and return to station mode."""
     try:
         await _net.stop_hotspot()
     except RuntimeError as exc:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
+    watchdog = getattr(request.app.state, "system_network_watchdog", None)
+    if watchdog is not None:
+        watchdog.suppress()
     return {"status": "hotspot_stopped"}
 
 

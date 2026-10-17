@@ -6,6 +6,7 @@ from fastapi import FastAPI
 
 from astrolol.core.auth import AclRule, Level
 from astrolol.core.plugin_api import LogScope, PluginContext, PluginManifest
+from astrolol.plugins.system.autonetwork import NetworkWatchdog
 from astrolol.plugins.system.models import SystemSettings
 from astrolol.plugins.system.throttle import ThrottleMonitor
 
@@ -20,7 +21,7 @@ class SystemPlugin:
         version="0.1.0",
         description=(
             "Device management for the host running astrolol. "
-            "Manages WiFi connections and access-point mode, "
+            "Manages WiFi connections and access-point mode, opening the hotspot by itself when no known network is around, "
             "shows CPU / memory / temperature / disk statistics, "
             "monitors power/thermal throttling, "
             "and provides reboot / shutdown / restart controls."
@@ -41,6 +42,7 @@ class SystemPlugin:
 
     def __init__(self) -> None:
         self._throttle_monitor: ThrottleMonitor | None = None
+        self._network_watchdog: NetworkWatchdog | None = None
 
     def setup(self, app: FastAPI, ctx: PluginContext) -> None:
         from astrolol.plugins.system.api import router
@@ -52,15 +54,23 @@ class SystemPlugin:
             interval_seconds=cfg.throttle_check_interval_seconds,
         )
         app.state.system_throttle_monitor = self._throttle_monitor
+        self._network_watchdog = NetworkWatchdog(
+            lambda: ctx.get_plugin_settings("system", SystemSettings)
+        )
+        app.state.system_network_watchdog = self._network_watchdog
         logger.info("system.plugin_setup")
 
     async def startup(self) -> None:
         if self._throttle_monitor is not None:
             await self._throttle_monitor.start()
+        if self._network_watchdog is not None:
+            await self._network_watchdog.start()
 
     async def shutdown(self) -> None:
         if self._throttle_monitor is not None:
             await self._throttle_monitor.stop()
+        if self._network_watchdog is not None:
+            await self._network_watchdog.stop()
 
 
 def get_plugin() -> SystemPlugin:
