@@ -38,12 +38,10 @@ solar-system barycentre — the Moon came out ~97° off; the target page's Moon 
 same bug) and bright stars had no names (Hipparcos only has numbers; `star_names.py` now adds the
 IAU names as aliases, also to catalogues synced earlier).
 
-- **A slew went below the horizon.** The only check is `MountManager._check_above_horizon`, and it
-  silently does nothing when the active profile has no Site item (`horizon_min_alt_deg` is also 0 by
-  default). Not reproducible here: needs the Pi's `astrolol.log` of that night (look for
-  `mount.slew_started` and which profile/site was active). At least log a warning when the check is
-  skipped for lack of a site; consider falling back to the latitude/longitude the mount reports.
-  The Moon bug above may have contributed (wrong coordinates were checked, not the real Moon).
+- ~~A slew went below the horizon~~ — fixed: `PUT /profiles/{id}` replaced the profile in the store but
+  `app.state.active_profile` kept the old copy, so a Site added while the profile was active was
+  invisible to the horizon check (and to the guider scale, polar align…) until it was re-activated.
+  A skipped check is now logged (`mount.horizon_check_skipped`).
 - **Nudge cross: release events sometimes lost** (mount keeps moving or the button stays pressed).
   Fix the existing cross (pointer capture / `pointercancel` / blur / visibility loss all stop the
   nudge, server-side dead-man timeout) and design a mobile-first one.
@@ -52,13 +50,9 @@ IAU names as aliases, also to catalogues synced earlier).
   magnitude/size in the catalogue (Hipparcos Vmag is downloaded but not stored; OpenNGC has sizes).
 - **Target type filter** — checkboxes in the target search (galaxies, clusters, nebulae, stars,
   solar system, …) on the catalogue's `object_type`.
-- **Moon accuracy** — positions are geocentric: topocentric parallax is up to ~1° for the Moon
-  (needs the site). A GOTO to the Moon/planets then tracks at the sidereal rate; add lunar and
-  planetary tracking rates (eqmod and INDI).
-- **Star names as primary names** — a search for "Vega" returns "HIP 91262" with Vega as an alias;
-  show the proper name first, and add the fainter named stars (the list has ~110).
-- **Catalogue is only downloaded when empty** — an old database never picks up catalogue changes;
-  add a schema/data version and a refresh (UI button exists via `POST /sync`, nothing automatic).
+- **Lunar / planetary tracking rates** — positions are now topocentric for the active profile's
+  site, but a GOTO to the Moon/planets still tracks at the sidereal rate (eqmod and INDI).
+- **More star names** — the list has ~110 IAU names (Hipparcos only has numbers); add the fainter ones.
 
 ## EQMOD native driver — assumptions & deferred items
 
