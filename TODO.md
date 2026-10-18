@@ -50,8 +50,6 @@ IAU names as aliases, also to catalogues synced earlier).
 - **"What to watch tonight" list** — suggested targets for the site and date: above the horizon long
   enough, away from the Moon, ranked (size vs. field of view, brightness, altitude window). Needs
   magnitude/size in the catalogue (Hipparcos Vmag is downloaded but not stored; OpenNGC has sizes).
-- **Target type filter** — checkboxes in the target search (galaxies, clusters, nebulae, stars,
-  solar system, …) on the catalogue's `object_type`.
 - **Lunar / planetary tracking rates** — positions are now topocentric for the active profile's
   site, but a GOTO to the Moon/planets still tracks at the sidereal rate (eqmod and INDI).
 - **More star names** — the list has ~110 IAU names (Hipparcos only has numbers); add the fainter ones.

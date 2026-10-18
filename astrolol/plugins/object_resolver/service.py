@@ -6,6 +6,7 @@ search route uses the same ``search_objects`` function, so both behave identical
 
 from __future__ import annotations
 
+from collections.abc import Collection
 from datetime import datetime
 from typing import Any
 
@@ -33,15 +34,18 @@ async def search_objects(
     limit: int = 20,
     when: datetime | None = None,
     site: solar_system.Site | None = None,
+    groups: Collection[str] | None = None,
 ) -> list[ObjectMatch]:
     """Catalog + solar-system search, with the optional SIMBAD fallback when nothing matched.
 
-    Solar-system positions are topocentric when *site* is given."""
-    results: list[dict[str, Any]] = catalog.search(q, limit=limit)
+    Solar-system positions are topocentric when *site* is given. *groups* (see TYPE_GROUPS)
+    keeps only those kinds of object; the SIMBAD fallback, whose types are unknown, is then off."""
+    results: list[dict[str, Any]] = catalog.search(q, limit=limit, groups=groups)
     for r in results:
         r.setdefault("source", "catalog")
-    results.extend(solar_system.search(q, when=when, site=site))
-    if not results and settings.simbad_fallback:
+    if groups is None or "solar_system" in groups:
+        results.extend(solar_system.search(q, when=when, site=site))
+    if not results and groups is None and settings.simbad_fallback:
         hit = await simbad.resolve(q)
         if hit:
             results.append(hit)

@@ -81,5 +81,15 @@
     "visibility": "Target visibility",
     "none": "No target set.",
     "peak": "peak {{alt}}°"
+  },
+  "filter": {
+    "label": "Show only",
+    "galaxy": "Galaxies",
+    "cluster": "Clusters",
+    "nebula": "Nebulae",
+    "star": "Stars",
+    "solar_system": "Solar system",
+    "other": "Other",
+    "clear": "Show all"
   }
 }

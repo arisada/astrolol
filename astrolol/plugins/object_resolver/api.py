@@ -7,7 +7,7 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException, Query, Request
 from pydantic import BaseModel
 
 from astrolol.plugins.object_resolver import solar_system
-from astrolol.plugins.object_resolver.catalog import ObjectCatalog
+from astrolol.plugins.object_resolver.catalog import TYPE_GROUPS, ObjectCatalog
 from astrolol.plugins.object_resolver.service import ObjectMatch, active_site, search_objects
 
 router = APIRouter(prefix="/plugins/object_resolver", tags=["object_resolver"])
@@ -66,11 +66,18 @@ async def search(
     q: str = Query(..., min_length=1),
     limit: int = Query(20, ge=1, le=100),
     when: str | None = Query(None),
+    types: str | None = Query(
+        None, description="Comma-separated kinds to keep: " + ", ".join(TYPE_GROUPS) + ". Default: all."
+    ),
 ) -> list[ObjectMatch]:
     t = _parse_when(when)
+    groups = [g.strip() for g in types.split(",") if g.strip()] if types else None
+    unknown = [g for g in groups or [] if g not in TYPE_GROUPS]
+    if unknown:
+        raise HTTPException(status_code=422, detail=f"Unknown type group: {', '.join(unknown)}")
     settings = request.app.state.object_resolver_settings
     return await search_objects(
-        _catalog(request), settings, q, limit, t, site=active_site(request.app)
+        _catalog(request), settings, q, limit, t, site=active_site(request.app), groups=groups
     )
 
 

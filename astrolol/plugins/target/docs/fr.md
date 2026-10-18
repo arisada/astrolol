@@ -14,6 +14,11 @@ ses autres noms. Les planètes et la Lune sont placées comme on les voit depuis
 du profil actif). Les catalogues sont sur l'ordinateur du télescope : la recherche fonctionne sans
 Internet ; un catalogue en ligne prend le relais quand le réseau est disponible.
 
+Les pastilles sous le champ limitent la recherche aux **Galaxies**, **Amas**, **Nébuleuses**,
+**Étoiles**, **Système solaire** ou **Autres** ; choisissez-en plusieurs pour les combiner, et
+**Tout afficher** les efface. Sans sélection, tout est cherché. Le catalogue en ligne n'est pas
+interrogé tant qu'un filtre est actif. Le choix est retenu sur cet appareil.
+
 ## La fiche de l'objet
 
 - **Nom**, autres désignations et type d'objet (Galaxie, Nébuleuse en émission…).

@@ -15,6 +15,11 @@ catalogues are
 on the telescope computer, so search works without Internet; an online catalogue is used as a
 fallback when the network is available.
 
+The chips under the box narrow the search to **Galaxies**, **Clusters**, **Nebulae**, **Stars**,
+**Solar system** or **Other**; pick several to combine them, and **Show all** clears them. With none
+selected everything is searched. The online catalogue is not asked while a filter is on. The choice
+is remembered on this device.
+
 ## The object card
 
 - **Name**, other designations and the object type (Galaxy, Emission Nebula…).

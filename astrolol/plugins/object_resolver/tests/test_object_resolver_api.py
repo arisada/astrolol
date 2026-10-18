@@ -316,3 +316,81 @@ async def test_service_lookup_exact_name_or_alias(catalog: ObjectCatalog) -> Non
     assert planet is not None and planet.source == "solar_system"
     # A substring hit is not an exact match: no silent wrong guess
     assert await svc.lookup("Andromeda") is None
+
+
+# ── Type filter ────────────────────────────────────────────────────────────────
+
+def _names(resp) -> set[str]:
+    assert resp.status_code == 200
+    return {r["name"] for r in resp.json()}
+
+
+def test_search_without_filter_returns_every_kind(client: TestClient) -> None:
+    assert {"NGC 224", "NGC 1952", "NGC 5128"} <= _names(client.get("/plugins/object_resolver/search?q=NGC"))
+
+
+def test_filter_keeps_only_the_chosen_kind(client: TestClient) -> None:
+    galaxies = _names(client.get("/plugins/object_resolver/search?q=NGC&types=galaxy"))
+    assert galaxies == {"NGC 224", "NGC 5128"}
+    assert _names(client.get("/plugins/object_resolver/search?q=NGC&types=nebula")) == {"NGC 1952"}
+
+
+def test_filter_takes_several_kinds(client: TestClient) -> None:
+    both = _names(client.get("/plugins/object_resolver/search?q=NGC&types=galaxy,nebula"))
+    assert both == {"NGC 224", "NGC 1952", "NGC 5128"}
+
+
+def test_filter_applies_before_the_limit(client: TestClient) -> None:
+    """A limit of 1 must still find the nebula, which is not the first NGC match."""
+    resp = client.get("/plugins/object_resolver/search?q=NGC&types=nebula&limit=1")
+    assert _names(resp) == {"NGC 1952"}
+
+
+def test_filter_with_no_match_is_empty(client: TestClient) -> None:
+    assert _names(client.get("/plugins/object_resolver/search?q=NGC&types=star")) == set()
+
+
+def test_filter_includes_solar_system_only_when_asked(client: TestClient) -> None:
+    assert "Moon" in _names(client.get("/plugins/object_resolver/search?q=moon&types=solar_system"))
+    assert _names(client.get("/plugins/object_resolver/search?q=moon&types=galaxy")) == set()
+    assert "Moon" in _names(client.get("/plugins/object_resolver/search?q=moon"))
+
+
+def test_unknown_kind_is_refused(client: TestClient) -> None:
+    resp = client.get("/plugins/object_resolver/search?q=NGC&types=galaxy,comet")
+    assert resp.status_code == 422
+    assert "comet" in resp.json()["detail"]
+
+
+def test_filter_turns_the_simbad_fallback_off(catalog: ObjectCatalog) -> None:
+    """SIMBAD answers carry no type we can group, so a filtered search never asks it."""
+    app = _make_app(catalog, simbad_fallback=True)
+    with patch("astrolol.plugins.object_resolver.service.simbad.resolve", new=AsyncMock()) as resolve:
+        with TestClient(app) as c:
+            resp = c.get("/plugins/object_resolver/search?q=zzzz&types=galaxy")
+    assert resp.json() == []
+    resolve.assert_not_called()
+
+
+def test_other_catches_unlisted_and_missing_types(tmp_path: Path) -> None:
+    from astrolol.plugins.object_resolver.catalog import TYPE_GROUPS, type_group
+
+    assert type_group("Galaxy Pair") == "galaxy"
+    assert type_group("Open Cluster") == "cluster"
+    assert type_group("Solar System") == "solar_system"
+    assert type_group("Other") == "other"
+    assert type_group("") == "other"
+    assert type_group("Something New") == "other"
+    assert set(TYPE_GROUPS) == {"galaxy", "cluster", "nebula", "star", "solar_system", "other"}
+
+    cat = ObjectCatalog(tmp_path / "other.db")
+    cat.open()
+    cat.load_csv("\n".join([
+        _HEADER,
+        _row(Name="NGC0001", Type="G", RA="00:07:15.84", Dec="+27:42:29.1"),
+        _row(Name="NGC0002", Type="Other", RA="00:09:00.00", Dec="+27:00:00.0"),
+        _row(Name="NGC0003", Type="Weird", RA="00:10:00.00", Dec="+27:00:00.0"),
+    ]))
+    names = {r["name"] for r in cat.search("NGC", groups=["other"])}
+    cat.close()
+    assert names == {"NGC 2", "NGC 3"}

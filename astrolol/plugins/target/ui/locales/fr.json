@@ -81,5 +81,15 @@
     "visibility": "Visibilité de la cible",
     "none": "Aucune cible définie.",
     "peak": "max. {{alt}}°"
+  },
+  "filter": {
+    "label": "Afficher seulement",
+    "galaxy": "Galaxies",
+    "cluster": "Amas",
+    "nebula": "Nébuleuses",
+    "star": "Étoiles",
+    "solar_system": "Système solaire",
+    "other": "Autres",
+    "clear": "Tout afficher"
   }
 }

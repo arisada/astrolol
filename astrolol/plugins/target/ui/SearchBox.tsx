@@ -2,10 +2,12 @@
 // Renders a dropdown of results with type badges.
 
 import { useEffect, useRef, useState } from 'react'
-import { Search, X } from 'lucide-react'
+import { Check, Search, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { typeKey } from './FavoritesList'
 import { describeNames } from './names'
+import { sanitizeSelection, toggleGroup, TYPE_GROUPS, typesParam, type TypeGroup } from './typeFilter'
+import { useLocalStorage } from '@/hooks/useLocalStorage'
 
 export interface ObjectMatch {
   name: string
@@ -46,6 +48,9 @@ export function SearchBox({ onSelect }: Props) {
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
   const [activeIdx, setActiveIdx] = useState(-1)
+  const [stored, setStored] = useLocalStorage<TypeGroup[]>('astrolol.target.types', [])
+  const kinds = sanitizeSelection(stored)
+  const kindsParam = typesParam(kinds)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const listRef = useRef<HTMLUListElement>(null)
@@ -60,8 +65,9 @@ export function SearchBox({ onSelect }: Props) {
     debounceRef.current = setTimeout(async () => {
       setLoading(true)
       try {
+        const filter = kindsParam ? `&types=${kindsParam}` : ''
         const res = await fetch(
-          `/plugins/object_resolver/search?q=${encodeURIComponent(query)}&limit=12`,
+          `/plugins/object_resolver/search?q=${encodeURIComponent(query)}&limit=12${filter}`,
         )
         if (res.ok) {
           const data: ObjectMatch[] = await res.json()
@@ -74,7 +80,7 @@ export function SearchBox({ onSelect }: Props) {
       }
     }, 280)
     return () => { if (debounceRef.current) clearTimeout(debounceRef.current) }
-  }, [query])
+  }, [query, kindsParam])
 
   function select(obj: ObjectMatch) {
     setQuery(obj.name)
@@ -128,6 +134,38 @@ export function SearchBox({ onSelect }: Props) {
             className="absolute right-3 p-0.5 rounded text-slate-500 hover:text-slate-300"
           >
             <X className="h-3.5 w-3.5" />
+          </button>
+        )}
+      </div>
+
+      <div className="mt-2 flex flex-wrap items-center gap-1.5" role="group" aria-label={t('filter.label')}>
+        {TYPE_GROUPS.map((g) => {
+          const on = kinds.includes(g)
+          return (
+            <button
+              key={g}
+              type="button"
+              role="checkbox"
+              aria-checked={on}
+              onClick={() => setStored(toggleGroup(kinds, g))}
+              className={`flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs transition-colors ${
+                on
+                  ? 'border-indigo-500 bg-indigo-500/20 text-indigo-200'
+                  : 'border-slate-700 text-slate-400 hover:bg-slate-800'
+              }`}
+            >
+              {on && <Check className="h-3 w-3" />}
+              {t(`filter.${g}`)}
+            </button>
+          )
+        })}
+        {kinds.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setStored([])}
+            className="px-1.5 text-xs text-slate-500 hover:text-slate-300"
+          >
+            {t('filter.clear')}
           </button>
         )}
       </div>

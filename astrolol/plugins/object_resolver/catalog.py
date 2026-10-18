@@ -7,6 +7,7 @@ import io
 import math
 import re
 import sqlite3
+from collections.abc import Collection
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -78,6 +79,43 @@ _TYPE_LABELS: dict[str, str] = {
     "*Ass": "Stellar Association",
     "Cl+N": "Cluster + Nebula",
 }
+
+# What the target search lets the user filter on: each object type belongs to one group, and
+# any type not listed here (including none at all) is "other".
+TYPE_GROUPS: dict[str, tuple[str, ...]] = {
+    "galaxy": ("Galaxy", "Galaxy Group", "Galaxy Pair", "Galaxy Triple", "Galaxy Cluster"),
+    "cluster": ("Open Cluster", "Globular Cluster", "Stellar Association"),
+    "nebula": (
+        "Nebula", "Emission Nebula", "Reflection Nebula", "Dark Nebula", "Planetary Nebula",
+        "HII Region", "Supernova Remnant", "Cluster + Nebula",
+    ),
+    "star": ("Star", "Double Star", "Nova"),
+    "solar_system": ("Solar System",),
+    "other": (),
+}
+
+
+def type_group(object_type: str) -> str:
+    """The filter group an object type belongs to."""
+    for group, types in TYPE_GROUPS.items():
+        if object_type in types:
+            return group
+    return "other"
+
+
+def _group_clause(groups: Collection[str]) -> tuple[str, list[str]]:
+    """SQL condition (and its parameters) matching objects of the given groups."""
+    known = [t for types in TYPE_GROUPS.values() for t in types]
+    wanted = [t for g in groups if g != "other" for t in TYPE_GROUPS[g]]
+    parts: list[str] = []
+    params: list[str] = []
+    if wanted:
+        parts.append(f"o.object_type IN ({','.join('?' * len(wanted))})")
+        params += wanted
+    if "other" in groups:
+        parts.append(f"o.object_type NOT IN ({','.join('?' * len(known))})")
+        params += known
+    return (" AND (" + " OR ".join(parts) + ")", params) if parts else (" AND 0", [])
 
 
 def _parse_ra(s: str) -> float:
@@ -518,22 +556,27 @@ class ObjectCatalog:
 
     # ── Queries ────────────────────────────────────────────────────────────────
 
-    def search(self, query: str, limit: int = 20) -> list[dict[str, Any]]:
-        """Search by name or alias (case-insensitive substring match)."""
+    def search(
+        self, query: str, limit: int = 20, groups: Collection[str] | None = None,
+    ) -> list[dict[str, Any]]:
+        """Search by name or alias (case-insensitive substring match).
+
+        *groups* (keys of TYPE_GROUPS) keeps only objects of those kinds; None keeps all."""
         assert self._conn is not None
+        clause, extra = _group_clause(groups) if groups is not None else ("", [])
         rows = self._conn.execute(
-            """
+            f"""
             SELECT o.id, o.primary_name, o.object_type, o.ra, o.dec,
                    MIN(CASE WHEN n.name = ? COLLATE NOCASE THEN 0
                             WHEN n.name LIKE ? THEN 1 ELSE 2 END) AS rank
             FROM object_names n
             JOIN objects o ON o.id = n.object_id
-            WHERE n.name LIKE ?
+            WHERE n.name LIKE ?{clause}
             GROUP BY o.id
             ORDER BY rank, o.id
             LIMIT ?
             """,
-            (query, f"{query}%", f"%{query}%", limit),
+            (query, f"{query}%", f"%{query}%", *extra, limit),
         ).fetchall()
         return [self._enrich(row) for row in rows]
 
