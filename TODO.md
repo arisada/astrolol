@@ -32,6 +32,9 @@ Items designed for but not yet built. Ordered roughly by priority.
 
 ## From the 2026-10-17 night session
 
+Not verified on a real mount yet: the nudge fix (ordering + leases), the Stop button aborting a slew,
+the horizon refusal after editing a profile, and the joystick.
+
 Fixed the next day: Moon/planets/Sun resolved to the wrong place (the resolver converted the
 geocentric position to ICRS, which for a body with a distance is the direction seen from the
 solar-system barycentre — the Moon came out ~97° off; the target page's Moon separation had the
@@ -45,13 +48,28 @@ IAU names as aliases, also to catalogues synced earlier).
 - ~~Nudge cross: release events sometimes lost~~ — fixed: the release raced the start on the server
   (EQMOD only registers an axis as nudging once its start finished, so a stop that arrived first
   stopped nothing), and the page lost releases (no pointer capture, button disabled under the finger).
-  Taps now nudge for a fixed time, holds are a short lease renewed while pressed. Still to do: a
-  mobile-first cross design.
+  Taps now nudge for a fixed time, holds are a short lease renewed while pressed.
+- **Nudge joystick (built, not yet tried in the field)** — a dock widget: one big circle for a thumb,
+  the touch point is the centre, distance = speed, eyepiece rotation/mirror switches. To do:
+  - Tune by hand on a phone: `REACH` (`NudgeJoystick.tsx`) and `SPEED_CURVE` (`joystick.ts`).
+  - A dedicated full-screen page (a small plugin) — in portrait the dock is only a bottom sheet.
+  - Stop one axis without stopping the other (the driver's `stop_move` stops everything, so dropping
+    one axis of a diagonal stops both and restarts the other); and a speed change restarts the axis
+    on EQMOD (stop, then run) — a smoother ramp would need a driver change.
+  - Orientation from a plate solve instead of the switches.
+- **Target type filter (built)** — follow-ups: browsing by type (needs the magnitude/size catalogue
+  below, search needs 2 characters); the online SIMBAD fallback is off while filtering (its answers
+  carry no type); the MCP `search_objects` tool does not take `types` yet.
 - **"What to watch tonight" list** — suggested targets for the site and date: above the horizon long
   enough, away from the Moon, ranked (size vs. field of view, brightness, altitude window). Needs
   magnitude/size in the catalogue (Hipparcos Vmag is downloaded but not stored; OpenNGC has sizes).
 - **Lunar / planetary tracking rates** — positions are now topocentric for the active profile's
   site, but a GOTO to the Moon/planets still tracks at the sidereal rate (eqmod and INDI).
+- **Planetarium / star map** — implement a planetarium inside a plugin: a sky map for the site and
+  time (stars, deep-sky objects from the catalogue, Moon and planets, the mount's pointing and the
+  field of view, the target from the Target page), tap an object to select it or slew to it. Needs
+  magnitudes in the catalogue (see "what to watch tonight") and likely shares the horizontal/equatorial
+  sky components.
 - **More star names** — the list has ~110 IAU names (Hipparcos only has numbers); add the fainter ones.
 
 ## EQMOD native driver — assumptions & deferred items
