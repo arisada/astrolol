@@ -163,10 +163,10 @@ export const api = {
       }),
     setParkPosition: (deviceId: string) =>
       request<void>(`/mount/${deviceId}/set_park_position`, { method: 'POST' }),
-    startMove: (deviceId: string, direction: string, rate: string) =>
+    startMove: (deviceId: string, direction: string, rate: string, durationMs?: number) =>
       request<void>(`/mount/${deviceId}/move`, {
         method: 'POST',
-        body: JSON.stringify({ direction, rate }),
+        body: JSON.stringify({ direction, rate, duration_ms: durationMs }),
       }),
     stopMove: (deviceId: string) =>
       request<void>(`/mount/${deviceId}/move`, { method: 'DELETE' }),

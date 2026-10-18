@@ -176,13 +176,16 @@ class MoveRequest(BaseModel):
     # "<n>x" sidereal (e.g. "16x", up to "800x"), "guide" | "centering" | "find" | "max", or a
     # driver's own slew-rate name (INDI)
     rate: str = "centering"
+    # The motion stops by itself after this long unless the call is repeated (a tap, or the
+    # keep-alive of a held button). Absent: it lasts until DELETE /move.
+    duration_ms: int | None = Field(default=None, gt=0, le=10_000)
 
 
 @router.post("/{device_id}/move", status_code=204)
 async def start_move(device_id: str, body: MoveRequest, request: Request) -> None:
-    """Start continuous directional motion. Send DELETE /move to stop."""
+    """Start continuous directional motion. Send DELETE /move to stop (or give `duration_ms`)."""
     try:
-        await _manager(request).start_move(device_id, body.direction, body.rate)
+        await _manager(request).start_move(device_id, body.direction, body.rate, body.duration_ms)
     except (DeviceNotFoundError, DeviceKindError) as exc:
         raise HTTPException(status_code=404, detail=str(exc))
     except ValueError as exc:  # unknown rate, or a limit that forbids moving this way

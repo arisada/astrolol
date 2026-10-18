@@ -145,3 +145,25 @@ async def test_move_passes_the_speed_and_stop_move_stops_it(app, client: AsyncCl
     mount = app.state.device_manager.get_mount("m")
     assert mount.moves == [("W", "800x")]
     assert mount.move_stops == 1
+
+
+@pytest.mark.asyncio
+async def test_move_with_a_duration_stops_by_itself(app, client: AsyncClient) -> None:
+    import asyncio
+
+    async with client as c:
+        await _connect(c, "plain")
+        r = await c.post("/mount/m/move", json={"direction": "N", "rate": "8x", "duration_ms": 50})
+        assert r.status_code == 204
+        await asyncio.sleep(0.15)
+    mount = app.state.device_manager.get_mount("m")
+    assert mount.moves == [("N", "8x")]
+    assert mount.move_stops == 1
+
+
+@pytest.mark.asyncio
+async def test_move_duration_is_bounded(app, client: AsyncClient) -> None:
+    async with client as c:
+        await _connect(c, "plain")
+        r = await c.post("/mount/m/move", json={"direction": "N", "duration_ms": 60_000})
+    assert r.status_code == 422

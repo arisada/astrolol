@@ -42,9 +42,11 @@ IAU names as aliases, also to catalogues synced earlier).
   `app.state.active_profile` kept the old copy, so a Site added while the profile was active was
   invisible to the horizon check (and to the guider scale, polar align…) until it was re-activated.
   A skipped check is now logged (`mount.horizon_check_skipped`).
-- **Nudge cross: release events sometimes lost** (mount keeps moving or the button stays pressed).
-  Fix the existing cross (pointer capture / `pointercancel` / blur / visibility loss all stop the
-  nudge, server-side dead-man timeout) and design a mobile-first one.
+- ~~Nudge cross: release events sometimes lost~~ — fixed: the release raced the start on the server
+  (EQMOD only registers an axis as nudging once its start finished, so a stop that arrived first
+  stopped nothing), and the page lost releases (no pointer capture, button disabled under the finger).
+  Taps now nudge for a fixed time, holds are a short lease renewed while pressed. Still to do: a
+  mobile-first cross design.
 - **"What to watch tonight" list** — suggested targets for the site and date: above the horizon long
   enough, away from the Moon, ranked (size vs. field of view, brightness, altitude window). Needs
   magnitude/size in the catalogue (Hipparcos Vmag is downloaded but not stored; OpenNGC has sizes).

@@ -97,6 +97,11 @@ class MountManager:
         self._auto_park_last: dict[str, tuple[int, int]] = {}  # device_id → (h, m) last parked
         self._horizon_triggered: set[str] = set()          # device_ids that crossed the horizon limit
         self._flip_suspended: dict[str, int] = {}          # device_id → suspend_auto_flip depth
+        # Hand nudges: started/stopped one at a time per mount, so a quick click's stop can never
+        # overtake its start; a lease ends a nudge nobody renewed (a lost "button released").
+        self._move_locks: dict[str, asyncio.Lock] = {}
+        self._moving: dict[str, dict[str, str]] = {}       # device_id → {direction: rate}
+        self._move_leases: dict[str, asyncio.Task] = {}
 
     # --- Public API ---
 
@@ -261,17 +266,47 @@ class MountManager:
         await mount.set_park_position()
         logger.info("mount.park_position_set", device_id=device_id)
 
-    async def start_move(self, device_id: str, direction: str, rate: str) -> None:
-        """Start continuous directional motion at the given slew rate."""
+    async def start_move(
+        self, device_id: str, direction: str, rate: str, duration_ms: int | None = None,
+    ) -> None:
+        """Start continuous directional motion at the given slew rate.
+
+        With `duration_ms` the motion stops by itself after that long unless the same call
+        renews it, so a client that vanishes (or whose "released" never arrives) cannot leave
+        the mount running. Without it the motion lasts until stop_move().
+        """
         mount = self._device_manager.get_mount(device_id)
-        await mount.start_move(direction, rate)
-        logger.info("mount.move_started", device_id=device_id, direction=direction, rate=rate)
+        async with self._move_locks.setdefault(device_id, asyncio.Lock()):
+            moving = self._moving.setdefault(device_id, {})
+            if moving.get(direction) != rate:   # a renewal does not touch the driver
+                await mount.start_move(direction, rate)
+                moving[direction] = rate
+                logger.info("mount.move_started", device_id=device_id, direction=direction, rate=rate)
+            self._cancel_move_lease(device_id)
+            if duration_ms is not None:
+                self._move_leases[device_id] = asyncio.create_task(self._expire_move(device_id, duration_ms / 1000))
 
     async def stop_move(self, device_id: str) -> None:
         """Stop all directional motion."""
         mount = self._device_manager.get_mount(device_id)
-        await mount.stop_move()
-        logger.info("mount.move_stopped", device_id=device_id)
+        async with self._move_locks.setdefault(device_id, asyncio.Lock()):
+            self._cancel_move_lease(device_id)
+            self._moving.pop(device_id, None)
+            await mount.stop_move()
+            logger.info("mount.move_stopped", device_id=device_id)
+
+    def _cancel_move_lease(self, device_id: str) -> None:
+        lease = self._move_leases.pop(device_id, None)
+        if lease is not None and lease is not asyncio.current_task():
+            lease.cancel()
+
+    async def _expire_move(self, device_id: str, seconds: float) -> None:
+        await asyncio.sleep(seconds)
+        logger.info("mount.move_lease_expired", device_id=device_id)
+        try:
+            await self.stop_move(device_id)
+        except Exception as exc:  # the mount went away meanwhile
+            logger.warning("mount.move_lease_stop_failed", device_id=device_id, error=str(exc))
 
     async def pulse_guide(self, device_id: str, direction: str, duration_ms: int) -> None:
         """Guide pulse; returns once the pulse has completed.

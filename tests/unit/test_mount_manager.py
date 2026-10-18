@@ -882,3 +882,90 @@ async def test_auto_flip_suspended(manager: DeviceManager, event_bus) -> None:
     task = mm._get_or_create("m1")._active_task
     assert task is not None
     await task
+
+
+# --- hand nudges: ordering and lease ---
+
+class _SlowMoveMount(FakeMount):
+    """Like a serial mount: starting takes a while, and only then is it known to be moving."""
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        self.running = False
+
+    async def start_move(self, direction: str, rate: str) -> None:
+        await asyncio.sleep(0.05)
+        self.running = True
+        await super().start_move(direction, rate)
+
+    async def stop_move(self) -> None:
+        self.running = False
+        await super().stop_move()
+
+
+@pytest.mark.asyncio
+async def test_a_stop_sent_during_a_start_does_not_overtake_it(manager: DeviceManager, event_bus) -> None:
+    manager.registry.register_mount("slow", _SlowMoveMount)  # type: ignore[arg-type]
+    await manager.connect(DeviceConfig(device_id="m1", kind="mount", adapter_key="slow"))
+    mm = MountManager(device_manager=manager, event_bus=event_bus)
+
+    start = asyncio.create_task(mm.start_move("m1", "N", "8x"))
+    await asyncio.sleep(0.01)          # the start is on the wire
+    await mm.stop_move("m1")           # the quick click's release
+    await start
+
+    assert manager.get_mount("m1").running is False
+
+
+@pytest.mark.asyncio
+async def test_a_nudge_with_a_duration_stops_by_itself(manager: DeviceManager, event_bus) -> None:
+    await manager.connect(DeviceConfig(device_id="m1", kind="mount", adapter_key="fake_mount"))
+    mm = MountManager(device_manager=manager, event_bus=event_bus)
+
+    await mm.start_move("m1", "E", "4x", duration_ms=50)
+    mount = manager.get_mount("m1")
+    assert mount.move_stops == 0
+    await asyncio.sleep(0.15)
+
+    assert mount.move_stops == 1
+
+
+@pytest.mark.asyncio
+async def test_renewing_a_nudge_extends_it_without_restarting_the_driver(
+    manager: DeviceManager, event_bus,
+) -> None:
+    await manager.connect(DeviceConfig(device_id="m1", kind="mount", adapter_key="fake_mount"))
+    mm = MountManager(device_manager=manager, event_bus=event_bus)
+    mount = manager.get_mount("m1")
+
+    for _ in range(4):
+        await mm.start_move("m1", "E", "4x", duration_ms=120)
+        await asyncio.sleep(0.05)      # 200 ms in all, longer than one lease
+    assert mount.moves == [("E", "4x")]
+    assert mount.move_stops == 0
+
+    await asyncio.sleep(0.25)
+    assert mount.move_stops == 1
+
+
+@pytest.mark.asyncio
+async def test_an_explicit_stop_cancels_the_lease(manager: DeviceManager, event_bus) -> None:
+    await manager.connect(DeviceConfig(device_id="m1", kind="mount", adapter_key="fake_mount"))
+    mm = MountManager(device_manager=manager, event_bus=event_bus)
+
+    await mm.start_move("m1", "W", "4x", duration_ms=50)
+    await mm.stop_move("m1")
+    await asyncio.sleep(0.15)
+
+    assert manager.get_mount("m1").move_stops == 1   # not stopped a second time by the lease
+
+
+@pytest.mark.asyncio
+async def test_a_nudge_without_duration_runs_until_stopped(manager: DeviceManager, event_bus) -> None:
+    await manager.connect(DeviceConfig(device_id="m1", kind="mount", adapter_key="fake_mount"))
+    mm = MountManager(device_manager=manager, event_bus=event_bus)
+
+    await mm.start_move("m1", "N", "4x")
+    await asyncio.sleep(0.1)
+
+    assert manager.get_mount("m1").move_stops == 0
