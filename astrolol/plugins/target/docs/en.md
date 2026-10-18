@@ -7,8 +7,10 @@ mount at it.
 
 ## Searching
 
-Type in the search box: a catalogue number (`M 42`, `NGC 891`, `IC 1795`, `Sh2-155`, `HIP 677`),
-a common name (`Andromeda`, `Heart Nebula`) or a planet (`Jupiter`, `Moon`). Planets and the Moon are placed as seen from your site (the one in the active profile). The
+Type in the search box: a catalogue number (`M 42`, `NGC 891`, `IC 1795`, `C 14` or `Caldwell 14`, `Sh2-155`, `HIP 677`),
+a common name (`Andromeda`, `Heart Nebula`), a bright star (`Vega`) or a planet (`Jupiter`, `Moon`).
+An object is listed under its Messier number when it has one, followed by its other names.
+Planets and the Moon are placed as seen from your site (the one in the active profile). The
 catalogues are
 on the telescope computer, so search works without Internet; an online catalogue is used as a
 fallback when the network is available.
@@ -43,6 +45,7 @@ After a slew, use [Plate Solving](../../platesolve/docs/en.md) to centre the obj
 
 Your saved objects, one click away. **Save mount position** saves where the mount points right
 now under a name you choose, for spots that are not in any catalogue (a framing you like, a
-comet you centred by hand). Remove an entry with its bin.
+comet you centred by hand). Each entry shows all the names the object is known by, Messier
+number first. Remove an entry with its bin.
 
 Favourites are also offered when you add a task to the [Sequencer](../../sequencer/docs/en.md).

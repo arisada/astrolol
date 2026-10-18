@@ -8,8 +8,10 @@ pointer la monture.
 ## Rechercher
 
 Tapez dans le champ de recherche : un numéro de catalogue (`M 42`, `NGC 891`, `IC 1795`,
-`Sh2-155`, `HIP 677`), un nom courant (`Andromède`, `Heart Nebula`) ou une planète (`Jupiter`,
-`Lune`). Les planètes et la Lune sont placées comme on les voit depuis votre site (celui du profil actif). Les catalogues sont sur l'ordinateur du télescope : la recherche fonctionne sans
+`C 14` ou `Caldwell 14`, `Sh2-155`, `HIP 677`), un nom courant (`Andromède`, `Heart Nebula`), une étoile brillante (`Vega`) ou une planète
+(`Jupiter`, `Lune`). Un objet est présenté sous son numéro de Messier quand il en a un, suivi de
+ses autres noms. Les planètes et la Lune sont placées comme on les voit depuis votre site (celui
+du profil actif). Les catalogues sont sur l'ordinateur du télescope : la recherche fonctionne sans
 Internet ; un catalogue en ligne prend le relais quand le réseau est disponible.
 
 ## La fiche de l'objet
@@ -45,8 +47,8 @@ centrer l'objet précisément.
 
 Vos objets enregistrés, à un clic. **Enregistrer la position de la monture** enregistre l'endroit
 où pointe la monture, sous le nom de votre choix, pour les endroits qui ne sont dans aucun
-catalogue (un cadrage qui vous plaît, une comète centrée à la main). Retirez une entrée avec sa
-corbeille.
+catalogue (un cadrage qui vous plaît, une comète centrée à la main). Chaque entrée montre tous les
+noms de l'objet, numéro de Messier en premier. Retirez une entrée avec sa corbeille.
 
 Les favoris sont aussi proposés quand vous ajoutez une tâche au
 [Séquenceur](../../sequencer/docs/fr.md).

@@ -8,6 +8,7 @@ import { AlertTriangle, BookmarkPlus, ChevronLeft, ChevronRight, Crosshair, Moon
 import type { ObjectMatch } from './SearchBox'
 import type { EphemerisResult } from './api'
 import { AltitudeChart } from './AltitudeChart'
+import { describeNames } from './names'
 
 interface Props {
   object: ObjectMatch
@@ -73,6 +74,7 @@ export function ObjectCard({
 }: Props) {
   const { t, i18n } = useTranslation('target')
   const lng = i18n.language
+  const names = describeNames(object.name, object.aliases)
   const [selectedMount, setSelectedMount] = useState<string>(mountIds[0] ?? '')
 
   const hasMounts = mountIds.length > 0
@@ -82,11 +84,9 @@ export function ObjectCard({
       {/* Header */}
       <div className="flex items-start justify-between px-4 pt-4 pb-3 border-b border-slate-700/50">
         <div>
-          <h2 className="text-lg font-semibold text-slate-100">{object.name}</h2>
-          {object.aliases.filter((a) => a !== object.name).length > 0 && (
-            <p className="text-xs text-slate-500 mt-0.5">
-              {object.aliases.filter((a) => a !== object.name).slice(0, 4).join('  ·  ')}
-            </p>
+          <h2 className="text-lg font-semibold text-slate-100">{names.title}</h2>
+          {names.others.length > 0 && (
+            <p className="text-xs text-slate-500 mt-0.5">{names.others.slice(0, 5).join('  ·  ')}</p>
           )}
         </div>
         <span className="text-xs px-2 py-1 rounded bg-slate-700 text-slate-300 font-medium mt-0.5">

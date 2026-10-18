@@ -24,6 +24,7 @@ class FavoriteTarget(BaseModel):
     dec: float                      # ICRS degrees
     object_name: str = ""           # Canonical name from catalogue (e.g. "M 42")
     object_type: str = ""           # Human label (e.g. "Emission Nebula")
+    aliases: list[str] = []         # Names in other catalogues (e.g. ["NGC 224", "Andromeda Galaxy"])
     notes: str = ""
     added_at: datetime = Field(default_factory=_now)
 

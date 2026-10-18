@@ -5,6 +5,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Search, X } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import { typeKey } from './FavoritesList'
+import { describeNames } from './names'
 
 export interface ObjectMatch {
   name: string
@@ -137,7 +138,9 @@ export function SearchBox({ onSelect }: Props) {
           className="absolute z-[100] mt-1 w-full rounded-lg border border-slate-700 bg-slate-800 shadow-2xl overflow-hidden"
           role="listbox"
         >
-          {results.map((obj, i) => (
+          {results.map((obj, i) => {
+            const names = describeNames(obj.name, obj.aliases)
+            return (
             <li
               key={`${obj.name}-${i}`}
               role="option"
@@ -147,17 +150,18 @@ export function SearchBox({ onSelect }: Props) {
                 i === activeIdx ? 'bg-slate-700' : 'hover:bg-slate-700/60'
               }`}
             >
-              <span className="font-medium text-slate-100 truncate flex-1">{obj.name}</span>
-              {obj.aliases.length > 1 && (
-                <span className="text-xs text-slate-500 truncate max-w-[5rem]">
-                  {obj.aliases.filter((a) => a !== obj.name).slice(0, 2).join(', ')}
+              <span className="font-medium text-slate-100 truncate flex-1">{names.title}</span>
+              {names.others.length > 0 && (
+                <span className="text-xs text-slate-500 truncate max-w-[8rem]">
+                  {names.others.slice(0, 2).join(', ')}
                 </span>
               )}
               <span className={`shrink-0 text-xs px-1.5 py-0.5 rounded font-medium ${typeBadgeClass(obj.type)}`}>
                 {t(`types.${typeKey(obj.type)}`, { defaultValue: obj.type })}
               </span>
             </li>
-          ))}
+            )
+          })}
         </ul>
       )}
     </div>

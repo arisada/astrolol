@@ -3,6 +3,7 @@
 import { useTranslation } from 'react-i18next'
 import { BookmarkX, ChevronRight, Star } from 'lucide-react'
 import type { FavoriteTarget } from './api'
+import { describeNames } from './names'
 
 interface Props {
   favorites: FavoriteTarget[]
@@ -33,6 +34,14 @@ export function typeKey(type: string): string {
   return type.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '')
 }
 
+/** The label, and the object's other names (every catalogue) to show beside it. */
+function favoriteNames(fav: FavoriteTarget): { title: string; others: string[] } {
+  const d = describeNames(fav.object_name || fav.name, [fav.name, ...(fav.aliases ?? [])])
+  const title = describeNames(fav.name, []).title
+  const all = [d.title, ...d.others]
+  return { title, others: all.filter((n) => n.toLowerCase() !== title.toLowerCase()) }
+}
+
 function typeDot(type: string): string {
   return TYPE_DOT[type] ?? 'bg-slate-500'
 }
@@ -50,7 +59,9 @@ export function FavoritesList({ favorites, onRecall, onDelete }: Props) {
 
   return (
     <ul className="space-y-1">
-      {favorites.map((fav) => (
+      {favorites.map((fav) => {
+        const names = favoriteNames(fav)
+        return (
         <li key={fav.id} className="group flex items-center gap-2 rounded-lg px-3 py-2.5 hover:bg-slate-700/50 transition-colors">
           {/* Type dot */}
           <span className={`shrink-0 w-2 h-2 rounded-full ${typeDot(fav.object_type)}`} />
@@ -61,9 +72,9 @@ export function FavoritesList({ favorites, onRecall, onDelete }: Props) {
             className="flex-1 text-left min-w-0"
           >
             <div className="flex items-center gap-2">
-              <span className="text-sm font-medium text-slate-200 truncate">{fav.name}</span>
-              {fav.object_name && fav.object_name !== fav.name && (
-                <span className="text-xs text-slate-500 truncate">{fav.object_name}</span>
+              <span className="text-sm font-medium text-slate-200 truncate">{names.title}</span>
+              {names.others.length > 0 && (
+                <span className="text-xs text-slate-500 truncate">{names.others.slice(0, 3).join(' · ')}</span>
               )}
             </div>
             <div className="flex items-center gap-2 mt-0.5">
@@ -89,7 +100,8 @@ export function FavoritesList({ favorites, onRecall, onDelete }: Props) {
             <BookmarkX className="h-3.5 w-3.5" />
           </button>
         </li>
-      ))}
+        )
+      })}
     </ul>
   )
 }

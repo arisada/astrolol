@@ -3,10 +3,11 @@ import { useTranslation } from 'react-i18next'
 import { MapPin, Star } from 'lucide-react'
 import { useStore } from '@/store'
 import type { EphemerisResult, FavoriteTarget, TargetSettings } from './api'
-import { getEphemeris, getSettings, putSettings, setMountTarget, slewMount } from './api'
+import { getEphemeris, getSettings, putSettings, searchObjects, setMountTarget, slewMount } from './api'
 import { SearchBox, type ObjectMatch } from './SearchBox'
 import { ObjectCard } from './ObjectCard'
 import { FavoritesList } from './FavoritesList'
+import { describeNames } from './names'
 import { Page } from '@/components/Page'
 
 // crypto.randomUUID() only exists in secure contexts (HTTPS or localhost) — it's
@@ -118,18 +119,20 @@ export function TargetPage() {
       showToast(t('toast.already'))
       return
     }
+    const names = describeNames(selected.name, selected.aliases)
     const newFav: FavoriteTarget = {
       id: makeFavoriteId(),
-      name: selected.name,
+      name: names.title,
       ra: selected.ra,
       dec: selected.dec,
       object_name: selected.name,
       object_type: selected.type,
+      aliases: [selected.name, ...selected.aliases],
       notes: '',
       added_at: new Date().toISOString(),
     }
     saveSettings({ ...settings, favorites: [...settings.favorites, newFav] })
-    showToast(t('toast.added', { name: selected.name }))
+    showToast(t('toast.added', { name: names.title }))
   }
 
   function openMountSaveForm() {
@@ -174,16 +177,35 @@ export function TargetPage() {
     saveSettings({ ...settings, favorites: settings.favorites.filter((f) => f.id !== id) })
   }
 
-  function handleRecallFavorite(fav: FavoriteTarget) {
+  async function handleRecallFavorite(fav: FavoriteTarget) {
+    let aliases = fav.aliases ?? []
+    // Favourites saved before the other names were kept: look them up again (same object = same position).
+    if (aliases.length === 0 && fav.object_name) {
+      try {
+        const found = await searchObjects(fav.object_name)
+        const same = found.find((o) => Math.abs(o.ra - fav.ra) < 0.001 && Math.abs(o.dec - fav.dec) < 0.001)
+        if (same) {
+          aliases = [same.name, ...same.aliases]
+          // Keep them, and lead with the Messier name unless the user gave their own label.
+          const lead = describeNames(same.name, aliases).title
+          const label = fav.name === fav.object_name ? lead : fav.name
+          saveSettings({
+            ...settings,
+            favorites: settings.favorites.map((f) => f.id === fav.id ? { ...f, aliases, name: label } : f),
+          })
+        }
+      } catch { /* offline catalogue: show what the favourite holds */ }
+    }
     const obj: ObjectMatch = {
-      name: fav.name,
-      aliases: [fav.name],
+      name: fav.object_name || fav.name,
+      aliases: [fav.name, ...aliases],
       ra: fav.ra,
       dec: fav.dec,
       type: fav.object_type,
       source: 'favorites',
     }
     setSelected(obj)
+    setObsDate(null)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 

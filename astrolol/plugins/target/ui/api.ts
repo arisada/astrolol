@@ -1,5 +1,7 @@
 // Target plugin — typed fetch helpers mirroring api.py routes.
 
+import type { ObjectMatch } from './SearchBox'
+
 export interface AltitudePoint {
   time: string  // UTC ISO string
   alt: number   // degrees above horizon
@@ -41,6 +43,7 @@ export interface FavoriteTarget {
   dec: number
   object_name: string
   object_type: string
+  aliases?: string[]
   notes: string
   added_at: string
 }
@@ -83,6 +86,9 @@ export const setMountTarget = (deviceId: string, ra: number, dec: number, name: 
     method: 'PUT',
     body: JSON.stringify({ ra, dec, name, source: 'target_plugin' }),
   })
+
+export const searchObjects = (q: string) =>
+  request<ObjectMatch[]>(`/plugins/object_resolver/search?q=${encodeURIComponent(q)}&limit=10`)
 
 export const slewMount = (deviceId: string) =>
   request<void>(`/mount/${deviceId}/slew`, { method: 'POST' })
