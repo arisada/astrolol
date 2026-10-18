@@ -25,7 +25,7 @@ class ObjectResolverPlugin:
         version="0.1.0",
         description=(
             "Offline-first astronomical object name resolver. Resolves NGC, IC, "
-            "Messier, Sharpless (Sh2), Hipparcos star, and common names to J2000 "
+            "Messier, Caldwell, Sharpless (Sh2), Hipparcos star, and common names to J2000 "
             "coordinates and vice-versa. Powered by the OpenNGC, Sharpless, and "
             "Hipparcos catalogs and Astropy (planets/Moon/Sun). Optional online "
             "Simbad fallback for unrecognised names."
@@ -55,17 +55,26 @@ class ObjectResolverPlugin:
         logger.info("object_resolver.plugin_setup", db_path=str(db_path))
 
     async def startup(self) -> None:
-        if self._catalog is None or self._catalog.is_populated():
+        if self._catalog is None:
             return
-        logger.info(
-            "object_resolver.catalog_empty_syncing",
-            detail=(
-                "first run: downloading OpenNGC (NGC/IC), Sharpless, and Hipparcos "
-                "catalogs (~130k objects) in the background — search/resolve will "
-                "return partial or no results from the local catalog until this "
-                "finishes; check GET /plugins/object_resolver/status for progress"
-            ),
-        )
+        if self._catalog.needs_refresh():
+            # Still searchable meanwhile; if there is no network the old data stays in use.
+            logger.info(
+                "object_resolver.catalog_outdated_syncing",
+                detail="the catalogue was built by an older version: refreshing it in the background",
+            )
+        elif self._catalog.is_populated():
+            return
+        else:
+            logger.info(
+                "object_resolver.catalog_empty_syncing",
+                detail=(
+                    "first run: downloading OpenNGC (NGC/IC), Sharpless, and Hipparcos "
+                    "catalogs (~130k objects) in the background — search/resolve will "
+                    "return partial or no results from the local catalog until this "
+                    "finishes; check GET /plugins/object_resolver/status for progress"
+                ),
+            )
         if self._app is not None:
             self._app.state.object_resolver_syncing = True
         # Run in the background so a slow connection doesn't block app startup —

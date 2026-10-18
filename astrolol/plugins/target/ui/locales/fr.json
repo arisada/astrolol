@@ -24,7 +24,9 @@
     "stellar_association": "Association stellaire",
     "solar_system": "Système solaire",
     "other": "Autre",
-    "mount_position": "Position de la monture"
+    "mount_position": "Position de la monture",
+    "nebula": "Nébuleuse",
+    "dark_nebula": "Nébuleuse obscure"
   },
   "title": "Cible",
   "search": {

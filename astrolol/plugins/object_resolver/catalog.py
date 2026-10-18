@@ -14,6 +14,7 @@ from typing import Any
 import httpx
 import structlog
 
+from astrolol.plugins.object_resolver.caldwell import CALDWELL, CALDWELL_EXTRA, caldwell_aliases
 from astrolol.plugins.object_resolver.star_names import STAR_ALIASES, STAR_NAMES
 
 logger = structlog.get_logger()
@@ -36,6 +37,19 @@ HIPPARCOS_URL = (
     "?-source=I/239/hip_main&-out=HIP,RAICRS,DEICRS,Vmag&-out.max=200000"
 )
 
+# Not INSERT OR REPLACE: a repeated name (OpenNGC lists some objects twice) would delete the row,
+# take a new id and leave the first row's names pointing at nothing, so the object could no
+# longer be found by them.
+_UPSERT_OBJECT = (
+    "INSERT INTO objects (primary_name, object_type, ra, dec) VALUES (?, ?, ?, ?)"
+    " ON CONFLICT(primary_name) DO UPDATE SET"
+    " object_type=excluded.object_type, ra=excluded.ra, dec=excluded.dec"
+)
+
+# Bump when what a sync produces changes: older databases are refreshed in the background.
+# 2: upsert (orphaned names), star names, Caldwell numbers.
+DATA_VERSION = 2
+
 _SKIP_TYPES = {"NonEx", "Dup"}
 
 _TYPE_LABELS: dict[str, str] = {
@@ -45,7 +59,13 @@ _TYPE_LABELS: dict[str, str] = {
     "GTrpl": "Galaxy Triple",
     "GClust": "Galaxy Cluster",
     "OC": "Open Cluster",
+    "OCl": "Open Cluster",
     "GC": "Globular Cluster",
+    "GCl": "Globular Cluster",
+    "Neb": "Nebula",
+    "EmN": "Emission Nebula",
+    "RfN": "Reflection Nebula",
+    "DrkN": "Dark Nebula",
     "PN": "Planetary Nebula",
     "HII": "HII Region",
     "EN": "Emission Nebula",
@@ -137,7 +157,7 @@ class ObjectCatalog:
         self._conn.row_factory = sqlite3.Row
         self._conn.execute("PRAGMA journal_mode=WAL")
         self._init_schema()
-        self.apply_star_names()  # catalogues synced before names existed get them too
+        self.apply_extra_names()  # catalogues synced before these names existed get them too
 
     def close(self) -> None:
         if self._conn:
@@ -175,6 +195,14 @@ class ObjectCatalog:
             "SELECT value FROM catalog_meta WHERE key='object_count'"
         ).fetchone()
         return row is not None and int(row["value"]) > 0
+
+    def needs_refresh(self) -> bool:
+        """True when the database was built by an older version of the loader."""
+        assert self._conn is not None
+        row = self._conn.execute(
+            "SELECT value FROM catalog_meta WHERE key='data_version'"
+        ).fetchone()
+        return self.is_populated() and (row is None or int(row["value"]) < DATA_VERSION)
 
     def object_count(self) -> int:
         assert self._conn is not None
@@ -233,6 +261,10 @@ class ObjectCatalog:
             (str(count),),
         )
         self._conn.execute(
+            "INSERT OR REPLACE INTO catalog_meta (key, value) VALUES ('data_version', ?)",
+            (str(DATA_VERSION),),
+        )
+        self._conn.execute(
             "INSERT OR REPLACE INTO catalog_meta (key, value) VALUES ('last_updated', ?)",
             (datetime.now(timezone.utc).isoformat(),),
         )
@@ -244,7 +276,7 @@ class ObjectCatalog:
         count = self._load_ngc_csv(ngc_content)
         count += self._load_sharpless_tsv(sharpless_content)
         count += self._load_hipparcos_tsv(hipparcos_content)
-        self.apply_star_names()
+        self.apply_extra_names()
         self._finalize(count)
         return count
 
@@ -295,8 +327,7 @@ class ObjectCatalog:
             type_label = _TYPE_LABELS.get(obj_type, obj_type)
 
             self._conn.execute(
-                "INSERT OR REPLACE INTO objects (primary_name, object_type, ra, dec)"
-                " VALUES (?, ?, ?, ?)",
+                _UPSERT_OBJECT,
                 (primary_name, type_label, ra, dec),
             )
             obj_id = self._conn.execute(
@@ -362,8 +393,7 @@ class ObjectCatalog:
 
             primary_name = f"Sh2-{n}"
             self._conn.execute(
-                "INSERT OR REPLACE INTO objects (primary_name, object_type, ra, dec)"
-                " VALUES (?, ?, ?, ?)",
+                _UPSERT_OBJECT,
                 (primary_name, "HII Region", ra, dec),
             )
             obj_id = self._conn.execute(
@@ -402,8 +432,7 @@ class ObjectCatalog:
 
             primary_name = f"HIP {n}"
             self._conn.execute(
-                "INSERT OR REPLACE INTO objects (primary_name, object_type, ra, dec)"
-                " VALUES (?, ?, ?, ?)",
+                _UPSERT_OBJECT,
                 (primary_name, "Star", ra, dec),
             )
             obj_id = self._conn.execute(
@@ -419,6 +448,51 @@ class ObjectCatalog:
             count += 1
 
         return count
+
+    def apply_extra_names(self) -> None:
+        """Aliases that no downloaded catalogue carries: star names, the Caldwell numbers."""
+        assert self._conn is not None
+        if self._conn.execute("SELECT 1 FROM objects LIMIT 1").fetchone() is None:
+            return
+        self.apply_star_names()
+        self.apply_caldwell()
+
+    def apply_caldwell(self) -> int:
+        """Add "C 5" / "C5" / "Caldwell 5" to each Caldwell object (idempotent); returns aliases added."""
+        assert self._conn is not None
+        added = 0
+        for number, (name, kind, ra, dec, others) in CALDWELL_EXTRA.items():
+            self._conn.execute(
+                "INSERT OR IGNORE INTO objects (primary_name, object_type, ra, dec) VALUES (?, ?, ?, ?)",
+                (name, kind, ra, dec),
+            )
+            for alias in (name, *others):
+                self._add_alias(name, alias)
+        for number, names in CALDWELL.items():
+            names = names or tuple(v[0] for k, v in CALDWELL_EXTRA.items() if k == number)
+            for i, name in enumerate(names):
+                row = self._conn.execute(
+                    "SELECT object_id FROM object_names WHERE name=?", (name,)
+                ).fetchone()
+                if row is None:
+                    continue
+                if i == 0:  # a double entry (the Double Cluster) tags its first member only
+                    for alias in caldwell_aliases(number):
+                        cur = self._conn.execute(
+                            "INSERT OR IGNORE INTO object_names (name, object_id) VALUES (?, ?)",
+                            (alias, row["object_id"]),
+                        )
+                        added += cur.rowcount
+        self._conn.commit()
+        return added
+
+    def _add_alias(self, primary_name: str, alias: str) -> None:
+        assert self._conn is not None
+        self._conn.execute(
+            "INSERT OR IGNORE INTO object_names (name, object_id)"
+            " SELECT ?, id FROM objects WHERE primary_name=?",
+            (alias, primary_name),
+        )
 
     def apply_star_names(self) -> int:
         """Add the proper names of bright stars as aliases of their HIP entries (idempotent).
@@ -449,13 +523,17 @@ class ObjectCatalog:
         assert self._conn is not None
         rows = self._conn.execute(
             """
-            SELECT DISTINCT o.id, o.primary_name, o.object_type, o.ra, o.dec
+            SELECT o.id, o.primary_name, o.object_type, o.ra, o.dec,
+                   MIN(CASE WHEN n.name = ? COLLATE NOCASE THEN 0
+                            WHEN n.name LIKE ? THEN 1 ELSE 2 END) AS rank
             FROM object_names n
             JOIN objects o ON o.id = n.object_id
             WHERE n.name LIKE ?
+            GROUP BY o.id
+            ORDER BY rank, o.id
             LIMIT ?
             """,
-            (f"%{query}%", limit),
+            (query, f"{query}%", f"%{query}%", limit),
         ).fetchall()
         return [self._enrich(row) for row in rows]
 

@@ -199,3 +199,54 @@ def test_star_names_are_added_to_an_existing_catalogue_on_open(tmp_path: Path) -
 def test_star_names_table_has_no_duplicate_hip_numbers() -> None:
     from astrolol.plugins.object_resolver.star_names import STAR_NAMES
     assert len(set(STAR_NAMES.values())) == len(STAR_NAMES)
+
+
+# ── Duplicate rows, Caldwell numbers, ranking, refresh ─────────────────────────
+
+def test_a_repeated_catalogue_row_keeps_the_names_of_the_first(catalog: ObjectCatalog) -> None:
+    csv = "\n".join([
+        _NGC_HEADER,
+        _ngc_row(Name="NGC4945", Type="G", RA="13:05:27.00", Dec="-49:41:26.0", **{"Common names": "Foo"}),
+        _ngc_row(Name="NGC4945", Type="G", RA="13:05:27.00", Dec="-49:41:26.0"),
+    ])
+    catalog.load_csv(csv)
+    assert [r["name"] for r in catalog.search("Foo")] == ["NGC 4945"]
+    assert catalog.search("NGC 4945")
+
+
+def test_caldwell_numbers_are_added_in_every_spelling(catalog: ObjectCatalog) -> None:
+    catalog.load_csv("\n".join([
+        _NGC_HEADER,
+        _ngc_row(Name="NGC4945", Type="G", RA="13:05:27.00", Dec="-49:41:26.0"),
+        _ngc_row(Name="NGC0869", Type="OC", RA="02:19:00.00", Dec="+57:08:00.0"),
+        _ngc_row(Name="NGC0884", Type="OC", RA="02:22:00.00", Dec="+57:08:00.0"),
+    ]))
+    catalog.apply_caldwell()
+    for q in ("C 83", "C83", "Caldwell 83"):
+        assert catalog.search(q)[0]["name"] == "NGC 4945"
+    assert catalog.search("Caldwell 14")[0]["name"] == "NGC 869"  # the Double Cluster, first member
+
+
+def test_caldwell_objects_without_another_catalogue_are_created(catalog: ObjectCatalog) -> None:
+    catalog.load_csv(NGC_CSV)
+    catalog.apply_caldwell()
+    assert catalog.search("Coalsack")[0]["type"] == "Dark Nebula"
+    assert catalog.search("C 41")[0]["name"] == "Mel 25"
+    assert "Hyades" in catalog.search("C 41")[0]["aliases"]
+
+
+def test_exact_name_ranks_before_substring_matches(catalog: ObjectCatalog) -> None:
+    catalog.load_csv("\n".join([
+        _NGC_HEADER,
+        _ngc_row(Name="IC0083", Type="G", RA="00:08:00.00", Dec="+10:00:00.0"),
+        _ngc_row(Name="NGC4945", Type="G", RA="13:05:27.00", Dec="-49:41:26.0"),
+    ]))
+    catalog.apply_caldwell()
+    assert [r["name"] for r in catalog.search("C 83")][0] == "NGC 4945"
+
+
+def test_old_databases_are_flagged_for_refresh(catalog: ObjectCatalog) -> None:
+    catalog._load_all(NGC_CSV, SHARPLESS_TSV, HIPPARCOS_TSV)
+    assert not catalog.needs_refresh()
+    catalog._conn.execute("DELETE FROM catalog_meta WHERE key='data_version'")
+    assert catalog.needs_refresh()

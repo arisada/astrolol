@@ -24,7 +24,9 @@
     "stellar_association": "Stellar Association",
     "solar_system": "Solar System",
     "other": "Other",
-    "mount_position": "Mount Position"
+    "mount_position": "Mount Position",
+    "nebula": "Nebula",
+    "dark_nebula": "Dark Nebula"
   },
   "title": "Target",
   "search": {
