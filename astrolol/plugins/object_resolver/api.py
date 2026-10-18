@@ -8,7 +8,7 @@ from pydantic import BaseModel
 
 from astrolol.plugins.object_resolver import solar_system
 from astrolol.plugins.object_resolver.catalog import ObjectCatalog
-from astrolol.plugins.object_resolver.service import ObjectMatch, search_objects
+from astrolol.plugins.object_resolver.service import ObjectMatch, active_site, search_objects
 
 router = APIRouter(prefix="/plugins/object_resolver", tags=["object_resolver"])
 
@@ -69,7 +69,9 @@ async def search(
 ) -> list[ObjectMatch]:
     t = _parse_when(when)
     settings = request.app.state.object_resolver_settings
-    return await search_objects(_catalog(request), settings, q, limit, t)
+    return await search_objects(
+        _catalog(request), settings, q, limit, t, site=active_site(request.app)
+    )
 
 
 @router.get("/resolve")
@@ -88,7 +90,7 @@ async def resolve(
     for r in results:
         r.setdefault("source", "catalog")
 
-    results.extend(solar_system.cone_search(ra, dec, radius, when=t))
+    results.extend(solar_system.cone_search(ra, dec, radius, when=t, site=active_site(request.app)))
     results.sort(key=lambda x: x.get("distance_arcmin") or 0.0)
 
     return [ObjectMatch(**r) for r in results]

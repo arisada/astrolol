@@ -32,12 +32,15 @@ async def search_objects(
     q: str,
     limit: int = 20,
     when: datetime | None = None,
+    site: solar_system.Site | None = None,
 ) -> list[ObjectMatch]:
-    """Catalog + solar-system search, with the optional SIMBAD fallback when nothing matched."""
+    """Catalog + solar-system search, with the optional SIMBAD fallback when nothing matched.
+
+    Solar-system positions are topocentric when *site* is given."""
     results: list[dict[str, Any]] = catalog.search(q, limit=limit)
     for r in results:
         r.setdefault("source", "catalog")
-    results.extend(solar_system.search(q, when=when))
+    results.extend(solar_system.search(q, when=when, site=site))
     if not results and settings.simbad_fallback:
         hit = await simbad.resolve(q)
         if hit:
@@ -47,6 +50,18 @@ async def search_objects(
 
 def _norm(name: str) -> str:
     return "".join(name.lower().split())
+
+
+def active_site(app: Any) -> solar_system.Site | None:
+    """(lat, lon, altitude) of the Site in the active profile, if there is one."""
+    from astrolol.equipment.optical_path import find_profile_site
+
+    profile = getattr(app.state, "active_profile", None)
+    equipment = getattr(app.state, "equipment_store", None)
+    if profile is None or equipment is None:
+        return None
+    site = find_profile_site(profile, equipment)
+    return None if site is None else (site.latitude, site.longitude, site.altitude)
 
 
 class ObjectResolverService:
@@ -60,7 +75,8 @@ class ObjectResolverService:
     ) -> list[ObjectMatch]:
         state = self._app.state
         return await search_objects(
-            state.object_resolver_catalog, state.object_resolver_settings, q, limit, when
+            state.object_resolver_catalog, state.object_resolver_settings, q, limit, when,
+            site=active_site(self._app),
         )
 
     async def lookup(self, name: str, when: datetime | None = None) -> ObjectMatch | None:

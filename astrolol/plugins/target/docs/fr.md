@@ -9,7 +9,7 @@ pointer la monture.
 
 Tapez dans le champ de recherche : un numéro de catalogue (`M 42`, `NGC 891`, `IC 1795`,
 `Sh2-155`, `HIP 677`), un nom courant (`Andromède`, `Heart Nebula`) ou une planète (`Jupiter`,
-`Lune`). Les catalogues sont sur l'ordinateur du télescope : la recherche fonctionne sans
+`Lune`). Les planètes et la Lune sont placées comme on les voit depuis votre site (celui du profil actif). Les catalogues sont sur l'ordinateur du télescope : la recherche fonctionne sans
 Internet ; un catalogue en ligne prend le relais quand le réseau est disponible.
 
 ## La fiche de l'objet

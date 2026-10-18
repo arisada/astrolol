@@ -8,7 +8,8 @@ mount at it.
 ## Searching
 
 Type in the search box: a catalogue number (`M 42`, `NGC 891`, `IC 1795`, `Sh2-155`, `HIP 677`),
-a common name (`Andromeda`, `Heart Nebula`) or a planet (`Jupiter`, `Moon`). The catalogues are
+a common name (`Andromeda`, `Heart Nebula`) or a planet (`Jupiter`, `Moon`). Planets and the Moon are placed as seen from your site (the one in the active profile). The
+catalogues are
 on the telescope computer, so search works without Internet; an online catalogue is used as a
 fallback when the network is available.
 
