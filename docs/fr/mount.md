@@ -78,7 +78,7 @@ gérer les retournements : il les fait entre deux images plutôt qu'au milieu d'
 ## Corrections
 
 Les flèches déplacent la monture vers le **Nord**, le **Sud**, l'**Est** et l'**Ouest** tant que vous
-les maintenez. Le bouton rouge au centre arrête d'un coup tout déplacement.
+les maintenez. Le bouton rouge au centre arrête d'un coup tout déplacement, y compris un pointage en cours.
 
 La vitesse affichée au-dessus des flèches est un multiple de la vitesse sidérale, de 1× (le rythme des
 étoiles) à 800×. Utilisez **−** et **+** pour la changer ; astrolol retient la vitesse de cette monture. Les montures qui

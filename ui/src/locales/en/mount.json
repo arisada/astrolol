@@ -82,7 +82,7 @@
     "speedXTitle": "{{n}}× sidereal rate",
     "slower": "Slower",
     "faster": "Faster",
-    "stopTitle": "Stop all nudge movement",
+    "stopTitle": "Stop the slew and all nudge movement",
     "north": "North",
     "south": "South",
     "east": "East",

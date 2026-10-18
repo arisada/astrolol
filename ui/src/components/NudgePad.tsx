@@ -64,11 +64,16 @@ export function NudgePad({ deviceId }: { deviceId: string }) {
     await act(() => api.mount.stopMove(deviceId))
   }, [deviceId, act])
 
-  // Stops whatever nudge is running, even when the page lost track of it (a lost touch, a reload).
+  // Stops a running slew or park, and any nudge, even when the page lost track of it (a lost touch,
+  // a reload). Outside a slew only the nudge is stopped, so tracking carries on.
+  const slewing = status?.is_slewing ?? false
   const stopAll = useCallback(async () => {
     movingRef.current = false
-    await act(() => api.mount.stopMove(deviceId))
-  }, [deviceId, act])
+    await act(async () => {
+      if (slewing) await api.mount.stop(deviceId)
+      await api.mount.stopMove(deviceId)
+    })
+  }, [deviceId, act, slewing])
 
   // A nudge must not outlive the pad being hidden, folded, closed or left.
   useEffect(() => {

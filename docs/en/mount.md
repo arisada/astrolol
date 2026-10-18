@@ -73,7 +73,7 @@ instead of in the middle of one.
 ## Nudge
 
 Arrow buttons move the mount **North**, **South**, **East** and **West** for as long as you hold
-them. The red button in the middle stops every nudge movement at once.
+them. The red button in the middle stops every nudge movement at once, and a slew in progress.
 
 The speed above the arrows is a multiple of the sidereal rate, from 1× (the pace of the stars) up to
 800×. Use **−** and **+** to change it; astrolol remembers the speed for this mount. Mounts that list their own speeds
