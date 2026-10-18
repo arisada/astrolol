@@ -86,7 +86,13 @@
     "north": "North",
     "south": "South",
     "east": "East",
-    "west": "West"
+    "west": "West",
+    "initial": {
+      "N": "N",
+      "S": "S",
+      "E": "E",
+      "W": "W"
+    }
   },
   "sky": {
     "title": "Sky",
@@ -107,6 +113,13 @@
       "tracking": "Tracking",
       "stopped": "Not tracking"
     },
-    "nudge": "Nudge"
+    "nudge": "Nudge",
+    "joystick": "Joystick"
+  },
+  "joystick": {
+    "rotation": "Eyepiece rotation",
+    "mirror": "Mirrored",
+    "hint": "Touch anywhere, then push toward the part of the sky you want to see. Back to where you started, or let go, to stop.",
+    "unavailable": "The mount is not available (not connected, or parked)."
   }
 }

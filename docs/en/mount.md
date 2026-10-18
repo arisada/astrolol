@@ -80,6 +80,18 @@ The speed above the arrows is a multiple of the sidereal rate, from 1× (the pac
 800×. Use **−** and **+** to change it; astrolol remembers the speed for this mount. Mounts that list their own speeds
 (through INDI) offer that list instead.
 
+### Joystick (phones)
+
+The **Joystick** dock widget is a big circle to nudge with one thumb while your eye stays at the
+eyepiece. Touch anywhere: that spot becomes the centre. Push toward the part of the sky you want to
+see; the further from the centre, the faster, up to the speed set under the circle. Going back to the
+centre, or lifting your thumb, stops. A quick flick nudges for half a second.
+
+The letters around the circle say which sky direction each side moves. Set **Eyepiece rotation**
+(0°, 90°, 180°, 270°, clockwise) and **Mirrored** to match what your eyepiece shows (a diagonal
+mirrors the image) until pushing toward the top moves the view the way you expect. The red button stops
+everything, including a slew.
+
 ## Device properties
 
 The gear next to the mount name opens the driver's full list of settings. See

@@ -2,21 +2,11 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ArrowDown, ArrowLeft, ArrowRight, ArrowUp, StopCircle } from 'lucide-react'
 import { api } from '@/api/client'
-import type { DeviceProperty } from '@/api/types'
 import { useStore } from '@/store'
-import { useMountSettings, DEFAULT_NUDGE_RATE } from '@/hooks/useMountSettings'
+import { useNudgeRates } from '@/hooks/useNudgeRates'
 import { Button } from '@/components/ui/button'
 import { ChoiceStepper } from '@/components/ui/choice-stepper'
 import { NudgeController } from './nudgeController'
-
-/** Nudge speeds in × sidereal, slow to fast, for mounts that do not list their own. */
-const NUDGE_SPEEDS = [1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 800]
-
-interface Rate { label: string; title?: string; rate: string }
-
-/** Rate options from a TELESCOPE_SLEW_RATE switch property. */
-const ratesFromProperty = (prop: DeviceProperty): Rate[] =>
-  prop.widgets.map((w) => ({ label: String(w.label || w.name), rate: String(w.name) }))
 
 /**
  * Speed stepper and a cross to move a mount by hand: tap a direction for a short nudge, hold it to
@@ -25,27 +15,8 @@ const ratesFromProperty = (prop: DeviceProperty): Rate[] =>
 export function NudgePad({ deviceId }: { deviceId: string }) {
   const { t } = useTranslation('mount')
   const status = useStore((s) => s.mountStatuses[deviceId] ?? null)
-  const [settings, saveSettings] = useMountSettings(deviceId)
-  const [slewRateProp, setSlewRateProp] = useState<DeviceProperty | null>(null)
+  const { rates, rate, settings, saveSettings } = useNudgeRates(deviceId)
   const [error, setError] = useState<string | null>(null)
-
-  useEffect(() => {
-    api.devices.properties(deviceId)
-      .then((props) => setSlewRateProp(props.find((p) => p.name === 'TELESCOPE_SLEW_RATE') ?? null))
-      .catch(() => setSlewRateProp(null))
-  }, [deviceId])
-
-  // The driver's own list when it has one (INDI), else plain multiples of the sidereal rate.
-  const rates = useMemo<Rate[]>(
-    () => slewRateProp
-      ? ratesFromProperty(slewRateProp)
-      : NUDGE_SPEEDS.map((n) => ({ label: t('nudge.speedX', { n }), title: t('nudge.speedXTitle', { n }), rate: `${n}x` })),
-    [slewRateProp, t],
-  )
-  // The saved speed; a driver list that does not contain it starts at its second-slowest entry.
-  const rate = rates.some((r) => r.rate === settings.nudge_rate)
-    ? settings.nudge_rate
-    : rates[Math.min(1, rates.length - 1)]?.rate ?? DEFAULT_NUDGE_RATE
 
   const act = useCallback(async (fn: () => Promise<unknown>) => {
     setError(null)

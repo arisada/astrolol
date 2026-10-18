@@ -86,7 +86,13 @@
     "north": "Nord",
     "south": "Sud",
     "east": "Est",
-    "west": "Ouest"
+    "west": "Ouest",
+    "initial": {
+      "N": "N",
+      "S": "S",
+      "E": "E",
+      "W": "O"
+    }
   },
   "sky": {
     "title": "Ciel",
@@ -107,6 +113,13 @@
       "tracking": "Suivi actif",
       "stopped": "Suivi arrêté"
     },
-    "nudge": "Corrections"
+    "nudge": "Corrections",
+    "joystick": "Joystick"
+  },
+  "joystick": {
+    "rotation": "Rotation de l'oculaire",
+    "mirror": "En miroir",
+    "hint": "Touchez n'importe où, puis poussez vers la partie du ciel que vous voulez voir. Revenez au point de départ, ou relâchez, pour arrêter.",
+    "unavailable": "La monture n'est pas disponible (non connectée, ou parquée)."
   }
 }

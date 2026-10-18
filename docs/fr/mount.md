@@ -86,6 +86,18 @@ La vitesse affichée au-dessus des flèches est un multiple de la vitesse sidér
 étoiles) à 800×. Utilisez **−** et **+** pour la changer ; astrolol retient la vitesse de cette monture. Les montures qui
 fournissent leur propre liste de vitesses (via INDI) proposent cette liste.
 
+### Joystick (téléphone)
+
+Le widget **Joystick** du dock est un grand cercle pour corriger d'un pouce, l'œil à l'oculaire.
+Touchez n'importe où : ce point devient le centre. Poussez vers la partie du ciel que vous voulez voir ;
+plus vous vous éloignez du centre, plus c'est rapide, jusqu'à la vitesse réglée sous le cercle. Revenir
+au centre, ou lever le pouce, arrête. Un petit coup rapide corrige pendant une demi-seconde.
+
+Les lettres autour du cercle indiquent la direction du ciel de chaque côté. Réglez **Rotation de
+l'oculaire** (0°, 90°, 180°, 270°, dans le sens horaire) et **En miroir** pour correspondre à ce que montre
+votre oculaire (un renvoi coudé inverse l'image), jusqu'à ce que pousser vers le haut déplace la vue comme
+vous l'attendez. Le bouton rouge arrête tout, y compris un pointage.
+
 ## Propriétés de l'appareil
 
 La roue dentée à côté du nom de la monture ouvre la liste complète des réglages du pilote. Voir
