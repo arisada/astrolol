@@ -14,6 +14,8 @@ from typing import Any
 import httpx
 import structlog
 
+from astrolol.plugins.object_resolver.star_names import STAR_ALIASES, STAR_NAMES
+
 logger = structlog.get_logger()
 
 OPENGC_URL = (
@@ -135,6 +137,7 @@ class ObjectCatalog:
         self._conn.row_factory = sqlite3.Row
         self._conn.execute("PRAGMA journal_mode=WAL")
         self._init_schema()
+        self.apply_star_names()  # catalogues synced before names existed get them too
 
     def close(self) -> None:
         if self._conn:
@@ -241,6 +244,7 @@ class ObjectCatalog:
         count = self._load_ngc_csv(ngc_content)
         count += self._load_sharpless_tsv(sharpless_content)
         count += self._load_hipparcos_tsv(hipparcos_content)
+        self.apply_star_names()
         self._finalize(count)
         return count
 
@@ -415,6 +419,28 @@ class ObjectCatalog:
             count += 1
 
         return count
+
+    def apply_star_names(self) -> int:
+        """Add the proper names of bright stars as aliases of their HIP entries (idempotent).
+
+        Returns how many aliases were added.
+        """
+        assert self._conn is not None
+        added = 0
+        for names in (STAR_NAMES, STAR_ALIASES):
+            for name, hip in names.items():
+                row = self._conn.execute(
+                    "SELECT id FROM objects WHERE primary_name=?", (f"HIP {hip}",)
+                ).fetchone()
+                if row is None:
+                    continue
+                cur = self._conn.execute(
+                    "INSERT OR IGNORE INTO object_names (name, object_id) VALUES (?, ?)",
+                    (name, row["id"]),
+                )
+                added += cur.rowcount
+        self._conn.commit()
+        return added
 
     # ── Queries ────────────────────────────────────────────────────────────────
 

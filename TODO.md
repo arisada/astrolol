@@ -30,6 +30,36 @@ Items designed for but not yet built. Ordered roughly by priority.
   handling in `ui/src/store/index.ts`) silently keeping a device filtered out, or a race with
   the WS event ordering. Needs reproduction + a known device id to trace through the store.
 
+## From the 2026-10-17 night session
+
+Fixed the next day: Moon/planets/Sun resolved to the wrong place (the resolver converted the
+geocentric position to ICRS, which for a body with a distance is the direction seen from the
+solar-system barycentre — the Moon came out ~97° off; the target page's Moon separation had the
+same bug) and bright stars had no names (Hipparcos only has numbers; `star_names.py` now adds the
+IAU names as aliases, also to catalogues synced earlier).
+
+- **A slew went below the horizon.** The only check is `MountManager._check_above_horizon`, and it
+  silently does nothing when the active profile has no Site item (`horizon_min_alt_deg` is also 0 by
+  default). Not reproducible here: needs the Pi's `astrolol.log` of that night (look for
+  `mount.slew_started` and which profile/site was active). At least log a warning when the check is
+  skipped for lack of a site; consider falling back to the latitude/longitude the mount reports.
+  The Moon bug above may have contributed (wrong coordinates were checked, not the real Moon).
+- **Nudge cross: release events sometimes lost** (mount keeps moving or the button stays pressed).
+  Fix the existing cross (pointer capture / `pointercancel` / blur / visibility loss all stop the
+  nudge, server-side dead-man timeout) and design a mobile-first one.
+- **"What to watch tonight" list** — suggested targets for the site and date: above the horizon long
+  enough, away from the Moon, ranked (size vs. field of view, brightness, altitude window). Needs
+  magnitude/size in the catalogue (Hipparcos Vmag is downloaded but not stored; OpenNGC has sizes).
+- **Target type filter** — checkboxes in the target search (galaxies, clusters, nebulae, stars,
+  solar system, …) on the catalogue's `object_type`.
+- **Moon accuracy** — positions are geocentric: topocentric parallax is up to ~1° for the Moon
+  (needs the site). A GOTO to the Moon/planets then tracks at the sidereal rate; add lunar and
+  planetary tracking rates (eqmod and INDI).
+- **Star names as primary names** — a search for "Vega" returns "HIP 91262" with Vega as an alias;
+  show the proper name first, and add the fainter named stars (the list has ~110).
+- **Catalogue is only downloaded when empty** — an old database never picks up catalogue changes;
+  add a schema/data version and a refresh (UI button exists via `POST /sync`, nothing automatic).
+
 ## EQMOD native driver — assumptions & deferred items
 
 Phase 2 (`astrolol/plugins/eqmod/`) deliberately starts narrow. Each item below is an assumption

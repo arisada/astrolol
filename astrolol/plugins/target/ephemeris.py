@@ -285,7 +285,7 @@ def compute_ephemeris(
     try:
         moon_coord = get_body("moon", t_moon_ref, location=location)
         # Convert GCRS → ICRS before separation to avoid the NonRotationTransformationWarning
-        moon_icrs = SkyCoord(ra=moon_coord.icrs.ra, dec=moon_coord.icrs.dec, frame="icrs")
+        moon_icrs = SkyCoord(ra=moon_coord.ra, dec=moon_coord.dec, frame="icrs")  # geocentric direction, not .icrs (barycentric)
         target_coord = SkyCoord(ra=ra_deg * u.deg, dec=dec_deg * u.deg, frame="icrs")
         moon_separation = float(target_coord.separation(moon_icrs).deg)
         moon_illumination = float(observer.moon_illumination(t_moon_ref))

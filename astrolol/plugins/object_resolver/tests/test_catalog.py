@@ -165,3 +165,37 @@ def test_sync_combines_all_three_catalogs(catalog: ObjectCatalog) -> None:
     assert any(r["name"] == "IC 1" for r in catalog.search("IC 1"))
     assert any(r["name"] == "Sh2-1" for r in catalog.search("Sh2-1"))
     assert any(r["name"] == "HIP 1" for r in catalog.search("HIP 1"))
+
+
+# ── Proper names of bright stars ───────────────────────────────────────────────
+
+def test_named_stars_are_found_after_a_hipparcos_load(catalog: ObjectCatalog) -> None:
+    vega = "\n".join([
+        "HIP\tRAICRS\tDEICRS\tVmag", " \tdeg\tdeg\tmag", "------\t------\t------\t-----",
+        " 91262\t279.23410832\t+38.78299311\t 0.03",
+        " 32349\t101.28854105\t-16.71314306\t-1.44",
+    ])
+    catalog.load_hipparcos_tsv(vega)
+    catalog.apply_star_names()
+    hit = catalog.search("vega")[0]
+    assert hit["name"] == "HIP 91262"
+    assert [r["name"] for r in catalog.search("Dog Star")] == ["HIP 32349"]
+
+
+def test_star_names_are_added_to_an_existing_catalogue_on_open(tmp_path: Path) -> None:
+    cat = ObjectCatalog(tmp_path / "old.db")
+    cat.open()
+    cat.load_hipparcos_tsv("\n".join([
+        "HIP\tRAICRS\tDEICRS\tVmag", " \tdeg\tdeg\tmag", "------\t------\t------\t-----",
+        " 11767\t37.94614689\t+89.26413805\t 2.0",
+    ]))
+    assert cat.search("Polaris") == []  # a catalogue synced before names existed
+    cat.close()
+    cat.open()
+    assert cat.search("Polaris")[0]["name"] == "HIP 11767"
+    cat.close()
+
+
+def test_star_names_table_has_no_duplicate_hip_numbers() -> None:
+    from astrolol.plugins.object_resolver.star_names import STAR_NAMES
+    assert len(set(STAR_NAMES.values())) == len(STAR_NAMES)

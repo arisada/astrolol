@@ -23,7 +23,10 @@ _BODIES: dict[str, str] = {
 
 
 def _ra_dec(body_key: str, when: datetime) -> tuple[float, float]:
-    coord = get_body(body_key, Time(when)).icrs
+    # Geocentric direction (GCRS axes = ICRS axes). Do NOT convert to ICRS: for a body with a
+    # distance that gives the direction seen from the solar-system barycentre, which for the
+    # Moon is up to ~100° away from where it is in our sky.
+    coord = get_body(body_key, Time(when))
     return float(coord.ra.deg), float(coord.dec.deg)
 
 
