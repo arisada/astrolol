@@ -92,9 +92,15 @@ async def update_profile(profile_id: str, profile: Profile, request: Request) ->
         raise HTTPException(status_code=400, detail="Profile id in URL and body must match.")
     _check_roots(profile, request)
     try:
-        return _store(request).update(profile)
+        updated = _store(request).update(profile)
     except KeyError:
         raise HTTPException(status_code=404, detail=f"Profile '{profile_id}' not found.")
+    # The active profile is a copy held in app state: without this a site (or any device) added
+    # while it is active stays invisible to the horizon check, the guider scale, etc.
+    if getattr(request.app.state.active_profile, "id", None) == profile_id:
+        request.app.state.active_profile = updated
+        request.app.state.imager_manager.set_context(updated)
+    return updated
 
 
 # ---------------------------------------------------------------------------

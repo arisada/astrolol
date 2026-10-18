@@ -364,6 +364,7 @@ class MountManager:
         """ValueError if the target is below the flat horizon limit (no site known: no check)."""
         site = self._site()
         if site is None:
+            logger.warning("mount.horizon_check_skipped", device_id=device_id, reason="no site in the active profile")
             return
         limit = self._get_mount_settings(device_id).horizon_min_alt_deg
         alt = altitude_of(coord, datetime.now(timezone.utc), site.latitude, site.longitude)

@@ -896,3 +896,22 @@ async def test_update_refuses_a_second_root(api_with_inventory):
     created = (await client.post("/profiles", json=_body("rig", site.id))).json()
     created["roots"].append({"item_id": mount.id, "role": None, "children": []})
     assert (await client.put(f"/profiles/{created['id']}", json=created)).status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_api_update_refreshes_the_active_profile(app, client):
+    async with client as c:
+        created = (await c.post("/profiles", json=_PROFILE_BODY)).json()
+        app.state.active_profile = Profile(**created)
+        await c.put(f"/profiles/{created['id']}", json={**created, "name": "renamed"})
+    assert app.state.active_profile.name == "renamed"
+
+
+@pytest.mark.asyncio
+async def test_api_update_leaves_another_active_profile_alone(app, client):
+    async with client as c:
+        a = (await c.post("/profiles", json=_PROFILE_BODY)).json()
+        b = (await c.post("/profiles", json={"name": "other"})).json()
+        app.state.active_profile = Profile(**a)
+        await c.put(f"/profiles/{b['id']}", json={**b, "name": "renamed"})
+    assert app.state.active_profile.name == "test rig"

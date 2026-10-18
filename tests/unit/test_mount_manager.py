@@ -1,6 +1,7 @@
 import asyncio
 
 import pytest
+import structlog.testing
 
 from astrolol.core.events import (
     MountOperationFailed,
@@ -728,7 +729,10 @@ async def test_slew_above_the_horizon_is_allowed(manager: DeviceManager, event_b
 async def test_without_a_site_the_horizon_is_not_checked(manager: DeviceManager, event_bus) -> None:
     mm, _ = await _limits_setup(manager, event_bus, site=None)
     await mm.set_target("m1", _NEVER_RISES)
-    await mm.slew("m1")
+    with structlog.testing.capture_logs() as logs:
+        await mm.slew("m1")
+    # Silently skipping hid a missing site once.
+    assert any(e["event"] == "mount.horizon_check_skipped" for e in logs)
     await mm._get_or_create("m1")._active_task
 
 
