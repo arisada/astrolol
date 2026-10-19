@@ -212,8 +212,6 @@ more design/testing than a single sitting allows:
 
 ## Near-term
 
-- **Target persistence across restart** — store the last-set target in `profiles.json` so
-  it survives a backend restart.
 - **Meta-scheduler (name TBD)** — decides what to image when (altitude, twilight, meridian,
   weather, blocked sky) and drives the sequencer through `app.state.sequencer`
   (`astrolol.core.sequencer.Sequencer`: `switch_to`, `insert_next`, `wait_for_task`,
@@ -366,8 +364,7 @@ named sequences (server library) and task file download/upload.
 
 ## Imaging — deferred
 
-- **Debayer + full STF preview** — colour camera preview shows raw Bayer grid today.
-- **Calibration pipeline** — flat/dark/bias acquisition and application (ccdproc). Plugin.
+- **Calibration pipeline** — flat/dark/bias acquisition and application to the saved frames (ccdproc). Plugin. (Debayer and the stretched preview are done; the guider keeps its own dark library.)
 
 ## Mount — deferred
 
@@ -393,10 +390,6 @@ named sequences (server library) and task file download/upload.
 
 ## Post-MVP
 
-- **Persistence layer** — SQLAlchemy + aiosqlite + Alembic migrations. Session history,
-  image metadata, autofocus run data.
-- **UI: red mode** — CSS filter toggle for night vision preservation.
-- **UI: mobile layout** — responsive breakpoints, bottom tab navigation on small screens.
 - **UI: touch target sizes** — most action buttons use `size="sm"` (h-8, 32px), below the
   recommended 44px minimum for touch. Worst offenders: `DurationStepper` +/− buttons,
   focuser move-in/out buttons, and the CollapsibleSidebar toggle strip (h-8). Audit and

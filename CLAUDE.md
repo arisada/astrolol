@@ -593,7 +593,6 @@ astrolol/
 │   └── preview.py      # FITS → JPEG (percentile auto-stretch, astropy + Pillow)
 ├── mount/
 │   └── manager.py      # MountManager — slew/park/flip tasks, sync, tracking, events
-├── persistence/        # empty stub — planned SQLAlchemy/aiosqlite/Alembic layer, not started
 ├── config/
 │   ├── logging_setup.py  # structlog config + EventBusForwarder (log → EventBus bridge)
 │   ├── settings.py       # pydantic-settings (images_dir, jpeg_quality, ASTROLOL_ prefix)
