@@ -57,12 +57,17 @@ IAU names as aliases, also to catalogues synced earlier).
     one axis of a diagonal stops both and restarts the other); and a speed change restarts the axis
     on EQMOD (stop, then run) — a smoother ramp would need a driver change.
   - Orientation from a plate solve instead of the switches.
-- **Target type filter (built)** — follow-ups: browsing by type (needs the magnitude/size catalogue
-  below, search needs 2 characters); the online SIMBAD fallback is off while filtering (its answers
+- **Target type filter (built)** — follow-ups: browsing by type (search needs 2 characters; the Tonight
+  tab now lists by kind); the online SIMBAD fallback is off while filtering (its answers
   carry no type); the MCP `search_objects` tool does not take `types` yet.
-- **"What to watch tonight" list** — suggested targets for the site and date: above the horizon long
-  enough, away from the Moon, ranked (size vs. field of view, brightness, altitude window). Needs
-  magnitude/size in the catalogue (Hipparcos Vmag is downloaded but not stored; OpenNGC has sizes).
+- **"What to watch tonight" (built: Target → Tonight tab)** — well-known objects of one kind that get
+  above the minimum altitude in the coming dark hours, highest first, Moon-spoiled ones last. To do:
+  - Size vs. the profile's field of view and a surface-brightness estimate (the catalogue now has
+    magnitude and size, filled by the next online refresh), to rank by more than altitude.
+  - Planet and Moon magnitudes/phase on their rows; the Sun is excluded.
+  - A date picker (only tonight today); the MCP tools do not offer the list yet.
+  - "Well known" = Messier, Caldwell, objects with a common name, named stars, ~30 double stars
+    (`double_stars.py`, by Hipparcos number); extend as needed.
 - **Lunar / planetary tracking rates** — positions are now topocentric for the active profile's
   site, but a GOTO to the Moon/planets still tracks at the sidereal rate (eqmod and INDI).
 - **Planetarium / star map** — implement a planetarium inside a plugin: a sky map for the site and

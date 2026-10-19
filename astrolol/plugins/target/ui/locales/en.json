@@ -86,10 +86,41 @@
     "label": "Show only",
     "galaxy": "Galaxies",
     "cluster": "Clusters",
-    "nebula": "Nebulae",
+    "nebula": "Other nebulae",
     "star": "Stars",
     "solar_system": "Solar system",
     "other": "Other",
-    "clear": "Show all"
+    "clear": "Show all",
+    "double_star": "Double stars",
+    "planetary_nebula": "Planetary nebulae"
+  },
+  "tabs": {
+    "search": "Search",
+    "tonight": "Tonight"
+  },
+  "tonight": {
+    "kind": "Kind of object",
+    "kinds": {
+      "galaxy": "Galaxies",
+      "double_star": "Double stars",
+      "solar_system": "Solar system",
+      "planetary_nebula": "Planetary nebulae",
+      "nebula": "Other nebulae",
+      "cluster": "Clusters",
+      "star": "Stars",
+      "other": "Others"
+    },
+    "refresh": "Refresh",
+    "window": "Dark from {{from}} to {{to}} · above {{alt}}°, highest first",
+    "loading": "Working out what is up tonight…",
+    "empty": "Nothing of this kind gets above {{alt}}° tonight.",
+    "noLocation": "No observer location set — configure it in the active profile.",
+    "noDarkness": "The sky does not get dark enough tonight.",
+    "mag": "mag {{mag}}",
+    "peak": "peaks {{time}} · {{alt}}°",
+    "rises": "rises above {{alt}}° at {{time}}",
+    "sets": "sets {{time}}",
+    "moonSeparation": "Moon {{deg}}° away",
+    "nearMoonHeading": "Close to the Moon"
   }
 }

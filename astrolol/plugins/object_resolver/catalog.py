@@ -16,6 +16,7 @@ import httpx
 import structlog
 
 from astrolol.plugins.object_resolver.caldwell import CALDWELL, CALDWELL_EXTRA, caldwell_aliases
+from astrolol.plugins.object_resolver.double_stars import DOUBLE_STARS
 from astrolol.plugins.object_resolver.star_names import STAR_ALIASES, STAR_NAMES
 
 logger = structlog.get_logger()
@@ -42,14 +43,17 @@ HIPPARCOS_URL = (
 # take a new id and leave the first row's names pointing at nothing, so the object could no
 # longer be found by them.
 _UPSERT_OBJECT = (
-    "INSERT INTO objects (primary_name, object_type, ra, dec) VALUES (?, ?, ?, ?)"
+    "INSERT INTO objects (primary_name, object_type, ra, dec, mag, size_arcmin)"
+    " VALUES (?, ?, ?, ?, ?, ?)"
     " ON CONFLICT(primary_name) DO UPDATE SET"
-    " object_type=excluded.object_type, ra=excluded.ra, dec=excluded.dec"
+    " object_type=excluded.object_type, ra=excluded.ra, dec=excluded.dec,"
+    " mag=excluded.mag, size_arcmin=excluded.size_arcmin"
 )
 
 # Bump when what a sync produces changes: older databases are refreshed in the background.
 # 2: upsert (orphaned names), star names, Caldwell numbers.
-DATA_VERSION = 2
+# 3: magnitude and size, the well-known flag, double stars.
+DATA_VERSION = 3
 
 _SKIP_TYPES = {"NonEx", "Dup"}
 
@@ -84,12 +88,14 @@ _TYPE_LABELS: dict[str, str] = {
 # any type not listed here (including none at all) is "other".
 TYPE_GROUPS: dict[str, tuple[str, ...]] = {
     "galaxy": ("Galaxy", "Galaxy Group", "Galaxy Pair", "Galaxy Triple", "Galaxy Cluster"),
-    "cluster": ("Open Cluster", "Globular Cluster", "Stellar Association"),
+    "double_star": ("Double Star",),
+    "planetary_nebula": ("Planetary Nebula",),
     "nebula": (
-        "Nebula", "Emission Nebula", "Reflection Nebula", "Dark Nebula", "Planetary Nebula",
+        "Nebula", "Emission Nebula", "Reflection Nebula", "Dark Nebula",
         "HII Region", "Supernova Remnant", "Cluster + Nebula",
     ),
-    "star": ("Star", "Double Star", "Nova"),
+    "cluster": ("Open Cluster", "Globular Cluster", "Stellar Association"),
+    "star": ("Star", "Nova"),
     "solar_system": ("Solar System",),
     "other": (),
 }
@@ -167,6 +173,13 @@ def _parse_vizier_tsv(content: str) -> list[dict[str, str]]:
     return rows
 
 
+def _float(value: str | None) -> float | None:
+    try:
+        return float(value) if value not in (None, "") else None
+    except ValueError:
+        return None
+
+
 def _angular_sep_deg(ra1: float, dec1: float, ra2: float, dec2: float) -> float:
     """Great-circle angular separation in degrees (haversine)."""
     ra1r, dec1r, ra2r, dec2r = map(math.radians, (ra1, dec1, ra2, dec2))
@@ -214,7 +227,10 @@ class ObjectCatalog:
                 primary_name TEXT NOT NULL UNIQUE,
                 object_type  TEXT NOT NULL DEFAULT '',
                 ra           REAL NOT NULL,
-                dec          REAL NOT NULL
+                dec          REAL NOT NULL,
+                mag          REAL,
+                size_arcmin  REAL,
+                notable      INTEGER NOT NULL DEFAULT 0
             );
             CREATE TABLE IF NOT EXISTS object_names (
                 name      TEXT NOT NULL COLLATE NOCASE,
@@ -223,6 +239,13 @@ class ObjectCatalog:
             );
             CREATE INDEX IF NOT EXISTS idx_objects_coords ON objects (ra, dec);
         """)
+        # Databases made before these columns existed.
+        have = {r["name"] for r in self._conn.execute("PRAGMA table_info(objects)")}
+        for column, ddl in (
+            ("mag", "REAL"), ("size_arcmin", "REAL"), ("notable", "INTEGER NOT NULL DEFAULT 0"),
+        ):
+            if column not in have:
+                self._conn.execute(f"ALTER TABLE objects ADD COLUMN {column} {ddl}")
         self._conn.commit()
 
     # ── Status ─────────────────────────────────────────────────────────────────
@@ -366,7 +389,11 @@ class ObjectCatalog:
 
             self._conn.execute(
                 _UPSERT_OBJECT,
-                (primary_name, type_label, ra, dec),
+                (
+                    primary_name, type_label, ra, dec,
+                    _float(row.get("V-Mag")) if _float(row.get("V-Mag")) is not None else _float(row.get("B-Mag")),
+                    _float(row.get("MajAx")),
+                ),
             )
             obj_id = self._conn.execute(
                 "SELECT id FROM objects WHERE primary_name=?", (primary_name,)
@@ -394,6 +421,8 @@ class ObjectCatalog:
             common = (row.get("Common names") or "").strip()
             if common:
                 aliases.update(n.strip() for n in common.split(",") if n.strip())
+            if common or messier:
+                self._conn.execute("UPDATE objects SET notable=1 WHERE id=?", (obj_id,))
 
             identifiers = (row.get("Identifiers") or "").strip()
             if identifiers:
@@ -432,7 +461,7 @@ class ObjectCatalog:
             primary_name = f"Sh2-{n}"
             self._conn.execute(
                 _UPSERT_OBJECT,
-                (primary_name, "HII Region", ra, dec),
+                (primary_name, "HII Region", ra, dec, None, None),
             )
             obj_id = self._conn.execute(
                 "SELECT id FROM objects WHERE primary_name=?", (primary_name,)
@@ -471,7 +500,7 @@ class ObjectCatalog:
             primary_name = f"HIP {n}"
             self._conn.execute(
                 _UPSERT_OBJECT,
-                (primary_name, "Star", ra, dec),
+                (primary_name, "Star", ra, dec, _float(row.get("Vmag")), None),
             )
             obj_id = self._conn.execute(
                 "SELECT id FROM objects WHERE primary_name=?", (primary_name,)
@@ -494,6 +523,8 @@ class ObjectCatalog:
             return
         self.apply_star_names()
         self.apply_caldwell()
+        self.apply_double_stars()
+        self.apply_notable()
 
     def apply_caldwell(self) -> int:
         """Add "C 5" / "C5" / "Caldwell 5" to each Caldwell object (idempotent); returns aliases added."""
@@ -523,6 +554,41 @@ class ObjectCatalog:
                         added += cur.rowcount
         self._conn.commit()
         return added
+
+    def apply_double_stars(self) -> None:
+        """Mark the showpiece double stars (their Hipparcos entries) and add their names (idempotent)."""
+        assert self._conn is not None
+        for name, hip in DOUBLE_STARS.items():
+            row = self._conn.execute(
+                "SELECT id FROM objects WHERE primary_name=?", (f"HIP {hip}",)
+            ).fetchone()
+            if row is None:
+                continue
+            self._conn.execute("UPDATE objects SET object_type='Double Star' WHERE id=?", (row["id"],))
+            self._conn.execute(
+                "INSERT OR IGNORE INTO object_names (name, object_id) VALUES (?, ?)", (name, row["id"])
+            )
+        self._conn.commit()
+
+    def apply_notable(self) -> None:
+        """Flag the well-known objects: Messier, Caldwell, the named and double stars (idempotent).
+
+        The ones with a common name are flagged when the catalogue is loaded."""
+        assert self._conn is not None
+        numbered = " OR ".join(
+            f"name GLOB '{letter} {'[0-9]' * digits}'" for letter in "MC" for digits in (1, 2, 3)
+        )
+        self._conn.execute(
+            f"UPDATE objects SET notable=1 WHERE notable=0 AND id IN"
+            f" (SELECT object_id FROM object_names WHERE {numbered})"
+        )
+        hips = [f"HIP {h}" for h in {*STAR_NAMES.values(), *DOUBLE_STARS.values()}]
+        for i in range(0, len(hips), 500):
+            chunk = hips[i:i + 500]
+            self._conn.execute(
+                f"UPDATE objects SET notable=1 WHERE primary_name IN ({','.join('?' * len(chunk))})", chunk
+            )
+        self._conn.commit()
 
     def _add_alias(self, primary_name: str, alias: str) -> None:
         assert self._conn is not None
@@ -566,7 +632,7 @@ class ObjectCatalog:
         clause, extra = _group_clause(groups) if groups is not None else ("", [])
         rows = self._conn.execute(
             f"""
-            SELECT o.id, o.primary_name, o.object_type, o.ra, o.dec,
+            SELECT o.id, o.primary_name, o.object_type, o.ra, o.dec, o.mag, o.size_arcmin,
                    MIN(CASE WHEN n.name = ? COLLATE NOCASE THEN 0
                             WHEN n.name LIKE ? THEN 1 ELSE 2 END) AS rank
             FROM object_names n
@@ -577,6 +643,17 @@ class ObjectCatalog:
             LIMIT ?
             """,
             (query, f"{query}%", f"%{query}%", *extra, limit),
+        ).fetchall()
+        return [self._enrich(row) for row in rows]
+
+    def notable(self, groups: Collection[str] | None = None) -> list[dict[str, Any]]:
+        """The well-known objects (Messier, Caldwell, named and double stars…), optionally of some kinds."""
+        assert self._conn is not None
+        clause, extra = _group_clause(groups) if groups is not None else ("", [])
+        rows = self._conn.execute(
+            f"SELECT o.id, o.primary_name, o.object_type, o.ra, o.dec, o.mag, o.size_arcmin"
+            f" FROM objects o WHERE o.notable=1{clause} ORDER BY o.id",
+            extra,
         ).fetchall()
         return [self._enrich(row) for row in rows]
 
@@ -591,7 +668,7 @@ class ObjectCatalog:
 
         rows = self._conn.execute(
             """
-            SELECT id, primary_name, object_type, ra, dec
+            SELECT id, primary_name, object_type, ra, dec, mag, size_arcmin
             FROM objects
             WHERE dec BETWEEN ? AND ?
               AND ra BETWEEN ? AND ?
@@ -631,4 +708,6 @@ class ObjectCatalog:
             "type": row["object_type"],
             "ra": row["ra"],
             "dec": row["dec"],
+            "mag": row["mag"],
+            "size_arcmin": row["size_arcmin"],
         }

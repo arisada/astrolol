@@ -377,11 +377,16 @@ def test_other_catches_unlisted_and_missing_types(tmp_path: Path) -> None:
 
     assert type_group("Galaxy Pair") == "galaxy"
     assert type_group("Open Cluster") == "cluster"
+    assert type_group("Planetary Nebula") == "planetary_nebula"
+    assert type_group("Double Star") == "double_star"
+    assert type_group("HII Region") == "nebula"
     assert type_group("Solar System") == "solar_system"
     assert type_group("Other") == "other"
     assert type_group("") == "other"
     assert type_group("Something New") == "other"
-    assert set(TYPE_GROUPS) == {"galaxy", "cluster", "nebula", "star", "solar_system", "other"}
+    assert set(TYPE_GROUPS) == {
+        "galaxy", "double_star", "planetary_nebula", "nebula", "cluster", "star", "solar_system", "other",
+    }
 
     cat = ObjectCatalog(tmp_path / "other.db")
     cat.open()

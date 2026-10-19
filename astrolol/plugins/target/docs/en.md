@@ -15,10 +15,25 @@ catalogues are
 on the telescope computer, so search works without Internet; an online catalogue is used as a
 fallback when the network is available.
 
-The chips under the box narrow the search to **Galaxies**, **Clusters**, **Nebulae**, **Stars**,
-**Solar system** or **Other**; pick several to combine them, and **Show all** clears them. With none
+The chips under the box narrow the search to **Galaxies**, **Double stars**, **Planetary nebulae**,
+**Other nebulae**, **Clusters**, **Stars**, **Solar system** or **Other**; pick several to combine them, and **Show all** clears them. With none
 selected everything is searched. The online catalogue is not asked while a filter is on. The choice
 is remembered on this device.
+
+## Tonight
+
+The **Tonight** tab suggests well-known objects (Messier and Caldwell objects, showpiece double
+stars, named stars, the Moon and planets) for the coming dark hours at your site. Pick a kind —
+**Galaxies**, **Double stars**, **Solar system**, **Planetary nebulae**, **Other nebulae**, **Clusters**, **Stars**
+or **Others** — and the list shows what gets above the minimum altitude (30° unless you changed it)
+before dawn, highest right now first. Before dusk it shows the evening ahead.
+
+Each line gives the altitude now (a dash when the object is still to rise), when it peaks and how
+high, when it rises above the minimum or sets, its type, brightness and size when known, and the
+Moon's distance. Objects too close to a bright Moon that is up are kept at the bottom, under *Close to
+the Moon*. Tap a line to open the object card, then slew or add it to the favourites as usual. The
+list needs a site in the active profile. Brightness and size appear after the catalogue has been
+refreshed once with an Internet connection.
 
 ## The object card
 

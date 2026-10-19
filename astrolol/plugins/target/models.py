@@ -88,3 +88,34 @@ class EphemerisResult(BaseModel):
 
     # Set when profile has no observer location configured
     observer_location_missing: bool = False
+
+
+# ── Tonight ───────────────────────────────────────────────────────────────────
+
+class TonightItem(BaseModel):
+    """One suggested object, with how it is placed during the coming dark hours."""
+    name: str
+    aliases: list[str] = []
+    type: str = ""
+    ra: float                           # ICRS degrees
+    dec: float
+    source: str = "catalog"
+    mag: float | None = None
+    size_arcmin: float | None = None    # major axis
+    alt_now: float                      # degrees at the start of the window (now, or dusk)
+    peak_alt: float
+    peak_time: str                      # UTC ISO
+    rise_time: str | None = None        # when it first gets above the minimum altitude, if not yet
+    set_time: str | None = None         # when it drops below it again, if before the window ends
+    moon_separation: float | None = None
+    near_moon: bool = False             # too close to a bright Moon that is up
+
+
+class TonightResult(BaseModel):
+    observer_location_missing: bool = False
+    no_darkness: bool = False           # the Sun does not go far enough below the horizon
+    window_start: str | None = None     # UTC ISO: now, or dusk when it is still daylight
+    window_end: str | None = None
+    min_altitude_deg: float = 30.0
+    moon_illumination: float | None = None
+    items: list[TonightItem] = []

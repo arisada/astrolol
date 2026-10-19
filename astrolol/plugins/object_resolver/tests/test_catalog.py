@@ -250,3 +250,125 @@ def test_old_databases_are_flagged_for_refresh(catalog: ObjectCatalog) -> None:
     assert not catalog.needs_refresh()
     catalog._conn.execute("DELETE FROM catalog_meta WHERE key='data_version'")
     assert catalog.needs_refresh()
+
+
+# --- magnitude, size, the well-known flag, double stars ---
+
+_NGC_WITH_DATA = "\n".join([
+    _NGC_HEADER,
+    _ngc_row(Name="NGC0224", Type="G", RA="00:42:44.30", Dec="+41:16:09.4", MajAx="177.83",
+             **{"V-Mag": "3.44", "B-Mag": "4.36", "M": "31", "Common names": "Andromeda Galaxy"}),
+    _ngc_row(Name="NGC0100", Type="G", RA="00:21:00.00", Dec="+05:00:00.0", MajAx="3.2",
+             **{"B-Mag": "13.1"}),
+    _ngc_row(Name="NGC0200", Type="G", RA="00:30:00.00", Dec="+05:00:00.0"),
+    _ngc_row(Name="NGC7000", Type="HII", RA="20:59:17.0", Dec="+44:31:44.0", MajAx="120",
+             **{"Common names": "North America Nebula"}),
+])
+
+
+_CALDWELL_ONLY = {"Mel 25", "Coalsack"}   # created in every catalogue, and well known
+
+
+def _notable(cat: ObjectCatalog, groups=None) -> set[str]:
+    return {r["name"] for r in cat.notable(groups)} - _CALDWELL_ONLY
+
+
+def test_magnitude_and_size_are_loaded(catalog: ObjectCatalog) -> None:
+    catalog.load_csv(_NGC_WITH_DATA)
+    by_name = {r["name"]: r for r in catalog.search("NGC")}
+    assert by_name["NGC 224"]["mag"] == 3.44          # V magnitude when there is one
+    assert by_name["NGC 224"]["size_arcmin"] == 177.83
+    assert by_name["NGC 100"]["mag"] == 13.1          # else B
+    assert by_name["NGC 200"]["mag"] is None and by_name["NGC 200"]["size_arcmin"] is None
+
+
+def test_hipparcos_magnitude_is_loaded(catalog: ObjectCatalog) -> None:
+    catalog.load_hipparcos_tsv(HIPPARCOS_TSV)
+    assert catalog.search("HIP 3")[0]["mag"] == 6.61
+
+
+def test_messier_and_named_objects_are_well_known_and_others_are_not(catalog: ObjectCatalog) -> None:
+    catalog.load_csv(_NGC_WITH_DATA)
+    catalog.apply_extra_names()
+    assert _notable(catalog) == {"NGC 224", "NGC 7000"}
+
+
+def test_caldwell_and_named_stars_are_well_known(catalog: ObjectCatalog) -> None:
+    catalog.load_csv(_ngc_row_csv("NGC0188", "OC"))
+    catalog.load_hipparcos_tsv("\n".join([
+        "HIP\tRAICRS\tDEICRS\tVmag", " \tdeg\tdeg\tmag", "------\t------\t------\t-----",
+        " 91262\t279.23410832\t+38.78299311\t 0.03",
+        " 91263\t279.5\t+38.0\t 8.0",
+    ]))
+    catalog.apply_extra_names()
+    names = _notable(catalog)
+    assert "HIP 91262" in names          # Vega
+    assert "HIP 91263" not in names      # an ordinary star
+
+
+def _ngc_row_csv(name: str, kind: str) -> str:
+    return "\n".join([_NGC_HEADER, _ngc_row(Name=name, Type=kind, RA="00:53:00.00", Dec="+85:15:00.0")])
+
+
+def test_other_m_designations_are_not_messier(catalog: ObjectCatalog) -> None:
+    """"M 1-20" (a planetary nebula) is not Messier 1."""
+    catalog.load_csv("\n".join([
+        _NGC_HEADER,
+        _ngc_row(Name="IC0001", Type="PN", RA="07:30:00.00", Dec="-09:00:00.0", Identifiers="M 1-20"),
+    ]))
+    catalog.apply_extra_names()
+    assert _notable(catalog) == set()
+
+
+def test_showpiece_double_stars_are_marked_and_named(catalog: ObjectCatalog) -> None:
+    catalog.load_hipparcos_tsv("\n".join([
+        "HIP\tRAICRS\tDEICRS\tVmag", " \tdeg\tdeg\tmag", "------\t------\t------\t-----",
+        " 95947\t292.68033548\t+27.95968190\t 3.18",
+        " 91919\t281.08\t+39.67\t 5.0",
+    ]))
+    catalog.apply_extra_names()
+    albireo = catalog.search("Albireo")[0]
+    assert albireo["type"] == "Double Star"
+    assert catalog.search("Double Double")[0]["name"] == "HIP 91919"
+    assert {r["name"] for r in catalog.notable(["double_star"])} == {"HIP 95947", "HIP 91919"}
+
+
+def test_double_star_table_points_at_distinct_known_stars() -> None:
+    from astrolol.plugins.object_resolver.double_stars import DOUBLE_STARS
+
+    assert len(DOUBLE_STARS) == len(set(DOUBLE_STARS))
+    assert all(isinstance(h, int) and h > 0 for h in DOUBLE_STARS.values())
+
+
+def test_notable_can_be_limited_to_kinds(catalog: ObjectCatalog) -> None:
+    catalog.load_csv(_NGC_WITH_DATA)
+    catalog.apply_extra_names()
+    assert _notable(catalog, ["galaxy"]) == {"NGC 224"}
+    assert _notable(catalog, ["nebula"]) == {"NGC 7000"}
+    assert _notable(catalog, ["cluster"]) == set()
+
+
+def test_a_database_without_the_new_columns_is_upgraded(tmp_path: Path) -> None:
+    import sqlite3
+
+    path = tmp_path / "v2.db"
+    old = sqlite3.connect(path)
+    old.executescript("""
+        CREATE TABLE catalog_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+        CREATE TABLE objects (id INTEGER PRIMARY KEY AUTOINCREMENT, primary_name TEXT NOT NULL UNIQUE,
+            object_type TEXT NOT NULL DEFAULT '', ra REAL NOT NULL, dec REAL NOT NULL);
+        CREATE TABLE object_names (name TEXT NOT NULL COLLATE NOCASE,
+            object_id INTEGER NOT NULL REFERENCES objects(id), PRIMARY KEY (name));
+        INSERT INTO objects (primary_name, object_type, ra, dec) VALUES ('NGC 224', 'Galaxy', 10.68, 41.27);
+        INSERT INTO object_names (name, object_id) VALUES ('NGC 224', 1), ('M 31', 1);
+        INSERT INTO catalog_meta VALUES ('object_count', '1'), ('data_version', '2');
+    """)
+    old.commit()
+    old.close()
+
+    cat = ObjectCatalog(path)
+    cat.open()
+    assert cat.needs_refresh()                 # version 2: refreshed in the background when online
+    assert _notable(cat) == {"NGC 224"}   # Messier is known without a refresh
+    assert cat.search("M 31")[0]["mag"] is None
+    cat.close()

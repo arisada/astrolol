@@ -8,7 +8,10 @@ import { SearchBox, type ObjectMatch } from './SearchBox'
 import { ObjectCard } from './ObjectCard'
 import { FavoritesList } from './FavoritesList'
 import { describeNames } from './names'
+import { TonightList } from './TonightList'
 import { Page } from '@/components/Page'
+import { Tabs } from '@/components/ui/tabs'
+import { useLocalStorage } from '@/hooks/useLocalStorage'
 
 // crypto.randomUUID() only exists in secure contexts (HTTPS or localhost) — it's
 // undefined when astrolol is reached over plain HTTP by hostname/IP (e.g.
@@ -35,6 +38,7 @@ export function TargetPage() {
     .map((id) => ({ id, status: mountStatuses[id] }))
     .find((e) => e.status?.ra != null && e.status?.dec != null)
 
+  const [tab, setTab] = useLocalStorage<'search' | 'tonight'>('astrolol.target.tab', 'search')
   const [selected, setSelected] = useState<ObjectMatch | null>(null)
   const [obsDate, setObsDate] = useState<string | null>(null)
   const [ephemeris, setEphemeris] = useState<EphemerisResult | null>(null)
@@ -222,10 +226,15 @@ export function TargetPage() {
         </div>
       )}
 
-      {/* Search */}
       <section>
         <h1 className="text-base font-semibold text-slate-300 mb-3">{t('title')}</h1>
-        <SearchBox onSelect={handleSelect} />
+        <Tabs
+          className="mb-3"
+          tabs={[{ id: 'search', label: t('tabs.search') }, { id: 'tonight', label: t('tabs.tonight') }] as const}
+          value={tab}
+          onChange={setTab}
+        />
+        {tab === 'search' && <SearchBox onSelect={handleSelect} />}
       </section>
 
       {/* Object detail */}
@@ -243,6 +252,8 @@ export function TargetPage() {
           onAddToFavorites={handleAddToFavorites}
         />
       )}
+
+      {tab === 'tonight' && <TonightList onSelect={handleSelect} />}
 
       {/* Favourites */}
       {settingsLoaded && (

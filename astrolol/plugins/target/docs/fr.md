@@ -14,10 +14,28 @@ ses autres noms. Les planètes et la Lune sont placées comme on les voit depuis
 du profil actif). Les catalogues sont sur l'ordinateur du télescope : la recherche fonctionne sans
 Internet ; un catalogue en ligne prend le relais quand le réseau est disponible.
 
-Les pastilles sous le champ limitent la recherche aux **Galaxies**, **Amas**, **Nébuleuses**,
-**Étoiles**, **Système solaire** ou **Autres** ; choisissez-en plusieurs pour les combiner, et
+Les pastilles sous le champ limitent la recherche aux **Galaxies**, **Étoiles doubles**,
+**Nébuleuses planétaires**, **Autres nébuleuses**, **Amas**, **Étoiles**, **Système solaire** ou
+**Autres** ; choisissez-en plusieurs pour les combiner, et
 **Tout afficher** les efface. Sans sélection, tout est cherché. Le catalogue en ligne n'est pas
 interrogé tant qu'un filtre est actif. Le choix est retenu sur cet appareil.
+
+## Ce soir
+
+L'onglet **Ce soir** propose des objets célèbres (objets de Messier et de Caldwell, étoiles doubles
+remarquables, étoiles nommées, la Lune et les planètes) pour les heures sombres à venir sur votre
+site. Choisissez un type — **Galaxies**, **Étoiles doubles**, **Système solaire**, **Nébuleuses
+planétaires**, **Autres nébuleuses**, **Amas**, **Étoiles** ou **Autres** — et la liste montre ce qui dépasse la
+hauteur minimale (30° sauf réglage contraire) avant l'aube, les plus hauts à cet instant d'abord. Avant
+le crépuscule, elle montre la soirée à venir.
+
+Chaque ligne donne la hauteur actuelle (un tiret si l'objet doit encore se lever), l'heure et la
+hauteur de sa culmination, l'heure où il passe au-dessus du minimum ou se couche, son type, sa
+luminosité et sa taille quand elles sont connues, et la distance à la Lune. Les objets trop proches
+d'une Lune brillante et levée restent en bas, sous *Près de la Lune*. Touchez une ligne pour ouvrir la
+fiche de l'objet, puis pointez-le ou ajoutez-le aux favoris comme d'habitude. La liste demande un site
+dans le profil actif. La luminosité et la taille apparaissent après une première actualisation du
+catalogue avec une connexion Internet.
 
 ## La fiche de l'objet
 

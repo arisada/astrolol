@@ -1,6 +1,7 @@
 """FastAPI router for the target plugin."""
 from __future__ import annotations
 
+import asyncio
 from datetime import datetime, timezone
 
 import structlog
@@ -8,7 +9,7 @@ from fastapi import APIRouter, HTTPException, Query, Request
 
 from astrolol.equipment.models import SiteItem
 from astrolol.plugins.target.ephemeris import compute_ephemeris
-from astrolol.plugins.target.models import EphemerisResult, TargetSettings
+from astrolol.plugins.target.models import EphemerisResult, TargetSettings, TonightResult
 
 logger = structlog.get_logger()
 
@@ -125,3 +126,46 @@ async def get_ephemeris(
         peak_alt=result.peak_alt,
     )
     return result
+
+
+# ── Tonight ────────────────────────────────────────────────────────────────────
+
+@router.get("/tonight", response_model=TonightResult)
+async def get_tonight(
+    request: Request,
+    types: str | None = Query(None, description="Comma-separated kinds of object (see the object resolver); default all."),
+    limit: int = Query(100, ge=1, le=500),
+    when: str | None = Query(None, description="Start of the look-ahead, ISO 8601 (default now)."),
+) -> TonightResult:
+    """Well-known objects that get above the minimum altitude during the coming dark hours,
+    highest first, those too close to a bright Moon last."""
+    from astrolol.plugins.target import tonight
+
+    site = _resolve_site(request)
+    if site is None:
+        return TonightResult(observer_location_missing=True)
+    resolver = getattr(request.app.state, "object_resolver", None)
+    if resolver is None:
+        raise HTTPException(status_code=503, detail="The object resolver is not available.")
+    groups = [g.strip() for g in types.split(",") if g.strip()] if types else None
+    start = tonight.now_utc()
+    if when is not None:
+        try:
+            start = datetime.fromisoformat(when)
+        except ValueError:
+            raise HTTPException(status_code=422, detail="Invalid date; use ISO 8601.")
+        if start.tzinfo is None:
+            start = start.replace(tzinfo=timezone.utc)
+    min_alt = _get_settings(request).min_altitude_deg
+    where = (site.latitude, site.longitude, site.altitude)
+
+    window = await asyncio.to_thread(tonight.find_dark_window, start, *where)
+    if window is None:
+        return TonightResult(no_darkness=True, min_altitude_deg=min_alt)
+    try:
+        found = resolver.notable(groups, when=window.middle, site=where)
+    except KeyError as exc:   # an unknown kind
+        raise HTTPException(status_code=422, detail=f"Unknown type group: {exc.args[0]}") from exc
+    return await asyncio.to_thread(
+        tonight.compute_tonight, [m.model_dump() for m in found], window, *where, min_alt, limit,
+    )

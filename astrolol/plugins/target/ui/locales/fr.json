@@ -86,10 +86,41 @@
     "label": "Afficher seulement",
     "galaxy": "Galaxies",
     "cluster": "Amas",
-    "nebula": "Nébuleuses",
+    "nebula": "Autres nébuleuses",
     "star": "Étoiles",
     "solar_system": "Système solaire",
     "other": "Autres",
-    "clear": "Tout afficher"
+    "clear": "Tout afficher",
+    "double_star": "Étoiles doubles",
+    "planetary_nebula": "Nébuleuses planétaires"
+  },
+  "tabs": {
+    "search": "Recherche",
+    "tonight": "Ce soir"
+  },
+  "tonight": {
+    "kind": "Type d'objet",
+    "kinds": {
+      "galaxy": "Galaxies",
+      "double_star": "Étoiles doubles",
+      "solar_system": "Système solaire",
+      "planetary_nebula": "Nébuleuses planétaires",
+      "nebula": "Autres nébuleuses",
+      "cluster": "Amas",
+      "star": "Étoiles",
+      "other": "Autres"
+    },
+    "refresh": "Actualiser",
+    "window": "Nuit noire de {{from}} à {{to}} · au-dessus de {{alt}}°, les plus hauts d'abord",
+    "loading": "Calcul de ce qui est visible ce soir…",
+    "empty": "Rien de ce type n'atteint {{alt}}° ce soir.",
+    "noLocation": "Aucun lieu d'observation défini — configurez-le dans le profil actif.",
+    "noDarkness": "Le ciel ne devient pas assez sombre ce soir.",
+    "mag": "mag {{mag}}",
+    "peak": "culmine à {{time}} · {{alt}}°",
+    "rises": "passe au-dessus de {{alt}}° à {{time}}",
+    "sets": "se couche à {{time}}",
+    "moonSeparation": "Lune à {{deg}}°",
+    "nearMoonHeading": "Près de la Lune"
   }
 }

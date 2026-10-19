@@ -92,3 +92,34 @@ export const searchObjects = (q: string) =>
 
 export const slewMount = (deviceId: string) =>
   request<void>(`/mount/${deviceId}/slew`, { method: 'POST' })
+
+export interface TonightItem {
+  name: string
+  aliases: string[]
+  type: string
+  ra: number
+  dec: number
+  source: string
+  mag: number | null
+  size_arcmin: number | null
+  alt_now: number
+  peak_alt: number
+  peak_time: string
+  rise_time: string | null
+  set_time: string | null
+  moon_separation: number | null
+  near_moon: boolean
+}
+
+export interface TonightResult {
+  observer_location_missing: boolean
+  no_darkness: boolean
+  window_start: string | null
+  window_end: string | null
+  min_altitude_deg: number
+  moon_illumination: number | null
+  items: TonightItem[]
+}
+
+export const getTonight = (types: string) =>
+  request<TonightResult>(`/plugins/target/tonight?types=${encodeURIComponent(types)}`)

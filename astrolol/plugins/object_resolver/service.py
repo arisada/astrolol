@@ -25,6 +25,8 @@ class ObjectMatch(BaseModel):
     type: str
     source: str
     distance_arcmin: float | None = None
+    mag: float | None = None
+    size_arcmin: float | None = None   # major axis
 
 
 async def search_objects(
@@ -82,6 +84,22 @@ class ObjectResolverService:
             state.object_resolver_catalog, state.object_resolver_settings, q, limit, when,
             site=active_site(self._app),
         )
+
+    def notable(
+        self,
+        groups: Collection[str] | None = None,
+        when: datetime | None = None,
+        site: solar_system.Site | None = None,
+    ) -> list[ObjectMatch]:
+        """The well-known objects of the given kinds (None: all) for observing lists, with the
+        Moon and planets placed for *when* and *site*."""
+        state = self._app.state
+        results: list[dict[str, Any]] = state.object_resolver_catalog.notable(groups)
+        for r in results:
+            r.setdefault("source", "catalog")
+        if groups is None or "solar_system" in groups:
+            results.extend(solar_system.bodies(when=when, site=site))
+        return [ObjectMatch(**r) for r in results]
 
     async def lookup(self, name: str, when: datetime | None = None) -> ObjectMatch | None:
         """The object whose name or alias is exactly *name* (ignoring case and spaces).

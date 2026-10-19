@@ -75,6 +75,21 @@ def search(query: str, when: datetime | None = None, site: Site | None = None) -
     return results
 
 
+def bodies(when: datetime | None = None, site: Site | None = None) -> list[dict[str, Any]]:
+    """The Moon and the planets (not the Sun) as seen from *site*, for observing lists."""
+    t = when or _now()
+    out = []
+    for key, display in _BODIES.items():
+        if key == "sun":
+            continue
+        ra, dec = _ra_dec(key, t, site)
+        out.append({
+            "name": display, "aliases": [], "type": "Solar System",
+            "ra": ra, "dec": dec, "source": "solar_system",
+        })
+    return out
+
+
 def cone_search(
     ra: float, dec: float, radius_arcmin: float, when: datetime | None = None,
     site: Site | None = None,
