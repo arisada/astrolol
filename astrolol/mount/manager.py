@@ -176,7 +176,16 @@ class MountManager:
             )
 
         coord = ctrl._target
-        self._check_above_horizon(device_id, coord)
+        try:
+            self._check_above_horizon(device_id, coord)
+        except ValueError as exc:
+            # Whoever asked (a page, the sequencer, an AI assistant) gets the 409, but a refusal
+            # that only lives in that response is invisible to everyone else: log and publish it.
+            logger.warning("mount.slew_refused", device_id=device_id, reason=str(exc))
+            await self._event_bus.publish(
+                MountOperationFailed(device_id=device_id, operation="slew", reason=str(exc))
+            )
+            raise
         icrs = coord.icrs
         ctrl._active_task = asyncio.create_task(
             self._slew_worker(ctrl, coord),

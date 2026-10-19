@@ -704,9 +704,26 @@ _CIRCUMPOLAR = SkyCoord(ra=37.95 * u.deg, dec=89.26 * u.deg)  # Polaris, alt ~ l
 async def test_slew_below_the_horizon_is_refused(manager: DeviceManager, event_bus) -> None:
     mm, _ = await _limits_setup(manager, event_bus)
     await mm.set_target("m1", _NEVER_RISES)
+    q = event_bus.subscribe()
     with pytest.raises(ValueError, match="below the horizon limit"):
         await mm.slew("m1")
     assert not mm._get_or_create("m1").is_busy
+    events = []
+    while not q.empty():
+        events.append(q.get_nowait())
+    failed = [e for e in events if isinstance(e, MountOperationFailed)]
+    assert len(failed) == 1
+    assert failed[0].operation == "slew" and "below the horizon limit" in failed[0].reason
+    assert not any(e.type == "mount.slew_started" for e in events)
+
+
+@pytest.mark.asyncio
+async def test_refused_slew_is_logged_as_a_warning(manager: DeviceManager, event_bus) -> None:
+    mm, _ = await _limits_setup(manager, event_bus)
+    await mm.set_target("m1", _NEVER_RISES)
+    with structlog.testing.capture_logs() as logs, pytest.raises(ValueError):
+        await mm.slew("m1")
+    assert any(e["event"] == "mount.slew_refused" and e["log_level"] == "warning" for e in logs)
 
 
 @pytest.mark.asyncio
