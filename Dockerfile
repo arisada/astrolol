@@ -9,7 +9,7 @@
 #   docker-compose.yml      — production: source baked in, UI pre-built
 #   docker-compose-dev.yml  — development: source bind-mounted, Vite HMR
 # ──────────────────────────────────────────────────────────────────────────────
-FROM ubuntu:24.04
+FROM ubuntu:26.04
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     software-properties-common nodejs npm
@@ -34,7 +34,9 @@ COPY vendor /app/vendor
 # Stub install: resolves and caches all deps in the image without needing the
 # real source.  PYTHONPATH=/app (set below) makes the bind-mounted source
 # importable at runtime without a separate "pip install -e ." on startup.
+# typing-extensions first: the distro copy has no pip RECORD file, so pip cannot upgrade it in place.
 RUN mkdir -p astrolol && touch astrolol/__init__.py \
+    && pip install --no-cache-dir --ignore-installed typing-extensions --break-system-packages \
     && pip install --no-cache-dir -e ".[dev,indi]" --break-system-packages \
     && rm -rf astrolol astrolol.egg-info
 

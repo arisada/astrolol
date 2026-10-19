@@ -1,6 +1,7 @@
 """Development tools: git pull (fast-forward only) and UI rebuild."""
 from __future__ import annotations
 
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -21,6 +22,8 @@ def _git(cwd: Path, *args: str) -> None:
 
 @pytest.fixture
 def repos(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> tuple[Path, Path]:
+    if shutil.which("git") is None:
+        pytest.skip("git is not installed")
     origin, clone = tmp_path / "origin", tmp_path / "clone"
     origin.mkdir()
     _git(origin, "init", "-b", "main")
