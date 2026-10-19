@@ -24,6 +24,7 @@ from astrolol.api.auth import router as auth_router
 from astrolol.api.bluetooth import router as bluetooth_router
 from astrolol.api.devices import router as devices_router
 from astrolol.api.filter_wheel import router as filter_wheel_router
+from astrolol.api.flat_panel import router as flat_panel_router
 from astrolol.api.focuser import router as focuser_router
 from astrolol.api.imager import router as imager_router
 from astrolol.api.indi import router as indi_router
@@ -48,6 +49,7 @@ from astrolol.devices.bluetooth.manager import BluetoothManager
 from astrolol.devices.bluetooth.store import BluetoothDeviceStore
 from astrolol.devices.manager import DeviceManager
 from astrolol.filter_wheel import FilterWheelManager
+from astrolol.flat_panel import FlatPanelManager
 from astrolol.focuser import FocuserManager
 from astrolol.imaging import ImagerManager
 from astrolol.mount import MountManager
@@ -154,6 +156,7 @@ def create_app() -> FastAPI:
     imager_manager = ImagerManager(device_manager=device_manager, event_bus=event_bus, profile_store=profile_store, equipment_store=equipment_store, mount_manager=mount_manager)
     focuser_manager = FocuserManager(device_manager=device_manager, event_bus=event_bus)
     filter_wheel_manager = FilterWheelManager(device_manager=device_manager, event_bus=event_bus)
+    flat_panel_manager = FlatPanelManager(device_manager=device_manager, event_bus=event_bus)
     bluetooth_manager = BluetoothManager(
         backend=BlueZBackend(), store=BluetoothDeviceStore(_settings.bluetooth_devices_file)
     )
@@ -167,6 +170,7 @@ def create_app() -> FastAPI:
     app.state.mount_manager = mount_manager
     app.state.focuser_manager = focuser_manager
     app.state.filter_wheel_manager = filter_wheel_manager
+    app.state.flat_panel_manager = flat_panel_manager
     app.state.profile_store = profile_store
     app.state.equipment_store = equipment_store
     app.state.active_profile = None
@@ -214,6 +218,7 @@ def create_app() -> FastAPI:
     app.include_router(mount_router)
     app.include_router(focuser_router)
     app.include_router(filter_wheel_router)
+    app.include_router(flat_panel_router)
     app.include_router(indi_router)
     app.include_router(settings_router)
 

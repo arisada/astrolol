@@ -19,7 +19,7 @@ from astrolol.core.events import (
     FocuserPositionUpdated,
     MountCoordsUpdated,
 )
-from astrolol.devices.base import ICamera, IFocuser, IFilterWheel, IMount, IRotator
+from astrolol.devices.base import ICamera, IFocuser, IFilterWheel, IMount, IRotator, IFlatPanel
 from astrolol.devices.base.models import DeviceState
 from astrolol.devices.config import DeviceConfig
 from astrolol.devices.registry import DeviceRegistry
@@ -277,6 +277,9 @@ class DeviceManager:
 
     def get_rotator(self, device_id: str) -> IRotator:
         return self._get_typed(device_id, "rotator")  # type: ignore[return-value]
+
+    def get_flat_panel(self, device_id: str) -> IFlatPanel:
+        return self._get_typed(device_id, "flat_panel")  # type: ignore[return-value]
 
     def get_config(self, device_id: str) -> DeviceConfig:
         """Return the full DeviceConfig (including params) for a connected device."""

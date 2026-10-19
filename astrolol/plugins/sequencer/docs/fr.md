@@ -77,6 +77,13 @@ caméra qui mène.
 - **Démarrer le guidage (attendre la stabilisation)** (nécessite un guideur)
 - **Autofocus** (nécessite l'[Autofocus](../../autofocus/docs/fr.md))
 - **Attendre que les caméras atteignent la température**
+- **Panneau de flats : fermer le cache et l'allumer, l'ouvrir ensuite** : pour les flats. Le
+  cache du panneau de flats placé sous le télescope de la caméra dans le profil est fermé et la
+  lumière allumée avant les images ; la lumière est éteinte et le cache ouvert quand la tâche
+  se termine, se met en pause ou échoue. Une colonne **Panneau** apparaît dans le tableau des
+  poses pour régler la luminosité de chaque ligne (vide = ne pas toucher au panneau), chaque
+  filtre peut donc avoir la sienne. Activer cette option désactive aussi le pointage, le
+  centrage, le guidage et le dithering, inutiles pour des flats.
 
 **Pendant l'imagerie** : **Dither toutes les** *n* images de la principale, et un **Délai entre
 les images** facultatif.

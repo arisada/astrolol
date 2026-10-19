@@ -16,7 +16,7 @@ The Equipment page has two tabs:
 
 Click **Load driver** and follow the wizard.
 
-1. **What do you want to connect?** Camera, Mount, Focuser, Filter Wheel or Rotator.
+1. **What do you want to connect?** Camera, Mount, Focuser, Filter Wheel, Flat Panel or Rotator.
 2. **How is it connected?**
    - **Browse INDI drivers**: almost all commercial hardware. astrolol starts and stops the INDI
      server by itself (this can be changed in [Options](options.md#indi-server)).
@@ -73,6 +73,7 @@ The inventory is your equipment list. Each item has a type:
 | Filter Wheel | Driver, filter names (comma-separated, in slot order) |
 | Focuser | Driver |
 | Rotator | Driver |
+| Flat Panel | Driver (a light panel, a motorised dust cover, or both) |
 | GPS | Driver |
 
 **Add equipment** opens the form; each item has **Edit** and **Delete** buttons.

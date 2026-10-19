@@ -318,6 +318,43 @@ class FakeFilterWheelManager:
         self.slot = slot
 
 
+class FakeFlatPanelManager:
+    """Records what the sequencer asks of the panel; ``fail_on`` makes that call raise."""
+
+    def __init__(self) -> None:
+        self.cover = "open"
+        self.light_on = False
+        self.brightness: int | None = 0
+        self.calls: list[tuple[str, Any]] = []
+        self.fail_on: str | None = None
+
+    def _maybe_fail(self, what: str) -> None:
+        if self.fail_on == what:
+            raise RuntimeError(f"{what} jammed")
+
+    async def get_status(self, panel_id: str) -> Any:
+        return SimpleNamespace(
+            has_cover=True, cover=self.cover, has_light=True,
+            light_on=self.light_on, brightness=self.brightness,
+        )
+
+    async def close_cover(self, panel_id: str) -> None:
+        self._maybe_fail("close")
+        self.calls.append(("close", None))
+        self.cover = "closed"
+
+    async def open_cover(self, panel_id: str) -> None:
+        self._maybe_fail("open")
+        self.calls.append(("open", None))
+        self.cover = "open"
+
+    async def set_light(self, panel_id: str, on: bool, brightness: int | None = None) -> None:
+        self.calls.append(("light", (on, brightness)))
+        self.light_on = on
+        if brightness is not None:
+            self.brightness = brightness
+
+
 class FakeDeviceManager:
     def __init__(self, devices: list[tuple[str, str]]) -> None:
         self.devices = devices  # (device_id, kind)
@@ -345,15 +382,23 @@ class Rig:
         self.solver = FakeSolveManager()
         self.fwm = FakeFilterWheelManager(["L", "R", "G", "B", "Ha"])
         self.dm = FakeDeviceManager(
-            [("cam1", "camera"), ("mount1", "mount"), ("fw1", "filter_wheel"), ("foc1", "focuser")]
+            [
+                ("cam1", "camera"),
+                ("mount1", "mount"),
+                ("fw1", "filter_wheel"),
+                ("foc1", "focuser"),
+                ("panel1", "flat_panel"),
+            ]
         )
         self.autofocus = FakeAutofocus()
+        self.panel = FakeFlatPanelManager()
         self.app = SimpleNamespace(
             state=SimpleNamespace(
                 device_manager=self.dm,
                 imager_manager=self.imager,
                 mount_manager=self.mount,
                 filter_wheel_manager=self.fwm,
+                flat_panel_manager=self.panel,
                 guider=self.guider,
                 solve_manager=self.solver,
                 autofocus_engine=self.autofocus,

@@ -89,3 +89,10 @@ n'a pas de nom).
 La roue dentée à côté du titre de la caméra, du focuser ou de la roue à filtres ouvre la liste
 complète des réglages du pilote (*Propriétés INDI*). Voir
 [Propriétés des appareils](interface.md#propriétés-des-appareils).
+
+## Panneau de flats
+
+Avec un panneau de flats connecté (un panneau lumineux, un cache anti-poussière motorisé, ou les
+deux), épinglez le widget **Panneau de flats** dans le dock pour ouvrir et fermer le cache,
+allumer et éteindre la lumière et régler sa luminosité. Les commandes que l'appareil n'a pas sont
+masquées.

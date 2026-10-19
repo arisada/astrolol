@@ -5,7 +5,8 @@
     "focuser": "Focuser",
     "filter_wheel": "Filter Wheel",
     "rotator": "Rotator",
-    "indi": "INDI Device"
+    "indi": "INDI Device",
+    "flat_panel": "Flat Panel"
   },
   "itemType": {
     "site": "Observation Site",
@@ -15,7 +16,8 @@
     "filter_wheel": "Filter Wheel",
     "focuser": "Focuser",
     "rotator": "Rotator",
-    "gps": "GPS"
+    "gps": "GPS",
+    "flat_panel": "Flat Panel"
   },
   "wizard": {
     "back": "Back",

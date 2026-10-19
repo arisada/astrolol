@@ -13,6 +13,13 @@ l'aube…) et pointez le télescope dessus.
 (d'après le profil ; *Pas de roue à filtres* sinon). Indiquez le nombre d'**images** pour chaque
 combinaison voulue (0 = l'ignorer) et le **Gain** (vide = défaut du pilote).
 
+**Panneau de flats** (affiché quand un panneau de flats est connecté). Activez **Utiliser le
+panneau de flats** : l'assistant ferme le cache et allume le panneau devant le télescope de
+chaque caméra, prend les essais, puis l'éteint et rouvre le cache. Les flats mis en file font de
+même à leur exécution. **Luminosité** est le niveau à utiliser (vide = laisser le panneau tel
+quel) ; choisissez-en un qui donne des poses d'une seconde ou plus, un panneau très lumineux
+imposant des poses très courtes.
+
 **Cible**
 
 - **Puits de potentiel visé (moyenne)** : la luminosité voulue pour les flats, en part de la

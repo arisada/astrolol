@@ -15,7 +15,7 @@ logger = structlog.get_logger()
 # A request under one of these that no route matched (e.g. a disabled
 # plugin's "/plugins/<id>/..." routes) is a real 404, not a client page.
 _API_PREFIXES = frozenset({
-    "api", "devices", "profiles", "imager", "mount", "focuser", "filter_wheel",
+    "api", "devices", "profiles", "imager", "mount", "focuser", "filter_wheel", "flat_panel",
     "indi", "inventory", "settings", "events", "health", "plugins", "admin", "ws", "auth",
 })
 

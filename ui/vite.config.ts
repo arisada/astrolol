@@ -68,6 +68,7 @@ export default defineConfig({
       '/mount':    p(backendHttp),
       '/focuser':      p(backendHttp),
       '/filter_wheel': p(backendHttp),
+      '/flat_panel': p(backendHttp),
       '/indi':         p(backendHttp),
       '/inventory':         p(backendHttp),
       '/settings': p(backendHttp),

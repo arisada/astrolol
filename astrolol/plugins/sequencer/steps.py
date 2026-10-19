@@ -162,6 +162,64 @@ class Steps:
         finally:
             self._host.bus.unsubscribe(q)
 
+    # ── Flat panel ─────────────────────────────────────────────────────────
+
+    async def flat_panel_on(
+        self, task_id: str | None, devices: LaneDevices, brightness: int | None
+    ) -> None:
+        """Cover closed, light on at *brightness* (null = as it is). Does nothing for
+        what is already so, which makes it cheap to call before every frame."""
+        fpm = self._state("flat_panel_manager")
+        if devices.flat_panel_id is None or fpm is None:
+            raise StepError("flat_panel", f"No flat panel for camera '{devices.camera_id}'")
+        panel = devices.flat_panel_id
+        try:
+            status = await fpm.get_status(panel)
+            if status.has_cover and status.cover != "closed":
+                t0 = await self._started(
+                    task_id, "flat_panel", Activity.FLAT_PANEL, f"Closing the cover of {panel}"
+                )
+                await fpm.close_cover(panel)
+                await self._finished(task_id, "flat_panel", t0, {"panel": panel, "cover": "closed"})
+            if status.has_light and (
+                not status.light_on or (brightness is not None and status.brightness != brightness)
+            ):
+                t0 = await self._started(
+                    task_id, "flat_panel", Activity.FLAT_PANEL, f"Lighting {panel}"
+                )
+                await fpm.set_light(panel, True, brightness)
+                await self._finished(
+                    task_id, "flat_panel", t0, {"panel": panel, "light": True, "brightness": brightness}
+                )
+        except StepError:
+            raise
+        except Exception as exc:
+            raise StepError("flat_panel", f"Flat panel {panel} failed: {exc}") from exc
+
+    async def flat_panel_off(self, task_id: str | None, devices: LaneDevices) -> None:
+        """Light off, cover open. Runs when a task leaves the panel for any reason, so
+        it reports instead of raising: an exception must not mask the original one."""
+        fpm = self._state("flat_panel_manager")
+        if devices.flat_panel_id is None or fpm is None:
+            return
+        panel = devices.flat_panel_id
+        try:
+            status = await fpm.get_status(panel)
+            if status.has_light and status.light_on:
+                await fpm.set_light(panel, False)
+            if status.has_cover and status.cover != "open":
+                await fpm.open_cover(panel)
+        except Exception as exc:
+            logger.error("sequencer.flat_panel_release_failed", panel=panel, error=str(exc))
+            await self._publish(
+                SequencerStepFailed(
+                    task_id=task_id,
+                    step="flat_panel",
+                    error=f"Could not switch off / open flat panel {panel}: {exc}",
+                    handling="continue",
+                )
+            )
+
     # ── Camera cooling ─────────────────────────────────────────────────────
 
     async def set_temperature(

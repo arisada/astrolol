@@ -42,6 +42,12 @@
     "saturation": "Saturation guard",
     "saturationHint": "% — treat as clipped above this"
   },
+  "panel": {
+    "title": "Flat panel",
+    "use": "Use the flat panel",
+    "brightness": "Brightness",
+    "asIs": "as it is"
+  },
   "trial": {
     "title": "Trial exposures",
     "start": "Starting duration",

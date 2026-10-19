@@ -469,6 +469,8 @@ async def _prepare_frame(
 ) -> None:
     """Filter change (and the autofocus it may trigger) before a lane's next frame."""
     schedule: RigSchedule = ts.schedule
+    if entry.task.use_flat_panel:
+        await runner._steps.flat_panel_on(entry.task.id, devices, group.panel_brightness)
     if group.filter_name is not None and ls.current_filter != group.filter_name:
         if index:
             await runner.set_lane_activity(entry, index, Activity.CHANGING_FILTER)

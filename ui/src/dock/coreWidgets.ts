@@ -1,8 +1,9 @@
 // Dock widgets of the core pages. Plugins list theirs in their own ui/index.ts.
-import { AlertTriangle, Compass, Focus, Gauge, Globe, Gamepad2, Move, Palette } from 'lucide-react'
+import { AlertTriangle, Compass, Focus, Gauge, Globe, Gamepad2, Lightbulb, Move, Palette } from 'lucide-react'
 import i18n from '@/i18n'
 import { registerDockWidget } from './registry'
 import { FilterWheelWidget } from './widgets/FilterWheel'
+import { FlatPanelWidget } from './widgets/FlatPanel'
 import { FocuserWidget } from './widgets/Focuser'
 import { MountJoystickWidget } from './widgets/MountJoystick'
 import { MountHorizonWidget } from './widgets/MountHorizon'
@@ -20,4 +21,5 @@ registerDockWidget({ id: 'mount.nudge', perDevice: 'mount', title: title('widget
 registerDockWidget({ id: 'mount.joystick', perDevice: 'mount', title: title('widget.joystick', 'mount'), icon: Gamepad2, route: '/mount', Component: MountJoystickWidget })
 registerDockWidget({ id: 'focuser.position', perDevice: 'focuser', title: title('widget.focuser', 'imaging'), icon: Focus, route: '/imaging', Component: FocuserWidget })
 registerDockWidget({ id: 'filter_wheel.current', perDevice: 'filter_wheel', title: title('widget.filterWheel', 'imaging'), icon: Palette, route: '/imaging', Component: FilterWheelWidget })
+registerDockWidget({ id: 'flat_panel.cover_light', perDevice: 'flat_panel', title: title('widget.flatPanel', 'imaging'), icon: Lightbulb, route: '/imaging', Component: FlatPanelWidget })
 registerDockWidget({ id: 'logs.warnings', title: title('widget.warnings', 'logs'), icon: AlertTriangle, route: '/logs', Component: WarningsWidget })

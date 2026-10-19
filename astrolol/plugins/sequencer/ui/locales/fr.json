@@ -19,7 +19,8 @@
     "meridian_flip": "Retournement au méridien",
     "parking": "Parcage",
     "waiting": "Attente",
-    "cooling": "Refroidissement"
+    "cooling": "Refroidissement",
+    "flat_panel": "Panneau de flats"
   },
   "runState": {
     "idle": "inactif",
@@ -161,7 +162,8 @@
       "ditherEvery": "dither toutes les {{n}}",
       "noDither": "sans dither",
       "roundRobin": "alternance ×{{n}}",
-      "onError": "en cas d'erreur : {{action}}"
+      "onError": "en cas d'erreur : {{action}}",
+      "flatPanel": "panneau de flats"
     }
   },
   "settings": {
@@ -475,7 +477,8 @@
       "primary": "Caméra principale",
       "camera": "Caméra {{n}}",
       "dither": "Dither toutes les : un entier ≥ 1",
-      "delay": "Délai entre les images : secondes ≥ 0"
+      "delay": "Délai entre les images : secondes ≥ 0",
+      "brightness": "La luminosité du panneau doit être un entier ≥ 0 (ou vide)"
     },
     "newTask": "Nouvelle tâche",
     "editTask": "Modifier la tâche",
@@ -530,7 +533,8 @@
       "roundRobin": "Alternance",
       "perTurn": "Images par tour",
       "afFilter": "Autofocus après chaque changement de filtre",
-      "setTemperature": "Régler la température"
+      "setTemperature": "Régler la température",
+      "panel": "Panneau"
     },
     "efficiency": {
       "cannotStart": "Une pose de {{longest}} s est plus longue que le temps entre deux dithers de la principale{{interval}} : elle ne pourrait jamais démarrer. Raccourcissez-la, ou faites dithérer la principale moins souvent.",
@@ -541,7 +545,8 @@
       "end": ".",
       "total": " Environ {{time}} au total."
     },
-    "waitTemperature": "Attendre que les caméras atteignent la température"
+    "waitTemperature": "Attendre que les caméras atteignent la température",
+    "flatPanel": "Panneau de flats : fermer le cache et l'allumer, l'ouvrir ensuite"
   },
   "widget": {
     "progress": "Séquence",

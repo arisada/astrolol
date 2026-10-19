@@ -47,7 +47,7 @@ class DeviceConfig(BaseModel):
             "multi-role driver. Example: 'CCD Simulator'."
         ),
     )
-    kind: str = Field(description="Device type: 'camera' | 'mount' | 'focuser' | 'filter_wheel' | 'rotator' | 'indi'")
+    kind: str = Field(description="Device type: 'camera' | 'mount' | 'focuser' | 'filter_wheel' | 'rotator' | 'flat_panel' | 'indi'")
     adapter_key: str = Field(description="Adapter registered by a plugin, e.g. 'indi_camera'")
     params: dict[str, Any] = Field(
         default_factory=dict,

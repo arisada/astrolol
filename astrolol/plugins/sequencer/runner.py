@@ -691,9 +691,22 @@ class Runner:
                 raise StepError("expose", f"Camera '{lane.camera_id or 'main'}' is not connected")
             ts.lane_devices[lane.id] = devices
         ts.devices = ts.lane_devices[task.lanes[0].id]
-        if setup_needed or not ts.setup_done:
-            await self._setup(entry, ts)
-        await run_lanes(self, entry, ts)
+        try:
+            if setup_needed or not ts.setup_done:
+                await self._setup(entry, ts)
+            await run_lanes(self, entry, ts)
+        finally:
+            if task.use_flat_panel:
+                await self._release_flat_panels(task.id, ts)
+
+    async def _release_flat_panels(self, task_id: str, ts: _TaskState) -> None:
+        """Lights off, covers open, once per panel: however the task ended or paused
+        (a resume closes them again before its next frame)."""
+        released: set[str] = set()
+        for devices in ts.lane_devices.values():
+            if devices.flat_panel_id is not None and devices.flat_panel_id not in released:
+                released.add(devices.flat_panel_id)
+                await self._steps.flat_panel_off(task_id, devices)
 
     async def _setup(self, entry: QueueEntry, ts: _TaskState) -> None:
         task, rt = entry.task, entry.runtime

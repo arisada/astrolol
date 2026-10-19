@@ -12,6 +12,7 @@ import type {
   ExposureRequest,
   ExposureResult,
   FilterWheelStatus,
+  FlatPanelStatus,
   FocuserDeviceSettings,
   FocuserStatus,
   ImageStats,
@@ -126,6 +127,19 @@ export const api = {
       request<void>(`/filter_wheel/${deviceId}/select`, {
         method: 'POST',
         body: JSON.stringify({ slot }),
+      }),
+  },
+
+  flatPanel: {
+    status: (deviceId: string) => request<FlatPanelStatus>(`/flat_panel/${deviceId}/status`),
+    openCover: (deviceId: string) =>
+      request<FlatPanelStatus>(`/flat_panel/${deviceId}/cover/open`, { method: 'POST' }),
+    closeCover: (deviceId: string) =>
+      request<FlatPanelStatus>(`/flat_panel/${deviceId}/cover/close`, { method: 'POST' }),
+    setLight: (deviceId: string, on: boolean, brightness?: number) =>
+      request<FlatPanelStatus>(`/flat_panel/${deviceId}/light`, {
+        method: 'POST',
+        body: JSON.stringify({ on, brightness }),
       }),
   },
 

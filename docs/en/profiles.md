@@ -35,7 +35,7 @@ What can go under what:
 |---|---|
 | Observation Site | Mount, GPS |
 | Mount | Telescope / OTA |
-| Telescope / OTA | Camera, Focuser, Rotator, Filter Wheel, another Telescope (e.g. a guide scope piggy-backed on the main one) |
+| Telescope / OTA | Camera, Focuser, Rotator, Filter Wheel, Flat Panel, another Telescope (e.g. a guide scope piggy-backed on the main one) |
 | Rotator | Focuser, Filter Wheel, Camera |
 | Focuser | Filter Wheel, Camera |
 | Filter Wheel | Camera |

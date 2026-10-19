@@ -21,6 +21,7 @@ import {
   Wind,
   XCircle,
   Zap,
+  Lightbulb,
 } from 'lucide-react'
 import { api } from '@/api/client'
 import type {
@@ -51,11 +52,12 @@ import { Page } from '@/components/Page'
 const VALID_CHILD_TYPES: Record<string, Set<string>> = {
   site: new Set(['mount', 'gps']),
   mount: new Set(['ota']),
-  ota: new Set(['camera', 'focuser', 'rotator', 'filter_wheel', 'ota']),
+  ota: new Set(['camera', 'focuser', 'rotator', 'filter_wheel', 'flat_panel', 'ota']),
   focuser: new Set(['filter_wheel', 'camera']),
   filter_wheel: new Set(['camera']),
   rotator: new Set(['focuser', 'filter_wheel', 'camera']),
   camera: new Set(),
+  flat_panel: new Set(),
   gps: new Set(),
 }
 
@@ -88,6 +90,7 @@ function ItemTypeIcon({ type, size = 13 }: { type: EquipmentItemType; size?: num
   if (type === 'filter_wheel') return <LoaderPinwheel size={size} />
   if (type === 'focuser') return <Crosshair size={size} />
   if (type === 'rotator') return <CircleDot size={size} />
+  if (type === 'flat_panel') return <Lightbulb size={size} />
   if (type === 'gps') return <Globe size={size} />
   return <Wind size={size} />
 }

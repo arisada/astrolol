@@ -171,7 +171,8 @@
     "expand": "Déplier",
     "noMount": "Aucune monture connectée",
     "noFocuser": "Aucun focuseur connecté",
-    "noFilterWheel": "Aucune roue à filtres connectée"
+    "noFilterWheel": "Aucune roue à filtres connectée",
+    "noFlatPanel": "Aucun panneau de flats connecté"
   },
   "log": {
     "show": "Afficher le journal",

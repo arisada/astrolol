@@ -4,7 +4,7 @@ from __future__ import annotations
 import pytest
 
 from astrolol.equipment.models import (
-    CameraItem, FilterWheelItem, FocuserItem, MountItem, OTAItem, RotatorItem, SiteItem,
+    CameraItem, FilterWheelItem, FlatPanelItem, FocuserItem, MountItem, OTAItem, RotatorItem, SiteItem,
 )
 from astrolol.equipment.optical_path import (
     resolve_optical_paths,
@@ -205,3 +205,28 @@ def test_resolve_optical_paths_device_id_none_when_not_connected(inv_store):
     [path] = resolve_optical_paths(profile, inv_store, dm)
     assert path.mount_device_id is None
     assert path.camera_device_id is None
+
+
+def test_flat_panel_is_found_beside_the_camera_not_above_it(inv_store):
+    """ota -> [camera, flat_panel]: siblings, so the panel is read from the OTA's children."""
+    ota = inv_store.create(OTAItem(name="RedCat 51", focal_length=250.0, aperture=51.0))
+    cam = inv_store.create(CameraItem(name="ASI2600"))
+    panel = inv_store.create(FlatPanelItem(name="Flip-Flat"))
+    roots = [ProfileNode(item_id=ota.id, children=[
+        ProfileNode(item_id=cam.id), ProfileNode(item_id=panel.id),
+    ])]
+    (path,) = walk_optical_paths(roots, inv_store)
+    assert path.flat_panel is not None and path.flat_panel.name == "Flip-Flat"
+
+
+def test_a_guide_scope_does_not_inherit_the_main_telescopes_panel(inv_store):
+    main = inv_store.create(OTAItem(name="Main", focal_length=800.0, aperture=80.0))
+    guide = inv_store.create(OTAItem(name="Guide", focal_length=120.0, aperture=30.0))
+    cam = inv_store.create(CameraItem(name="Guide cam"))
+    panel = inv_store.create(FlatPanelItem(name="Flip-Flat"))
+    roots = [ProfileNode(item_id=main.id, children=[
+        ProfileNode(item_id=panel.id),
+        ProfileNode(item_id=guide.id, children=[ProfileNode(item_id=cam.id)]),
+    ])]
+    (path,) = walk_optical_paths(roots, inv_store)
+    assert path.flat_panel is None

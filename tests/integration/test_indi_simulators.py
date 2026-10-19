@@ -341,3 +341,47 @@ async def test_camera_local_upload_filename_contains_device(camera_local, tmp_pa
         await camera_local.restore_upload_client()
     # UPLOAD_PREFIX is set to the sanitised device name; verify it appears in the path
     assert "CCD_Simulator" in image.fits_path
+
+
+# ---------------------------------------------------------------------------
+# Flat panel (Light Panel Simulator: a light, no cover)
+# ---------------------------------------------------------------------------
+
+@pytest.fixture(scope="module")
+async def flat_panel():
+    from astrolol.devices.indi.client import IndiClient
+    from astrolol.devices.indi.flat_panel import IndiFlatPanel
+    port = _BASE_PORT + 20
+    proc = _start_indiserver(port, "indi_simulator_lightpanel")
+    client = IndiClient(host="localhost", port=port)
+    await client.connect()
+    p = IndiFlatPanel(device_name="Light Panel Simulator", client=client)
+    await p.connect()
+    yield p
+    await p.disconnect()
+    await client.disconnect()
+    _stop(proc)
+
+
+async def test_flat_panel_light_only_status(flat_panel):
+    s = await flat_panel.get_status()
+    assert s.has_light and not s.has_cover and s.cover is None
+    assert s.light_on is False
+
+
+async def test_flat_panel_light_and_brightness(flat_panel):
+    await flat_panel.set_light(True, 100)
+    for _ in range(20):
+        s = await flat_panel.get_status()
+        if s.light_on and s.brightness == 100:
+            break
+        await asyncio.sleep(0.25)
+    assert s.light_on is True and s.brightness == 100
+    await flat_panel.set_light(False)
+    await asyncio.sleep(0.5)
+    assert (await flat_panel.get_status()).light_on is False
+
+
+async def test_flat_panel_without_cover_refuses_to_move_it(flat_panel):
+    with pytest.raises(ValueError):
+        await flat_panel.open_cover()

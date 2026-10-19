@@ -19,7 +19,8 @@
     "meridian_flip": "Meridian flip",
     "parking": "Parking",
     "waiting": "Waiting",
-    "cooling": "Cooling"
+    "cooling": "Cooling",
+    "flat_panel": "Flat panel"
   },
   "runState": {
     "idle": "idle",
@@ -161,7 +162,8 @@
       "ditherEvery": "dither every {{n}}",
       "noDither": "no dither",
       "roundRobin": "round robin ×{{n}}",
-      "onError": "on error: {{action}}"
+      "onError": "on error: {{action}}",
+      "flatPanel": "flat panel"
     }
   },
   "settings": {
@@ -475,7 +477,8 @@
       "primary": "Primary camera",
       "camera": "Camera {{n}}",
       "dither": "Dither every: a whole number ≥ 1",
-      "delay": "Delay between frames: seconds ≥ 0"
+      "delay": "Delay between frames: seconds ≥ 0",
+      "brightness": "Panel brightness must be a whole number ≥ 0 (or empty)"
     },
     "newTask": "New task",
     "editTask": "Edit task",
@@ -530,7 +533,8 @@
       "roundRobin": "Round robin",
       "perTurn": "Frames per turn",
       "afFilter": "Autofocus after each filter change",
-      "setTemperature": "Set temperature"
+      "setTemperature": "Set temperature",
+      "panel": "Panel"
     },
     "efficiency": {
       "cannotStart": "A {{longest}} s exposure is longer than the time between two of the primary's dithers{{interval}}: it could never start. Shorten it, or make the primary dither less often.",
@@ -541,7 +545,8 @@
       "end": ".",
       "total": " About {{time}} in total."
     },
-    "waitTemperature": "Wait for cameras to reach temperature"
+    "waitTemperature": "Wait for cameras to reach temperature",
+    "flatPanel": "Flat panel: close the cover and light it, open it afterwards"
   },
   "widget": {
     "progress": "Sequence",

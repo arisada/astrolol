@@ -33,6 +33,7 @@ interface GroupRow {
   gain: string          // '' = leave driver gain unchanged
   binning: number
   frame_type: SequencerExposureGroup['frame_type']
+  panel: string         // flat panel brightness; '' = leave the panel as it is
 }
 
 interface LaneDraft {
@@ -54,6 +55,7 @@ function toRow(g: SequencerExposureGroup): GroupRow {
     gain: g.gain == null ? '' : String(g.gain),
     binning: g.binning,
     frame_type: g.frame_type,
+    panel: g.panel_brightness == null ? '' : String(g.panel_brightness),
   }
 }
 
@@ -66,10 +68,15 @@ function parseRow(t: TFunction, r: GroupRow): SequencerExposureGroup | string {
     gain = Number(r.gain)
     if (!Number.isInteger(gain) || gain < 0) return t('editor.errors.gain')
   }
-  return { filter_name: r.filter_name || null, duration, count, gain, binning: r.binning, frame_type: r.frame_type }
+  let panel_brightness: number | null = null
+  if (r.panel.trim() !== '') {
+    panel_brightness = Number(r.panel)
+    if (!Number.isInteger(panel_brightness) || panel_brightness < 0) return t('editor.errors.brightness')
+  }
+  return { filter_name: r.filter_name || null, duration, count, gain, binning: r.binning, frame_type: r.frame_type, panel_brightness }
 }
 
-const NEW_ROW: GroupRow = { filter_name: '', duration: 300, count: 10, gain: '', binning: 1, frame_type: 'light' }
+const NEW_ROW: GroupRow = { filter_name: '', duration: 300, count: 10, gain: '', binning: 1, frame_type: 'light', panel: '' }
 let draftCounter = 0
 const newKey = () => `draft-${++draftCounter}`
 
@@ -122,6 +129,7 @@ export function TaskEditor({ entry, onClose }: {
   const [center, setCenter] = useState(base?.center ?? true)
   const [guide, setGuide] = useState(base?.start_guiding ?? true)
   const [afStart, setAfStart] = useState(base?.autofocus_at_start ?? false)
+  const [usePanel, setUsePanel] = useState(base?.use_flat_panel ?? false)
   const [waitTemp, setWaitTemp] = useState(base?.wait_for_temperature ?? false)
   const [ditherOn, setDitherOn] = useState(base ? base.dither_every != null : true)
   const [ditherEvery, setDitherEvery] = useState(String(base?.dither_every ?? 1))
@@ -159,6 +167,7 @@ export function TaskEditor({ entry, onClose }: {
       lanes: built,
       slew, center, start_guiding: guide,
       autofocus_at_start: afStart,
+      use_flat_panel: usePanel,
       wait_for_temperature: waitTemp && lanes.some((l) => l.temperature != null),
       dither_every: ditherOn ? every : null,
       sub_delay_s: delay,
@@ -254,6 +263,7 @@ export function TaskEditor({ entry, onClose }: {
                   cameras={cameras}
                   mainCamera={mainCamera}
                   paths={paths}
+                  usePanel={usePanel}
                   estimate={estimates?.[i] ?? null}
                   primaryInterval={primaryInterval}
                   onChange={(patch) => patchLane(i, patch)}
@@ -283,6 +293,10 @@ export function TaskEditor({ entry, onClose }: {
               disabled={!lanes.some((l) => l.temperature != null)}
               onChange={() => setWaitTemp((v) => !v)}
             />
+            <Toggle label={t('editor.flatPanel')} checked={usePanel} onChange={() => {
+              if (!usePanel) { setSlew(false); setCenter(false); setGuide(false); setDitherOn(false) }
+              setUsePanel((v) => !v)
+            }} />
             <Toggle label={lanes.length > 1 ? t('editor.autofocusAll') : t('editor.autofocus')} checked={afStart} onChange={() => setAfStart((v) => !v)} />
             {isCurrent && <p className="text-xs text-slate-500">{t('editor.currentHint')}</p>}
           </Section>
@@ -327,7 +341,7 @@ export function TaskEditor({ entry, onClose }: {
 }
 
 function LaneEditor({
-  index, draft, count, cameras, mainCamera, paths, estimate, primaryInterval, onChange, onRemove, onMakePrimary,
+  index, draft, count, cameras, mainCamera, paths, usePanel, estimate, primaryInterval, onChange, onRemove, onMakePrimary,
 }: {
   index: number
   draft: LaneDraft
@@ -335,6 +349,7 @@ function LaneEditor({
   cameras: ConnectedDevice[]
   mainCamera: string | undefined
   paths: OpticalPath[]
+  usePanel: boolean
   estimate: SequencerLaneEstimate | null
   primaryInterval: number | null
   onChange: (patch: Partial<LaneDraft>) => void
@@ -427,6 +442,7 @@ function LaneEditor({
               <th className="font-normal pb-1 pr-2">{t('editor.lane.gain')}</th>
               <th className="font-normal pb-1 pr-2">{t('editor.lane.bin')}</th>
               <th className="font-normal pb-1 pr-2">{t('editor.lane.type')}</th>
+              {usePanel && <th className="font-normal pb-1 pr-2">{t('editor.lane.panel')}</th>}
               <th className="font-normal pb-1 pr-2 text-right">{t('editor.lane.total')}</th>
               <th />
             </tr>
@@ -465,6 +481,9 @@ function LaneEditor({
                       {(['light', 'dark', 'flat', 'bias'] as const).map((ft) => <option key={ft} value={ft}>{tc(`frameType.${ft}`)}</option>)}
                     </select>
                   </td>
+                  {usePanel && <td className="pr-2 py-1 w-20">
+                    <Input inputSize="sm" placeholder="—" value={r.panel} onChange={(ev) => patchRow(i, { panel: ev.target.value })} />
+                  </td>}
                   <td className="pr-2 py-1 text-right font-mono text-slate-400 whitespace-nowrap">
                     {typeof g === 'string' ? <span className="text-status-error" title={g}>!</span> : fmtSeconds(g.count * g.duration)}
                   </td>

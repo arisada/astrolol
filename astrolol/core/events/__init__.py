@@ -28,6 +28,7 @@ from astrolol.core.events.models import (
     FocuserPositionUpdated,
     MountCoordsUpdated,
     FilterWheelFilterChanged,
+    FlatPanelChanged,
 )
 
 __all__ = [
@@ -60,4 +61,5 @@ __all__ = [
     "FocuserPositionUpdated",
     "MountCoordsUpdated",
     "FilterWheelFilterChanged",
+    "FlatPanelChanged",
 ]

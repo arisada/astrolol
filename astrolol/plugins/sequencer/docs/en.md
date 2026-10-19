@@ -72,6 +72,12 @@ camera leads.
 - **Start guiding (wait for settle)** (needs a guider)
 - **Autofocus** (needs [Autofocus](../../autofocus/docs/en.md))
 - **Wait for cameras to reach temperature**
+- **Flat panel: close the cover and light it, open it afterwards**: for flats. The cover of
+  the flat panel under the camera's telescope in the profile is closed and the light switched
+  on before the frames, and the light is switched off and the cover opened when the task ends,
+  pauses or fails. A **Panel** column appears in the exposure table to set the brightness of
+  each row (empty = leave the panel as it is), so each filter can have its own. Switching this on
+  also switches off slewing, centering, guiding and dithering, which flats do not need.
 
 **While imaging**: **Dither every** *n* primary frames, and an optional **Delay between frames**.
 

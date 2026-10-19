@@ -17,7 +17,7 @@ from pydantic import BaseModel
 
 from astrolol.devices.config import DeviceConfig
 from astrolol.equipment.models import (
-    CameraItem, EquipmentItem, FilterWheelItem, FocuserItem, MountItem,
+    CameraItem, EquipmentItem, FilterWheelItem, FlatPanelItem, FocuserItem, MountItem,
     OTAItem, RotatorItem, SiteItem,
 )
 
@@ -28,7 +28,7 @@ if TYPE_CHECKING:
 
 logger = structlog.get_logger()
 
-_CONNECTABLE_KINDS = frozenset({"mount", "camera", "focuser", "filter_wheel", "rotator"})
+_CONNECTABLE_KINDS = frozenset({"mount", "camera", "focuser", "filter_wheel", "rotator", "flat_panel"})
 
 
 class OpticalPath(BaseModel):
@@ -51,6 +51,9 @@ class OpticalPath(BaseModel):
 
     rotator: RotatorItem | None = None
     rotator_device_id: str | None = None
+
+    flat_panel: FlatPanelItem | None = None
+    flat_panel_device_id: str | None = None
 
 
 def _clean_params(params: dict) -> dict:
@@ -126,6 +129,7 @@ def walk_optical_paths(
     focuser: FocuserItem | None = None,
     filter_wheel: FilterWheelItem | None = None,
     rotator: RotatorItem | None = None,
+    flat_panel: FlatPanelItem | None = None,
 ) -> list[OpticalPath]:
     """Walk the equipment tree, emitting one OpticalPath per camera leaf.
 
@@ -143,11 +147,13 @@ def walk_optical_paths(
                 node.children, equipment_store,
                 site=site, mount=mount, ota=ota,
                 focuser=focuser, filter_wheel=filter_wheel, rotator=rotator,
+                flat_panel=flat_panel,
             ))
             continue
 
         cur_site, cur_mount, cur_ota = site, mount, ota
         cur_focuser, cur_filter_wheel, cur_rotator = focuser, filter_wheel, rotator
+        cur_flat_panel = flat_panel
 
         if item.type == "site":
             cur_site = item  # type: ignore[assignment]
@@ -155,6 +161,9 @@ def walk_optical_paths(
             cur_mount = item  # type: ignore[assignment]
         elif item.type == "ota":
             cur_ota = item  # type: ignore[assignment]
+            # A flat panel sits in front of the telescope, as a sibling of its cameras, so
+            # it is looked up among the OTA's children rather than inherited down a branch.
+            cur_flat_panel = _flat_panel_child(node, equipment_store)
         elif item.type == "focuser":
             cur_focuser = item  # type: ignore[assignment]
         elif item.type == "filter_wheel":
@@ -166,14 +175,27 @@ def walk_optical_paths(
                 camera=item,  # type: ignore[arg-type]
                 mount=cur_mount, site=cur_site, ota=cur_ota,
                 focuser=cur_focuser, filter_wheel=cur_filter_wheel, rotator=cur_rotator,
+                flat_panel=cur_flat_panel,
             ))
 
         paths.extend(walk_optical_paths(
             node.children, equipment_store,
             site=cur_site, mount=cur_mount, ota=cur_ota,
             focuser=cur_focuser, filter_wheel=cur_filter_wheel, rotator=cur_rotator,
+            flat_panel=cur_flat_panel,
         ))
     return paths
+
+
+def _flat_panel_child(node: "ProfileNode", equipment_store: "EquipmentStore") -> FlatPanelItem | None:
+    for child in node.children:
+        try:
+            item = equipment_store.get(child.item_id)
+        except KeyError:
+            continue
+        if item.type == "flat_panel":
+            return item  # type: ignore[return-value]
+    return None
 
 
 def walk_mount_sites(
@@ -222,6 +244,8 @@ def resolve_optical_paths(
             path.filter_wheel_device_id = _device_id_of(device_manager, "filter_wheel", path.filter_wheel)
         if path.rotator is not None:
             path.rotator_device_id = _device_id_of(device_manager, "rotator", path.rotator)
+        if path.flat_panel is not None:
+            path.flat_panel_device_id = _device_id_of(device_manager, "flat_panel", path.flat_panel)
     return paths
 
 

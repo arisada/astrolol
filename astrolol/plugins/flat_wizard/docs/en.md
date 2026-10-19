@@ -12,6 +12,12 @@ the telescope at it.
 (from the profile; *No filter wheel* otherwise). Set the number of **frames** for each
 combination you want (0 = skip it) and the **Gain** (empty = driver default).
 
+**Flat panel** (shown when a flat panel is connected). Turn on **Use the flat panel** and the
+wizard closes the cover and lights the panel in front of each camera's telescope, takes the
+trials, then switches it off and opens the cover again. The queued flats do the same when they
+run. **Brightness** is the level to use (empty = leave the panel as it is); pick one that gives
+exposures of a second or more, since a very bright panel forces very short ones.
+
 **Target**
 
 - **Target full well (mean)**: how bright the flats should be, as a share of the sensor's full

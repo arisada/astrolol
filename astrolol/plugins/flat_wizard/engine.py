@@ -122,12 +122,17 @@ class FlatWizardEngine:
             ))
             logger.info("flat_wizard.started", run_id=run.id, camera_ids=camera_ids)
 
-            wheel_locks: dict[str, asyncio.Lock] = {}
-            first_index = 0
-            async with asyncio.TaskGroup() as tg:
-                for camera in config.cameras:
-                    tg.create_task(self._solve_camera(run, camera, first_index, wheel_locks))
-                    first_index += len(camera.filters)
+            panels = await self._light_panels(config) if config.use_flat_panel else []
+            try:
+                wheel_locks: dict[str, asyncio.Lock] = {}
+                first_index = 0
+                async with asyncio.TaskGroup() as tg:
+                    for camera in config.cameras:
+                        tg.create_task(self._solve_camera(run, camera, first_index, wheel_locks))
+                        first_index += len(camera.filters)
+            finally:
+                # The queued flats close and light the panel again when they run.
+                await self._release_panels(panels)
 
             await self._queue_sequence(run)
 
@@ -295,6 +300,68 @@ class FlatWizardEngine:
             error=f"Did not converge to the target ADU within {config.max_attempts} attempts.",
         )
 
+    def _panel_for_camera(self, camera_id: str) -> str | None:
+        """The flat panel in front of *camera_id*: from the profile's equipment tree, else
+        the only connected panel."""
+        from astrolol.equipment.optical_path import (
+            find_optical_path_for_camera_device,
+            resolve_optical_paths,
+        )
+
+        dm = self._state("device_manager")
+        profile = self._state("active_profile")
+        store = self._state("equipment_store")
+        if dm is not None and profile is not None and store is not None and profile.roots:
+            try:
+                path = find_optical_path_for_camera_device(
+                    resolve_optical_paths(profile, store, dm), camera_id
+                )
+            except Exception as exc:
+                logger.warning("flat_wizard.optical_paths_failed", error=str(exc))
+                path = None
+            if path is not None and path.flat_panel_device_id is not None:
+                return path.flat_panel_device_id
+        if dm is None:
+            return None
+        connected = [d["device_id"] for d in dm.list_connected() if d["kind"] == "flat_panel"]
+        return connected[0] if len(connected) == 1 else None
+
+    async def _light_panels(self, config: FlatWizardConfig) -> list[str]:
+        """Cover closed and light on at the configured brightness, for every camera's panel.
+        Returns the panel ids (each once) so they can be released."""
+        fpm = self._state("flat_panel_manager")
+        panels: list[str] = []
+        for camera in config.cameras:
+            panel = self._panel_for_camera(camera.camera_id)
+            if fpm is None or panel is None:
+                raise ValueError(f"No flat panel found for camera '{camera.camera_id}'.")
+            if panel not in panels:
+                panels.append(panel)
+        try:
+            for panel in panels:
+                status = await fpm.get_status(panel)
+                if status.has_cover and status.cover != "closed":
+                    await fpm.close_cover(panel)
+                if status.has_light:
+                    await fpm.set_light(panel, True, config.panel_brightness)
+        except BaseException:
+            await self._release_panels(panels)
+            raise
+        return panels
+
+    async def _release_panels(self, panels: list[str]) -> None:
+        """Light off, cover open. Never raises: it runs while another error unwinds."""
+        fpm = self._state("flat_panel_manager")
+        for panel in panels:
+            try:
+                status = await fpm.get_status(panel)
+                if status.has_light and status.light_on:
+                    await fpm.set_light(panel, False)
+                if status.has_cover and status.cover != "open":
+                    await fpm.open_cover(panel)
+            except Exception as exc:
+                logger.error("flat_wizard.panel_release_failed", panel=panel, error=str(exc))
+
     async def _select_filter(self, camera: FlatWizardCameraSpec, filter_name: str) -> str | None:
         """Move the filter wheel to *filter_name*. Returns an error string, or None on success."""
         fwm = self._state("filter_wheel_manager")
@@ -336,6 +403,7 @@ class FlatWizardEngine:
                 ExposureGroup(
                     filter_name=spec.filter_name, duration=solved[(camera.camera_id, spec.filter_name)],
                     count=spec.count, binning=config.binning, gain=camera.gain, frame_type="flat",
+                    panel_brightness=config.panel_brightness if config.use_flat_panel else None,
                 )
                 for spec in camera.filters
                 if (camera.camera_id, spec.filter_name) in solved
@@ -359,6 +427,7 @@ class FlatWizardEngine:
             start_guiding=False,
             autofocus_at_start=False,
             dither_every=None,
+            use_flat_panel=config.use_flat_panel,
             on_error="skip",
         )
         entry = await sequencer.add(task)

@@ -255,6 +255,16 @@ class MountCoordsUpdated(BaseEvent):
     is_parked: bool = False
 
 
+# --- Flat panel events ---
+
+class FlatPanelChanged(BaseEvent):
+    type: Literal["flat_panel.changed"] = "flat_panel.changed"
+    device_id: str
+    cover: str | None = None
+    light_on: bool | None = None
+    brightness: int | None = None
+
+
 # --- Filter Wheel events ---
 
 class FilterWheelFilterChanged(BaseEvent):

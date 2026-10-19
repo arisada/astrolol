@@ -19,7 +19,7 @@ La page Matériel a deux onglets :
 
 Cliquez sur **Charger un pilote** et suivez l'assistant.
 
-1. **Que souhaitez-vous connecter ?** Caméra, Monture, Focuser, Roue à filtres ou Rotateur.
+1. **Que souhaitez-vous connecter ?** Caméra, Monture, Focuser, Roue à filtres, Panneau de flats ou Rotateur.
 2. **Comment est-il connecté ?**
    - **Parcourir les pilotes INDI** : presque tout le matériel du commerce. astrolol démarre et
      arrête le serveur INDI tout seul (modifiable dans [Options](options.md#serveur-indi)).
@@ -80,6 +80,7 @@ L'inventaire est la liste de votre matériel. Chaque élément a un type :
 | Roue à filtres | Pilote, noms des filtres (séparés par des virgules, dans l'ordre des positions) |
 | Focuser | Pilote |
 | Rotateur | Pilote |
+| Panneau de flats | Pilote (un panneau lumineux, un cache anti-poussière motorisé, ou les deux) |
 | GPS | Pilote |
 
 **Ajouter du matériel** ouvre le formulaire ; chaque élément a des boutons **Modifier** et

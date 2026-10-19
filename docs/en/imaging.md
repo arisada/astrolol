@@ -82,3 +82,9 @@ it; the names come from the [inventory](equipment.md#inventory) (*Filter 3* when
 
 The gear next to the camera, focuser or filter wheel title opens the driver's full list of
 settings (*INDI properties*). See [Device properties](interface.md#device-properties).
+
+## Flat panel
+
+With a flat panel (a light panel, a motorised dust cover, or both) connected, pin the **Flat panel**
+widget to the dock to open and close the cover, switch the light on and off and set its
+brightness. Controls the device does not have are hidden.

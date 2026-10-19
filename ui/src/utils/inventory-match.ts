@@ -4,7 +4,7 @@ import type {
 
 export const DEVICE_ITEM_TYPE: Partial<Record<DeviceKind, EquipmentItemType>> = {
   camera: 'camera', mount: 'mount', focuser: 'focuser',
-  filter_wheel: 'filter_wheel', rotator: 'rotator',
+  filter_wheel: 'filter_wheel', rotator: 'rotator', flat_panel: 'flat_panel',
 }
 
 // Key order independent, so params round-tripped through the backend still match.

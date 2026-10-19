@@ -10,10 +10,11 @@ from astrolol.core.events import EventBus
 import astropy.units as u
 from astropy.coordinates import SkyCoord
 
-from astrolol.devices.base.models import CameraStatus, DeviceState, ExposureParams, FilterWheelStatus, FocuserStatus, Image, MountStatus, RotatorStatus
+from astrolol.devices.base.models import CameraStatus, DeviceState, ExposureParams, CoverState, FilterWheelStatus, FlatPanelStatus, FocuserStatus, Image, MountStatus, RotatorStatus
 from astrolol.devices.manager import DeviceManager
 from astrolol.devices.registry import DeviceRegistry
 from astrolol.filter_wheel import FilterWheelManager
+from astrolol.flat_panel import FlatPanelManager
 from astrolol.focuser import FocuserManager
 from astrolol.imaging import ImagerManager
 from astrolol.mount import MountManager
@@ -250,6 +251,52 @@ class FakeFilterWheel:
         return self.connected
 
 
+class FakeFlatPanel:
+    """Minimal IFlatPanel: cover + light. ``has_cover=False`` / ``has_light=False`` model half-devices."""
+
+    def __init__(self, has_cover: bool = True, has_light: bool = True, **kwargs: object) -> None:
+        self.connected = False
+        self.has_cover = has_cover
+        self.has_light = has_light
+        self.cover = CoverState.CLOSED if has_cover else None
+        self.light_on = False if has_light else None
+        self.brightness = 0 if has_light else None
+
+    async def connect(self) -> None:
+        self.connected = True
+
+    async def disconnect(self) -> None:
+        self.connected = False
+
+    async def open_cover(self) -> None:
+        if not self.has_cover:
+            raise ValueError("This device has no motorised cover.")
+        self.cover = CoverState.OPEN
+
+    async def close_cover(self) -> None:
+        if not self.has_cover:
+            raise ValueError("This device has no motorised cover.")
+        self.cover = CoverState.CLOSED
+
+    async def set_light(self, on: bool, brightness: int | None = None) -> None:
+        if not self.has_light:
+            raise ValueError("This device has no light.")
+        if brightness is not None:
+            self.brightness = brightness
+        self.light_on = on
+
+    async def get_status(self) -> FlatPanelStatus:
+        state = DeviceState.CONNECTED if self.connected else DeviceState.DISCONNECTED
+        return FlatPanelStatus(
+            state=state, has_cover=self.has_cover, cover=self.cover, has_light=self.has_light,
+            light_on=self.light_on, brightness=self.brightness,
+            max_brightness=255 if self.has_light else None,
+        )
+
+    async def ping(self) -> bool:
+        return self.connected
+
+
 class FakeRotator:
     """Minimal IRotator implementation."""
 
@@ -280,6 +327,7 @@ def registry() -> DeviceRegistry:
     r.register_focuser("fake_focuser", FakeFocuser)  # type: ignore[arg-type]
     r.register_filter_wheel("fake_filter_wheel", FakeFilterWheel)  # type: ignore[arg-type]
     r.register_rotator("fake_rotator", FakeRotator)  # type: ignore[arg-type]
+    r.register_flat_panel("fake_flat_panel", FakeFlatPanel)  # type: ignore[arg-type]
     return r
 
 
@@ -311,3 +359,8 @@ def focuser_manager(manager: DeviceManager, event_bus: EventBus) -> FocuserManag
 @pytest.fixture
 def filter_wheel_manager(manager: DeviceManager, event_bus: EventBus) -> FilterWheelManager:
     return FilterWheelManager(device_manager=manager, event_bus=event_bus)
+
+
+@pytest.fixture
+def flat_panel_manager(manager: DeviceManager, event_bus: EventBus) -> FlatPanelManager:
+    return FlatPanelManager(device_manager=manager, event_bus=event_bus)

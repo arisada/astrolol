@@ -104,6 +104,25 @@ class FilterWheelStatus(BaseModel):
     is_moving: bool = False
 
 
+# --- Flat panel / dust cover ---
+
+class CoverState(StrEnum):
+    OPEN = "open"
+    CLOSED = "closed"
+    MOVING = "moving"
+    UNKNOWN = "unknown"
+
+
+class FlatPanelStatus(BaseModel):
+    state: DeviceState
+    has_cover: bool = False          # motorised dust cover (cap)
+    cover: CoverState | None = None  # None when the device has no cover
+    has_light: bool = False
+    light_on: bool | None = None
+    brightness: int | None = None
+    max_brightness: int | None = None
+
+
 # --- Rotator ---
 
 class RotatorStatus(BaseModel):

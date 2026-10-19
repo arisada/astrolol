@@ -304,6 +304,14 @@ class SequencerServiceImpl:
                     lane.id,
                 )
             cameras.add(devices.camera_id)
+            if task.use_flat_panel and devices.flat_panel_id is None:
+                issue(
+                    "error",
+                    "no_flat_panel",
+                    f"camera '{devices.camera_id}' has no connected flat panel (add one under its "
+                    "telescope in the profile)",
+                    lane.id,
+                )
             if mount_id and devices.mount_id and devices.mount_id != mount_id:
                 issue(
                     "error",

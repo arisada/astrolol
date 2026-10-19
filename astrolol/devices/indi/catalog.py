@@ -35,6 +35,13 @@ GROUP_TO_KIND: dict[str, str] = {
 }
 
 
+# Drivers filed under "Auxiliary" that are flat panels / dust covers.
+FLAT_PANEL_EXECUTABLES: frozenset[str] = frozenset({
+    "indi_flipflat", "indi_pegasus_flatmaster", "indi_snapcap",
+    "indi_simulator_lightpanel", "indi_wanderer_cover",
+})
+
+
 @dataclass
 class DriverEntry:
     label: str         # "ZWO CCD"          — shown to the user
@@ -81,12 +88,13 @@ def _parse_file(path: Path) -> list[DriverEntry]:
             if driver_el is None or not driver_el.text:
                 continue
 
+            executable = driver_el.text.strip()
             entries.append(DriverEntry(
                 label=label,
-                executable=driver_el.text.strip(),
+                executable=executable,
                 device_name=driver_el.get("name", label),
                 group=group,
-                kind=kind,
+                kind="flat_panel" if executable in FLAT_PANEL_EXECUTABLES else kind,
                 manufacturer=manufacturer,
             ))
 

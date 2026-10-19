@@ -171,7 +171,8 @@
     "expand": "Expand",
     "noMount": "No mount connected",
     "noFocuser": "No focuser connected",
-    "noFilterWheel": "No filter wheel connected"
+    "noFilterWheel": "No filter wheel connected",
+    "noFlatPanel": "No flat panel connected"
   },
   "log": {
     "show": "Show the log",

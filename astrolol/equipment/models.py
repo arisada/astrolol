@@ -100,6 +100,16 @@ class RotatorItem(BaseModel):
     connect_params: dict = {}
 
 
+class FlatPanelItem(BaseModel):
+    id: str = Field(default_factory=_uid)
+    type: Literal["flat_panel"] = "flat_panel"
+    name: str
+    indi_driver: str | None = None
+    indi_device_name: str | None = None
+    adapter_key: str | None = None
+    connect_params: dict = {}
+
+
 class GpsItem(BaseModel):
     id: str = Field(default_factory=_uid)
     type: Literal["gps"] = "gps"
@@ -112,7 +122,7 @@ class GpsItem(BaseModel):
 
 EquipmentItem = Annotated[
     SiteItem | MountItem | OTAItem | CameraItem |
-    FilterWheelItem | FocuserItem | RotatorItem | GpsItem,
+    FilterWheelItem | FocuserItem | RotatorItem | FlatPanelItem | GpsItem,
     Field(discriminator="type"),
 ]
 
@@ -120,11 +130,12 @@ EquipmentItem = Annotated[
 VALID_CHILD_TYPES: dict[str, set[str]] = {
     "site": {"mount", "gps"},
     "mount": {"ota"},
-    "ota": {"camera", "focuser", "rotator", "filter_wheel", "ota"},
+    "ota": {"camera", "focuser", "rotator", "filter_wheel", "flat_panel", "ota"},
     "focuser": {"filter_wheel", "camera"},
     "filter_wheel": {"camera"},
     "rotator": {"focuser", "filter_wheel", "camera"},
     "camera": set(),
+    "flat_panel": set(),
     "gps": set(),
 }
 

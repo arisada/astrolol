@@ -144,7 +144,7 @@ def test_profile_node_nested():
 
 def test_valid_child_types_completeness():
     """Every item type that can be a parent must declare its valid children."""
-    all_types = {"site", "mount", "ota", "camera", "filter_wheel", "focuser", "rotator", "gps"}
+    all_types = {"site", "mount", "ota", "camera", "filter_wheel", "focuser", "rotator", "flat_panel", "gps"}
     assert set(VALID_CHILD_TYPES.keys()) == all_types
 
 

@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from typing import Any, Type
 
-from astrolol.devices.base import ICamera, IMount, IFocuser, IFilterWheel, IRotator
+from astrolol.devices.base import ICamera, IMount, IFocuser, IFilterWheel, IRotator, IFlatPanel
 
 
 @dataclass
@@ -11,6 +11,7 @@ class DeviceRegistry:
     focusers: dict[str, Type[IFocuser]] = field(default_factory=dict)
     filter_wheels: dict[str, Type[IFilterWheel]] = field(default_factory=dict)
     rotators: dict[str, Type[IRotator]] = field(default_factory=dict)
+    flat_panels: dict[str, Type[IFlatPanel]] = field(default_factory=dict)
     indi_raws: dict[str, Any] = field(default_factory=dict)
     # Set by the INDI plugin so properties and load-driver endpoints can reach INDI
     indi_client: Any = None
@@ -34,6 +35,9 @@ class DeviceRegistry:
     def register_rotator(self, key: str, adapter: Type[IRotator]) -> None:
         self.rotators[key] = adapter
 
+    def register_flat_panel(self, key: str, adapter: Type[IFlatPanel]) -> None:
+        self.flat_panels[key] = adapter
+
     def register_indi_raw(self, key: str, adapter: Any) -> None:
         self.indi_raws[key] = adapter
 
@@ -44,6 +48,7 @@ class DeviceRegistry:
             "focuser": self.focusers,
             "filter_wheel": self.filter_wheels,
             "rotator": self.rotators,
+            "flat_panel": self.flat_panels,
             "indi": self.indi_raws,
         }.get(kind, {})
 
@@ -61,5 +66,6 @@ class DeviceRegistry:
             "focusers": list(self.focusers),
             "filter_wheels": list(self.filter_wheels),
             "rotators": list(self.rotators),
+            "flat_panels": list(self.flat_panels),
             "indi_raws": list(self.indi_raws),
         }

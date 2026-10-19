@@ -33,6 +33,7 @@ StepKind = Literal[
     "dither",
     "meridian_flip",
     "cooling",
+    "flat_panel",
 ]
 
 StepDetails = dict[str, str | float | int | bool | None]

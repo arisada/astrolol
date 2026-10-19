@@ -38,7 +38,7 @@ Ce qui peut aller sous quoi :
 |---|---|
 | Site d'observation | Monture, GPS |
 | Monture | Télescope / OTA |
-| Télescope / OTA | Caméra, Focuser, Rotateur, Roue à filtres, un autre Télescope (par ex. une lunette de guidage montée en parallèle du principal) |
+| Télescope / OTA | Caméra, Focuser, Rotateur, Roue à filtres, Panneau de flats, un autre Télescope (par ex. une lunette de guidage montée en parallèle du principal) |
 | Rotateur | Focuser, Roue à filtres, Caméra |
 | Focuser | Roue à filtres, Caméra |
 | Roue à filtres | Caméra |

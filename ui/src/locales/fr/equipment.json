@@ -5,7 +5,8 @@
     "focuser": "Focuser",
     "filter_wheel": "Roue à filtres",
     "rotator": "Rotateur",
-    "indi": "Appareil INDI"
+    "indi": "Appareil INDI",
+    "flat_panel": "Panneau de flats"
   },
   "itemType": {
     "site": "Site d'observation",
@@ -15,7 +16,8 @@
     "filter_wheel": "Roue à filtres",
     "focuser": "Focuser",
     "rotator": "Rotateur",
-    "gps": "GPS"
+    "gps": "GPS",
+    "flat_panel": "Panneau de flats"
   },
   "wizard": {
     "back": "Retour",

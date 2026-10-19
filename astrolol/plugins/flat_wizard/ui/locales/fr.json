@@ -42,6 +42,12 @@
     "saturation": "Garde de saturation",
     "saturationHint": "% — considéré comme écrêté au-delà"
   },
+  "panel": {
+    "title": "Panneau de flats",
+    "use": "Utiliser le panneau de flats",
+    "brightness": "Luminosité",
+    "asIs": "inchangée"
+  },
   "trial": {
     "title": "Poses d'essai",
     "start": "Durée initiale",

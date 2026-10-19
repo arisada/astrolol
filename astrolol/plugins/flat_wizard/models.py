@@ -68,6 +68,15 @@ class FlatWizardConfig(BaseModel):
     min_duration: float = Field(default=0.001, gt=0, description="Lower safety bound for trial exposures")
     max_duration: float = Field(default=30.0, gt=0, description="Upper safety bound for trial exposures")
     max_attempts: int = Field(default=8, ge=1, le=20, description="Trial exposures allowed per filter")
+    use_flat_panel: bool = Field(
+        default=False,
+        description="Close the cover and light the flat panel of each camera's telescope for "
+        "the trials and the queued flats, and release it afterwards",
+    )
+    panel_brightness: int | None = Field(
+        default=None, ge=0,
+        description="Flat panel brightness for the whole run; null = leave the panel's level as it is",
+    )
 
 
 # ── Result types ──────────────────────────────────────────────────────────────

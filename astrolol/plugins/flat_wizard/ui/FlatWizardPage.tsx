@@ -10,6 +10,7 @@ import { DurationStepper } from '@/components/ui/duration-stepper'
 import { CountStepper } from '@/components/ui/count-stepper'
 import { Input } from '@/components/ui/input'
 import { PillGroup } from '@/components/ui/pill-group'
+import { ToggleSwitch } from '@/components/ui/toggle-switch'
 import { StatusPill } from '@/components/ui/badge'
 import type { StatusPillVariant } from '@/components/ui/badge'
 import type {
@@ -36,6 +37,8 @@ interface AdvancedSettings {
   seed_duration: number
   max_duration: number
   max_attempts: number
+  use_flat_panel: boolean
+  panel_brightness: number | null
 }
 
 const DEFAULT_SETTINGS: AdvancedSettings = {
@@ -46,6 +49,8 @@ const DEFAULT_SETTINGS: AdvancedSettings = {
   seed_duration: 0.01,
   max_duration: 30,
   max_attempts: 8,
+  use_flat_panel: false,
+  panel_brightness: null,
 }
 
 const RUN_PILL_VARIANT: Record<FlatWizardRun['status'], StatusPillVariant> = {
@@ -87,6 +92,7 @@ export function FlatWizardPage() {
 
   const cameras = connectedDevices.filter((d) => d.kind === 'camera')
   const filterWheels = connectedDevices.filter((d) => d.kind === 'filter_wheel')
+  const hasFlatPanel = connectedDevices.some((d) => d.kind === 'flat_panel')
 
   const [settings, setSettings] = useState<AdvancedSettings>(DEFAULT_SETTINGS)
   const [cameraChoices, setCameraChoices] = useState<Record<string, CameraChoice>>({})
@@ -323,6 +329,36 @@ export function FlatWizardPage() {
               </div>
             )}
           </SidebarSection>
+
+          {(hasFlatPanel || settings.use_flat_panel) && (
+            <SidebarSection title={t('panel.title')}>
+              <div className="flex flex-col gap-3">
+                <div className="flex items-center gap-2">
+                  <ToggleSwitch
+                    checked={settings.use_flat_panel} disabled={busy}
+                    onChange={() => patchSettings('use_flat_panel', !settings.use_flat_panel)}
+                    label={t('panel.use')}
+                  />
+                  <span className="text-xs text-slate-300">{t('panel.use')}</span>
+                </div>
+                {settings.use_flat_panel && (
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-slate-400 w-28">{t('panel.brightness')}</span>
+                    <Input
+                      inputSize="sm" type="number" min={0} disabled={busy}
+                      value={settings.panel_brightness ?? ''}
+                      placeholder={t('panel.asIs')}
+                      onChange={(e) => patchSettings(
+                        'panel_brightness',
+                        e.target.value === '' ? null : Math.max(0, parseInt(e.target.value, 10) || 0),
+                      )}
+                      className="w-24"
+                    />
+                  </div>
+                )}
+              </div>
+            </SidebarSection>
+          )}
 
           <SidebarSection title={t('target.title')}>
             <div className="flex flex-col gap-3">

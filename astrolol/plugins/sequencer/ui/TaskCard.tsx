@@ -154,6 +154,7 @@ export function TaskCard({
               task.target.kind === 'current' ? t('card.plan.noSlew') : [task.slew && t('card.plan.slew'), task.center && t('card.plan.center')].filter(Boolean).join(' + '),
               task.start_guiding && t('card.plan.guide'),
               task.autofocus_at_start && t('card.plan.autofocus'),
+              task.use_flat_panel && t('card.plan.flatPanel'),
               lane.autofocus_on_filter_change && t('card.plan.refocus'),
               task.dither_every ? t('card.plan.ditherEvery', { n: task.dither_every }) : t('card.plan.noDither'),
               lane.order === 'round_robin' && t('card.plan.roundRobin', { n: lane.round_robin_batch }),

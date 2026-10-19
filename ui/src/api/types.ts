@@ -1,7 +1,7 @@
 // Hand-written types mirroring the Python Pydantic models.
 // Run `npm run generate-api-types` to regenerate from the live OpenAPI spec.
 
-export type DeviceKind = 'camera' | 'mount' | 'focuser' | 'filter_wheel' | 'rotator' | 'indi'
+export type DeviceKind = 'camera' | 'mount' | 'focuser' | 'filter_wheel' | 'rotator' | 'flat_panel' | 'indi'
 export type DeviceState = 'disconnected' | 'connecting' | 'connected' | 'busy' | 'error'
 
 export interface PairedSerialDevice {
@@ -258,6 +258,8 @@ export interface FlatWizardConfig {
   min_duration?: number
   max_duration?: number
   max_attempts?: number
+  use_flat_panel?: boolean
+  panel_brightness?: number | null   // null = leave the panel's level as it is
 }
 
 export interface FlatTrial {
@@ -475,6 +477,7 @@ export interface SequencerExposureGroup {
   binning: number
   gain: number | null
   frame_type: 'light' | 'dark' | 'flat' | 'bias'
+  panel_brightness: number | null
 }
 
 export interface SequencerLane {
@@ -496,6 +499,7 @@ export interface SequencerTask {
   center: boolean
   start_guiding: boolean
   autofocus_at_start: boolean
+  use_flat_panel: boolean
   wait_for_temperature: boolean
   dither_every: number | null
   sub_delay_s: number
@@ -506,7 +510,7 @@ export type SequencerTaskStatus = 'pending' | 'running' | 'interrupted' | 'compl
 export type SequencerRunState = 'idle' | 'starting' | 'running' | 'pausing' | 'paused' | 'stopping'
 export type SequencerActivity =
   | 'unparking' | 'slewing' | 'centering' | 'starting_guiding' | 'focusing' | 'changing_filter'
-  | 'exposing' | 'dithering' | 'waiting_for_primary' | 'waiting_for_guiding' | 'meridian_flip' | 'cooling'
+  | 'exposing' | 'dithering' | 'waiting_for_primary' | 'waiting_for_guiding' | 'meridian_flip' | 'cooling' | 'flat_panel'
   | 'parking' | 'waiting'
 export type SequencerStallKind = 'guiding' | 'centering' | 'autofocus'
 export type SequencerBoundary = 'now' | 'frame' | 'task'
@@ -766,6 +770,18 @@ export interface FilterWheelStatus {
   is_moving: boolean
 }
 
+export type CoverState = 'open' | 'closed' | 'moving' | 'unknown'
+
+export interface FlatPanelStatus {
+  state: DeviceState
+  has_cover: boolean
+  cover: CoverState | null
+  has_light: boolean
+  light_on: boolean | null
+  brightness: number | null
+  max_brightness: number | null
+}
+
 export interface ChannelStats {
   name: 'R' | 'G' | 'B'
   histogram: number[]
@@ -815,7 +831,7 @@ export interface ImagerStatus {
 
 export type EquipmentItemType =
   | 'site' | 'mount' | 'ota' | 'camera'
-  | 'filter_wheel' | 'focuser' | 'rotator' | 'gps'
+  | 'filter_wheel' | 'focuser' | 'rotator' | 'flat_panel' | 'gps'
 
 interface BaseEquipmentItem { id: string; name: string }
 
@@ -869,6 +885,13 @@ export interface RotatorEquipmentItem extends BaseEquipmentItem {
   adapter_key: string | null
   connect_params: Record<string, unknown>
 }
+export interface FlatPanelEquipmentItem extends BaseEquipmentItem {
+  type: 'flat_panel'
+  indi_driver: string | null
+  indi_device_name: string | null
+  adapter_key: string | null
+  connect_params: Record<string, unknown>
+}
 export interface GpsEquipmentItem extends BaseEquipmentItem {
   type: 'gps'
   indi_driver: string | null
@@ -880,7 +903,7 @@ export interface GpsEquipmentItem extends BaseEquipmentItem {
 export type EquipmentItem =
   | SiteEquipmentItem | MountEquipmentItem | OTAEquipmentItem
   | CameraEquipmentItem | FilterWheelEquipmentItem | FocuserEquipmentItem
-  | RotatorEquipmentItem | GpsEquipmentItem
+  | RotatorEquipmentItem | FlatPanelEquipmentItem | GpsEquipmentItem
 
 // --- Equipment profiles ---
 
@@ -930,6 +953,8 @@ export interface OpticalPath {
 
   rotator: RotatorEquipmentItem | null
   rotator_device_id: string | null
+  flat_panel: FlatPanelEquipmentItem | null
+  flat_panel_device_id: string | null
 }
 
 // --- Device properties (INDI) ---

@@ -152,6 +152,8 @@ class IndiConnectionManager:
             roles.append("filter_wheel")
         if client._get_vector(device_name, "ABS_ROTATOR_ANGLE") is not None:
             roles.append("rotator")
+        if client._get_vector(device_name, "FLAT_LIGHT_CONTROL") is not None or client._get_vector(device_name, "CAP_PARK") is not None:
+            roles.append("flat_panel")
         return roles
 
     @property
@@ -379,6 +381,49 @@ def _make_rotator_class(manager: IndiConnectionManager):
     return _Rotator
 
 
+def _make_flat_panel_class(manager: IndiConnectionManager):
+    from astrolol.devices.indi.flat_panel import IndiFlatPanel
+
+    class _FlatPanel(IndiFlatPanel):
+        _manager = manager
+
+        def __init__(self, device_name: str, executable: str = "",
+                     pre_connect_props: dict | None = None,
+                     device_port: str = "", device_baud_rate: str = "", **_kwargs):
+            props = dict(pre_connect_props or {})
+            if device_port and "DEVICE_PORT" not in props:
+                props["DEVICE_PORT"] = {"values": {"PORT": device_port}}
+            if device_baud_rate and "DEVICE_BAUD_RATE" not in props:
+                props["DEVICE_BAUD_RATE"] = {"on_elements": [device_baud_rate]}
+            super().__init__(device_name=device_name, client=manager.client,
+                             pre_connect_props=props or None)
+            self._executable = executable
+
+        async def connect(self) -> None:
+            if self._manager._server.manage and not self._executable:
+                raise ValueError(
+                    "INDI driver executable is required when astrolol manages indiserver. "
+                    "Select a driver from the catalog or enter an executable name "
+                    "(e.g. indi_flipflat)."
+                )
+            await self._manager.acquire()
+            if self._executable:
+                await self._manager.load_driver(self._executable)
+            await super().connect()
+
+        async def disconnect(self) -> None:
+            try:
+                await super().disconnect()
+            finally:
+                if self._executable:
+                    await self._manager.unload_driver(self._executable)
+                await self._manager.release()
+
+    _FlatPanel.__name__ = "IndiFlatPanel"
+    _FlatPanel.__qualname__ = "IndiFlatPanel"
+    return _FlatPanel
+
+
 def _make_indi_raw_class(manager: IndiConnectionManager):
     from astrolol.devices.indi.raw import IndiRawDevice
 
@@ -425,6 +470,7 @@ class IndiPlugin:
         registry.register_focuser("indi_focuser", _make_focuser_class(manager))
         registry.register_filter_wheel("indi_filter_wheel", _make_filter_wheel_class(manager))
         registry.register_rotator("indi_rotator", _make_rotator_class(manager))
+        registry.register_flat_panel("indi_flat_panel", _make_flat_panel_class(manager))
         registry.register_indi_raw("indi_raw", _make_indi_raw_class(manager))
         registry.indi_client = manager.client
         registry.indi_manager = manager

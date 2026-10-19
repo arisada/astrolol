@@ -328,3 +328,107 @@ def test_a_camera_may_appear_only_once() -> None:
     spec = FlatWizardCameraSpec(camera_id="cam_1", filters=[FlatWizardFilterSpec(count=1)])
     with pytest.raises(ValueError, match="only once"):
         FlatWizardConfig(cameras=[spec, spec])
+
+
+# ── Flat panel ───────────────────────────────────────────────────────────────
+
+class RecordingPanel:
+    """A cover + light panel; notes the light level at each trial exposure."""
+
+    def __init__(self) -> None:
+        self.cover = "open"
+        self.light_on = False
+        self.brightness = 0
+        self.calls: list[tuple[str, object]] = []
+
+    async def get_status(self, panel_id: str) -> SimpleNamespace:
+        return SimpleNamespace(
+            has_cover=True, cover=self.cover, has_light=True,
+            light_on=self.light_on, brightness=self.brightness,
+        )
+
+    async def close_cover(self, panel_id: str) -> None:
+        self.calls.append(("close", None))
+        self.cover = "closed"
+
+    async def open_cover(self, panel_id: str) -> None:
+        self.calls.append(("open", None))
+        self.cover = "open"
+
+    async def set_light(self, panel_id: str, on: bool, brightness: int | None = None) -> None:
+        self.calls.append(("light", (on, brightness)))
+        self.light_on = on
+        if brightness is not None:
+            self.brightness = brightness
+
+
+def _panel_app(imager: object, panel: RecordingPanel, connected: list[str]) -> tuple[SimpleNamespace, AsyncMock]:
+    app, sequencer = _app_with_sequencer(imager)
+    app.state.flat_panel_manager = panel
+    app.state.device_manager = SimpleNamespace(
+        list_connected=lambda: [{"device_id": d, "kind": "flat_panel"} for d in connected]
+    )
+    return app, sequencer
+
+
+@pytest.mark.asyncio
+async def test_panel_is_lit_for_the_trials_and_released_before_the_flats_are_queued() -> None:
+    panel = RecordingPanel()
+
+    class Imager(LinearFakeImager):
+        async def expose(self, camera_id: str, request: ExposureRequest) -> None:
+            assert panel.cover == "closed" and panel.light_on and panel.brightness == 120
+            await super().expose(camera_id, request)
+
+    app, sequencer = _panel_app(Imager(gain_per_second=10_000.0), panel, ["panel1"])
+    config = _config(FlatWizardFilterSpec(count=5), use_flat_panel=True, panel_brightness=120)
+
+    run = await _run_to_end(_engine(app), config)
+
+    assert run.status == "completed"
+    assert panel.calls[0] == ("close", None)
+    assert panel.calls[1] == ("light", (True, 120))
+    assert panel.calls[-2:] == [("light", (False, None)), ("open", None)]
+    task = sequencer.add.await_args.args[0]
+    assert task.use_flat_panel is True
+    assert task.lanes[0].groups[0].panel_brightness == 120
+
+
+@pytest.mark.asyncio
+async def test_panel_is_released_when_the_run_is_aborted() -> None:
+    panel = RecordingPanel()
+    app, _ = _panel_app(LinearFakeImager(gain_per_second=10_000.0, delay=5.0), panel, ["panel1"])
+    engine = _engine(app)
+    await engine.start(_config(FlatWizardFilterSpec(count=5), use_flat_panel=True))
+    await asyncio.sleep(0.05)
+    assert panel.light_on
+
+    await engine.abort()
+
+    assert not panel.light_on and panel.cover == "open"
+
+
+@pytest.mark.asyncio
+async def test_a_camera_without_a_panel_fails_the_run_before_any_exposure() -> None:
+    imager = LinearFakeImager(gain_per_second=10_000.0)
+    app, sequencer = _panel_app(imager, RecordingPanel(), connected=[])
+
+    run = await _run_to_end(_engine(app), _config(FlatWizardFilterSpec(count=5), use_flat_panel=True))
+
+    assert run.status == "failed"
+    assert "flat panel" in (run.error or "").lower()
+    assert imager.exposures == []
+    sequencer.add.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_without_the_option_the_panel_is_left_alone() -> None:
+    panel = RecordingPanel()
+    app, sequencer = _panel_app(LinearFakeImager(gain_per_second=10_000.0), panel, ["panel1"])
+
+    await _run_to_end(_engine(app), _config(FlatWizardFilterSpec(count=5), panel_brightness=120))
+
+    assert panel.calls == []
+    task = sequencer.add.await_args.args[0]
+    assert task.use_flat_panel is False
+    assert task.lanes[0].groups[0].panel_brightness is None

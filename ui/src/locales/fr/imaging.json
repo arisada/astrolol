@@ -55,6 +55,20 @@
   "noCamera": "Aucune caméra connectée.",
   "widget": {
     "focuser": "Focuseur",
-    "filterWheel": "Roue à filtres"
+    "filterWheel": "Roue à filtres",
+    "flatPanel": "Panneau de flats"
+  },
+  "flatPanel": {
+    "cover": "Cache",
+    "light": "Lumière",
+    "brightness": "Luminosité",
+    "openCover": "Ouvrir",
+    "closeCover": "Fermer",
+    "state": {
+      "open": "ouvert",
+      "closed": "fermé",
+      "moving": "en mouvement",
+      "unknown": "inconnu"
+    }
   }
 }

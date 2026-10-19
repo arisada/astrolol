@@ -4,6 +4,7 @@ import {
   Camera, ChevronLeft, CircleDot, Compass, Crosshair, Focus, Globe,
   Link2, LoaderPinwheel, MapPin, PackageCheck, PackagePlus, Pencil, Plug, PlugZap, Plus, RefreshCw,
   Telescope, Trash2, TriangleAlert, Wind,
+  Lightbulb,
 } from 'lucide-react'
 import { DmsInput } from '@/components/ui/dms-input'
 import { api } from '@/api/client'
@@ -51,6 +52,7 @@ const KIND_ADAPTER: Record<DeviceKind, string> = {
   focuser: 'indi_focuser',
   filter_wheel: 'indi_filter_wheel',
   rotator: 'indi_rotator',
+  flat_panel: 'indi_flat_panel',
   indi: 'indi_raw',
 }
 
@@ -61,6 +63,7 @@ const KIND_REGISTRY_KEY: Record<DeviceKind, string> = {
   focuser: 'focusers',
   filter_wheel: 'filter_wheels',
   rotator: 'rotators',
+  flat_panel: 'flat_panels',
   indi: 'indi_raws',
 }
 
@@ -69,6 +72,7 @@ function KindIcon({ kind, size = 28 }: { kind: DeviceKind; size?: number }) {
   if (kind === 'mount') return <Telescope size={size} />
   if (kind === 'filter_wheel') return <LoaderPinwheel size={size} />
   if (kind === 'rotator') return <CircleDot size={size} />
+  if (kind === 'flat_panel') return <Lightbulb size={size} />
   return <Crosshair size={size} />
 }
 
@@ -102,7 +106,7 @@ function StepBack({ onClick }: { onClick: () => void }) {
 // Step 1 — choose device type
 function TypeStep({ onSelect }: { onSelect: (kind: DeviceKind) => void }) {
   const { t } = useTranslation('equipment')
-  const kinds: DeviceKind[] = ['camera', 'mount', 'focuser', 'filter_wheel']
+  const kinds: DeviceKind[] = ['camera', 'mount', 'focuser', 'filter_wheel', 'flat_panel']
   return (
     <div>
       <p className="text-xs text-slate-500 mb-4">{t('wizard.typeQuestion')}</p>
@@ -846,6 +850,7 @@ function ItemTypeIcon({ type, size = 16 }: { type: EquipmentItemType; size?: num
   if (type === 'filter_wheel') return <LoaderPinwheel size={size} />
   if (type === 'focuser') return <Focus size={size} />
   if (type === 'rotator') return <CircleDot size={size} />
+  if (type === 'flat_panel') return <Lightbulb size={size} />
   if (type === 'gps') return <Globe size={size} />
   return <Wind size={size} />
 }
@@ -858,6 +863,7 @@ const ITEM_EXAMPLE_NAMES: Record<EquipmentItemType, string> = {
   filter_wheel: 'ZWO EFW 8-position',
   focuser: 'Pegasus FocusCube 3',
   rotator: 'Pegasus Falcon Rotator',
+  flat_panel: 'Optec Flip-Flat',
   gps: 'RaspiGPS',
 }
 
@@ -1228,7 +1234,7 @@ function InventorySection({ items, deviceStates, reload, importItem, onImportDon
     return acc
   }, {})
 
-  const allTypes: EquipmentItemType[] = ['site', 'mount', 'ota', 'camera', 'filter_wheel', 'focuser', 'rotator', 'gps']
+  const allTypes: EquipmentItemType[] = ['site', 'mount', 'ota', 'camera', 'filter_wheel', 'focuser', 'rotator', 'flat_panel', 'gps']
   const hasSite = items.some((item) => item.type === 'site')
 
   return (

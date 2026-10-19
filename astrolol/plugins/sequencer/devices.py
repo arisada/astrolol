@@ -23,6 +23,7 @@ class LaneDevices:
     filter_wheel_id: str | None
     focuser_id: str | None
     mount_id: str | None
+    flat_panel_id: str | None
     from_profile: bool  # False = no optical path for this camera, fell back to guesses
 
 
@@ -31,6 +32,11 @@ def _connected(app: Any, kind: str) -> list[str]:
     if dm is None:
         return []
     return [d["device_id"] for d in dm.list_connected() if d["kind"] == kind]
+
+
+def _only_connected(app: Any, kind: str) -> str | None:
+    ids = _connected(app, kind)
+    return ids[0] if len(ids) == 1 else None
 
 
 def optical_paths(app: Any) -> list[OpticalPath]:
@@ -84,17 +90,15 @@ def resolve_lane_devices(app: Any, lane: Lane) -> LaneDevices:
             filter_wheel_id=path.filter_wheel_device_id,
             focuser_id=path.focuser_device_id,
             mount_id=path.mount_device_id,
+            flat_panel_id=path.flat_panel_device_id or _only_connected(app, "flat_panel"),
             from_profile=True,
         )
 
-    def _only(kind: str) -> str | None:
-        ids = _connected(app, kind)
-        return ids[0] if len(ids) == 1 else None
-
     return LaneDevices(
         camera_id=camera_id,
-        filter_wheel_id=_only("filter_wheel"),
-        focuser_id=_only("focuser"),
-        mount_id=_only("mount"),
+        filter_wheel_id=_only_connected(app, "filter_wheel"),
+        focuser_id=_only_connected(app, "focuser"),
+        mount_id=_only_connected(app, "mount"),
+        flat_panel_id=_only_connected(app, "flat_panel"),
         from_profile=False,
     )

@@ -87,6 +87,12 @@ class ExposureGroup(BaseModel):
     binning: int = Field(default=1, ge=1, le=4)
     gain: int | None = Field(default=None, ge=0, description="null = leave driver gain unchanged")
     frame_type: Literal["light", "dark", "flat", "bias"] = "light"
+    panel_brightness: int | None = Field(
+        default=None,
+        ge=0,
+        description="Flat panel brightness for these frames (task.use_flat_panel); "
+        "null = leave the panel where it is",
+    )
 
 
 class Lane(BaseModel):
@@ -123,6 +129,11 @@ class ImagingTask(BaseModel):
     center: bool = Field(default=True, description="Plate-solve centering after the slew")
     start_guiding: bool = Field(default=True, description="Start guiding and wait for settle")
     autofocus_at_start: bool = False
+    use_flat_panel: bool = Field(
+        default=False,
+        description="Flats: close the cover and light the panel in front of each lane's "
+        "telescope before its frames; switch the light off and open the cover afterwards",
+    )
     wait_for_temperature: bool = Field(
         default=False,
         description="Before imaging, wait until every cooled camera with a set point reaches it",
@@ -183,6 +194,7 @@ class Activity(StrEnum):
     WAITING_FOR_GUIDING = "waiting_for_guiding"
     MERIDIAN_FLIP = "meridian_flip"
     COOLING = "cooling"
+    FLAT_PANEL = "flat_panel"
     PARKING = "parking"
     WAITING = "waiting"
 
