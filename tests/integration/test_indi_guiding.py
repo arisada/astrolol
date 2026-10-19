@@ -12,7 +12,7 @@ from astrolol.core.events import EventBus
 from astrolol.core.guiding import SettleParams
 from astrolol.plugins.guider.guider import BuiltinGuider
 from astrolol.plugins.guider.settings import GuiderSettings, pick_pulse_guider
-from tests.integration.test_indi_simulators import _start_indiserver, _stop
+from tests.indi_server import set_scope_info, start_indiserver as _start_indiserver, stop_indiserver as _stop
 
 # Real-time: each test guides for minutes of wall-clock time (~7 min in all), so these are
 # deselected by default (see pyproject.toml). Run them before a release and after any
@@ -44,6 +44,7 @@ async def rig(server, tmp_path_factory):
     cam = IndiCamera("Guide Simulator", client, images_dir=tmp_path_factory.mktemp("g"))
     await mount.connect()
     await cam.connect()
+    await set_scope_info(client, "Guide Simulator")
     await cam.set_active_telescope("Telescope Simulator")
     # The simulator starts at the celestial pole, where its star field is not stable: point it
     # at a normal target and track, so the only motion is what the guider causes.

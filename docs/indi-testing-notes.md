@@ -199,7 +199,9 @@ nothing to take the values from. The test passes on 1.9.9 and on 2.2.5 once the 
 is set.
 
 **Fix:** Set the CCD simulator's own `SCOPE_INFO` (`FOCAL_LENGTH`, `APERTURE`) before
-exposing. A real rig gets them from the profile's optical train.
+exposing. A real rig gets them from the profile's optical train. The tests do it with
+`set_scope_info()` (`tests/indi_server.py`) for the CCD and guide simulators; without it the
+guide simulator's streamed frames are blank too.
 
 **Not the cause:** the horizon. Slews to targets below the horizon run normally in the
 simulator (`EQUATORIAL_EOD_COORD` stays Busy for the whole slew). The refusal seen on the
@@ -219,3 +221,22 @@ the hour angle only from those two properties.
 
 **Fix:** `IndiMount._sky_position()` takes whatever the driver publishes and works out the
 rest from the driver's `GEOGRAPHIC_COORD` (see `tests/unit/test_indi_mount_sky.py`).
+
+---
+
+## 13. Tests must not read or write the developer's `~/.indi`
+
+**Symptom:** None yet, which is the problem: INDI drivers load saved configs, park data and
+scope configs from `$HOME/.indi` and save back to it, so a simulator can behave differently on
+a machine that has run INDI before, and the tests change the developer's saved configs.
+
+**Fix:** The root `conftest.py` creates an empty directory for the whole test session
+(`ASTROLOL_TEST_INDI_HOME`), and `tests/indi_server.py` (`start_indiserver()`) gives every
+indiserver its own empty `HOME` inside it. Only the indiserver process gets the new `HOME`: the
+test process keeps its own, since astropy and others cache there. Start indiserver in tests
+through that helper, not with `subprocess` directly.
+
+**Also:** a test that looks at pixels must not rely on where the simulator happens to draw
+stars. The empty sky is perfectly flat (pixel value 1, no noise), so point the telescope
+simulator at a known field and put the ROI on a star. After stopping a stream, starting another
+one on INDI 2.2.5 delivered no frames in a quick test, so tests do not restart streams.

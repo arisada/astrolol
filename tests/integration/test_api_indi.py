@@ -17,14 +17,14 @@ from __future__ import annotations
 
 import asyncio
 import shutil
-import socket
-import subprocess
-import time
 from pathlib import Path
 from typing import Any, Callable
 
 import pytest
 from httpx import ASGITransport, AsyncClient
+
+from tests.indi_server import start_indiserver as _start_indiserver
+from tests.indi_server import stop_indiserver as _stop
 
 
 async def _poll_until(
@@ -78,51 +78,8 @@ _BASE_PORT = 17700
 
 
 # ---------------------------------------------------------------------------
-# Helpers (identical contract to test_indi_simulators helpers)
+# Helpers
 # ---------------------------------------------------------------------------
-
-def _start_indiserver(port: int, *drivers: str) -> subprocess.Popen:
-    # Use a unique socket path so this instance does not collide with a
-    # running indiserver (default /tmp/indiserver) or the simulator test module.
-    socket_path = f"/tmp/indiserver_api_{port}"
-    proc = subprocess.Popen(
-        ["indiserver", "-p", str(port), "-u", socket_path, *drivers],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-    )
-    deadline = time.monotonic() + 5.0
-    connected = False
-    while time.monotonic() < deadline:
-        if proc.poll() is not None:
-            pytest.skip(
-                f"indiserver exited immediately (rc={proc.returncode}, drivers={drivers})"
-            )
-        try:
-            with socket.create_connection(("localhost", port), timeout=0.5):
-                connected = True
-                break
-        except OSError:
-            time.sleep(0.2)
-    if not connected:
-        proc.kill()
-        proc.wait()
-        pytest.skip(f"indiserver did not open port {port} within 5s (drivers={drivers})")
-    time.sleep(0.1)
-    if proc.poll() is not None:
-        pytest.skip(
-            f"indiserver crashed after bind (rc={proc.returncode}, drivers={drivers})"
-        )
-    return proc
-
-
-def _stop(proc: subprocess.Popen) -> None:
-    proc.terminate()
-    try:
-        proc.wait(timeout=5)
-    except subprocess.TimeoutExpired:
-        proc.kill()
-        proc.wait()
-
 
 def _make_unmanaged_app(port: int, images_dir: Path):
     """

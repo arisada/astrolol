@@ -10,12 +10,12 @@ from __future__ import annotations
 
 import asyncio
 import shutil
-import subprocess
-import tempfile
-import time
 from pathlib import Path
 
 import pytest
+
+from tests.indi_server import start_indiserver as _start_indiserver
+from tests.indi_server import stop_indiserver as _stop
 
 pytestmark = pytest.mark.skipif(
     shutil.which("indiserver") is None,
@@ -23,52 +23,6 @@ pytestmark = pytest.mark.skipif(
 )
 
 _BASE_PORT = 17600
-
-
-def _start_indiserver(port: int, *drivers: str) -> subprocess.Popen:
-    import socket
-    # Use a unique socket path so this instance does not collide with a
-    # running indiserver (which binds /tmp/indiserver by default) or with
-    # the API integration test module which runs its own instance.
-    socket_path = f"/tmp/indiserver_sim_{port}"
-    proc = subprocess.Popen(
-        ["indiserver", "-p", str(port), "-u", socket_path, *drivers],
-        stdout=subprocess.DEVNULL,
-        stderr=subprocess.DEVNULL,
-    )
-    # Block until indiserver is accepting TCP connections (up to 5 s)
-    deadline = time.monotonic() + 5.0
-    connected = False
-    while time.monotonic() < deadline:
-        if proc.poll() is not None:
-            pytest.skip(
-                f"indiserver exited immediately (rc={proc.returncode}, drivers={drivers})"
-            )
-        try:
-            with socket.create_connection(("localhost", port), timeout=0.5):
-                connected = True
-                break
-        except OSError:
-            time.sleep(0.2)
-    if not connected:
-        proc.kill()
-        proc.wait()
-        pytest.skip(f"indiserver did not open port {port} within 5 s (drivers={drivers})")
-    time.sleep(0.1)  # brief margin for INDI protocol init
-    if proc.poll() is not None:
-        pytest.skip(
-            f"indiserver crashed after bind (rc={proc.returncode}, drivers={drivers})"
-        )
-    return proc
-
-
-def _stop(proc: subprocess.Popen) -> None:
-    proc.terminate()
-    try:
-        proc.wait(timeout=5)
-    except subprocess.TimeoutExpired:
-        proc.kill()
-        proc.wait()
 
 
 # ---------------------------------------------------------------------------

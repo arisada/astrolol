@@ -21,7 +21,7 @@ from astrolol.core.events import EventBus
 from astrolol.plugins.autofocus import engine as engine_mod
 from astrolol.plugins.autofocus.engine import AutofocusEngine
 from astrolol.plugins.autofocus.models import AutofocusSettings
-from tests.integration.test_indi_simulators import _start_indiserver, _stop
+from tests.indi_server import set_scope_info, start_indiserver as _start_indiserver, stop_indiserver as _stop
 
 
 def _gsc_dir() -> str | None:
@@ -85,6 +85,7 @@ async def sim_rig(tmp_path_factory: pytest.TempPathFactory):
         images_dir=tmp_path_factory.mktemp("autofocus_sim"),
     )
     await camera.connect()
+    await set_scope_info(clients[0], "CCD Simulator")
     try:
         yield SimpleNamespace(camera=camera, focuser=focuser, mount=mount)
     finally:
