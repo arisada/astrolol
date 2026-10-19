@@ -456,8 +456,7 @@ python3 -m pytest -m slow tests/integration/test_indi_guiding.py -v
 python3 -m pytest tests/ astrolol/plugins/ -m "slow or not slow"   # everything, slow included
 ```
 
-Current count: **803 unit tests**, **49 integration tests** (3 of them slow), **1241 plugin tests** (1 slow)
-(all passing).
+There are thousands of tests across unit, integration and plugin suites, a few of them slow (all passing).
 
 ### UI unit tests
 
@@ -673,8 +672,8 @@ ui/
 
 tests/
 ├── conftest.py         # FakeCamera (real FITS), FakeMount, FakeFocuser + fixtures
-├── unit/               # 672 tests — no hardware required
-└── integration/        # 37 tests — require indiserver (skipped if not installed)
+├── unit/               # no hardware required
+└── integration/        # require indiserver (skipped if not installed)
 ```
 
 ## Deferred work

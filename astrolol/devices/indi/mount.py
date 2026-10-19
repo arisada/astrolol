@@ -10,11 +10,15 @@ INDI telescope properties used:
   TELESCOPE_TRACK_RATE  SWITCH  TRACK_SIDEREAL / TRACK_LUNAR / TRACK_SOLAR
   TELESCOPE_PIER_SIDE   SWITCH  PIER_EAST / PIER_WEST  (read; write triggers flip on EQMod)
   TIME_LST              NUMBER  LST  — used to derive hour angle when no direct HA property
+  HORIZONTAL_COORD      NUMBER  ALT, AZ
+  GEOGRAPHIC_COORD      NUMBER  LAT, LONG — LST / alt / az are worked out from it when the
+                                driver does not publish TIME_LST / HORIZONTAL_COORD
   TELESCOPE_INFO        NUMBER  — info block (used for ping)
 """
 from __future__ import annotations
 
 import time
+from datetime import datetime, timezone
 from typing import Callable
 
 import structlog
@@ -30,6 +34,7 @@ from astrolol.devices.base.models import (
 from astrolol.devices.indi.client import IndiClient
 from astrolol.devices.base.pulse import PulseDirection
 from astrolol.devices.indi.pulse import indi_pulse_guide
+from astrolol.mount.sky import alt_az, local_sidereal_time_h
 
 logger = structlog.get_logger()
 
@@ -38,6 +43,11 @@ def _to_jnow(coord: SkyCoord) -> SkyCoord:
     """Convert any SkyCoord to true-equator/true-equinox-of-date apparent coordinates
     (precession + nutation + annual aberration), the frame INDI EQUATORIAL_EOD_COORD uses."""
     return coord.transform_to(TETE(obstime=Time.now()))
+
+
+def _wrap_hours(ha: float) -> float:
+    """Hour angle folded into [-12, 12)."""
+    return (ha + 12.0) % 24.0 - 12.0
 
 
 def _jnow_to_icrs(ra_hours: float, dec_deg: float) -> SkyCoord | None:
@@ -73,6 +83,29 @@ class IndiMount:
         self._is_tracking = False
         self._on_coords_cb: Callable[[float | None, float | None, float | None, float | None], None] | None = None
         self._last_coords_publish: float = 0.0
+
+    def _sky_position(
+        self, ra_jnow: float | None, dec_jnow: float | None
+    ) -> tuple[float | None, float | None, float | None, float | None]:
+        """(alt, az, lst, hour_angle) of the current pointing.
+
+        Taken from the driver's HORIZONTAL_COORD and TIME_LST when it publishes them; many
+        drivers (the telescope simulator among them) do not, so whatever is missing is worked
+        out from the site the driver holds in GEOGRAPHIC_COORD.
+        """
+        alt = self._client.get_number_nowait(self._device_name, "HORIZONTAL_COORD", "ALT")
+        az = self._client.get_number_nowait(self._device_name, "HORIZONTAL_COORD", "AZ")
+        lst = self._client.get_number_nowait(self._device_name, "TIME_LST", "LST")
+        if lst is None or alt is None or az is None:
+            lat = self._client.get_number_nowait(self._device_name, "GEOGRAPHIC_COORD", "LAT")
+            lon = self._client.get_number_nowait(self._device_name, "GEOGRAPHIC_COORD", "LONG")
+            if lat is not None and lon is not None:
+                if lst is None:
+                    lst = local_sidereal_time_h(datetime.now(timezone.utc), lon)
+                if (alt is None or az is None) and ra_jnow is not None and dec_jnow is not None:
+                    alt, az = alt_az(_wrap_hours(lst - ra_jnow), dec_jnow, lat)
+        hour_angle = _wrap_hours(lst - ra_jnow) if lst is not None and ra_jnow is not None else None
+        return alt, az, lst, hour_angle
 
     def set_coords_listener(
         self,
@@ -113,8 +146,7 @@ class IndiMount:
         ra = icrs.ra.hour if icrs is not None else None
         dec = icrs.dec.deg if icrs is not None else None
 
-        alt = self._client.get_number_nowait(self._device_name, "HORIZONTAL_COORD", "ALT")
-        az  = self._client.get_number_nowait(self._device_name, "HORIZONTAL_COORD", "AZ")
+        alt, az, lst, hour_angle = self._sky_position(ra_jnow, dec_jnow)
 
         pier_east = self._client.get_switch_state_nowait(
             self._device_name, "TELESCOPE_PIER_SIDE", "PIER_EAST"
@@ -122,16 +154,6 @@ class IndiMount:
         pier_side: str | None = None
         if pier_east is not None:
             pier_side = "East" if pier_east else "West"
-
-        lst = self._client.get_number_nowait(self._device_name, "TIME_LST", "LST")
-        hour_angle: float | None = None
-        if ra_jnow is not None and lst is not None:
-            ha = lst - ra_jnow
-            while ha > 12:
-                ha -= 24
-            while ha < -12:
-                ha += 24
-            hour_angle = ha
 
         track_on = self._client.get_switch_state_nowait(
             self._device_name, "TELESCOPE_TRACK_STATE", "TRACK_ON"
@@ -295,20 +317,7 @@ class IndiMount:
         if pier_east is not None:
             pier_side = "East" if pier_east else "West"
 
-        # Hour angle must be computed from JNow RA (same frame as LST).
-        hour_angle: float | None = None
-        lst: float | None = None
-        lst = self._client.get_number_nowait(self._device_name, "TIME_LST", "LST")
-        if ra_jnow is not None and lst is not None:
-            ha = lst - ra_jnow
-            while ha > 12:
-                ha -= 24
-            while ha < -12:
-                ha += 24
-            hour_angle = ha
-
-        alt = self._client.get_number_nowait(self._device_name, "HORIZONTAL_COORD", "ALT")
-        az  = self._client.get_number_nowait(self._device_name, "HORIZONTAL_COORD", "AZ")
+        alt, az, lst, hour_angle = self._sky_position(ra_jnow, dec_jnow)
 
         v = self._client._get_vector(self._device_name, "EQUATORIAL_EOD_COORD")
         is_slewing = v is not None and v.state == "Busy"
