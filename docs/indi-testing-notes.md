@@ -182,3 +182,40 @@ the device still at its starting position.
 2. **Phase 2** — poll at normal intervals until `state != busy`.
 
 See `_wait_move_done()` in `tests/integration/test_api_indi.py`.
+
+---
+
+## 11. CCD simulator draws no stars when the focal length is 0 (INDI 2.2.5)
+
+**Symptom:** The autofocus simulator test (`astrolol/plugins/autofocus/tests/test_autofocus_simulator.py`)
+fails with "No stars detected at any focuser position". The mount did reach the target, but
+the CCD simulator logs `[WARNING] No stars found in field -- check gsc catalog coverage for
+this region.` on every exposure, and `gsc` itself works.
+
+**Root cause:** The CCD simulator sizes the field of view from the focal length and aperture
+in its `SCOPE_INFO`. With INDI 2.2.5 both are 0 on a fresh simulator, so the field is empty.
+The 2.2.5 telescope simulator also publishes no `TELESCOPE_INFO` (1.9.9 does), so there is
+nothing to take the values from. The test passes on 1.9.9 and on 2.2.5 once the focal length
+is set.
+
+**Fix:** Set the CCD simulator's own `SCOPE_INFO` (`FOCAL_LENGTH`, `APERTURE`) before
+exposing. A real rig gets them from the profile's optical train.
+
+**Not the cause:** the horizon. Slews to targets below the horizon run normally in the
+simulator (`EQUATORIAL_EOD_COORD` stays Busy for the whole slew). The refusal seen on the
+Mount page is astrolol's own horizon limit in `MountManager`, which a test that drives the
+adapter directly never goes through.
+
+---
+
+## 12. The telescope simulator publishes no LST, alt/az or hour angle
+
+**Symptom:** The sky widgets (position, horizon, the Mount page) stay empty with the INDI
+telescope simulator although the profile has a site and astrolol pushed it to the driver.
+
+**Root cause:** `indi_simulator_telescope` (1.9.9 and 2.2.5, with a location and time set)
+defines neither `TIME_LST` nor `HORIZONTAL_COORD`. `IndiMount` used to read lst, alt, az and
+the hour angle only from those two properties.
+
+**Fix:** `IndiMount._sky_position()` takes whatever the driver publishes and works out the
+rest from the driver's `GEOGRAPHIC_COORD` (see `tests/unit/test_indi_mount_sky.py`).
