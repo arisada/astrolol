@@ -4,5 +4,5 @@
 set -e
 data="${ASTROLOL_DATA_DIR:-/data}"
 mkdir -p "$data"
-cp /app/docker/demo/profiles.json /app/docker/demo/inventory.json "$data/"
+cp /app/docker/demo/*.json "$data/"
 exec "$@"

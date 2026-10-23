@@ -1,0 +1,72 @@
+{
+  "schema_version": 2,
+  "entries": [
+    {
+      "task": {
+        "id": "00000000-0000-4000-8000-000000000200",
+        "name": "Double Cluster",
+        "target": {
+          "kind": "coordinates",
+          "name": "Perseus Double Cluster (NGC 869/884)",
+          "favorite_id": null,
+          "catalog_id": null,
+          "ra": 35.25,
+          "dec": 57.13
+        },
+        "lanes": [
+          {
+            "id": "00000000-0000-4000-8000-000000000201",
+            "camera_id": "camera_ccd_simulator",
+            "groups": [
+              {
+                "filter_name": null,
+                "duration": 60.0,
+                "count": 10,
+                "binning": 1,
+                "gain": null,
+                "frame_type": "light",
+                "panel_brightness": null
+              }
+            ],
+            "order": "sequential",
+            "round_robin_batch": 1,
+            "autofocus_on_filter_change": false,
+            "target_temperature": null
+          }
+        ],
+        "slew": true,
+        "center": false,
+        "start_guiding": false,
+        "autofocus_at_start": false,
+        "use_flat_panel": false,
+        "wait_for_temperature": false,
+        "dither_every": 1,
+        "sub_delay_s": 0.0,
+        "on_error": "pause"
+      },
+      "runtime": {
+        "task_id": "00000000-0000-4000-8000-000000000200",
+        "status": "pending",
+        "lanes": [
+          {
+            "lane_id": "00000000-0000-4000-8000-000000000201",
+            "groups": [
+              {
+                "frames_done": 0
+              }
+            ],
+            "current_group": null,
+            "activity": null
+          }
+        ],
+        "started_at": null,
+        "finished_at": null,
+        "last_error": null,
+        "resolved_ra": null,
+        "resolved_dec": null,
+        "stall": null,
+        "interruptions": []
+      }
+    }
+  ]
+}

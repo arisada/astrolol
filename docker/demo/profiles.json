@@ -64,7 +64,7 @@
     "guider": {
       "guide_output": "camera",
       "camera_id": "camera_guide_ccd_simulator",
-      "mount_id": "mount_mount_simulator"
+      "mount_id": "mount_native_mount_simulator"
     },
     "platesolve": {
       "astap_bin": "astap_cli",
