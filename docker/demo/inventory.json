@@ -38,6 +38,15 @@
       "default_gain": null
     },
     {
+      "id": "00000000-0000-4000-8000-000000000007",
+      "type": "focuser",
+      "name": "Focuser Simulator",
+      "indi_driver": "indi_simulator_focus",
+      "indi_device_name": "Focuser Simulator",
+      "adapter_key": null,
+      "connect_params": {}
+    },
+    {
       "id": "00000000-0000-4000-8000-000000000005",
       "type": "ota",
       "name": "Guide Scope",

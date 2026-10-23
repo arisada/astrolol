@@ -17,9 +17,15 @@
                   "role": null,
                   "children": [
                     {
-                      "item_id": "00000000-0000-4000-8000-000000000004",
+                      "item_id": "00000000-0000-4000-8000-000000000007",
                       "role": null,
-                      "children": []
+                      "children": [
+                        {
+                          "item_id": "00000000-0000-4000-8000-000000000004",
+                          "role": null,
+                          "children": []
+                        }
+                      ]
                     }
                   ]
                 },
@@ -70,6 +76,16 @@
       "astap_bin": "astap_cli",
       "astap_db_path": "/opt/astap",
       "camera_id": "camera_ccd_simulator"
+    },
+    "autofocus": {
+      "step_size": 8000,
+      "num_steps": 5,
+      "exposure_time": 1,
+      "binning": 1
+    },
+    "eqmod": {
+      "indi_proxy_enabled": true,
+      "indi_proxy_api_url": "http://127.0.0.1:8000"
     }
   }
 }

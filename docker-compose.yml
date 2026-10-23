@@ -21,7 +21,8 @@ services:
       - PYTHONDONTWRITEBYTECODE=1
     tmpfs:
       - /data
-      - /tmp
+      # exec: astrolol writes small launcher scripts here (the INDI mount proxy)
+      - /tmp:exec,mode=1777
       - /root
     entrypoint: ["/app/docker/entrypoint.sh"]
     command: python -m astrolol.main

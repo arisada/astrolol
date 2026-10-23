@@ -35,9 +35,9 @@
           }
         ],
         "slew": true,
-        "center": false,
+        "center": true,
         "start_guiding": false,
-        "autofocus_at_start": false,
+        "autofocus_at_start": true,
         "use_flat_panel": false,
         "wait_for_temperature": false,
         "dither_every": 1,
