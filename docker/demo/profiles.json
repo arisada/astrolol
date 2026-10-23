@@ -1,0 +1,75 @@
+{
+  "profiles": [
+    {
+      "id": "00000000-0000-4000-8000-000000000100",
+      "name": "Demo",
+      "roots": [
+        {
+          "item_id": "00000000-0000-4000-8000-000000000001",
+          "role": null,
+          "children": [
+            {
+              "item_id": "00000000-0000-4000-8000-000000000002",
+              "role": null,
+              "children": [
+                {
+                  "item_id": "00000000-0000-4000-8000-000000000003",
+                  "role": null,
+                  "children": [
+                    {
+                      "item_id": "00000000-0000-4000-8000-000000000004",
+                      "role": null,
+                      "children": []
+                    }
+                  ]
+                },
+                {
+                  "item_id": "00000000-0000-4000-8000-000000000005",
+                  "role": null,
+                  "children": [
+                    {
+                      "item_id": "00000000-0000-4000-8000-000000000006",
+                      "role": null,
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "last_active_profile_id": "00000000-0000-4000-8000-000000000100",
+  "mount_targets": {},
+  "enabled_plugins": [
+    "autofocus",
+    "eqmod",
+    "flat_wizard",
+    "guider",
+    "lx200",
+    "mcp",
+    "object_resolver",
+    "platesolve",
+    "polar_align",
+    "sequencer",
+    "stellarium",
+    "system",
+    "target",
+    "viewer"
+  ],
+  "indi_local_upload": true,
+  "plugin_settings": {
+    "guider": {
+      "guide_output": "camera",
+      "camera_id": "camera_guide_ccd_simulator",
+      "mount_id": "mount_mount_simulator"
+    },
+    "platesolve": {
+      "astap_bin": "astap_cli",
+      "astap_db_path": "/opt/astap",
+      "camera_id": "camera_ccd_simulator"
+    }
+  }
+}

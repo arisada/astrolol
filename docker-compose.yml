@@ -1,21 +1,29 @@
 services:
 
-  # ── Single production container ─────────────────────────────────────────────
-  # Source and UI are baked into the image at build time.
-  # The backend serves the pre-built UI from ui/dist/ as static files.
+  # ── Immutable demo container ────────────────────────────────────────────────
+  # Source and UI are baked into the image at build time. Every start is a fresh
+  # demo: a Brussels site, a mount simulator, a test telescope with a CCD
+  # simulator, and a guide scope with a guide CCD simulator, with most plugins
+  # enabled (docker/demo/). The root filesystem is read-only and all state lives
+  # in tmpfs, so whatever is done is gone after a restart.
   # Rebuild the image whenever source or UI changes:
   #   docker compose build && docker compose up
   app:
     build: .
+    read_only: true
     ports:
       - "80:8000"
       - "10001:10001"
       - "10002:10002"
     environment:
       - ASTROLOL_DATA_DIR=/data
-    volumes:
-      - astrolol_data:/data
+      - ASTROLOL_IMAGES_DIR=/data/images
+      - PYTHONDONTWRITEBYTECODE=1
+    tmpfs:
+      - /data
+      - /tmp
+      - /root
+    entrypoint: ["/app/docker/entrypoint.sh"]
     command: python -m astrolol.main
-
-volumes:
-  astrolol_data:
+    # A restart (or `docker compose down`) discards the container and its tmpfs.
+    restart: "no"

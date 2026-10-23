@@ -1,0 +1,59 @@
+{
+  "schema_version": 1,
+  "items": [
+    {
+      "id": "00000000-0000-4000-8000-000000000001",
+      "type": "site",
+      "name": "Brussels",
+      "latitude": 50.8503,
+      "longitude": 4.3517,
+      "altitude": 13.0,
+      "timezone": "Europe/Brussels"
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000002",
+      "type": "mount",
+      "name": "Mount Simulator",
+      "indi_driver": null,
+      "indi_device_name": null,
+      "adapter_key": "eqmod_sim",
+      "connect_params": {}
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000003",
+      "type": "ota",
+      "name": "Test Telescope",
+      "focal_length": 500.0,
+      "aperture": 80.0
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000004",
+      "type": "camera",
+      "name": "CCD Simulator",
+      "indi_driver": "indi_simulator_ccd",
+      "indi_device_name": "CCD Simulator",
+      "adapter_key": null,
+      "connect_params": {},
+      "pixel_size_um": 5.2,
+      "default_gain": null
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000005",
+      "type": "ota",
+      "name": "Guide Scope",
+      "focal_length": 165.0,
+      "aperture": 50.0
+    },
+    {
+      "id": "00000000-0000-4000-8000-000000000006",
+      "type": "camera",
+      "name": "Guide CCD Simulator",
+      "indi_driver": "indi_simulator_guide",
+      "indi_device_name": "Guide Simulator",
+      "adapter_key": null,
+      "connect_params": {},
+      "pixel_size_um": 2.4,
+      "default_gain": null
+    }
+  ]
+}
