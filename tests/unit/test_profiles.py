@@ -915,3 +915,33 @@ async def test_api_update_leaves_another_active_profile_alone(app, client):
         app.state.active_profile = Profile(**a)
         await c.put(f"/profiles/{b['id']}", json={**b, "name": "renamed"})
     assert app.state.active_profile.name == "test rig"
+
+
+def test_save_is_atomic_and_leaves_no_temp_file(tmp_path):
+    from astrolol.profiles.store import ProfileStore
+
+    path = tmp_path / "profiles.json"
+    store = ProfileStore(path)
+    store.update_user_settings(store.get_user_settings())
+    assert path.exists()
+    assert not list(tmp_path.glob("*.tmp"))
+
+
+def test_failed_write_keeps_previous_file(tmp_path, monkeypatch):
+    import json
+    from pathlib import Path
+    from astrolol.profiles.store import ProfileStore
+
+    path = tmp_path / "profiles.json"
+    store = ProfileStore(path)
+    store.update_user_settings(store.get_user_settings())
+    before = path.read_text()
+
+    def boom(self, *a, **k):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(Path, "write_text", boom)
+    with pytest.raises(OSError):
+        store.update_user_settings(store.get_user_settings())
+    assert path.read_text() == before
+    json.loads(before)

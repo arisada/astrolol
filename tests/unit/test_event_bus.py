@@ -149,3 +149,25 @@ async def test_get_history_returns_snapshot():
     snapshot = bus.get_history()
     await bus.publish(LogEvent(level="info", component="test", message="b"))
     assert len(snapshot) == 1  # snapshot is frozen
+
+
+@pytest.mark.asyncio
+async def test_bounded_subscriber_drops_oldest():
+    bus = EventBus()
+    q = bus.subscribe(maxsize=3)
+    events = [LogEvent(level="info", component="t", message=str(i)) for i in range(5)]
+    for e in events:
+        await bus.publish(e)
+
+    assert [q.get_nowait().id for _ in range(3)] == [e.id for e in events[2:]]
+    assert bus.dropped_total == 2
+
+
+@pytest.mark.asyncio
+async def test_unbounded_subscriber_never_drops():
+    bus = EventBus()
+    q = bus.subscribe()
+    for i in range(50):
+        await bus.publish(LogEvent(level="info", component="t", message=str(i)))
+    assert q.qsize() == 50
+    assert bus.dropped_total == 0

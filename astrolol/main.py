@@ -43,6 +43,7 @@ from astrolol.app import (
     setup_plugins,
 )
 from astrolol.core.events import EventBus
+from astrolol.core.events.bus import CLIENT_QUEUE_SIZE
 from astrolol.core.plugin_api import LogScope, PluginContext
 from astrolol.devices.bluetooth.backend import BlueZBackend
 from astrolol.devices.bluetooth.manager import BluetoothManager
@@ -373,7 +374,7 @@ def create_app() -> FastAPI:
     @app.websocket("/ws/events")
     async def events_ws(websocket: WebSocket) -> None:
         await websocket.accept()
-        q = event_bus.subscribe()
+        q = event_bus.subscribe(maxsize=CLIENT_QUEUE_SIZE)
         logger.info("ws.client_connected", subscribers=event_bus.subscriber_count)
         try:
             while True:

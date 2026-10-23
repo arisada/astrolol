@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 from astrolol.config.user_settings import UserSettings
@@ -54,7 +55,11 @@ class ProfileStore:
             # Spread all UserSettings fields so new fields are auto-persisted
             **self._user_settings.model_dump(),
         }
-        self._path.write_text(json.dumps(payload, indent=2))
+        # Write beside the target and rename over it, so a power cut mid-write
+        # leaves the previous file intact instead of a truncated one.
+        tmp = self._path.with_name(self._path.name + ".tmp")
+        tmp.write_text(json.dumps(payload, indent=2))
+        os.replace(tmp, self._path)
 
     # --- CRUD ---
 

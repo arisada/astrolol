@@ -7,12 +7,20 @@ code directly; it only calls ``get_plugin()`` after discovering the module.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Literal, Protocol, TypeVar, runtime_checkable
+from typing import TYPE_CHECKING, Literal, Protocol, TypeVar, runtime_checkable
 
 from fastapi import FastAPI
 from pydantic import BaseModel
 
 from astrolol.core.auth import AclRule
+
+if TYPE_CHECKING:  # annotations only: these modules must not be imported at runtime from here
+    from astrolol.devices.bluetooth.manager import BluetoothManager
+    from astrolol.devices.manager import DeviceManager
+    from astrolol.devices.registry import DeviceRegistry
+    from astrolol.equipment.store import EquipmentStore
+    from astrolol.core.events.bus import EventBus
+    from astrolol.profiles.store import ProfileStore
 
 T = TypeVar("T", bound=BaseModel)
 
@@ -60,12 +68,12 @@ class PluginContext:
     Plugins must NOT import from each other directly.  Shared services are
     accessed here, and inter-plugin communication uses the EventBus.
     """
-    event_bus: Any         # astrolol.core.events.bus.EventBus
-    device_manager: Any    # astrolol.devices.manager.DeviceManager
-    device_registry: Any   # astrolol.devices.registry.DeviceRegistry
-    profile_store: Any = None     # astrolol.profiles.store.ProfileStore
-    equipment_store: Any = None   # astrolol.equipment.store.EquipmentStore
-    bluetooth_manager: Any = None  # astrolol.devices.bluetooth.BluetoothManager
+    event_bus: EventBus
+    device_manager: DeviceManager
+    device_registry: DeviceRegistry
+    profile_store: ProfileStore | None = None
+    equipment_store: EquipmentStore | None = None
+    bluetooth_manager: BluetoothManager | None = None
 
     def get_plugin_settings(self, plugin_id: str, model: type[T]) -> T:
         """Return plugin settings parsed into *model*, falling back to defaults."""
