@@ -240,3 +240,23 @@ through that helper, not with `subprocess` directly.
 stars. The empty sky is perfectly flat (pixel value 1, no noise), so point the telescope
 simulator at a known field and put the ROI on a star. After stopping a stream, starting another
 one on INDI 2.2.5 delivered no frames in a quick test, so tests do not restart streams.
+
+---
+
+## 14. The CCD simulator only follows a native mount through the INDI mount proxy
+
+**Symptom:** With a native mount (`eqmod_sim`, `eqmod`) and the INDI CCD simulator, plate solving
+never converges: the frames show the sky around RA 0 / Dec 0 whatever the mount points at, ASTAP
+"solves" them 60° or more from the target or fails with "exit code 1", and nothing is logged above
+debug level.
+
+**Root cause:** The simulator draws the star field of the telescope it snoops
+(`ACTIVE_DEVICES.ACTIVE_TELESCOPE`), and a native mount is not an INDI device. astrolol points the
+snoop at the eqmod plugin's "astrolol Mount Proxy" before each exposure, which only exists when the
+plugin's `indi_proxy_enabled` setting is on. The direct `TELESCOPE_EOD_COORD` write is a no-op on
+the simulator, so the snoop is its only source of pointing.
+
+**In Docker:** the proxy is started from a launcher script astrolol writes to the INDI run
+directory (`/tmp/astrolol`). Docker mounts a `tmpfs` `noexec` by default, so the launcher fails with
+"Permission denied" and the proxy never runs, again without an error. `docker-compose.yml` mounts
+`/tmp` with `exec`, and the demo seed (`docker/demo/profiles.json`) enables `indi_proxy_enabled`.
