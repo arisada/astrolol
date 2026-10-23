@@ -326,10 +326,26 @@ class Steps:
             raise StepError("park", f"Park failed: {exc}") from exc
         await self._finished(None, "park", t0)
 
+    async def ensure_tracking(self, mount_id: str | None, step: StepKind) -> None:
+        """Turn tracking on if the mount is not tracking. A parked mount is left alone (it
+        cannot track, and unparking is the runner's job); a mount that refuses fails *step*."""
+        mm = self._state("mount_manager")
+        if mount_id is None or mm is None:
+            return
+        try:
+            status = await mm.get_status(mount_id)
+            if status.is_parked or status.is_tracking:
+                return
+            await mm.set_tracking(mount_id, True, source="automation")
+        except Exception as exc:
+            raise StepError(step, f"Could not start tracking: {exc}") from exc
+        logger.info("sequencer.tracking_enabled", mount_id=mount_id, step=step)
+
     async def slew(self, task: ImagingTask, target: ResolvedTarget, mount_id: str | None) -> None:
         mm = self._state("mount_manager")
         if mount_id is None or mm is None:
             raise StepError("slew", "No mount connected")
+        await self.ensure_tracking(mount_id, "slew")
         assert target.ra is not None and target.dec is not None
         import astropy.units as u
         from astropy.coordinates import SkyCoord
@@ -354,6 +370,7 @@ class Steps:
     async def meridian_flip(self, task: ImagingTask, mount_id: str) -> bool:
         """Flip the mount. Returns False if the mount says no flip is needed."""
         mm = self._state("mount_manager")
+        await self.ensure_tracking(mount_id, "meridian_flip")
         before = await mm.get_status(mount_id)
         t0 = await self._started(task.id, "meridian_flip", Activity.MERIDIAN_FLIP, "Meridian flip")
         try:
@@ -395,6 +412,7 @@ class Steps:
         if devices.mount_id is None or devices.camera_id is None:
             raise StepError("center", "Centering needs a connected mount and camera")
         assert target.ra is not None and target.dec is not None
+        await self.ensure_tracking(devices.mount_id, "center")
         cfg = self._host.settings
         t0 = await self._started(task.id, "center", Activity.CENTERING, f"Centering {target.name}")
         try:
@@ -456,7 +474,7 @@ class Steps:
             return
         await self._finished(task_id, "stop_guiding", t0)
 
-    async def start_guiding(self, task_id: str) -> None:
+    async def start_guiding(self, task_id: str, mount_id: str | None = None) -> None:
         guider = self._guider()
         if guider is None:
             await self.skipped(
@@ -465,6 +483,7 @@ class Steps:
             return
         if not guider.status().connected:
             raise StepError("start_guiding", f"The guider ({guider.name}) is not connected")
+        await self.ensure_tracking(mount_id, "start_guiding")
         t0 = await self._started(
             task_id, "start_guiding", Activity.STARTING_GUIDING, "Starting guiding"
         )

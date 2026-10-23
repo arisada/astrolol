@@ -65,7 +65,8 @@ otherwise wait. Under each secondary camera, astrolol tells you which share of t
 actually expose; shorter exposures on the secondary waste less. **Make primary** changes which
 camera leads.
 
-**Before imaging**, each optional:
+**Before imaging**, each optional. Whenever one of the first three runs, tracking is switched on
+first if the mount was not tracking:
 
 - **Slew to the target**
 - **Center with plate solving** (needs [Plate Solving](../../platesolve/docs/en.md))

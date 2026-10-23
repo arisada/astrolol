@@ -102,7 +102,7 @@ async def ensure_guiding(runner: Runner, entry: QueueEntry, ts: _TaskState) -> N
                         "re-centering",
                         runner._steps.center(task, ts.target, ts.devices),
                     )
-                await runner._steps.start_guiding(task.id)
+                await runner._steps.start_guiding(task.id, ts.devices.mount_id if ts.devices else None)
             except StepError as exc:
                 error = str(exc)
             await tracker.attempt(error, cfg.guide_retry_interval_s)

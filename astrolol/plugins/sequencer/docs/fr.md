@@ -69,7 +69,8 @@ chaque caméra secondaire, astrolol indique quelle part du temps elle posera ré
 poses plus courtes sur la secondaire gaspillent moins. **Définir comme principale** change la
 caméra qui mène.
 
-**Avant l'imagerie**, chacun facultatif :
+**Avant l'imagerie**, chacun facultatif. Quand l'une des trois premières s'exécute, le suivi est
+d'abord activé si la monture ne suivait pas :
 
 - **Pointer la cible**
 - **Centrer par résolution astrométrique** (nécessite la

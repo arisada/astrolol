@@ -91,6 +91,7 @@ class FakeMountManager:
         self._t0 = time.monotonic()
         self.pier: str | None = "West"
         self.parked = False
+        self.tracking = True
         self.ra_h = 1.0
         self.dec = 40.0
         self.slews: list[tuple[float, float, str | None]] = []
@@ -112,6 +113,7 @@ class FakeMountManager:
             hour_angle=self.ha,
             pier_side=self.pier,
             is_parked=self.parked,
+            is_tracking=self.tracking,
             ra=self.ra_h,
             dec=self.dec,
         )
@@ -137,6 +139,10 @@ class FakeMountManager:
         self.pier = "East"
         self.events.append("flip")
         await self._bus.publish(MountMeridianFlipCompleted(device_id=mount_id))
+
+    async def set_tracking(self, mount_id: str, enabled: bool, mode: Any = None, source: str = "api") -> None:
+        self.tracking = enabled
+        self.events.append("tracking_on" if enabled else "tracking_off")
 
     async def unpark(self, mount_id: str) -> None:
         self.parked = False

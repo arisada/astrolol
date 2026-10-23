@@ -641,3 +641,45 @@ async def test_frames_without_guider_have_no_guiding_stats(rig: Rig) -> None:
     await _run_to_end(rig)
     frame = rig.of("sequencer.frame_saved")[0]
     assert frame.unguided_s is None
+
+
+# ── Tracking ──────────────────────────────────────────────────────────────────
+
+
+async def test_tracking_is_switched_on_before_the_slew(rig: Rig) -> None:
+    rig.mount.tracking = False
+    await rig.svc.add(make_task())
+    assert await _run_to_end(rig) == RunOutcome.COMPLETED
+    assert rig.mount.tracking
+    assert rig.mount.events.index("tracking_on") < rig.mount.events.index("slew")
+    assert rig.mount.events.count("tracking_on") == 1  # centering and guiding find it on
+
+
+async def test_tracking_already_on_is_left_alone(rig: Rig) -> None:
+    await rig.svc.add(make_task())
+    assert await _run_to_end(rig) == RunOutcome.COMPLETED
+    assert "tracking_on" not in rig.mount.events
+
+
+async def test_tracking_is_ensured_for_centering_and_guiding_without_a_slew(rig: Rig) -> None:
+    rig.mount.tracking = False
+    await rig.svc.add(make_task(slew=False))
+    assert await _run_to_end(rig) == RunOutcome.COMPLETED
+    assert rig.mount.events.count("tracking_on") == 1
+    assert len(rig.solver.calls) == 1
+    assert rig.mount.tracking
+
+
+async def test_a_mount_that_cannot_track_fails_the_slew_step(rig: Rig) -> None:
+    rig.mount.tracking = False
+
+    async def refuse(*_a: object, **_k: object) -> None:
+        raise ValueError("tracking not supported while parked")
+
+    rig.mount.set_tracking = refuse  # type: ignore[method-assign]
+    await rig.svc.add(make_task(on_error="abort"))
+    await rig.svc.start()
+    await rig.svc.wait_idle()
+    failed = rig.of("sequencer.step_failed")
+    assert failed and failed[0].step == "slew"
+    assert rig.mount.slews == []

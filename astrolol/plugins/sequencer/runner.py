@@ -735,7 +735,7 @@ class Runner:
                 )
         if task.start_guiding:
             if getattr(self.app.state, "guider", None) is None:
-                await self._steps.start_guiding(task.id)  # reported as skipped
+                await self._steps.start_guiding(task.id, ts.devices.mount_id)  # reported as skipped
             else:
                 await ensure_guiding(self, entry, ts)
         if task.autofocus_at_start:
