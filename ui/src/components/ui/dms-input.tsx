@@ -59,8 +59,10 @@ export function DmsInput({ value, onChange, mode }: DmsInputProps) {
 
   const shown = (field: DmsField) =>
     editing?.field === field ? editing.text : field === 'sec' ? fmtSec(parts.sec) : pad(parts[field])
+  // em, not ch: Chrome measures ch in an <input> against a fallback font, narrower than the mono face
+  // (0.6em a glyph), which clips the last digit. Room for n glyphs plus a little slack.
   const width: Record<DmsField, string> = {
-    deg: mode === 'lon' ? 'w-[3ch]' : 'w-[2ch]', min: 'w-[2ch]', sec: 'w-[4ch]',
+    deg: mode === 'lon' ? 'w-[1.9em]' : 'w-[1.3em]', min: 'w-[1.3em]', sec: 'w-[2.5em]',
   }
 
   return (
@@ -100,9 +102,9 @@ export function DmsInput({ value, onChange, mode }: DmsInputProps) {
                   apply(stepParts(parts, field, e.key === 'ArrowUp' ? 1 : -1, mode))
                 }
               }}
-              className={`${width[field]} bg-transparent p-0 text-right text-slate-200 focus:outline-none`}
+              className={`${width[field]} shrink-0 bg-transparent p-0 text-right text-slate-200 focus:outline-none`}
             />
-            <span className="ml-0.5 select-none text-xs text-slate-500">{UNITS[mode][i]}</span>
+            <span className="ml-0.5 shrink-0 select-none text-xs text-slate-500">{UNITS[mode][i]}</span>
           </label>
           <button type="button" className={stepBtn} aria-label={t('dms.decrease', { unit: UNITS[mode][i] })}
             onClick={() => { setEditing(null); apply(stepParts(parts, field, -1, mode)) }}>
