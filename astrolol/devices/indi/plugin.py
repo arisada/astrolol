@@ -40,19 +40,36 @@ class IndiConnectionManager:
 
     def __init__(self, run_dir: Path = Path("/tmp/astrolol")) -> None:
         from astrolol.config.settings import settings
-        from astrolol.devices.indi.server import IndiServer
         from astrolol.devices.indi.client import IndiClient
+        from astrolol.devices.indi.indigo import IndigoServer
+        from astrolol.devices.indi.server import IndiServer
 
-        self._server = IndiServer(
-            manage=settings.indi_manage_server,
-            host=settings.indi_host,
-            port=settings.indi_port,
-            run_dir=run_dir,
-        )
         self._client = IndiClient(
             host=settings.indi_host,
             port=settings.indi_port,
         )
+        # "indi" or "indigo": which server astrolol talks to (both speak INDI).
+        self.server_kind = settings.indi_server_kind
+        self._server: IndiServer | IndigoServer
+        if self.server_kind == "indigo":
+            self._server = IndigoServer(
+                self._client,
+                manage=settings.indi_manage_server,
+                host=settings.indi_host,
+                port=settings.indi_port,
+                run_dir=run_dir,
+                server_path=settings.indigo_server_path,
+            )
+        else:
+            self._server = IndiServer(
+                manage=settings.indi_manage_server,
+                host=settings.indi_host,
+                port=settings.indi_port,
+                run_dir=run_dir,
+            )
+        # Devices using each driver: one driver often runs several devices (a camera and its
+        # filter wheel, two cameras of one make), so it is unloaded only when the last goes.
+        self._driver_users: dict[str, int] = {}
         # Lock and loop reference are created lazily in acquire() so they bind
         # to the correct running event loop.  This matters when the same
         # IndiConnectionManager instance is used across multiple event loops
@@ -128,8 +145,13 @@ class IndiConnectionManager:
             # re-connecting a device is fast.  The server will be reaped by
             # the OS when astrolol exits.
 
-    async def discover_roles(self, device_name: str) -> list[str]:
-        """Wait for properties to stabilize then return discovered role kinds."""
+    async def discover_roles(self, device_name: str) -> list[tuple[str, str]]:
+        """Wait for properties to stabilize, then return (kind, device) for each role found.
+
+        INDI drivers put a device's roles on the device itself (a camera with a built-in
+        filter wheel); INDIGO drivers attach them as devices of their own, named after it
+        ("… (wheel)").
+        """
         # Poll until property count stops growing
         prev_count = -1
         while True:
@@ -152,22 +174,42 @@ class IndiConnectionManager:
             roles.append("filter_wheel")
         if client._get_vector(device_name, "ABS_ROTATOR_ANGLE") is not None:
             roles.append("rotator")
-        if client._get_vector(device_name, "FLAT_LIGHT_CONTROL") is not None or client._get_vector(device_name, "CAP_PARK") is not None:
+        if any(
+            client._get_vector(device_name, prop) is not None
+            for prop in ("FLAT_LIGHT_CONTROL", "CAP_PARK", "AUX_LIGHT_SWITCH", "AUX_COVER")
+        ):
             roles.append("flat_panel")
-        return roles
+        found = [(role, device_name) for role in roles]
+        if self.server_kind == "indigo":
+            from astrolol.devices.indi.indigo import companion_devices
+            found += companion_devices(client, device_name)
+        return found
 
     @property
     def client(self):  # type: ignore[return]
         return self._client
 
-    async def load_driver(self, executable: str) -> None:
+    async def preload_driver(self, executable: str) -> None:
+        """Load a driver to look at its devices before any connects (it stays loaded)."""
         await self._server.load_driver(executable)
 
+    async def load_driver(self, executable: str) -> None:
+        """Load a driver for a device about to connect; unload_driver() when it disconnects."""
+        await self._server.load_driver(executable)
+        self._driver_users[executable] = self._driver_users.get(executable, 0) + 1
+
     async def unload_driver(self, executable: str) -> None:
+        users = self._driver_users.get(executable, 0) - 1
+        if users > 0:
+            self._driver_users[executable] = users
+            logger.debug("indi.driver_still_used", driver=executable, users=users)
+            return
+        self._driver_users.pop(executable, None)
         await self._server.unload_driver(executable)
 
     async def stop_server(self) -> None:
-        """Explicitly stop indiserver (called from the admin endpoint)."""
+        """Explicitly stop the server (called from the admin endpoint)."""
+        self._driver_users.clear()
         if self._lock is None:
             await self._server.stop()
             return
@@ -487,15 +529,17 @@ class IndiPlugin:
             # Build a set of already-connected device kinds for this driver
             # (We can't easily check the device_manager here, so we just exclude primary)
             companion_configs = []
-            for role in roles:
-                if role == primary_kind:
+            for role, role_device in roles:
+                if role == primary_kind and role_device == device_name:
                     continue
                 adapter_key = f"indi_{role}"
                 companion_config = DeviceConfig(
                     kind=role,
                     adapter_key=adapter_key,
-                    params={"device_name": device_name, "executable": ""},
-                    driver_name=device_name,
+                    # The primary's driver: counted once more, so it stays loaded until
+                    # the last of them disconnects.
+                    params={"device_name": role_device, "executable": config.params.get("executable", "")},
+                    driver_name=role_device,
                 )
                 companion_configs.append(companion_config)
 

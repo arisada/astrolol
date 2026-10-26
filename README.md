@@ -83,6 +83,14 @@ sudo apt-get install -y nodejs npm
 sudo apt-get install indi-full
 ```
 
+**Optional: INDIGO instead of INDI**
+
+astrolol can drive an [INDIGO](https://www.indigo-astronomy.org) server instead of indiserver:
+install INDIGO (Debian and Raspberry Pi OS: the `indigo3` package from
+`https://indigo-astronomy.github.io/indigo_ppa/ppa`; elsewhere, build it from source) and start
+astrolol with `ASTROLOL_INDI_SERVER_KIND=indigo`. Set `ASTROLOL_INDIGO_SERVER_PATH` if
+`indigo_server` is not on the `PATH`. The Equipment page then lists INDIGO's drivers.
+
 **Optional: ASTAP plate solver, gsc**
 
 ```bash

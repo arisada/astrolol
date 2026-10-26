@@ -3,7 +3,10 @@ INDI-specific API endpoints.
 
 GET  /indi/drivers          — list all drivers from the catalog
 GET  /indi/drivers/{kind}   — filter by device kind (camera, mount, focuser, …)
-POST /indi/load_driver      — start indiserver, load a driver, return its property snapshot
+POST /indi/load_driver      — start the server, load a driver, return its property snapshot
+
+The server is indiserver or an INDIGO server (Settings.indi_server_kind); the catalog and
+the way a loaded driver's devices are found follow it.
 """
 from __future__ import annotations
 
@@ -14,6 +17,8 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
 from astrolol.api.properties import PropertyOut, prop_to_out
+from astrolol.config.settings import settings
+from astrolol.devices.indi import indigo
 from astrolol.devices.indi.catalog import DriverEntry, load_catalog
 
 logger = structlog.get_logger()
@@ -41,16 +46,27 @@ class DriverEntryOut(BaseModel):
         )
 
 
+def _catalog(request: Request) -> list[DriverEntry]:
+    manager = getattr(request.app.state.registry, "indi_manager", None)
+    if getattr(manager, "server_kind", "indi") != "indigo":
+        return load_catalog()
+    entries = indigo.load_catalog(indigo.catalog_dirs(settings.indigo_server_path))
+    if not entries and manager is not None:
+        # No driver list on this machine (a remote server): the server's own, once connected.
+        entries = indigo.catalog_from_server(manager.client)
+    return entries
+
+
 @router.get("/drivers", response_model=list[DriverEntryOut])
-def list_drivers() -> list[DriverEntryOut]:
-    """Return every driver in the INDI catalog."""
-    return [DriverEntryOut.from_entry(e) for e in load_catalog()]
+def list_drivers(request: Request) -> list[DriverEntryOut]:
+    """Return every driver in the catalog."""
+    return [DriverEntryOut.from_entry(e) for e in _catalog(request)]
 
 
 @router.get("/drivers/{kind}", response_model=list[DriverEntryOut])
-def list_drivers_by_kind(kind: str) -> list[DriverEntryOut]:
+def list_drivers_by_kind(kind: str, request: Request) -> list[DriverEntryOut]:
     """Return catalog entries for a specific device kind."""
-    return [DriverEntryOut.from_entry(e) for e in load_catalog() if e.kind == kind]
+    return [DriverEntryOut.from_entry(e) for e in _catalog(request) if e.kind == kind]
 
 
 # ---------------------------------------------------------------------------
@@ -132,6 +148,10 @@ async def load_driver(body: LoadDriverRequest, request: Request) -> LoadDriverRe
     client = manager.client
     exact_name = body.device_name
 
+    if getattr(manager, "server_kind", "indi") == "indigo":
+        device_names = await _load_indigo_driver(manager, body.executable)
+        return await _snapshot_response(client, device_names)
+
     # t0 check: if the driver was already loaded (e.g. cameras announced at indiserver
     # startup before the user clicked "Load driver"), return whatever is already known.
     # This handles multi-camera setups where all devices appear seconds after indiserver
@@ -148,7 +168,7 @@ async def load_driver(body: LoadDriverRequest, request: Request) -> LoadDriverRe
         # Driver not yet loaded — load it now and wait for devices to appear.
         try:
             if body.executable:
-                await manager.load_driver(body.executable)
+                await manager.preload_driver(body.executable)
         except Exception as exc:
             raise HTTPException(status_code=502, detail=f"Failed to start driver: {exc}") from exc
 
@@ -187,6 +207,10 @@ async def load_driver(body: LoadDriverRequest, request: Request) -> LoadDriverRe
                     ),
                 )
 
+    return await _snapshot_response(client, device_names)
+
+
+async def _snapshot_response(client, device_names: list[str]) -> LoadDriverResponse:  # noqa: ANN001
     resolved = device_names[0]
     snapshot = await client.get_properties_snapshot(resolved)
     props = [prop_to_out(p) for p in snapshot.values()]
@@ -199,3 +223,34 @@ async def load_driver(body: LoadDriverRequest, request: Request) -> LoadDriverRe
         num_props=len(result),
     )
     return LoadDriverResponse(properties=result, device_names=device_names)
+
+
+async def _load_indigo_driver(manager, executable: str) -> list[str]:  # noqa: ANN001
+    """Load an INDIGO driver and return its devices, those of its own kind first.
+
+    INDIGO device names are the driver's choice ("ZWO ASI294MC Pro #0"), so its devices are
+    found by the driver they report (DRIVER_INFO.DEVICE_DRIVER), not by name.
+    """
+    client = manager.client
+    if not executable:
+        raise HTTPException(status_code=422, detail="An INDIGO driver name is required.")
+    devices = indigo.devices_of_driver(client, executable)
+    if not devices:
+        try:
+            await manager.preload_driver(executable)
+        except (ValueError, RuntimeError, TimeoutError) as exc:
+            raise HTTPException(status_code=502, detail=f"Failed to start driver: {exc}") from exc
+        try:
+            await client._wait_cond(lambda: bool(indigo.devices_of_driver(client, executable)), timeout=20.0)
+        except TimeoutError:
+            raise HTTPException(
+                status_code=504,
+                detail=(
+                    f"{executable} loaded but announced no device within 20 s. "
+                    "Check that the device is plugged in and powered."
+                ),
+            )
+        # A driver attaches its devices one after the other: a moment for the rest.
+        await asyncio.sleep(1.0)
+        devices = indigo.devices_of_driver(client, executable)
+    return indigo.sort_for_kind(client, devices, indigo.kind_of_driver(executable))

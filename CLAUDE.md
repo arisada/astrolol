@@ -438,8 +438,9 @@ Plugin scopes are collected at startup and exposed via `GET /admin/log_scopes`;
 - Unit tests go in `tests/unit/`. Use `FakeCamera`, `FakeMount`, `FakeFocuser` from
   `tests/conftest.py` — no hardware required.
 - Integration tests go in `tests/integration/` and are skipped automatically when
-  `indiserver` is not installed. `test_indigo_simulators.py` runs the INDI adapters against
-  INDIGO's simulators and is skipped without `indigo_server` (not in the Docker image).
+  `indiserver` is not installed. `test_indigo_simulators.py` (adapters) and `test_api_indigo.py`
+  (API, managed and unmanaged server) run against INDIGO's simulators and are skipped without
+  `indigo_server` (not in the Docker image).
   On Ubuntu 26.04 the `indigo3` package can't install (needs `libavahi-compat-libdnssd1`, no
   longer shipped), so build from source: compile avahi 0.8's `avahi-compat-libdns_sd/*.c` into
   `libdns_sd.so.1` against the system libavahi-client, drop it and `dns_sd.h` into INDIGO's
@@ -581,7 +582,9 @@ astrolol/
 │   ├── config.py       # DeviceConfig — friendly ID generation + validation
 │   ├── manager.py      # DeviceManager — connect/disconnect lifecycle + events
 │   ├── registry.py     # DeviceRegistry — adapter_key → class mapping
-│   └── indi/           # INDI adapters (camera, mount, focuser + IndiClient)
+│   └── indi/           # INDI adapters (camera, mount, focuser + IndiClient); indigo.py: an
+│                       # INDIGO server instead of indiserver (ASTROLOL_INDI_SERVER_KIND=indigo)
+│                       # — its catalog, driver loading and device kinds, same adapters
 ├── equipment/          # EquipmentStore — physical equipment tree (site/mount/OTA/camera/
 │                       # filter wheel/focuser/rotator/GPS) as profile-node graph, OpticalPath
 ├── filter_wheel/

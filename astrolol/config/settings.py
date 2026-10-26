@@ -1,5 +1,7 @@
 import os
 from pathlib import Path
+from typing import Literal
+
 from pydantic_settings import BaseSettings
 
 
@@ -31,6 +33,9 @@ class Settings(BaseSettings):
     indi_manage_server: bool = True   # False = connect to already-running server
     indi_host: str = "localhost"
     indi_port: int = 7624
+    # Which server speaks INDI to astrolol: "indi" (indiserver) or "indigo" (indigo_server).
+    indi_server_kind: Literal["indi", "indigo"] = "indi"
+    indigo_server_path: str = "indigo_server"   # name on PATH, or a full path
 
     # Extra browser origins allowed to call the API (e.g. a UI served from another
     # host). The server's own origin is always allowed. JSON list in the env var:

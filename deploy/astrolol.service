@@ -76,6 +76,8 @@ Environment=PYTHONUNBUFFERED=1
 # Examples (uncomment to use):
 #Environment=ASTROLOL_DATA_DIR=/var/lib/astrolol
 #Environment=ASTROLOL_IMAGES_DIR=/home/astrolol/images
+# INDIGO drivers instead of INDI ones (astrolol starts indigo_server instead of indiserver)
+#Environment=ASTROLOL_INDI_SERVER_KIND=indigo
 
 # Shutdown: SIGTERM first so running exposures/slews can be cancelled and
 # hardware left in a sane state; SIGKILL after 20 s.

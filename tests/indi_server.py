@@ -41,12 +41,14 @@ def start_indiserver(port: int, *drivers: str) -> subprocess.Popen:
 
 def start_indigo_server(port: int, *drivers: str) -> subprocess.Popen:
     """indigo_server on *port* with *drivers*, in a fresh home; skips the test if it won't start."""
-    # -b-: no network announcement; -w- -c-: no web apps or web control panel.
-    return _start(["indigo_server", "-p", str(port), "-b-", "-w-", "-c-", *drivers], port, drivers)
+    # By its real path, so it finds its driver list (<prefix>/share/indigo) and lists every
+    # driver in Server.DRIVERS. -b-: no network announcement; -w- -c-: no web pages.
+    server = os.path.realpath(shutil.which("indigo_server") or "indigo_server")
+    return _start([server, "-p", str(port), "-b-", "-w-", "-c-", *drivers], port, drivers)
 
 
 def _start(cmd: list[str], port: int, drivers: tuple[str, ...]) -> subprocess.Popen:
-    server = cmd[0]
+    server = Path(cmd[0]).name
     session_home = os.environ.get(INDI_HOME_ENV)
     home = Path(tempfile.mkdtemp(prefix=f"{server}-{port}-", dir=session_home))
     proc = subprocess.Popen(

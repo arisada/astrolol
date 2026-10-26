@@ -46,6 +46,10 @@ sudo apt-get install -y git python3-venv python3-pip nodejs npm indi-bin nginx o
 ```
 
 - `indi-bin` provides `indiserver`, which astrolol starts and stops itself.
+- To use INDIGO drivers instead, install INDIGO (`indigo3`, from
+  `deb [trusted=yes] https://indigo-astronomy.github.io/indigo_ppa/ppa indigo main`) and add
+  `Environment=ASTROLOL_INDI_SERVER_KIND=indigo` to the unit (step 5). astrolol then starts
+  `indigo_server` instead of `indiserver`; one or the other, not both.
 - Add the INDI drivers for your equipment: `sudo apt-get install indi-full` for everything,
   or only the driver packages you need (`apt search indi-`). On a Raspberry Pi, the
   Astroberry repository described in the README also carries up-to-date INDI packages.

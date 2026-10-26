@@ -41,7 +41,7 @@ function roundPixelSize(um: number | null): number | null {
 
 function suggestDeviceId(kind: DeviceKind, driver: DriverEntry | null): string {
   if (!driver) return ''
-  const raw = driver.executable.replace(/^indi_/, '') || driver.manufacturer
+  const raw = driver.executable.replace(/^indi(go)?_/, '') || driver.manufacturer
   const slug = raw.toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/, '').slice(0, 40)
   return slug ? `${kind}_${slug}` : ''
 }
