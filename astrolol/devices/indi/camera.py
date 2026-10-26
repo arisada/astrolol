@@ -386,11 +386,19 @@ class IndiCamera:
         )
 
     async def push_scope_info(self, focal_length: float, aperture: float) -> None:
-        """Push telescope optics to the camera's SCOPE_INFO property (best-effort)."""
+        """Push telescope optics to the camera's SCOPE_INFO property (best-effort).
+
+        INDIGO cameras call it CCD_LENS, with the same elements.
+        """
+        prop = "SCOPE_INFO"
+        if self._client._get_vector(self._device_name, prop) is None and (
+            self._client._get_vector(self._device_name, "CCD_LENS") is not None
+        ):
+            prop = "CCD_LENS"
         try:
             await self._client.set_number(
                 self._device_name,
-                "SCOPE_INFO",
+                prop,
                 {"FOCAL_LENGTH": focal_length, "APERTURE": aperture},
             )
             logger.info(

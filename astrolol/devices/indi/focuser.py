@@ -4,7 +4,7 @@ INDI focuser adapter — implements IFocuser using IndiClient.
 INDI focuser properties used:
   ABS_FOCUS_POSITION  NUMBER  FOCUS_ABSOLUTE_POSITION  — absolute move / current position
   FOCUS_ABORT_MOTION  SWITCH  ABORT                    — halt
-  FOCUS_TEMPERATURE   NUMBER  TEMPERATURE              — optional
+  FOCUS_TEMPERATURE   NUMBER  TEMPERATURE              — optional (INDIGO: FOCUSER_TEMPERATURE)
 """
 from __future__ import annotations
 
@@ -144,6 +144,10 @@ class IndiFocuser:
         temperature = self._client.get_number_nowait(
             self._device_name, "FOCUS_TEMPERATURE", "TEMPERATURE"
         )
+        if temperature is None:
+            temperature = self._client.get_number_nowait(
+                self._device_name, "FOCUSER_TEMPERATURE", "TEMPERATURE"
+            )
 
         return FocuserStatus(
             state=self._state,

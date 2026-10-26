@@ -132,6 +132,17 @@ async def test_mount_park_unpark(mount):
     assert (await mount.get_status()).is_parked is False
 
 
+async def test_mount_tracking_rate(mount, client):
+    # INDIGO's rate switch is TELESCOPE_TRACK_RATE (INDI: TELESCOPE_TRACK_MODE).
+    from astrolol.devices.base.models import TrackingMode
+    await mount.set_tracking(True, TrackingMode.LUNAR)
+    await asyncio.sleep(0.5)
+    assert client.get_switch_state_nowait(_MOUNT, "TELESCOPE_TRACK_RATE", "TRACK_LUNAR") is True
+    await mount.set_tracking(True, TrackingMode.SIDEREAL)
+    await asyncio.sleep(0.5)
+    assert client.get_switch_state_nowait(_MOUNT, "TELESCOPE_TRACK_RATE", "TRACK_SIDEREAL") is True
+
+
 async def test_mount_ping(mount):
     assert await mount.ping() is True
 
@@ -172,6 +183,11 @@ async def test_focuser_move_by(focuser):
     await focuser.move_to(1000)
     await focuser.move_by(-200)
     assert (await focuser.get_status()).position == pytest.approx(800, abs=5)
+
+
+async def test_focuser_temperature(focuser):
+    # INDIGO: FOCUSER_TEMPERATURE (INDI: FOCUS_TEMPERATURE).
+    assert (await focuser.get_status()).temperature is not None
 
 
 async def test_focuser_ping(focuser):
@@ -228,6 +244,14 @@ async def test_camera_cooler(camera):
     await asyncio.sleep(0.5)
     assert (await camera.get_status()).cooler_on is True
     await camera.set_cooler(False, None)
+
+
+async def test_camera_scope_info(camera, client):
+    # INDIGO: CCD_LENS (INDI: SCOPE_INFO).
+    await camera.push_scope_info(1000.0, 200.0)
+    await asyncio.sleep(0.5)
+    assert client.get_number_nowait(_IMAGER, "CCD_LENS", "FOCAL_LENGTH") == pytest.approx(1000.0)
+    assert client.get_number_nowait(_IMAGER, "CCD_LENS", "APERTURE") == pytest.approx(200.0)
 
 
 async def test_camera_ping(camera):
