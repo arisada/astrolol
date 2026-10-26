@@ -20,7 +20,7 @@ from astropy.coordinates import SkyCoord
 
 from astrolol.devices.base.models import DeviceState, MountStatus, TrackingMode
 from astrolol.mount.sky import alt_az, icrs_to_jnow, jnow_to_icrs, local_sidereal_time_h
-from astrolol.plugins.eqmod.rates import nudge_speed_x_sidereal
+from astrolol.mount.rates import nudge_speed_x_sidereal
 from astrolol.plugins.eqmod.geometry import MountGeometry, PierSide, SyncOffset, opposite, pier_side_of
 from astrolol.plugins.eqmod.protocol import (
     HIGH_SPEED_THRESHOLD_DEG_PER_SEC,

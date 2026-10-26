@@ -24,8 +24,9 @@ Click **Load driver** and follow the wizard.
      camera's filter wheel or focuser that INDIGO shows as a device of its own connects with
      the camera.
    - **Other adapter**: drivers provided by astrolol plugins, for example `eqmod` (the native
-     Sky-Watcher driver from the [EQMOD](../../astrolol/plugins/eqmod/docs/en.md) plugin) or its mount simulator. If no plugin
-     offers one for the chosen kind, the wizard says so.
+     Sky-Watcher driver from the [EQMOD](../../astrolol/plugins/eqmod/docs/en.md) plugin) or its mount simulator,
+     and the `alpaca_…` adapters of the [ASCOM Alpaca](../../astrolol/plugins/alpaca/docs/en.md) plugin.
+     If none is offered for the chosen kind, the wizard says so.
 3. For INDI: **Select manufacturer**, then **Select model**. **Enter manually…** lets you type a
    driver name (`indi_asi_ccd`) and, optionally, the name the driver announces the device
    under (useful when one driver serves several identical devices).

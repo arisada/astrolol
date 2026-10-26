@@ -446,6 +446,11 @@ Plugin scopes are collected at startup and exposed via `GET /admin/log_scopes`;
   `libdns_sd.so.1` against the system libavahi-client, drop it and `dns_sd.h` into INDIGO's
   `build/lib` and `build/include` after `make init`, `make all`, then symlink
   `build/bin/indigo_server` into `~/.local/bin`.
+  The alpaca plugin's tests (`astrolol/plugins/alpaca/tests/`) run against ASCOM's OmniSim and are
+  skipped without `ascom.alpaca.simulators` on the PATH (or `ASTROLOL_ALPACA_SIM`; not in the
+  Docker image): unpack the self-contained Linux release (v0.4.0) and link the binary into
+  `~/.local/bin`. `tests/alpaca_sim.py` starts one per session under a renamed link (OmniSim
+  refuses to run beside a process of its own name) with an empty `HOME`.
 - Use `TestClient` (httpx) for API tests. Create a fresh `FastAPI()` per test — never share
   app state between tests.
 - Structlog output is captured by pytest's log system, not `capsys`. Use
@@ -615,6 +620,11 @@ astrolol/
 
 astrolol/plugins/
 ├── hello/              # Minimal full-stack plugin (PoC / reference implementation)
+├── alpaca/             # ASCOM Alpaca devices on the network: alpaca_camera/_mount/_focuser/
+│                       # _filter_wheel/_rotator/_flat_panel adapters (async httpx AlpacaClient,
+│                       # ImageBytes download, polling instead of push; the camera writes the FITS
+│                       # itself), and a page that finds servers (UDP discovery + saved addresses)
+│                       # and connects their devices
 ├── autofocus/          # Full-stack plugin — canonical example for complex plugins
 ├── eqmod/              # Native (non-INDI) Sky-Watcher motor-controller driver: GoTo/sync/
 │                       # tracking/park over EQMOD cable or USB; ships an INDI mount-proxy so

@@ -45,7 +45,8 @@ questions:
    - **Browse INDI drivers** for almost every commercial device. astrolol starts the INDI
      server for you.
    - **Other adapter** for drivers that come with astrolol plugins, such as the native
-     [EQMOD](../../astrolol/plugins/eqmod/docs/en.md) driver for Sky-Watcher mounts.
+     [EQMOD](../../astrolol/plugins/eqmod/docs/en.md) driver for Sky-Watcher mounts, or for
+     [ASCOM Alpaca](../../astrolol/plugins/alpaca/docs/en.md) devices on the network.
 3. **Select manufacturer**, then **Select model**. If your device is not listed, choose
    **Enter manually…** and type the name of its INDI driver (for example `indi_asi_ccd`).
 4. **Configure & connect.** astrolol shows the settings the driver offers before connecting:

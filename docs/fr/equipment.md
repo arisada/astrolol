@@ -28,7 +28,8 @@ Cliquez sur **Charger un pilote** et suivez l'assistant.
      présente comme un appareil à part, se connecte avec la caméra.
    - **Autre adaptateur** : les pilotes fournis par des modules d'astrolol, par exemple
      `eqmod` (le pilote natif Sky-Watcher du module [EQMOD](../../astrolol/plugins/eqmod/docs/fr.md))
-     ou son simulateur de monture. Si aucun module n'en propose pour le type choisi,
+     ou son simulateur de monture, et les adaptateurs `alpaca_…` du module
+     [ASCOM Alpaca](../../astrolol/plugins/alpaca/docs/fr.md). Si aucun n'est proposé pour le type choisi,
      l'assistant le signale.
 3. Pour INDI : **Choisir le fabricant**, puis **Choisir le modèle**. **Saisir manuellement…**
    permet de taper un nom de pilote (`indi_asi_ccd`) et, si besoin, le nom sous lequel le

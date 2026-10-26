@@ -70,7 +70,7 @@ from astropy.time import Time
 
 from astrolol.devices.base.models import DeviceState, MountStatus, TrackingMode
 from astrolol.plugins.eqmod.protocol import SIDEREAL_DEG_PER_SEC
-from astrolol.plugins.eqmod.rates import nudge_speed_x_sidereal
+from astrolol.mount.rates import nudge_speed_x_sidereal
 
 logger = structlog.get_logger()
 

@@ -1,0 +1,33 @@
+{
+  "label": "ASCOM Alpaca",
+  "manifest": {
+    "name": "ASCOM Alpaca",
+    "description": "Cameras, mounts, focusers, filter wheels, rotators and flat panels that speak ASCOM Alpaca over the network."
+  },
+  "title": "ASCOM Alpaca",
+  "intro": "Alpaca devices found on your network. Connect one and it appears with your other equipment.",
+  "scan": "Search again",
+  "scanning": "Searching…",
+  "none": "No Alpaca device found. If yours is on another network, add its address below.",
+  "unreachable": "{{address}}: {{error}}",
+  "server": {
+    "noDevices": "This server offers no device."
+  },
+  "device": {
+    "number": "number {{n}}",
+    "unsupported": "Not supported yet",
+    "connectedAs": "Connected as {{id}}",
+    "id": "Device ID",
+    "idInvalid": "Letters, digits, - and _ only, starting with a letter or digit.",
+    "connect": "Connect",
+    "connecting": "Connecting…"
+  },
+  "addresses": {
+    "title": "Servers to ask directly",
+    "hint": "For servers the search does not reach, such as on another network. Port 11111 if none is given.",
+    "placeholder": "192.168.1.20:11111",
+    "add": "Add",
+    "remove": "Remove",
+    "clear": "Clear"
+  }
+}

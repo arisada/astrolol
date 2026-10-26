@@ -1,7 +1,8 @@
 """Nudge speeds, in multiples of the sidereal rate.
 
 A rate is either one of the INDI-style names or "<n>x" (e.g. "16x", "800x"), which is also what
-the INDI EQMod driver calls its slew rates, so the UI can offer the same list for both.
+the INDI EQMod driver calls its slew rates, so the UI can offer the same list for every mount
+(EQMOD, Alpaca).
 """
 from __future__ import annotations
 

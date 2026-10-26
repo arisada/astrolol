@@ -92,6 +92,14 @@ INDIGO in Options → INDI Server, or start astrolol with `ASTROLOL_INDI_SERVER_
 `ASTROLOL_INDIGO_SERVER_PATH` (or the INDIGO server program in Options) if `indigo_server` is not
 on the `PATH`. The Equipment page then lists INDIGO's drivers.
 
+**Optional: ASCOM Alpaca devices**
+
+Nothing to install: enable the ASCOM Alpaca plugin (Options → Plugins) and it finds Alpaca
+devices (built-in Alpaca, ASCOM Remote) on the network. For tests without hardware, ASCOM's
+[OmniSim](https://github.com/ASCOMInitiative/ASCOM.Alpaca.Simulators/releases) simulators have
+self-contained Linux builds (x64, armhf, aarch64): unpack one and put `ascom.alpaca.simulators`
+on the `PATH`.
+
 **Optional: ASTAP plate solver, gsc**
 
 ```bash

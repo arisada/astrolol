@@ -1,0 +1,33 @@
+{
+  "label": "ASCOM Alpaca",
+  "manifest": {
+    "name": "ASCOM Alpaca",
+    "description": "Caméras, montures, focusers, roues à filtres, rotateurs et panneaux de flat qui parlent ASCOM Alpaca par le réseau."
+  },
+  "title": "ASCOM Alpaca",
+  "intro": "Les appareils Alpaca trouvés sur votre réseau. Connectez-en un et il apparaît avec le reste de votre équipement.",
+  "scan": "Chercher à nouveau",
+  "scanning": "Recherche…",
+  "none": "Aucun appareil Alpaca trouvé. Si le vôtre est sur un autre réseau, ajoutez son adresse ci-dessous.",
+  "unreachable": "{{address}} : {{error}}",
+  "server": {
+    "noDevices": "Ce serveur ne propose aucun appareil."
+  },
+  "device": {
+    "number": "numéro {{n}}",
+    "unsupported": "Pas encore pris en charge",
+    "connectedAs": "Connecté sous {{id}}",
+    "id": "ID de l'appareil",
+    "idInvalid": "Lettres, chiffres, - et _ uniquement, en commençant par une lettre ou un chiffre.",
+    "connect": "Connecter",
+    "connecting": "Connexion…"
+  },
+  "addresses": {
+    "title": "Serveurs à interroger directement",
+    "hint": "Pour les serveurs que la recherche n'atteint pas, par exemple sur un autre réseau. Port 11111 si aucun n'est indiqué.",
+    "placeholder": "192.168.1.20:11111",
+    "add": "Ajouter",
+    "remove": "Retirer",
+    "clear": "Effacer"
+  }
+}

@@ -6,7 +6,7 @@ import astrolol.plugins
 from astrolol.core.plugin_api import NavGroup
 
 EXPECTED = {
-    "equipment": {"eqmod", "bluetooth_serial", "guide_simulator", "lx200", "stellarium"},
+    "equipment": {"alpaca", "eqmod", "bluetooth_serial", "guide_simulator", "lx200", "stellarium"},
     "settings": {"system", "mdns", "hello", "security", "mcp"},
 }
 

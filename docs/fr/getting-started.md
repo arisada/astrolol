@@ -49,7 +49,8 @@ pilote** et répondez aux questions :
    - **Parcourir les pilotes INDI** pour presque tous les appareils du commerce. astrolol
      démarre le serveur INDI pour vous.
    - **Autre adaptateur** pour les pilotes fournis par des modules d'astrolol, comme le pilote
-     natif [EQMOD](../../astrolol/plugins/eqmod/docs/fr.md) des montures Sky-Watcher.
+     natif [EQMOD](../../astrolol/plugins/eqmod/docs/fr.md) des montures Sky-Watcher, ou pour les
+     appareils [ASCOM Alpaca](../../astrolol/plugins/alpaca/docs/fr.md) du réseau.
 3. **Choisir le fabricant**, puis **Choisir le modèle**. Si votre appareil n'est pas dans la
    liste, choisissez **Saisir manuellement…** et tapez le nom de son pilote INDI (par exemple
    `indi_asi_ccd`).

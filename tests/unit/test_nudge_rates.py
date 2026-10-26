@@ -1,6 +1,6 @@
 import pytest
 
-from astrolol.plugins.eqmod.rates import MAX_NUDGE_X_SIDEREAL, nudge_speed_x_sidereal
+from astrolol.mount.rates import MAX_NUDGE_X_SIDEREAL, nudge_speed_x_sidereal
 
 
 def test_names_keep_their_meaning() -> None:
