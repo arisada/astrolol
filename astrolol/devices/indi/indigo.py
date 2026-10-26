@@ -99,6 +99,17 @@ _KIND_GROUPS: dict[str, str] = {
     "aux": "Auxiliary",
 }
 # indigo_aux_* drivers that are flat panels or dust covers.
+# Properties every INDIGO device has that set up the server, not how the device connects:
+# its saved profiles, extra copies of the device, a password. The connect wizard shows them
+# greyed out and never sends them.
+SERVER_ONLY_PROPERTIES: frozenset[str] = frozenset({
+    "ADDITIONAL_INSTANCES",
+    "AUTHENTICATION",
+    "CONFIG_PROCESS",   # INDIGO's CONFIG, translated: saves the profile
+    "PROFILE",
+    "PROFILE_NAME",
+})
+
 FLAT_PANEL_DRIVERS: frozenset[str] = frozenset({
     "indigo_aux_alto", "indigo_aux_arteskyflat", "indigo_aux_flatmaster", "indigo_aux_flipflat",
     "indigo_aux_geoptikflat", "indigo_aux_giotto", "indigo_aux_wcv4ec",
@@ -310,13 +321,16 @@ class IndigoServer:
         pid = (state or {}).get("pid")
         if pid and self._is_indigo_server(pid):
             running = sorted((state or {}).get("indi_drivers", []))
-            if running == sorted(self.indi_drivers):
+            same_port = (state or {}).get("port", self.port) == self.port
+            if running == sorted(self.indi_drivers) and same_port:
                 logger.info("indigo.server_reusing", pid=pid)
                 self._managed_pid = pid
                 self._loaded_drivers = set(running)
                 return
-            # Started with other INDI drivers, which it cannot change while it runs.
-            logger.info("indigo.server_restarting", pid=pid, running=running, wanted=self.indi_drivers)
+            # Started with other INDI drivers, which it cannot change while it runs, or on
+            # another port (changed in Options since).
+            logger.info("indigo.server_restarting", pid=pid, running=running, wanted=self.indi_drivers,
+                        old_port=(state or {}).get("port"), port=self.port)
             await self.stop()
             for _ in range(50):     # its worker lets go of the port a moment later
                 if not _port_in_use(self.port):
@@ -394,6 +408,16 @@ class IndigoServer:
         self._loaded_drivers = set()
         self._cleanup_state()
         logger.info("indigo.server_stopped", pid=pid)
+
+    async def stop_left_over(self) -> None:
+        """Stop the INDIGO server a previous run left running (astrolol now uses another server)."""
+        if not self.manage:
+            return
+        pid = (self._read_state() or {}).get("pid")
+        if pid and self._is_indigo_server(pid):
+            await self.stop()
+        else:
+            self._cleanup_state()
 
     def runs(self, executable: str) -> bool:
         """Whether the running server has *executable*, an INDI driver, from its start."""
@@ -479,6 +503,7 @@ class IndigoServer:
             self._run_dir.mkdir(parents=True, exist_ok=True)
             self._state_path.write_text(json.dumps({
                 "pid": self._managed_pid,
+                "port": self.port,
                 "indi_drivers": sorted(self._loaded_drivers),
             }))
         except OSError as exc:

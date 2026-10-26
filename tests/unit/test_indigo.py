@@ -361,7 +361,10 @@ async def test_server_endpoint_says_which_server(monkeypatch: pytest.MonkeyPatch
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
         r = await c.get("/indi/server")
     assert r.status_code == 200
-    assert r.json() == {"kind": "indigo", "managed": False, "host": "astro.local", "port": 7625}
+    info = r.json()
+    assert {k: info[k] for k in ("kind", "managed", "host", "port")} == {
+        "kind": "indigo", "managed": False, "host": "astro.local", "port": 7625,
+    }
 
 
 def test_environment_selects_indigo(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
 import { Trans, useTranslation } from 'react-i18next'
 import { api } from '@/api/client'
-import { useIndiServer } from '@/hooks/useIndiServer'
-import type { PluginInfo } from '@/api/types'
+import type { IndiServerChoiceInfo, IndiServerInfo, PluginInfo } from '@/api/types'
+import { PillGroup } from '@/components/ui/pill-group'
 import { NAV_GROUPS } from '@/components/Sidebar'
 import { useStore } from '@/store'
 import { ToggleSwitch } from '@/components/ui/toggle-switch'
@@ -67,14 +67,146 @@ function TokenReference() {
   )
 }
 
+const HOST_RE = /^[A-Za-z0-9._:-]+$/
+const SERVER_KINDS = ['indi', 'indigo'] as const
+
+// The INDI server: chosen here, used from the next start; the environment can fix parts of it.
+function IndiServerSettings({ onRestart, restarting }: { onRestart: () => void; restarting: boolean }) {
+  const { t } = useTranslation('options')
+  const [info, setInfo] = useState<IndiServerInfo | null>(null)
+  const [form, setForm] = useState<IndiServerChoiceInfo | null>(null)
+  const [host, setHost] = useState('')
+  const [port, setPort] = useState('')
+  const [indigoPath, setIndigoPath] = useState('')
+  const [saveError, setSaveError] = useState(false)
+
+  const show = (i: IndiServerInfo) => {
+    setInfo(i)
+    setForm(i.next)
+    setHost(i.next.host)
+    setPort(String(i.next.port))
+    setIndigoPath(i.next.indigo_path)
+  }
+
+  useEffect(() => {
+    api.indi.server().then(show).catch(() => { /* backend may not be running */ })
+  }, [])
+
+  if (!info || !form) return null
+
+  const fixed = (k: keyof IndiServerChoiceInfo) => info.env.includes(k)
+  const portValue = Number(port)
+  const portValid = Number.isInteger(portValue) && portValue >= 1 && portValue <= 65535
+  const hostValid = HOST_RE.test(host)
+
+  const save = async (next: IndiServerChoiceInfo) => {
+    setForm(next)
+    setSaveError(false)
+    try {
+      const current = await api.settings.get()
+      // What the environment fixes is not ours to save.
+      const choice = Object.fromEntries(
+        Object.entries(next).filter(([k]) => !fixed(k as keyof IndiServerChoiceInfo)),
+      )
+      await api.settings.put({ ...current, indi_server: choice })
+      show(await api.indi.server())
+    } catch {
+      setSaveError(true)
+    }
+  }
+
+  const address = `${info.host}:${info.port}`
+  const inUse = info.kind === 'indigo'
+    ? (info.managed ? t('indi.serverIndigoManaged') : t('indi.serverIndigoExternal', { address }))
+    : (info.managed ? t('indi.serverIndiManaged') : t('indi.serverIndiExternal', { address }))
+  const indigoPathOff = form.kind !== 'indigo' || !form.managed
+
+  return (
+    <>
+      <Row label={t('indi.server')} hint={t('indi.serverHint')}>
+        <fieldset disabled={fixed('kind')} className={fixed('kind') ? 'opacity-50' : ''}>
+          <PillGroup
+            options={SERVER_KINDS}
+            value={form.kind}
+            onChange={(kind) => save({ ...form, kind })}
+            formatLabel={(k) => k.toUpperCase()}
+          />
+        </fieldset>
+      </Row>
+      <Row label={t('indi.managed')} hint={t('indi.managedHint')}>
+        <ToggleSwitch
+          checked={form.managed}
+          onChange={() => save({ ...form, managed: !form.managed })}
+          label={t('indi.managed')}
+          disabled={fixed('managed')}
+        />
+      </Row>
+      {!form.managed && (
+        <Row label={t('indi.host')} hint={t('indi.hostHint')}>
+          <Input
+            inputSize="sm"
+            value={host}
+            disabled={fixed('host')}
+            onChange={(e) => setHost(e.target.value)}
+            onBlur={() => { if (hostValid && host !== form.host) save({ ...form, host }) }}
+            className={`!w-48 ${hostValid ? '' : 'border-status-error'}`}
+          />
+        </Row>
+      )}
+      <Row label={t('indi.port')} hint={t('indi.portHint')}>
+        <Input
+          inputSize="sm"
+          type="number"
+          min={1}
+          max={65535}
+          value={port}
+          disabled={fixed('port')}
+          onChange={(e) => setPort(e.target.value)}
+          onBlur={() => { if (portValid && portValue !== form.port) save({ ...form, port: portValue }) }}
+          className={`!w-24 ${portValid ? '' : 'border-status-error'}`}
+        />
+      </Row>
+      <div className={indigoPathOff ? 'opacity-50' : ''}>
+        <Row
+          label={t('indi.indigoPath')}
+          hint={indigoPathOff ? t('indi.indigoPathUnused') : t('indi.indigoPathHint')}
+        >
+          <Input
+            inputSize="sm"
+            value={indigoPath}
+            disabled={indigoPathOff || fixed('indigo_path')}
+            onChange={(e) => setIndigoPath(e.target.value)}
+            onBlur={() => {
+              if (indigoPath.trim() && indigoPath !== form.indigo_path) save({ ...form, indigo_path: indigoPath.trim() })
+            }}
+            className="!w-48"
+          />
+        </Row>
+      </div>
+      {info.env.length > 0 && <p className="text-xs text-slate-500">{t('indi.serverEnv')}</p>}
+      <Row label={t('indi.serverInUse')}>
+        <span className="text-sm text-slate-300">{inUse}</span>
+      </Row>
+      {info.restart_needed && (
+        <div className="flex items-center gap-3 flex-wrap">
+          <p className="text-xs text-amber-400">{t('indi.serverRestart')}</p>
+          <button
+            type="button"
+            onClick={onRestart}
+            disabled={restarting}
+            className="px-3 py-1 rounded text-xs font-medium bg-red-700 hover:bg-red-600 text-slate-100 disabled:opacity-50 transition-colors"
+          >
+            {restarting ? t('server.restarting') : t('server.restart')}
+          </button>
+        </div>
+      )}
+      {saveError && <p className="text-xs text-status-error">{t('indi.serverSaveError')}</p>}
+    </>
+  )
+}
+
 export function Options() {
   const { t, i18n } = useTranslation('options')
-  const indiServer = useIndiServer()
-  const indiServerAddress = indiServer ? `${indiServer.host}:${indiServer.port}` : ''
-  const indiServerText = !indiServer ? '—'
-    : indiServer.kind === 'indigo'
-      ? (indiServer.managed ? t('indi.serverIndigoManaged') : t('indi.serverIndigoExternal', { address: indiServerAddress }))
-      : (indiServer.managed ? t('indi.serverIndiManaged') : t('indi.serverIndiExternal', { address: indiServerAddress }))
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [indiDebugLevel, setIndiDebugLevel] = useState(0)
 
@@ -309,12 +441,7 @@ export function Options() {
       </Section>
 
       <Section title={t('indi.title')}>
-        <Row
-          label={t('indi.server')}
-          hint={t('indi.serverHint')}
-        >
-          <span className="text-sm text-slate-300">{indiServerText}</span>
-        </Row>
+        <IndiServerSettings onRestart={restartNow} restarting={restarting} />
         <Row
           label={t('indi.runDir')}
           hint={t('indi.runDirHint')}

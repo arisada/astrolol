@@ -43,15 +43,21 @@ For example `%U/astro/%O/%D` with `%F_%f_%Es_%N` gives
 
 ## INDI Server
 
-- **Server**: which server drives your INDI devices, and whether astrolol starts it. By default
-  astrolol starts *indiserver* when the first device connects. It can instead use
-  [INDIGO](https://www.indigo-astronomy.org) drivers, or a server you run yourself; this is set
-  where astrolol is installed (environment variables, e.g. in its service file) and takes
-  effect when it starts:
-  - `ASTROLOL_INDI_SERVER_KIND=indigo`: INDIGO instead of indiserver (the Equipment page then
-    lists INDIGO's drivers). `ASTROLOL_INDIGO_SERVER_PATH` if `indigo_server` is not found.
-  - `ASTROLOL_INDI_MANAGE_SERVER=false`, with `ASTROLOL_INDI_HOST` and `ASTROLOL_INDI_PORT`
-    (7624 by default): a server you start yourself, possibly on another computer.
+- **Server**: which server drives your INDI devices: *INDI* (indiserver, the default) or
+  [*INDIGO*](https://www.indigo-astronomy.org), whose drivers the Equipment page then lists.
+  Changes take effect when astrolol restarts; a **Restart astrolol** button appears until then,
+  and the server astrolol started before is stopped at the restart.
+  - **Started by astrolol**: on, astrolol starts the server when the first device connects. Off,
+    it uses a server you start yourself, at **Host** and **Port** (7624 by default), possibly on
+    another computer.
+  - **INDIGO server program**: `indigo_server`, or its full path if it is not on the search
+    path. Greyed out unless astrolol starts an INDIGO server.
+  - **In use**: the server astrolol is using now.
+
+  These can also be set where astrolol is installed (environment variables, e.g. in its service
+  file): `ASTROLOL_INDI_SERVER_KIND` (`indi` or `indigo`), `ASTROLOL_INDI_MANAGE_SERVER`,
+  `ASTROLOL_INDI_HOST`, `ASTROLOL_INDI_PORT` and `ASTROLOL_INDIGO_SERVER_PATH`. A setting given
+  this way is greyed out here.
 - **Run directory**: where the INDI server keeps its control files.
 - **Local image transfer**: the driver writes images straight to disk instead of sending them
   over the network connection. Faster, especially with large sensors. **Upload directory** is

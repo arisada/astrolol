@@ -49,23 +49,54 @@ class DriverEntryOut(BaseModel):
         )
 
 
+class IndiServerChoiceOut(BaseModel):
+    kind: Literal["indi", "indigo"]
+    managed: bool
+    host: str
+    port: int
+    indigo_path: str                  # the INDIGO server program
+
+
 class IndiServerInfo(BaseModel):
     kind: Literal["indi", "indigo"]   # indiserver or an INDIGO server
     managed: bool                     # astrolol starts it
     host: str
     port: int
+    # The server used from the next start (Options' choice, UserSettings.indi_server), the
+    # parts of it the environment fixes, and whether it differs from the running one.
+    next: IndiServerChoiceOut
+    env: list[str] = []
+    restart_needed: bool = False
 
 
 @router.get("/server", response_model=IndiServerInfo)
 def get_server(request: Request) -> IndiServerInfo:
-    """Which server astrolol talks INDI to, and how (set from the ASTROLOL_INDI_* settings)."""
+    """Which server astrolol talks INDI to, and how; and the one chosen for the next start."""
+    from astrolol.config.settings import INDI_SERVER_FIELDS, ENV_FIELDS, indi_server_env_keys
+
     manager = getattr(request.app.state.registry, "indi_manager", None)
     server = getattr(manager, "_server", None)
+    # settings hold what this run started with (the choice is applied once, at start).
+    running = {key: getattr(settings, field) for key, field in INDI_SERVER_FIELDS.items()}
+    choice = request.app.state.profile_store.get_user_settings().indi_server
+    nxt = {
+        key: value if field in ENV_FIELDS or getattr(choice, key) is None else getattr(choice, key)
+        for (key, field), value in zip(INDI_SERVER_FIELDS.items(), running.values())
+    }
+    # The INDIGO program only matters to a managed INDIGO server; the host only to an external one.
+    relevant = ["kind", "managed", "port"]
+    if not nxt["managed"]:
+        relevant.append("host")
+    if nxt["kind"] == "indigo" and nxt["managed"]:
+        relevant.append("indigo_path")
     return IndiServerInfo(
         kind=getattr(manager, "server_kind", settings.indi_server_kind),
         managed=getattr(server, "manage", settings.indi_manage_server),
         host=getattr(server, "host", settings.indi_host),
         port=getattr(server, "port", settings.indi_port),
+        next=IndiServerChoiceOut(**nxt),
+        env=indi_server_env_keys(),
+        restart_needed=any(nxt[k] != running[k] for k in relevant),
     )
 
 
@@ -144,6 +175,8 @@ class LoadDriverResponse(BaseModel):
     # catalog name ("ZWO CCD").  When multiple cameras are connected all names
     # are returned so the user can register each one with the correct name.
     device_names: list[str] = []
+    # Properties shown but not offered: they set up the server, not the device (INDIGO's).
+    disabled_properties: list[str] = []
 
 
 @router.post("/load_driver", response_model=LoadDriverResponse)
@@ -173,7 +206,11 @@ async def load_driver(body: LoadDriverRequest, request: Request) -> LoadDriverRe
 
     if getattr(manager, "server_kind", "indi") == "indigo":
         device_names = await _load_indigo_driver(manager, body.executable)
-        return await _snapshot_response(client, device_names)
+        response = await _snapshot_response(client, device_names)
+        response.disabled_properties = sorted(
+            p.name for p in response.properties if p.name in indigo.SERVER_ONLY_PROPERTIES
+        )
+        return response
 
     # t0 check: if the driver was already loaded (e.g. cameras announced at indiserver
     # startup before the user clicked "Load driver"), return whatever is already known.

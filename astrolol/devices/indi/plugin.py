@@ -44,6 +44,7 @@ class IndiConnectionManager:
         from astrolol.devices.indi.client import IndiClient
         from astrolol.devices.indi.server import IndiServer
 
+        self._run_dir = run_dir
         self._client = IndiClient(
             host=settings.indi_host,
             port=settings.indi_port,
@@ -112,6 +113,7 @@ class IndiConnectionManager:
                 await self._start_services()
 
     async def _start_services(self) -> None:
+        await self._stop_other_server()
         if isinstance(self._server, IndigoServer):
             # An INDIGO server runs INDI drivers only from its start.
             self._server.indi_drivers = self._indi_startup_drivers()
@@ -120,6 +122,26 @@ class IndiConnectionManager:
         self._started = True
         for executable in list(self._startup_drivers):
             await self._load_startup_driver(executable)
+
+    async def _stop_other_server(self) -> None:
+        """Stop a server of the other kind a previous run started (the server was switched in
+        Options): it would hold the port, and astrolol would talk to the wrong one."""
+        from astrolol.config.settings import settings
+        from astrolol.devices.indi.server import IndiServer, _wait_port_free
+
+        if not self._server.manage:
+            return
+        other: IndiServer | IndigoServer
+        if isinstance(self._server, IndigoServer):
+            other = IndiServer(manage=True, host=self._server.host, port=self._server.port, run_dir=self._run_dir)
+        else:
+            other = IndigoServer(self._client, manage=True, host=self._server.host, port=self._server.port,
+                                 run_dir=self._run_dir, server_path=settings.indigo_server_path)
+        if other._read_state() is None:
+            return
+        logger.info("indi.stopping_other_server", kind="indi" if isinstance(other, IndiServer) else "indigo")
+        await other.stop_left_over()
+        await _wait_port_free(self._server.port)
 
     def _indi_startup_drivers(self) -> list[str]:
         return [d for d in self._startup_drivers if not d.startswith("indigo_")]

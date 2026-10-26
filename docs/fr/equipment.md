@@ -36,7 +36,8 @@ Cliquez sur **Charger un pilote** et suivez l'assistant.
 4. **Configurer et connecter** : le pilote est chargé et les réglages qu'il accepte avant la
    connexion sont listés : port série, vitesse, etc. Laissez-les tels quels sauf si vous savez
    qu'il faut les changer. Si le pilote sert plusieurs appareils, choisissez le **Nom de
-   l'appareil INDI**.
+   l'appareil INDI**. Avec INDIGO, les réglages propres au serveur INDIGO (ses profils, les
+   instances supplémentaires, un mot de passe) sont grisés : ils ne changent pas à la connexion.
 5. **ID de l'appareil** (facultatif) : un nom court utilisé partout dans astrolol (entrées du
    menu, noms de fichiers). Lettres, chiffres, `-` et `_`. Laissez vide pour qu'il soit tiré du
    nom de l'appareil.

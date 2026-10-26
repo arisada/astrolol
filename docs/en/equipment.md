@@ -32,6 +32,8 @@ Click **Load driver** and follow the wizard.
 4. **Configure & connect**: the driver is loaded and the settings it accepts before connecting
    are listed: serial port, baud rate, and so on. Leave them as they are unless you know you
    need to change them. If the driver serves several devices, choose the **INDI device name**.
+   With INDIGO, the settings that belong to the INDIGO server (its profiles, additional
+   instances, a password) are shown greyed out: they are not changed when connecting.
 5. **Device ID** (optional): a short name used everywhere in astrolol (menu entries, file
    names). Letters, digits, `-` and `_`. Leave it empty and one is made from the device name.
 6. **Connect**.

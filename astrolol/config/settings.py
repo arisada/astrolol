@@ -29,7 +29,7 @@ class Settings(BaseSettings):
     security_file: Path = _BASE / "security.json"       # users, API tokens, sessions (security plugin)
     service_token_file: Path = _BASE / "service_token"  # credential for astrolol's own helper processes
 
-    # INDI server settings (advanced — normally hidden in UI)
+    # INDI server settings; Options sets them too (UserSettings.indi_server), the environment wins.
     indi_manage_server: bool = True   # False = connect to already-running server
     indi_host: str = "localhost"
     indi_port: int = 7624
@@ -46,3 +46,27 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
+
+# The fields of the INDI server choice (UserSettings.indi_server) and the settings they set.
+INDI_SERVER_FIELDS = {
+    "kind": "indi_server_kind",
+    "managed": "indi_manage_server",
+    "host": "indi_host",
+    "port": "indi_port",
+    "indigo_path": "indigo_server_path",
+}
+# Settings the environment set (ASTROLOL_*): they win over the choice made in Options.
+ENV_FIELDS = frozenset(settings.model_fields_set)
+
+
+def indi_server_env_keys() -> list[str]:
+    """The keys of the INDI server choice fixed by the environment."""
+    return [key for key, field in INDI_SERVER_FIELDS.items() if field in ENV_FIELDS]
+
+
+def apply_indi_server_choice(choice: object) -> None:
+    """Use the INDI server chosen in Options (read at start), except what the environment sets."""
+    for key, field in INDI_SERVER_FIELDS.items():
+        value = getattr(choice, key, None)
+        if value is not None and field not in ENV_FIELDS:
+            setattr(settings, field, value)

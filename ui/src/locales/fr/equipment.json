@@ -56,7 +56,8 @@
     "configure": "Configurer et connecter",
     "indiName": "Nom de l'appareil INDI",
     "discovering": "détection…",
-    "noProps": "Aucune propriété configurable. Cliquez sur Connecter pour continuer."
+    "noProps": "Aucune propriété configurable. Cliquez sur Connecter pour continuer.",
+    "serverProperty": "Se règle sur le serveur INDIGO, pas à la connexion."
   },
   "device": {
     "autoDiscovered": "détecté automatiquement",

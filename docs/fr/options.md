@@ -44,17 +44,21 @@ Par exemple `%U/astro/%O/%D` avec `%F_%f_%Es_%N` donne
 
 ## Serveur INDI
 
-- **Serveur** : le serveur qui pilote vos appareils INDI, et s'il est démarré par astrolol. Par
-  défaut, astrolol démarre *indiserver* à la connexion du premier appareil. Il peut aussi
-  utiliser les pilotes [INDIGO](https://www.indigo-astronomy.org), ou un serveur que vous lancez
-  vous-même ; cela se règle là où astrolol est installé (variables d'environnement, par ex. dans
-  son fichier de service) et prend effet à son démarrage :
-  - `ASTROLOL_INDI_SERVER_KIND=indigo` : INDIGO au lieu d'indiserver (la page Équipement
-    propose alors les pilotes INDIGO). `ASTROLOL_INDIGO_SERVER_PATH` si `indigo_server` est
-    introuvable.
-  - `ASTROLOL_INDI_MANAGE_SERVER=false`, avec `ASTROLOL_INDI_HOST` et `ASTROLOL_INDI_PORT`
-    (7624 par défaut) : un serveur que vous démarrez vous-même, éventuellement sur un autre
-    ordinateur.
+- **Serveur** : le serveur qui pilote vos appareils INDI : *INDI* (indiserver, par défaut) ou
+  [*INDIGO*](https://www.indigo-astronomy.org), dont la page Équipement propose alors les
+  pilotes. Les changements prennent effet au redémarrage d'astrolol ; un bouton **Redémarrer
+  astrolol** apparaît jusque-là, et le serveur qu'astrolol avait démarré est arrêté au redémarrage.
+  - **Démarré par astrolol** : activé, astrolol démarre le serveur à la connexion du premier
+    appareil. Désactivé, il utilise un serveur que vous démarrez vous-même, sur **Hôte** et
+    **Port** (7624 par défaut), éventuellement sur un autre ordinateur.
+  - **Programme du serveur INDIGO** : `indigo_server`, ou son chemin complet s'il n'est pas dans
+    le chemin de recherche. Grisé sauf quand astrolol démarre un serveur INDIGO.
+  - **En service** : le serveur qu'astrolol utilise maintenant.
+
+  Ils peuvent aussi se régler là où astrolol est installé (variables d'environnement, par ex.
+  dans son fichier de service) : `ASTROLOL_INDI_SERVER_KIND` (`indi` ou `indigo`),
+  `ASTROLOL_INDI_MANAGE_SERVER`, `ASTROLOL_INDI_HOST`, `ASTROLOL_INDI_PORT` et
+  `ASTROLOL_INDIGO_SERVER_PATH`. Un réglage donné ainsi est grisé ici.
 - **Dossier d'exécution** : où le serveur INDI garde ses fichiers de contrôle.
 - **Transfert d'images local** : le pilote écrit les images directement sur le disque au lieu de
   les envoyer par la connexion réseau. Plus rapide, surtout avec de grands capteurs. Le

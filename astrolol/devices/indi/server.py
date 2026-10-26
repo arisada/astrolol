@@ -78,7 +78,12 @@ class IndiServer:
         state = self._read_state()
         if state:
             pid = state.get("pid")
-            if pid and self._is_our_indiserver(pid):
+            if pid and self._is_our_indiserver(pid) and state.get("port", self.port) != self.port:
+                # Left on another port (changed in Options since): start one on this one.
+                logger.info("indi.server_port_changed", pid=pid, old_port=state.get("port"), port=self.port)
+                await self.stop()
+                await _wait_port_free(self.port)
+            elif pid and self._is_our_indiserver(pid):
                 logger.info("indi.server_reusing", pid=pid)
                 self._managed_pid = pid
                 self._loaded_drivers = set(state.get("loaded_drivers", []))
@@ -166,6 +171,16 @@ class IndiServer:
         self._cleanup_fifo()
         logger.info("indi.server_stopped", pid=pid)
 
+    async def stop_left_over(self) -> None:
+        """Stop the indiserver a previous run left running (astrolol now uses another server)."""
+        if not self.manage:
+            return
+        pid = (self._read_state() or {}).get("pid")
+        if pid and self._is_our_indiserver(pid):
+            await self.stop()
+        else:
+            self._cleanup_state()
+
     async def load_driver(self, executable: str) -> None:
         """
         Tell indiserver to start a driver.
@@ -249,6 +264,7 @@ class IndiServer:
             self._state_path.write_text(
                 json.dumps({
                     "pid": self._managed_pid,
+                    "port": self.port,
                     "loaded_drivers": sorted(self._loaded_drivers),
                 })
             )
@@ -310,3 +326,11 @@ class IndiServer:
             self._fifo_path.unlink(missing_ok=True)
         except OSError:
             pass
+
+
+async def _wait_port_free(port: int) -> None:
+    """A stopped server lets go of its port a moment after it exits."""
+    for _ in range(50):
+        if not IndiServer._port_in_use(port):
+            return
+        await asyncio.sleep(0.1)

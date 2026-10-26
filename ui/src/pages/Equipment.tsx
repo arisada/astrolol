@@ -588,6 +588,7 @@ function ConfigureStep({
   driver,
   properties,
   preConnectProps,
+  disabledProperties = [],
   onPreConnectPropsChange,
   onBack,
   onConnect,
@@ -603,6 +604,7 @@ function ConfigureStep({
   driver: DriverEntry | null
   properties: DeviceProperty[]
   preConnectProps: PreConnectProps
+  disabledProperties?: string[]
   onPreConnectPropsChange: (props: PreConnectProps) => void
   onBack: () => void
   onConnect: () => void
@@ -700,7 +702,14 @@ function ConfigureStep({
                 </p>
               )}
               <div className="flex flex-col gap-3">
-                {props.map((prop) => (
+                {props.map((prop) => disabledProperties.includes(prop.name) ? (
+                  // Sets up the server, not the device: shown for reference, never sent.
+                  <fieldset key={prop.name} disabled className="flex flex-col gap-1 opacity-50">
+                    <label className="text-xs text-slate-400">{prop.label || prop.name}</label>
+                    <PropEditor prop={prop} value={undefined} onChange={() => {}} />
+                    <p className="text-xs text-slate-500">{t('wizard.serverProperty')}</p>
+                  </fieldset>
+                ) : (
                   <div key={prop.name} className="flex flex-col gap-1">
                     <label className="text-xs text-slate-400">{prop.label || prop.name}</label>
                     <PropEditor
@@ -1402,6 +1411,7 @@ export function Equipment() {
   // Two-phase state
   const [driverProperties, setDriverProperties] = useState<DeviceProperty[]>([])
   const [preConnectProps, setPreConnectProps] = useState<PreConnectProps>({})
+  const [disabledProperties, setDisabledProperties] = useState<string[]>([])
   const [pendingConnect, setPendingConnect] = useState<{
     deviceName: string
     executable: string
@@ -1553,6 +1563,7 @@ export function Equipment() {
       const resolvedName = names[0] ?? deviceName
       setDiscoveredDeviceNames(names)
       setDriverProperties(result.properties)
+      setDisabledProperties(result.disabled_properties ?? [])
       setPreConnectProps({})
       setPendingConnect({ deviceName: resolvedName, executable })
       setPendingDeviceId(suggestDeviceId(selectedKind, selectedDriver))
@@ -1842,6 +1853,7 @@ export function Equipment() {
               driver={selectedDriver}
               properties={driverProperties}
               preConnectProps={preConnectProps}
+              disabledProperties={disabledProperties}
               onPreConnectPropsChange={setPreConnectProps}
               onBack={handleBack}
               onConnect={handleConnect}

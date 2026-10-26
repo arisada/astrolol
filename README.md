@@ -87,9 +87,10 @@ sudo apt-get install indi-full
 
 astrolol can drive an [INDIGO](https://www.indigo-astronomy.org) server instead of indiserver:
 install INDIGO (Debian and Raspberry Pi OS: the `indigo3` package from
-`https://indigo-astronomy.github.io/indigo_ppa/ppa`; elsewhere, build it from source) and start
-astrolol with `ASTROLOL_INDI_SERVER_KIND=indigo`. Set `ASTROLOL_INDIGO_SERVER_PATH` if
-`indigo_server` is not on the `PATH`. The Equipment page then lists INDIGO's drivers.
+`https://indigo-astronomy.github.io/indigo_ppa/ppa`; elsewhere, build it from source) and choose
+INDIGO in Options → INDI Server, or start astrolol with `ASTROLOL_INDI_SERVER_KIND=indigo`. Set
+`ASTROLOL_INDIGO_SERVER_PATH` (or the INDIGO server program in Options) if `indigo_server` is not
+on the `PATH`. The Equipment page then lists INDIGO's drivers.
 
 **Optional: ASTAP plate solver, gsc**
 

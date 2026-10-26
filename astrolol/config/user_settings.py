@@ -41,12 +41,22 @@ class DockSettings(BaseModel):
     widgets: list[DockWidget] = Field(default_factory=list, max_length=50)
 
 
+class IndiServerChoice(BaseModel):
+    """The INDI server chosen in Options, used from the next start. None = keep the default."""
+    kind: Literal["indi", "indigo"] | None = None   # indiserver or an INDIGO server
+    managed: bool | None = None                     # astrolol starts it (else: already running)
+    host: str | None = Field(default=None, min_length=1, max_length=253, pattern=r"^[A-Za-z0-9._:-]+$")
+    port: int | None = Field(default=None, ge=1, le=65535)
+    indigo_path: str | None = Field(default=None, min_length=1, max_length=4096)  # indigo_server
+
+
 class UserSettings(BaseModel):
     save_dir_template: str = "~/astrolol_pictures/%D"
     save_filename_template: str = "%F_%N_%Es_%Gg"
     enabled_plugins: list[str] = []
     indi_run_dir: str = "/tmp/astrolol"       # directory for INDI FIFO and state file
     indi_local_upload: bool = False
+    indi_server: IndiServerChoice = Field(default_factory=IndiServerChoice)
     indi_local_upload_dir: str = "/tmp/astrolol_upload"
     low_memory_mode: bool = False
     language: str = "en"                      # UI language (BCP-47 code, e.g. "en", "fr")

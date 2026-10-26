@@ -98,6 +98,11 @@ async def test_load_driver_for_a_mount(unmanaged_app):
         })
     assert r.status_code == 200, r.text
     assert r.json()["device_names"] == ["Mount Simulator"]
+    # INDIGO's own set-up (profiles, extra instances, a password) is shown but not offered.
+    disabled = r.json()["disabled_properties"]
+    assert {"PROFILE", "ADDITIONAL_INSTANCES", "AUTHENTICATION"} <= set(disabled)
+    assert "CONNECTION" not in disabled
+    assert set(disabled) <= {p["name"] for p in r.json()["properties"]}
 
 
 async def test_load_driver_refuses_an_indi_driver(unmanaged_app):

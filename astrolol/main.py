@@ -140,6 +140,9 @@ def create_app() -> FastAPI:
     from astrolol.core import mem_guard as _mem_guard_mod
     _mem_guard_mod.configure(lambda: profile_store.get_user_settings().low_memory_mode)
 
+    from astrolol.config.settings import apply_indi_server_choice
+    apply_indi_server_choice(user_settings.indi_server)
+
     pm = build_plugin_manager()
     registry = build_registry(pm, indi_run_dir=Path(user_settings.indi_run_dir))
     event_bus = EventBus()

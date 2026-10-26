@@ -583,7 +583,7 @@ astrolol/
 │   ├── manager.py      # DeviceManager — connect/disconnect lifecycle + events
 │   ├── registry.py     # DeviceRegistry — adapter_key → class mapping
 │   └── indi/           # INDI adapters (camera, mount, focuser + IndiClient); indigo.py: an
-│                       # INDIGO server instead of indiserver (ASTROLOL_INDI_SERVER_KIND=indigo)
+│                       # INDIGO server instead of indiserver (Options, or ASTROLOL_INDI_SERVER_KIND=indigo)
 │                       # — its catalog, driver loading and device kinds, same adapters
 ├── equipment/          # EquipmentStore — physical equipment tree (site/mount/OTA/camera/
 │                       # filter wheel/focuser/rotator/GPS) as profile-node graph, OpticalPath

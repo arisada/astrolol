@@ -117,6 +117,7 @@ export interface UserSettings {
   enabled_plugins: string[]
   indi_run_dir: string
   indi_local_upload: boolean
+  indi_server?: IndiServerChoice
   indi_local_upload_dir: string
   low_memory_mode: boolean
   language: string
@@ -1002,6 +1003,8 @@ export interface LoadDriverResponse {
    *  May differ from the catalog name (e.g. indi_asi_ccd → "ZWO CCD ASI294MC Pro").
    *  Multiple entries when several cameras of the same model are connected. */
   device_names: string[]
+  /** Shown greyed out, never sent: they set up the server, not the device (INDIGO). */
+  disabled_properties?: string[]
 }
 
 /** The server astrolol talks INDI to: indiserver, or an INDIGO server. */
@@ -1011,6 +1014,29 @@ export interface IndiServerInfo {
   managed: boolean
   host: string
   port: number
+  /** The server used from the next start (chosen in Options) */
+  next: IndiServerChoiceInfo
+  /** Parts of it fixed by the environment */
+  env: (keyof IndiServerChoiceInfo)[]
+  /** The next start uses another server than the running one */
+  restart_needed: boolean
+}
+
+export interface IndiServerChoiceInfo {
+  kind: 'indi' | 'indigo'
+  managed: boolean
+  host: string
+  port: number
+  indigo_path: string
+}
+
+/** UserSettings.indi_server: the INDI server chosen in Options; null = the default. */
+export interface IndiServerChoice {
+  kind?: 'indi' | 'indigo' | null
+  managed?: boolean | null
+  host?: string | null
+  port?: number | null
+  indigo_path?: string | null
 }
 
 export interface IndiDeviceMessage {

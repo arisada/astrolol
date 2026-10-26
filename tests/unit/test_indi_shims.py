@@ -7,6 +7,7 @@ from astrolol.devices.indi.plugin import IndiConnectionManager
 
 class _FakeServer:
     def __init__(self) -> None:
+        self.manage = False   # unmanaged: no other server to stop at start
         self.started = 0
         self.loaded: list[str] = []
         self.unloaded: list[str] = []
