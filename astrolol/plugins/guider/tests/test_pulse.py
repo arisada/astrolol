@@ -1,7 +1,13 @@
 import pytest
 
 from astrolol.devices.base import IPulseGuider, PulseGuideNotSupported
-from astrolol.devices.indi.pulse import has_pulse_guide, indi_pulse_guide
+from astrolol.devices.indi.pulse import (
+    connect_guide_companion,
+    disconnect_guide_companion,
+    has_pulse_guide,
+    indi_pulse_guide,
+    pulse_device,
+)
 from astrolol.plugins.guider.settings import GuiderSettings, pick_pulse_guider
 
 
@@ -77,3 +83,47 @@ def test_pick_follows_the_setting() -> None:
 def test_pick_refuses_a_device_that_cannot_pulse(output, cam, mount) -> None:
     with pytest.raises(PulseGuideNotSupported):
         pick_pulse_guider(output, cam, mount)
+
+
+class CompanionClient(FakeClient):
+    """Pulse properties live on '<device> (guider)', as INDIGO drivers publish them."""
+
+    def __init__(self, device_props: dict[str, set[str]]) -> None:
+        super().__init__(set())
+        self.device_props = device_props
+        self.connected: list[str] = []
+        self.disconnected: list[str] = []
+
+    def _get_vector(self, device: str, prop: str):  # noqa: ANN202
+        return object() if prop in self.device_props.get(device, set()) else None
+
+    def list_devices(self) -> list[str]:
+        return list(self.device_props)
+
+    async def connect_device(self, device: str) -> None:
+        self.connected.append(device)
+
+    async def disconnect_device(self, device: str) -> None:
+        self.disconnected.append(device)
+
+
+async def test_pulse_goes_to_the_guide_companion() -> None:
+    client = CompanionClient({"Mount": set(), "Mount (guider)": ST4})
+    assert pulse_device(client, "Mount") == "Mount (guider)"  # type: ignore[arg-type]
+    await indi_pulse_guide(client, "Mount", "W", 100)  # type: ignore[arg-type]
+    assert client.sent == [("Mount (guider)", "TELESCOPE_TIMED_GUIDE_WE", {"TIMED_GUIDE_W": 100.0, "TIMED_GUIDE_E": 0.0})]
+
+
+async def test_the_device_itself_wins_over_a_companion() -> None:
+    client = CompanionClient({"Mount": ST4, "Mount (guider)": ST4})
+    assert pulse_device(client, "Mount") == "Mount"  # type: ignore[arg-type]
+
+
+async def test_companion_is_connected_and_disconnected_only_if_it_exists() -> None:
+    client = CompanionClient({"Mount": ST4, "Mount (guider)": set(), "Cam": set()})
+    await connect_guide_companion(client, "Mount")  # type: ignore[arg-type]
+    await connect_guide_companion(client, "Cam")  # type: ignore[arg-type]
+    await disconnect_guide_companion(client, "Mount")  # type: ignore[arg-type]
+    await disconnect_guide_companion(client, "Cam")  # type: ignore[arg-type]
+    assert client.connected == ["Mount (guider)"]
+    assert client.disconnected == ["Mount (guider)"]

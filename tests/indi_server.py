@@ -4,6 +4,9 @@ INDI drivers read and write ``$HOME/.indi`` (saved driver configs, park data, sc
 so each server gets an empty home of its own, under the one the root conftest.py creates for
 the whole session. A test therefore never sees state saved by an earlier test or by the
 developer's own INDI sessions, and never writes into the developer's ``~/.indi``.
+
+The same goes for INDIGO servers (``start_indigo_server``), which keep their state in
+``$HOME/.indigo``; ``stop_indiserver`` stops either kind.
 """
 from __future__ import annotations
 
@@ -30,13 +33,24 @@ _homes: dict[int, Path] = {}
 
 def start_indiserver(port: int, *drivers: str) -> subprocess.Popen:
     """indiserver on *port* with *drivers*, in a fresh INDI home; skips the test if it won't start."""
-    session_home = os.environ.get(INDI_HOME_ENV)
-    home = Path(tempfile.mkdtemp(prefix=f"indi-{port}-", dir=session_home))
     # A unique socket path, so this instance does not collide with a running indiserver
     # (which binds /tmp/indiserver by default) or another test module's.
     socket_path = f"/tmp/indiserver_test_{port}"
+    return _start(["indiserver", "-p", str(port), "-u", socket_path, *drivers], port, drivers)
+
+
+def start_indigo_server(port: int, *drivers: str) -> subprocess.Popen:
+    """indigo_server on *port* with *drivers*, in a fresh home; skips the test if it won't start."""
+    # -b-: no network announcement; -w- -c-: no web apps or web control panel.
+    return _start(["indigo_server", "-p", str(port), "-b-", "-w-", "-c-", *drivers], port, drivers)
+
+
+def _start(cmd: list[str], port: int, drivers: tuple[str, ...]) -> subprocess.Popen:
+    server = cmd[0]
+    session_home = os.environ.get(INDI_HOME_ENV)
+    home = Path(tempfile.mkdtemp(prefix=f"{server}-{port}-", dir=session_home))
     proc = subprocess.Popen(
-        ["indiserver", "-p", str(port), "-u", socket_path, *drivers],
+        cmd,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
         env={**os.environ, "HOME": str(home)},
@@ -46,7 +60,7 @@ def start_indiserver(port: int, *drivers: str) -> subprocess.Popen:
     connected = False
     while time.monotonic() < deadline:
         if proc.poll() is not None:
-            pytest.skip(f"indiserver exited immediately (rc={proc.returncode}, drivers={drivers})")
+            pytest.skip(f"{server} exited immediately (rc={proc.returncode}, drivers={drivers})")
         try:
             with socket.create_connection(("localhost", port), timeout=0.5):
                 connected = True
@@ -56,10 +70,10 @@ def start_indiserver(port: int, *drivers: str) -> subprocess.Popen:
     if not connected:
         proc.kill()
         proc.wait()
-        pytest.skip(f"indiserver did not open port {port} within 5 s (drivers={drivers})")
+        pytest.skip(f"{server} did not open port {port} within 5 s (drivers={drivers})")
     time.sleep(0.1)  # brief margin for INDI protocol init
     if proc.poll() is not None:
-        pytest.skip(f"indiserver crashed after bind (rc={proc.returncode}, drivers={drivers})")
+        pytest.skip(f"{server} crashed after bind (rc={proc.returncode}, drivers={drivers})")
     return proc
 
 

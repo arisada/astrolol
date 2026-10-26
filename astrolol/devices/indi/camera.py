@@ -37,7 +37,11 @@ from astrolol.devices.base.streaming import (
     StreamParams,
 )
 from astrolol.devices.indi.client import IndiClient
-from astrolol.devices.indi.pulse import indi_pulse_guide
+from astrolol.devices.indi.pulse import (
+    connect_guide_companion,
+    disconnect_guide_companion,
+    indi_pulse_guide,
+)
 
 logger = structlog.get_logger()
 
@@ -85,9 +89,11 @@ class IndiCamera:
         except Exception:
             self._state = DeviceState.ERROR
             raise
+        await connect_guide_companion(self._client, self._device_name)
 
     async def disconnect(self) -> None:
         try:
+            await disconnect_guide_companion(self._client, self._device_name)
             await self._client.disconnect_device(self._device_name)
         finally:
             self._state = DeviceState.DISCONNECTED

@@ -33,7 +33,11 @@ from astrolol.devices.base.models import (
 )
 from astrolol.devices.indi.client import IndiClient
 from astrolol.devices.base.pulse import PulseDirection
-from astrolol.devices.indi.pulse import indi_pulse_guide
+from astrolol.devices.indi.pulse import (
+    connect_guide_companion,
+    disconnect_guide_companion,
+    indi_pulse_guide,
+)
 from astrolol.mount.sky import alt_az, local_sidereal_time_h
 
 logger = structlog.get_logger()
@@ -186,6 +190,7 @@ class IndiMount:
         except Exception:
             self._state = DeviceState.ERROR
             raise
+        await connect_guide_companion(self._client, self._device_name)
         self._last_coords_publish = 0.0  # reset rate-limiter on fresh connect
         self._client.remove_prop_listener(self._device_name, "EQUATORIAL_EOD_COORD", self._handle_coords)
         self._client.add_prop_listener(self._device_name, "EQUATORIAL_EOD_COORD", self._handle_coords)
@@ -193,6 +198,7 @@ class IndiMount:
     async def disconnect(self) -> None:
         self._client.remove_prop_listener(self._device_name, "EQUATORIAL_EOD_COORD", self._handle_coords)
         try:
+            await disconnect_guide_companion(self._client, self._device_name)
             await self._client.disconnect_device(self._device_name)
         finally:
             self._state = DeviceState.DISCONNECTED

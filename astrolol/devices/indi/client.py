@@ -176,7 +176,9 @@ class IndiClient(IPyClient):
             elif isinstance(event, indi_events.ConnectionLost):
                 self._connected.clear()
 
-        if isinstance(event, indi_events.setBLOBVector):
+        # INDIGO announces an exposure with an empty, Busy BLOB before sending the image;
+        # only a BLOB that carries data is a new image.
+        if isinstance(event, indi_events.setBLOBVector) and any(event.data.values()):
             key = (event.devicename, event.vectorname)
             self._blob_versions[key] = self._blob_versions.get(key, 0) + 1
             for cb in list(self._blob_listeners.get(key, [])):
@@ -306,18 +308,18 @@ class IndiClient(IPyClient):
                         device=device_name, prop=prop_name, error=str(exc),
                     )
 
-        # Step 2: send CONNECTION=CONNECT.
-        await self.set_switch(device_name, "CONNECTION", ["CONNECT"])
+        # Step 2: send CONNECTION=CONNECT, unless the device is connected already (left so by
+        # an earlier session): INDIGO drivers do not answer a CONNECT they have nothing to do for.
+        def connected() -> bool:
+            v = self._get_vector(device_name, "CONNECTION")
+            return v is not None and v.state == "Ok" and v["CONNECT"] == "On"
 
-        # Step 3: wait for CONNECTION to reach Ok with CONNECT=On.
-        await self._wait_cond(
-            lambda: (
-                self._vector_state(device_name, "CONNECTION") == "Ok"
-                and self._get_vector(device_name, "CONNECTION") is not None
-                and self._get_vector(device_name, "CONNECTION")["CONNECT"] == "On"
-            ),
-            timeout=conn_timeout,
-        )
+        if connected():
+            logger.info("indi.device_already_connected", device=device_name)
+        else:
+            await self.set_switch(device_name, "CONNECTION", ["CONNECT"])
+            # Step 3: wait for CONNECTION to reach Ok with CONNECT=On.
+            await self._wait_cond(connected, timeout=conn_timeout)
         # Step 4: let the initial defXxxVector flood drain.  In asyncio the
         # event loop processes pending data during the sleep, so 50 ms of
         # silence is enough to guarantee all properties are known before we

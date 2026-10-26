@@ -206,6 +206,34 @@ async def test_indi_light_only_and_cover_only_devices() -> None:
         await cover_only.set_light(True)
 
 
+# INDIGO keeps its own names for the light and cover switches.
+_INDIGO = {
+    "AUX_COVER": _Vector("Ok", OPEN=_Member("On"), CLOSE=_Member("Off")),
+    "AUX_LIGHT_SWITCH": _Vector("Ok", ON=_Member("On"), OFF=_Member("Off")),
+    "FLAT_LIGHT_INTENSITY": _Vector("Ok", FLAT_LIGHT_INTENSITY_VALUE=_Member(50, 0, 100)),
+}
+
+
+@pytest.mark.asyncio
+async def test_indigo_status() -> None:
+    s = await _panel(dict(_INDIGO))[0].get_status()
+    assert (s.has_cover, s.cover, s.has_light, s.light_on) == (True, CoverState.OPEN, True, True)
+    assert (s.brightness, s.max_brightness) == (50, 100)
+
+
+@pytest.mark.asyncio
+async def test_indigo_commands_use_indigo_properties() -> None:
+    panel, client = _panel(dict(_INDIGO))
+    await panel.close_cover()
+    await panel.open_cover()
+    await panel.set_light(False)
+    assert client.sent == [
+        ("switch", "AUX_COVER", ("CLOSE",)),
+        ("switch", "AUX_COVER", ("OPEN",)),
+        ("switch", "AUX_LIGHT_SWITCH", ("OFF",)),
+    ]
+
+
 # --- catalog -----------------------------------------------------------------
 
 def test_flat_panel_drivers_are_classified(tmp_path) -> None:

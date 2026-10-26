@@ -438,7 +438,13 @@ Plugin scopes are collected at startup and exposed via `GET /admin/log_scopes`;
 - Unit tests go in `tests/unit/`. Use `FakeCamera`, `FakeMount`, `FakeFocuser` from
   `tests/conftest.py` — no hardware required.
 - Integration tests go in `tests/integration/` and are skipped automatically when
-  `indiserver` is not installed.
+  `indiserver` is not installed. `test_indigo_simulators.py` runs the INDI adapters against
+  INDIGO's simulators and is skipped without `indigo_server` (not in the Docker image).
+  On Ubuntu 26.04 the `indigo3` package can't install (needs `libavahi-compat-libdnssd1`, no
+  longer shipped), so build from source: compile avahi 0.8's `avahi-compat-libdns_sd/*.c` into
+  `libdns_sd.so.1` against the system libavahi-client, drop it and `dns_sd.h` into INDIGO's
+  `build/lib` and `build/include` after `make init`, `make all`, then symlink
+  `build/bin/indigo_server` into `~/.local/bin`.
 - Use `TestClient` (httpx) for API tests. Create a fresh `FastAPI()` per test — never share
   app state between tests.
 - Structlog output is captured by pytest's log system, not `capsys`. Use

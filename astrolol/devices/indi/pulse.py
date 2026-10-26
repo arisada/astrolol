@@ -2,6 +2,9 @@
 
 Both expose TELESCOPE_TIMED_GUIDE_NS (TIMED_GUIDE_N / _S) and TELESCOPE_TIMED_GUIDE_WE
 (TIMED_GUIDE_W / _E), in milliseconds. The property is Busy while the pulse runs.
+
+INDIGO drivers put them on a companion device instead, named after the device with a
+" (guider)" suffix ("Mount Simulator (guider)"), which has to be connected on its own.
 """
 
 from __future__ import annotations
@@ -9,8 +12,14 @@ from __future__ import annotations
 import asyncio
 import time
 
+import structlog
+
 from astrolol.devices.base.pulse import PulseDirection, PulseGuideNotSupported
 from astrolol.devices.indi.client import IndiClient
+
+logger = structlog.get_logger()
+
+GUIDE_COMPANION_SUFFIX = " (guider)"
 
 _AXES: dict[str, tuple[str, str, str]] = {
     # direction: (property, element for this direction, element for the opposite one)
@@ -28,6 +37,35 @@ def has_pulse_guide(client: IndiClient, device_name: str) -> bool:
     )
 
 
+def pulse_device(client: IndiClient, device_name: str) -> str:
+    """The device that takes *device_name*'s guide pulses: itself, or its guide companion."""
+    companion = device_name + GUIDE_COMPANION_SUFFIX
+    if not has_pulse_guide(client, device_name) and has_pulse_guide(client, companion):
+        return companion
+    return device_name
+
+
+async def connect_guide_companion(client: IndiClient, device_name: str) -> None:
+    """Connect *device_name*'s guide companion, if the server has one; best effort."""
+    companion = device_name + GUIDE_COMPANION_SUFFIX
+    if companion not in client.list_devices():
+        return
+    try:
+        await client.connect_device(companion)
+    except Exception as exc:
+        logger.warning("indi.guide_companion_connect_failed", device=companion, error=str(exc))
+
+
+async def disconnect_guide_companion(client: IndiClient, device_name: str) -> None:
+    companion = device_name + GUIDE_COMPANION_SUFFIX
+    if companion not in client.list_devices():
+        return
+    try:
+        await client.disconnect_device(companion)
+    except Exception as exc:
+        logger.debug("indi.guide_companion_disconnect_failed", device=companion, error=str(exc))
+
+
 async def indi_pulse_guide(
     client: IndiClient, device_name: str, direction: PulseDirection, duration_ms: int
 ) -> None:
@@ -36,6 +74,7 @@ async def indi_pulse_guide(
     if direction not in _AXES:
         raise ValueError(f"unknown direction {direction!r}")
     prop, element, opposite = _AXES[direction]
+    device_name = pulse_device(client, device_name)
     if client._get_vector(device_name, prop) is None:
         raise PulseGuideNotSupported(f"{device_name} has no {prop}")
     started = time.monotonic()
