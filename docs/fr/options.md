@@ -45,7 +45,7 @@ Par exemple `%U/astro/%O/%D` avec `%F_%f_%Es_%N` donne
 ## Serveur INDI
 
 - **Serveur** : le serveur qui pilote vos appareils INDI : *INDI* (indiserver, par défaut) ou
-  [*INDIGO*](https://www.indigo-astronomy.org), dont la page Équipement propose alors les
+  [*INDIGO*](https://www.indigo-astronomy.org), dont la page Matériel propose alors les
   pilotes. Les changements prennent effet au redémarrage d'astrolol ; un bouton **Redémarrer
   astrolol** apparaît jusque-là, et le serveur qu'astrolol avait démarré est arrêté au redémarrage.
   - **Démarré par astrolol** : activé, astrolol démarre le serveur à la connexion du premier
