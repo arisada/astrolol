@@ -1004,6 +1004,15 @@ export interface LoadDriverResponse {
   device_names: string[]
 }
 
+/** The server astrolol talks INDI to: indiserver, or an INDIGO server. */
+export interface IndiServerInfo {
+  kind: 'indi' | 'indigo'
+  /** astrolol starts and stops it */
+  managed: boolean
+  host: string
+  port: number
+}
+
 export interface IndiDeviceMessage {
   timestamp: string
   message: string

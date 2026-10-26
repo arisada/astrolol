@@ -43,9 +43,15 @@ For example `%U/astro/%O/%D` with `%F_%f_%Es_%N` gives
 
 ## INDI Server
 
-- **Manage indiserver automatically**: astrolol starts and stops the INDI server as devices are
-  connected. Leave it on unless you run your own INDI server; in that case turn it off and set
-  **INDI server host** and **port** (default 7624) under *Show advanced settings*.
+- **Server**: which server drives your INDI devices, and whether astrolol starts it. By default
+  astrolol starts *indiserver* when the first device connects. It can instead use
+  [INDIGO](https://www.indigo-astronomy.org) drivers, or a server you run yourself; this is set
+  where astrolol is installed (environment variables, e.g. in its service file) and takes
+  effect when it starts:
+  - `ASTROLOL_INDI_SERVER_KIND=indigo`: INDIGO instead of indiserver (the Equipment page then
+    lists INDIGO's drivers). `ASTROLOL_INDIGO_SERVER_PATH` if `indigo_server` is not found.
+  - `ASTROLOL_INDI_MANAGE_SERVER=false`, with `ASTROLOL_INDI_HOST` and `ASTROLOL_INDI_PORT`
+    (7624 by default): a server you start yourself, possibly on another computer.
 - **Run directory**: where the INDI server keeps its control files.
 - **Local image transfer**: the driver writes images straight to disk instead of sending them
   over the network connection. Faster, especially with large sensors. **Upload directory** is
@@ -70,5 +76,5 @@ the *Sequencer*. Choose only one guider: *Built-in Guider*, *PHD2 Guiding* or
 
 - **Restart astrolol**: restarts the application. Connected devices are reconnected through the
   active profile.
-- **Stop INDI server**: stops the INDI server and all INDI drivers. Use it if a driver is stuck;
-  it is started again the next time an INDI device is connected.
+- **Stop INDI server**: stops the INDI server (indiserver or INDIGO) and all its drivers. Use it
+  if a driver is stuck; it is started again the next time an INDI device is connected.

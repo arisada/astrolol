@@ -44,10 +44,17 @@ Par exemple `%U/astro/%O/%D` avec `%F_%f_%Es_%N` donne
 
 ## Serveur INDI
 
-- **Gérer indiserver automatiquement** : astrolol démarre et arrête le serveur INDI au fil des
-  connexions. Laissez-le activé sauf si vous faites tourner votre propre serveur INDI ; dans ce
-  cas, désactivez-le et renseignez l'**Hôte du serveur INDI** et le **Port du serveur INDI**
-  (7624 par défaut) sous *Afficher les réglages avancés*.
+- **Serveur** : le serveur qui pilote vos appareils INDI, et s'il est démarré par astrolol. Par
+  défaut, astrolol démarre *indiserver* à la connexion du premier appareil. Il peut aussi
+  utiliser les pilotes [INDIGO](https://www.indigo-astronomy.org), ou un serveur que vous lancez
+  vous-même ; cela se règle là où astrolol est installé (variables d'environnement, par ex. dans
+  son fichier de service) et prend effet à son démarrage :
+  - `ASTROLOL_INDI_SERVER_KIND=indigo` : INDIGO au lieu d'indiserver (la page Équipement
+    propose alors les pilotes INDIGO). `ASTROLOL_INDIGO_SERVER_PATH` si `indigo_server` est
+    introuvable.
+  - `ASTROLOL_INDI_MANAGE_SERVER=false`, avec `ASTROLOL_INDI_HOST` et `ASTROLOL_INDI_PORT`
+    (7624 par défaut) : un serveur que vous démarrez vous-même, éventuellement sur un autre
+    ordinateur.
 - **Dossier d'exécution** : où le serveur INDI garde ses fichiers de contrôle.
 - **Transfert d'images local** : le pilote écrit les images directement sur le disque au lieu de
   les envoyer par la connexion réseau. Plus rapide, surtout avec de grands capteurs. Le
@@ -74,5 +81,6 @@ PHD2* ou *Simulateur de guidage*.
 
 - **Redémarrer astrolol** : redémarre l'application. Les appareils sont reconnectés via le
   profil actif.
-- **Arrêter le serveur INDI** : arrête le serveur INDI et tous les pilotes INDI. Utile si un
-  pilote est bloqué ; il redémarre à la prochaine connexion d'un appareil INDI.
+- **Arrêter le serveur INDI** : arrête le serveur INDI (indiserver ou INDIGO) et tous ses
+  pilotes. Utile si un pilote est bloqué ; il redémarre à la prochaine connexion d'un appareil
+  INDI.

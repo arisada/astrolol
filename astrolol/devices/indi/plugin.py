@@ -21,6 +21,7 @@ import pluggy
 
 from astrolol.plugin import hookimpl
 from astrolol.devices.config import DeviceConfig
+from astrolol.devices.indi.indigo import IndigoServer
 from astrolol.devices.registry import DeviceRegistry
 
 logger = structlog.get_logger()
@@ -41,7 +42,6 @@ class IndiConnectionManager:
     def __init__(self, run_dir: Path = Path("/tmp/astrolol")) -> None:
         from astrolol.config.settings import settings
         from astrolol.devices.indi.client import IndiClient
-        from astrolol.devices.indi.indigo import IndigoServer
         from astrolol.devices.indi.server import IndiServer
 
         self._client = IndiClient(
@@ -112,11 +112,40 @@ class IndiConnectionManager:
                 await self._start_services()
 
     async def _start_services(self) -> None:
+        if isinstance(self._server, IndigoServer):
+            # An INDIGO server runs INDI drivers only from its start.
+            self._server.indi_drivers = self._indi_startup_drivers()
         await self._server.start()
         await self._client.connect()
         self._started = True
         for executable in list(self._startup_drivers):
             await self._load_startup_driver(executable)
+
+    def _indi_startup_drivers(self) -> list[str]:
+        return [d for d in self._startup_drivers if not d.startswith("indigo_")]
+
+    async def _restart_for_indi_drivers(self) -> None:
+        """Start a managed INDIGO server again when the INDI drivers it should run change.
+
+        Only while astrolol has no device on it: otherwise the change waits for its next start.
+        """
+        server = self._server
+        if not isinstance(server, IndigoServer):
+            return
+        wanted = self._indi_startup_drivers()
+        if sorted(wanted) == sorted(server._loaded_drivers):
+            return
+        if not server.manage:
+            logger.warning("indigo.indi_drivers_need_managed_server", drivers=wanted)
+            return
+        if self._ref_count > 0:
+            logger.warning("indigo.indi_drivers_wait_for_restart", drivers=wanted, devices=self._ref_count)
+            return
+        logger.info("indigo.restarting_for_indi_drivers", drivers=wanted)
+        await self._client.disconnect()
+        await server.stop()
+        self._started = False
+        await self._start_services()
 
     async def _load_startup_driver(self, executable: str) -> None:
         try:
@@ -125,16 +154,22 @@ class IndiConnectionManager:
             logger.warning("indi.startup_driver_failed", driver=executable, error=str(exc))
 
     async def add_startup_driver(self, executable: str) -> None:
-        """Load *executable* now if indiserver is up, and again every time it starts."""
+        """Load *executable* now if the server is up, and again every time it starts."""
         if executable not in self._startup_drivers:
             self._startup_drivers.append(executable)
         if self._started:
+            if isinstance(self._server, IndigoServer) and not executable.startswith("indigo_"):
+                await self._restart_for_indi_drivers()
+                return
             await self._load_startup_driver(executable)
 
     async def remove_startup_driver(self, executable: str) -> None:
         if executable in self._startup_drivers:
             self._startup_drivers.remove(executable)
         if self._started:
+            if isinstance(self._server, IndigoServer) and not executable.startswith("indigo_"):
+                await self._restart_for_indi_drivers()
+                return
             await self._server.unload_driver(executable)
 
     async def release(self) -> None:

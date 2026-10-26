@@ -45,6 +45,10 @@ ne bouge pas comme prévu.
     caméra de guidage INDI, puis *astrolol Mount Proxy* comme monture.
   - Les pilotes INDI qui lisent la position du télescope (pour les en-têtes FITS, ou le champ
     d'étoiles du simulateur CCD) : réglez leur télescope sur *astrolol Mount Proxy*.
+  - Quand astrolol utilise un serveur INDIGO, la monture y apparaît sous le nom
+    *astrolol Mount Proxy @ astrolol-indi-mount-proxy*. Le serveur INDIGO ne prend le proxy
+    qu'à son démarrage : l'activer ou le désactiver redémarre le serveur, ou attend qu'aucun
+    appareil n'y soit connecté. Cela ne fonctionne qu'avec un serveur INDIGO démarré par astrolol.
 
 ## Connexion par Bluetooth
 

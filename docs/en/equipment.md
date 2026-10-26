@@ -19,7 +19,10 @@ Click **Load driver** and follow the wizard.
 1. **What do you want to connect?** Camera, Mount, Focuser, Filter Wheel, Flat Panel or Rotator.
 2. **How is it connected?**
    - **Browse INDI drivers**: almost all commercial hardware. astrolol starts and stops the INDI
-     server by itself (this can be changed in [Options](options.md#indi-server)).
+     server by itself (this can be changed in [Options](options.md#indi-server)). When astrolol
+     uses INDIGO, this reads **Browse INDIGO drivers** and lists INDIGO's drivers instead; a
+     camera's filter wheel or focuser that INDIGO shows as a device of its own connects with
+     the camera.
    - **Other adapter**: drivers provided by astrolol plugins, for example `eqmod` (the native
      Sky-Watcher driver from the [EQMOD](../../astrolol/plugins/eqmod/docs/en.md) plugin) or its mount simulator. If no plugin
      offers one for the chosen kind, the wizard says so.

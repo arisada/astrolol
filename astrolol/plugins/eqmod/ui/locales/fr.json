@@ -59,10 +59,16 @@
       "unavailable": "prise en charge INDI indisponible",
       "loaded": "chargé dans indiserver",
       "registered": "enregistré, pas encore chargé",
-      "pending": "enregistré : se charge au démarrage d'indiserver (premier appareil INDI)"
+      "pending": "enregistré : se charge au démarrage d'indiserver (premier appareil INDI)",
+      "loadedIndigo": "actif dans le serveur INDIGO",
+      "pendingIndigo": "enregistré : démarre avec le serveur INDIGO (premier appareil INDI)",
+      "restartIndigo": "enregistré : démarre au prochain démarrage du serveur INDIGO (quand aucun appareil ne l'utilise)",
+      "unmanagedIndigo": "impossible : astrolol ne démarre pas ce serveur INDIGO"
     },
     "help1": "Publie la monture connectée sur l'indiserver d'astrolol sous le nom <m>{{name}}</m> (un relais vers l'API REST d'astrolol, pas un vrai pilote de monture).",
+    "help1Indigo": "Publie la monture connectée sur le serveur INDIGO d'astrolol sous le nom <m>{{name}}</m> (un relais vers l'API REST d'astrolol, pas un vrai pilote de monture).",
     "help2": "PHD2 : connectez-vous à l'indiserver de cette machine (port 7624), choisissez votre caméra de guidage INDI, puis <m>astrolol Mount Proxy</m> comme monture. Les impulsions de guidage utilisent la vitesse de guidage de la monture (paramètre de connexion <m>guide_rate</m>, 0,5x sidéral par défaut).",
+    "help2Indigo": "PHD2 : connectez-vous au serveur INDIGO de cette machine (port 7624) comme à un serveur INDI, choisissez votre caméra de guidage, puis <m>{{name}}</m> comme monture. Les impulsions de guidage utilisent la vitesse de guidage de la monture (paramètre de connexion <m>guide_rate</m>, 0,5x sidéral par défaut).",
     "help3": "Pilotes INDI qui écoutent un télescope (par ex. le champ d'étoiles du simulateur CCD, ou les en-têtes FITS) : réglez leur télescope actif sur <m>astrolol Mount Proxy</m>."
   },
   "bt": {

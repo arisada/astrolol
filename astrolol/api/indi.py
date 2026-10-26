@@ -1,6 +1,7 @@
 """
 INDI-specific API endpoints.
 
+GET  /indi/server           — which server (indiserver or INDIGO), managed or not, where
 GET  /indi/drivers          — list all drivers from the catalog
 GET  /indi/drivers/{kind}   — filter by device kind (camera, mount, focuser, …)
 POST /indi/load_driver      — start the server, load a driver, return its property snapshot
@@ -13,6 +14,8 @@ from __future__ import annotations
 import asyncio
 
 import structlog
+from typing import Literal
+
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
@@ -44,6 +47,26 @@ class DriverEntryOut(BaseModel):
             kind=e.kind,
             manufacturer=e.manufacturer,
         )
+
+
+class IndiServerInfo(BaseModel):
+    kind: Literal["indi", "indigo"]   # indiserver or an INDIGO server
+    managed: bool                     # astrolol starts it
+    host: str
+    port: int
+
+
+@router.get("/server", response_model=IndiServerInfo)
+def get_server(request: Request) -> IndiServerInfo:
+    """Which server astrolol talks INDI to, and how (set from the ASTROLOL_INDI_* settings)."""
+    manager = getattr(request.app.state.registry, "indi_manager", None)
+    server = getattr(manager, "_server", None)
+    return IndiServerInfo(
+        kind=getattr(manager, "server_kind", settings.indi_server_kind),
+        managed=getattr(server, "manage", settings.indi_manage_server),
+        host=getattr(server, "host", settings.indi_host),
+        port=getattr(server, "port", settings.indi_port),
+    )
 
 
 def _catalog(request: Request) -> list[DriverEntry]:
@@ -226,7 +249,7 @@ async def _snapshot_response(client, device_names: list[str]) -> LoadDriverRespo
 
 
 async def _load_indigo_driver(manager, executable: str) -> list[str]:  # noqa: ANN001
-    """Load an INDIGO driver and return its devices, those of its own kind first.
+    """Load an INDIGO driver and return its devices of the driver's kind.
 
     INDIGO device names are the driver's choice ("ZWO ASI294MC Pro #0"), so its devices are
     found by the driver they report (DRIVER_INFO.DEVICE_DRIVER), not by name.
@@ -253,4 +276,4 @@ async def _load_indigo_driver(manager, executable: str) -> list[str]:  # noqa: A
         # A driver attaches its devices one after the other: a moment for the rest.
         await asyncio.sleep(1.0)
         devices = indigo.devices_of_driver(client, executable)
-    return indigo.sort_for_kind(client, devices, indigo.kind_of_driver(executable))
+    return indigo.devices_for_kind(client, devices, indigo.kind_of_driver(executable))

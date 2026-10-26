@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Trans, useTranslation } from 'react-i18next'
 import { api } from '@/api/client'
+import { useIndiServer } from '@/hooks/useIndiServer'
 import type { PluginInfo } from '@/api/types'
 import { NAV_GROUPS } from '@/components/Sidebar'
 import { useStore } from '@/store'
@@ -9,12 +10,6 @@ import { Input } from '@/components/ui/input'
 import { SUPPORTED_LANGUAGES, setLanguage } from '@/i18n'
 import { THEMES, setTheme } from '@/theme'
 import { Page } from '@/components/Page'
-
-interface IndiSettings {
-  manageServer: boolean
-  host: string
-  port: number
-}
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -74,11 +69,12 @@ function TokenReference() {
 
 export function Options() {
   const { t, i18n } = useTranslation('options')
-  const [indi, setIndi] = useState<IndiSettings>({
-    manageServer: true,
-    host: 'localhost',
-    port: 7624,
-  })
+  const indiServer = useIndiServer()
+  const indiServerAddress = indiServer ? `${indiServer.host}:${indiServer.port}` : ''
+  const indiServerText = !indiServer ? '—'
+    : indiServer.kind === 'indigo'
+      ? (indiServer.managed ? t('indi.serverIndigoManaged') : t('indi.serverIndigoExternal', { address: indiServerAddress }))
+      : (indiServer.managed ? t('indi.serverIndiManaged') : t('indi.serverIndiExternal', { address: indiServerAddress }))
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [indiDebugLevel, setIndiDebugLevel] = useState(0)
 
@@ -314,14 +310,10 @@ export function Options() {
 
       <Section title={t('indi.title')}>
         <Row
-          label={t('indi.manage')}
-          hint={t('indi.manageHint')}
+          label={t('indi.server')}
+          hint={t('indi.serverHint')}
         >
-          <ToggleSwitch
-            checked={indi.manageServer}
-            onChange={() => setIndi((s) => ({ ...s, manageServer: !s.manageServer }))}
-            label={t('indi.manage')}
-          />
+          <span className="text-sm text-slate-300">{indiServerText}</span>
         </Row>
         <Row
           label={t('indi.runDir')}
@@ -368,32 +360,6 @@ export function Options() {
 
           {showAdvanced && (
             <div className="mt-4 space-y-4 border-t border-slate-700 pt-4">
-              <Row
-                label={t('indi.host')}
-                hint={t('indi.hostHint')}
-              >
-                <Input
-                  value={indi.host}
-                  onChange={(e) => setIndi((s) => ({ ...s, host: e.target.value }))}
-                  disabled={indi.manageServer}
-                  className="!w-40"
-                />
-              </Row>
-              <Row
-                label={t('indi.port')}
-                hint={t('indi.portHint')}
-              >
-                <Input
-                  type="number"
-                  value={String(indi.port)}
-                  onChange={(e) => {
-                    const n = parseInt(e.target.value, 10)
-                    if (!isNaN(n)) setIndi((s) => ({ ...s, port: n }))
-                  }}
-                  disabled={indi.manageServer}
-                  className="!w-24"
-                />
-              </Row>
               <Row
                 label={t('indi.logging')}
                 hint={t('indi.loggingHint')}

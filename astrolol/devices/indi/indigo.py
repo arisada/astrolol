@@ -5,7 +5,9 @@ An INDIGO server speaks the INDI protocol to astrolol, so the INDI adapters and 
 drive its devices. What differs is around them:
 
   - Drivers are loaded and unloaded through the server's own "Server" device (DRIVERS /
-    LOAD / UNLOAD properties), not a FIFO, and only INDIGO drivers can be loaded at run time.
+    LOAD / UNLOAD properties), not a FIFO, and only INDIGO drivers can be loaded at run time:
+    an INDI driver (astrolol's own INDI mount proxy) runs as a process of its own, named on
+    the command line (-i), so changing those means starting the server again.
   - The catalog is INDIGO's driver list: files of ``"name", "label", version`` lines in
     ``<prefix>/share/indigo`` (what indigo_server itself reads), or the server's DRIVERS
     property when only a remote server has it.
@@ -23,11 +25,14 @@ import shutil
 import signal
 import socket
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import structlog
 
 from astrolol.devices.indi.catalog import DriverEntry
-from astrolol.devices.indi.client import IndiClient
+
+if TYPE_CHECKING:  # importing the client needs indipyclient, which astrolol can run without
+    from astrolol.devices.indi.client import IndiClient
 
 logger = structlog.get_logger()
 
@@ -35,6 +40,8 @@ SERVER_DEVICE = "Server"
 _STATE_NAME = "astrolol_indigo.json"
 _START_TIMEOUT = 10.0
 _LOAD_TIMEOUT = 15.0
+# indigo_server keeps a driver's path in INDIGO_NAME_SIZE (128) bytes and cuts longer ones.
+MAX_INDI_DRIVER_PATH = 127
 
 # DRIVER_INTERFACE bits (indigo_bus.h).
 INTERFACE_MOUNT = 1 << 0
@@ -226,9 +233,14 @@ def devices_of_driver(client: IndiClient, driver: str) -> list[str]:
     ]
 
 
-def sort_for_kind(client: IndiClient, devices: list[str], kind: str) -> list[str]:
-    """*devices* with those of *kind* first, otherwise in their order."""
-    return sorted(devices, key=lambda d: kind not in kinds_of_interface(device_interface(client, d)))
+def devices_for_kind(client: IndiClient, devices: list[str], kind: str) -> list[str]:
+    """Those of *devices* that are a *kind*, or all of them if none is.
+
+    A camera driver also attaches its filter wheel and focuser ("… (wheel)"): they connect
+    with the camera as its companions, and are no camera to pick.
+    """
+    matching = [d for d in devices if kind in kinds_of_interface(device_interface(client, d))]
+    return matching or devices
 
 
 def companion_devices(client: IndiClient, device: str) -> list[tuple[str, str]]:
@@ -245,6 +257,11 @@ def companion_devices(client: IndiClient, device: str) -> list[tuple[str, str]]:
             for kind in kinds_of_interface(device_interface(client, d)):
                 companions.append((kind, d))
     return companions
+
+
+def indi_driver_device(device: str, executable: str) -> str:
+    """The name an INDIGO server gives *device* of INDI driver *executable* run with -i."""
+    return f"{device} @ {Path(executable).name}"
 
 
 # ---------------------------------------------------------------------------
@@ -279,6 +296,9 @@ class IndigoServer:
         self._state_path = run_dir / _STATE_NAME
         self._server_path = server_path
         self._managed_pid: int | None = None
+        # INDI drivers to run alongside, set before start(); those the running server has.
+        self.indi_drivers: list[str] = []
+        self._loaded_drivers: set[str] = set()
 
     async def start(self) -> None:
         if not self.manage:
@@ -289,10 +309,20 @@ class IndigoServer:
         state = self._read_state()
         pid = (state or {}).get("pid")
         if pid and self._is_indigo_server(pid):
-            logger.info("indigo.server_reusing", pid=pid)
-            self._managed_pid = pid
-            return
-        if state:
+            running = sorted((state or {}).get("indi_drivers", []))
+            if running == sorted(self.indi_drivers):
+                logger.info("indigo.server_reusing", pid=pid)
+                self._managed_pid = pid
+                self._loaded_drivers = set(running)
+                return
+            # Started with other INDI drivers, which it cannot change while it runs.
+            logger.info("indigo.server_restarting", pid=pid, running=running, wanted=self.indi_drivers)
+            await self.stop()
+            for _ in range(50):     # its worker lets go of the port a moment later
+                if not _port_in_use(self.port):
+                    break
+                await asyncio.sleep(0.1)
+        elif state:
             logger.info("indigo.server_stale_state", old_pid=pid)
             self._cleanup_state()
 
@@ -313,6 +343,9 @@ class IndigoServer:
             # anyone on the network drive the devices without going through astrolol.
             "-b-", "-w-", "-c-",
         ]
+        indi_drivers = [d for d in self.indi_drivers if self._fits(d)]
+        for driver in indi_drivers:
+            cmd += ["-i", driver]
         logger.info("indigo.server_starting", cmd=" ".join(cmd))
         process = await asyncio.create_subprocess_exec(
             *cmd,
@@ -329,6 +362,7 @@ class IndigoServer:
                 raise RuntimeError(f"indigo_server did not open port {self.port}")
             await asyncio.sleep(0.2)
         self._managed_pid = process.pid
+        self._loaded_drivers = set(indi_drivers)
         self._save_state()
         logger.info("indigo.server_started", pid=process.pid, port=self.port)
 
@@ -357,12 +391,23 @@ class IndigoServer:
         except ProcessLookupError:
             pass
         self._managed_pid = None
+        self._loaded_drivers = set()
         self._cleanup_state()
         logger.info("indigo.server_stopped", pid=pid)
 
+    def runs(self, executable: str) -> bool:
+        """Whether the running server has *executable*, an INDI driver, from its start."""
+        return executable in self._loaded_drivers
+
     async def load_driver(self, executable: str) -> None:
-        """Load an INDIGO driver (a no-op if it is loaded already)."""
+        """Load an INDIGO driver (a no-op if it is loaded already).
+
+        An INDI driver can only have been given at start (indi_drivers): loading one is a
+        no-op if the server has it, and an error otherwise.
+        """
         if not executable.startswith("indigo_"):
+            if self.runs(executable):
+                return
             raise ValueError(
                 f"{executable} is not an INDIGO driver; an INDIGO server cannot load "
                 "other drivers while it runs."
@@ -401,6 +446,15 @@ class IndigoServer:
         pid = self._managed_pid or (self._read_state() or {}).get("pid")
         return bool(pid and self._is_indigo_server(pid))
 
+    @staticmethod
+    def _fits(driver: str) -> bool:
+        if len(driver.encode()) <= MAX_INDI_DRIVER_PATH:
+            return True
+        logger.error(
+            "indigo.indi_driver_path_too_long", driver=driver, max_length=MAX_INDI_DRIVER_PATH,
+        )
+        return False
+
     def _is_loaded(self, executable: str) -> bool:
         if self._client.get_switch_state_nowait(SERVER_DEVICE, "DRIVERS", executable):
             return True
@@ -423,7 +477,10 @@ class IndigoServer:
     def _save_state(self) -> None:
         try:
             self._run_dir.mkdir(parents=True, exist_ok=True)
-            self._state_path.write_text(json.dumps({"pid": self._managed_pid}))
+            self._state_path.write_text(json.dumps({
+                "pid": self._managed_pid,
+                "indi_drivers": sorted(self._loaded_drivers),
+            }))
         except OSError as exc:
             logger.warning("indigo.state_save_failed", error=str(exc))
 

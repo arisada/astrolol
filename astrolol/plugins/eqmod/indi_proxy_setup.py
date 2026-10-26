@@ -14,6 +14,7 @@ from typing import Any
 import structlog
 
 from astrolol.config.settings import settings
+from astrolol.devices.indi.indigo import indi_driver_device
 from astrolol.plugins.eqmod.astrolol_indi_mount_proxy import DEVICE
 
 logger = structlog.get_logger()
@@ -71,12 +72,18 @@ class IndiProxyRegistration:
     def status(self) -> dict[str, Any]:
         enabled, api_url = self._active or (False, None)
         server = getattr(self._manager, "_server", None)
+        server_kind = getattr(self._manager, "server_kind", "indi")
+        launcher = str(self.launcher_path)
         return {
             "enabled": enabled,
             "api_url": api_url,
             "indi_available": self._manager is not None,
+            # "indi" or "indigo". An INDIGO server runs the proxy only from its start, and
+            # names its device after it.
+            "server_kind": server_kind,
+            "server_managed": bool(getattr(server, "manage", False)),
             "indiserver_running": bool(getattr(self._manager, "_started", False)),
-            "loaded": str(self.launcher_path) in getattr(server, "_loaded_drivers", set()),
-            "launcher": str(self.launcher_path),
-            "device_name": DEVICE,
+            "loaded": launcher in getattr(server, "_loaded_drivers", set()),
+            "launcher": launcher,
+            "device_name": indi_driver_device(DEVICE, launcher) if server_kind == "indigo" else DEVICE,
         }

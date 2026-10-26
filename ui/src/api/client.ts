@@ -19,6 +19,7 @@ import type {
   ImagerDeviceSettings,
   ImagerStatus,
   IndiDeviceMessage,
+  IndiServerInfo,
   LoadDriverResponse,
   LogScopeEntry,
   MountStatus,
@@ -206,6 +207,7 @@ export const api = {
   },
 
   indi: {
+    server: () => request<IndiServerInfo>('/indi/server'),
     drivers: (kind?: string) =>
       request<DriverEntry[]>(kind ? `/indi/drivers/${kind}` : '/indi/drivers'),
     loadDriver: (executable: string, deviceName: string) =>

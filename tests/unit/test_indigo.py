@@ -169,12 +169,14 @@ def test_devices_of_a_driver_leave_out_guide_outputs() -> None:
     ]
 
 
-def test_devices_of_the_wanted_kind_come_first() -> None:
+def test_only_devices_of_the_wanted_kind_are_offered() -> None:
     client = _FakeClient(_SIMULATOR)
     devices = indigo.devices_of_driver(client, "indigo_ccd_simulator")  # type: ignore[arg-type]
-    ordered = indigo.sort_for_kind(client, devices, "filter_wheel")  # type: ignore[arg-type]
-    assert ordered[0] == "CCD Imager Simulator (wheel)"
-    assert ordered[1:] == [d for d in devices if d != "CCD Imager Simulator (wheel)"]
+    assert indigo.devices_for_kind(client, devices, "camera") == [  # type: ignore[arg-type]
+        "CCD Imager Simulator", "CCD Guider Simulator",
+    ]
+    # A driver whose devices are of another kind: all of them, rather than none.
+    assert indigo.devices_for_kind(client, devices, "rotator") == devices  # type: ignore[arg-type]
 
 
 def test_companions_are_the_devices_named_after_it() -> None:
@@ -343,6 +345,23 @@ async def test_drivers_endpoint_serves_the_indigo_catalog(
         r = await c.get("/indi/drivers/camera")
     assert r.status_code == 200
     assert {d["executable"] for d in r.json()} == {"indigo_ccd_asi", "indigo_ccd_simulator"}
+
+
+async def test_server_endpoint_says_which_server(monkeypatch: pytest.MonkeyPatch) -> None:
+    from httpx import ASGITransport, AsyncClient
+
+    from astrolol.config.settings import settings
+    from astrolol.main import create_app
+
+    monkeypatch.setattr(settings, "indi_server_kind", "indigo")
+    monkeypatch.setattr(settings, "indi_manage_server", False)
+    monkeypatch.setattr(settings, "indi_host", "astro.local")
+    monkeypatch.setattr(settings, "indi_port", 7625)
+    app = create_app()
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+        r = await c.get("/indi/server")
+    assert r.status_code == 200
+    assert r.json() == {"kind": "indigo", "managed": False, "host": "astro.local", "port": 7625}
 
 
 def test_environment_selects_indigo(monkeypatch: pytest.MonkeyPatch) -> None:

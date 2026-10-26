@@ -40,6 +40,8 @@ export interface IndiProxyStatus {
   enabled: boolean
   api_url: string | null
   indi_available: boolean
+  server_kind: 'indi' | 'indigo'
+  server_managed: boolean
   indiserver_running: boolean
   loaded: boolean
   launcher: string

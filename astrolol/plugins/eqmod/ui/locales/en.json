@@ -59,10 +59,16 @@
       "unavailable": "INDI support unavailable",
       "loaded": "loaded in indiserver",
       "registered": "registered, not loaded yet",
-      "pending": "registered: loads when indiserver starts (first INDI device)"
+      "pending": "registered: loads when indiserver starts (first INDI device)",
+      "loadedIndigo": "running in the INDIGO server",
+      "pendingIndigo": "registered: runs when the INDIGO server starts (first INDI device)",
+      "restartIndigo": "registered: runs once the INDIGO server starts again (when no device uses it)",
+      "unmanagedIndigo": "not possible: astrolol does not start this INDIGO server"
     },
     "help1": "Publishes the connected mount on astrolol's indiserver as <m>{{name}}</m> (a relay to astrolol's REST API, not a real mount driver).",
+    "help1Indigo": "Publishes the connected mount on astrolol's INDIGO server as <m>{{name}}</m> (a relay to astrolol's REST API, not a real mount driver).",
     "help2": "PHD2: connect to this machine's indiserver (port 7624), pick your INDI guide camera, and pick <m>astrolol Mount Proxy</m> as the mount. Guide pulses run at the mount's guide rate (connect param <m>guide_rate</m>, 0.5x sidereal by default).",
+    "help2Indigo": "PHD2: connect to this machine's INDIGO server (port 7624) as an INDI server, pick your guide camera, and pick <m>{{name}}</m> as the mount. Guide pulses run at the mount's guide rate (connect param <m>guide_rate</m>, 0.5x sidereal by default).",
     "help3": "INDI drivers that snoop a telescope (e.g. the CCD simulator's star field, or FITS headers): set their active telescope to <m>astrolol Mount Proxy</m>."
   },
   "bt": {

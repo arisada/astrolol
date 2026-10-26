@@ -143,12 +143,15 @@ function SettingsCard() {
     }
   }
 
+  const indigo = proxy?.server_kind === 'indigo'
   const proxyState = !proxy ? '—'
     : !proxy.enabled ? t('settings.proxyState.disabled')
     : !proxy.indi_available ? t('settings.proxyState.unavailable')
-    : proxy.loaded ? t('settings.proxyState.loaded')
-    : proxy.indiserver_running ? t('settings.proxyState.registered')
-    : t('settings.proxyState.pending')
+    : proxy.loaded ? t(indigo ? 'settings.proxyState.loadedIndigo' : 'settings.proxyState.loaded')
+    : indigo && !proxy.server_managed ? t('settings.proxyState.unmanagedIndigo')
+    : proxy.indiserver_running ? t(indigo ? 'settings.proxyState.restartIndigo' : 'settings.proxyState.registered')
+    : t(indigo ? 'settings.proxyState.pendingIndigo' : 'settings.proxyState.pending')
+  const proxyName = proxy?.device_name ?? 'astrolol Mount Proxy'
 
   return (
     <div className="bg-surface-raised border border-surface-border rounded p-4 flex flex-col gap-4 text-sm">
@@ -187,9 +190,10 @@ function SettingsCard() {
           />
         </label>
         <div className="text-xs text-slate-500 space-y-1">
-          <p><Trans t={t} i18nKey="settings.help1" values={{ name: proxy?.device_name ?? 'astrolol Mount Proxy' }} components={MONO} /></p>
-          <p><Trans t={t} i18nKey="settings.help2" components={MONO} /></p>
-          <p><Trans t={t} i18nKey="settings.help3" components={MONO} /></p>
+          <p><Trans t={t} i18nKey={indigo ? 'settings.help1Indigo' : 'settings.help1'} values={{ name: proxyName }} components={MONO} /></p>
+          <p><Trans t={t} i18nKey={indigo ? 'settings.help2Indigo' : 'settings.help2'} values={{ name: proxyName }} components={MONO} /></p>
+          {/* INDIGO cameras do not follow a mount's pointing the INDI way. */}
+          {!indigo && <p><Trans t={t} i18nKey="settings.help3" components={MONO} /></p>}
         </div>
       </div>
 

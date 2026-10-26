@@ -42,6 +42,10 @@ expected.
     and *astrolol Mount Proxy* as the mount.
   - INDI drivers that read the telescope position (for FITS headers, or the CCD simulator's
     star field): set their telescope to *astrolol Mount Proxy*.
+  - When astrolol uses an INDIGO server, the mount is listed there as
+    *astrolol Mount Proxy @ astrolol-indi-mount-proxy*. The INDIGO server takes the proxy only
+    when it starts: switching it on or off restarts the server, or waits until no device is
+    connected to it. This works only with an INDIGO server astrolol starts itself.
 
 ## Connect over Bluetooth
 

@@ -84,9 +84,10 @@ async def test_load_driver_finds_the_driver_devices(unmanaged_app):
         })
     assert r.status_code == 200, r.text
     names = r.json()["device_names"]
+    # The cameras: their wheel, focuser and guide outputs come with them, not as choices.
     assert names[0] == "CCD Imager Simulator"
-    assert "CCD Imager Simulator (wheel)" in names
-    assert not any(n.endswith("(guider)") or n.endswith("(AO)") for n in names)
+    assert "CCD Guider Simulator" in names
+    assert not any("(" in n for n in names)
     assert any(p["name"] == "CONNECTION" for p in r.json()["properties"])
 
 

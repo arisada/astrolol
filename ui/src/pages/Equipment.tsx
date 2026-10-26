@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import { DmsInput } from '@/components/ui/dms-input'
 import { api } from '@/api/client'
+import { useIndiServer } from '@/hooks/useIndiServer'
 import type {
   ConnectedDevice, DeviceKind, DeviceProperty, DeviceState, DriverEntry,
   EquipmentItem, EquipmentItemType, PreConnectProps, Profile,
@@ -139,6 +140,7 @@ function SourceStep({
   onBack: () => void
 }) {
   const { t } = useTranslation('equipment')
+  const indigo = useIndiServer()?.kind === 'indigo'
   return (
     <div>
       <StepBack onClick={onBack} />
@@ -151,9 +153,9 @@ function SourceStep({
           onClick={onChooseIndi}
           className="text-left rounded px-3 py-2.5 text-sm text-slate-300 border border-transparent hover:border-surface-border hover:bg-surface-raised transition-colors"
         >
-          {t('wizard.browseIndi')}
+          {t(indigo ? 'wizard.browseIndigo' : 'wizard.browseIndi')}
           <span className="block text-xs text-slate-500 mt-0.5">
-            {t('wizard.browseIndiHint')}
+            {t(indigo ? 'wizard.browseIndigoHint' : 'wizard.browseIndiHint')}
           </span>
         </button>
         <button
@@ -270,6 +272,7 @@ function ManualStep({
   error: string | null
 }) {
   const { t } = useTranslation('equipment')
+  const indigo = useIndiServer()?.kind === 'indigo'
   const [executable, setExecutable] = useState('')
   const [deviceNameHint, setDeviceNameHint] = useState('')
 
@@ -287,7 +290,7 @@ function ManualStep({
             {t('wizard.executable')} <span className="text-status-error">*</span>
           </label>
           <Input
-            placeholder={t('wizard.executablePlaceholder')}
+            placeholder={t(indigo ? 'wizard.executablePlaceholderIndigo' : 'wizard.executablePlaceholder')}
             value={executable}
             onChange={(e) => setExecutable(e.target.value)}
             autoFocus
@@ -937,6 +940,7 @@ function ItemForm({
   onCancel: () => void
 }) {
   const { t } = useTranslation('equipment')
+  const indigo = useIndiServer()?.kind === 'indigo'
   const [form, setForm] = useState<EquipmentItem | Omit<EquipmentItem, 'id'>>(initial)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -1022,7 +1026,7 @@ function ItemForm({
             <input
               value={(form as { indi_driver: string | null }).indi_driver ?? ''}
               onChange={(e) => set('indi_driver', e.target.value || null)}
-              placeholder={t('form.indiDriverPlaceholder')}
+              placeholder={t(indigo ? 'form.indiDriverPlaceholderIndigo' : 'form.indiDriverPlaceholder')}
               className="bg-surface border border-surface-border rounded-lg px-3 py-1.5 text-sm text-slate-200
                 focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent w-full"
             />

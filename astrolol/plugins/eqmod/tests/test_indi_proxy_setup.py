@@ -107,3 +107,28 @@ def test_proxy_sends_the_service_token_when_the_file_exists(tmp_path) -> None:
     token.write_text("abc123\n")
     assert AstrololApi("http://x", str(token))._auth_headers() == {"Authorization": "Bearer abc123"}
     assert AstrololApi("http://x")._auth_headers() == {}
+
+
+class _FakeIndigoServer:
+    def __init__(self, manage: bool, running: set[str]) -> None:
+        self.manage = manage
+        self._loaded_drivers = running
+
+
+@pytest.mark.parametrize("server_kind, running, managed, name", [
+    ("indi", True, True, "astrolol Mount Proxy"),
+    # INDIGO names an INDI driver's device after the driver, and runs it only from its start.
+    ("indigo", True, True, "astrolol Mount Proxy @ astrolol-indi-mount-proxy"),
+    ("indigo", False, False, "astrolol Mount Proxy @ astrolol-indi-mount-proxy"),
+])
+async def test_status_names_the_device_clients_see(tmp_path, server_kind, running, managed, name) -> None:
+    manager = _FakeIndiManager()
+    manager.server_kind = server_kind  # type: ignore[attr-defined]
+    launcher = str(tmp_path / LAUNCHER_NAME)
+    manager._server = _FakeIndigoServer(managed, {launcher} if running else set())  # type: ignore[attr-defined]
+    reg = IndiProxyRegistration(manager, tmp_path)
+    await reg.apply(True, "http://127.0.0.1:8000")
+    status = reg.status()
+    assert (status["server_kind"], status["server_managed"]) == (server_kind, managed)
+    assert status["loaded"] is running
+    assert status["device_name"] == name

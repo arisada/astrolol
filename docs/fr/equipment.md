@@ -23,6 +23,9 @@ Cliquez sur **Charger un pilote** et suivez l'assistant.
 2. **Comment est-il connecté ?**
    - **Parcourir les pilotes INDI** : presque tout le matériel du commerce. astrolol démarre et
      arrête le serveur INDI tout seul (modifiable dans [Options](options.md#serveur-indi)).
+     Quand astrolol utilise INDIGO, le bouton devient **Parcourir les pilotes INDIGO** et
+     propose les pilotes INDIGO ; la roue à filtres ou le focuser d'une caméra, qu'INDIGO
+     présente comme un appareil à part, se connecte avec la caméra.
    - **Autre adaptateur** : les pilotes fournis par des modules d'astrolol, par exemple
      `eqmod` (le pilote natif Sky-Watcher du module [EQMOD](../../astrolol/plugins/eqmod/docs/fr.md))
      ou son simulateur de monture. Si aucun module n'en propose pour le type choisi,
