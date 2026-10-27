@@ -8,7 +8,8 @@
 #
 # Checks: apt resolves every dependency from the distro alone, the service account and data
 # directory exist, the files are in place, and astrolol starts as its user, answers /health and
-# serves the web UI and the configuration file's data_dir is used. No systemd in the container:
+# serves the web UI and the configuration file's data_dir is used; then nginx in front of it,
+# HTTP and HTTPS. No systemd in the container:
 # astrolol is started by hand, the unit file is only checked with systemd-analyze.
 set -euo pipefail
 
@@ -64,5 +65,17 @@ curl -fsS http://127.0.0.1:8000/health || { cat /tmp/astrolol.out; fail "no answ
 echo
 curl -fsS -H "Accept: text/html" http://127.0.0.1:8000/ | grep -qi "<div id=\"root\"" || fail "the web UI is not served"
 [[ -f /var/lib/astrolol/astrolol.log ]] || fail "data_dir from /etc/astrolol/astrolol.toml not used"
+
+# nginx in front of it, the way the user guide sets it up.
+apt-get install -y -qq nginx openssl >/dev/null
+cp /usr/share/astrolol/nginx/nginx-http.conf /etc/nginx/sites-available/astrolol
+ln -s /etc/nginx/sites-available/astrolol /etc/nginx/sites-enabled/
+rm -f /etc/nginx/sites-enabled/default
+nginx -t 2>/dev/null && nginx || fail "nginx does not start with nginx-http.conf"
+curl -fsS http://127.0.0.1/health >/dev/null || fail "no /health through nginx"
+curl -fsS http://127.0.0.1/ | grep -qi "<div id=\"root\"" || fail "nginx does not serve the web UI"
+/usr/share/astrolol/nginx/install-nginx-https.sh >/dev/null || fail "install-nginx-https.sh failed"
+curl -fsSk https://127.0.0.1/health >/dev/null || fail "no /health over HTTPS"
+curl -fsSk https://127.0.0.1/ | grep -qi "<div id=\"root\"" || fail "no web UI over HTTPS"
 echo "OK: '"$name"' on $(. /etc/os-release; echo "$PRETTY_NAME") $(uname -m)"
 '

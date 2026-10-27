@@ -16,8 +16,8 @@
 #
 # Options:
 #   --ui-dist DIR     UI build directory. Default: $ASTROLOL_UI_DIST, else the
-#                     one the service user's astrolol install serves, else
-#                     <this checkout>/ui/dist
+#                     one the service user's astrolol install serves, else the
+#                     package's, else <this checkout>/ui/dist
 #   --user NAME       the service user (default: astrolol); its ~/venv is
 #                     asked where the UI is
 #   --name NAME       extra name for the certificate; repeatable
@@ -82,6 +82,9 @@ if [[ -z $ui_dist ]]; then
         ui_dist="$(cd / && "$home/venv/bin/python3" -c \
             'from astrolol.api.static import UI_DIST; print(UI_DIST or "")' 2>/dev/null || true)"
     fi
+    # Installed from the package: the system's Python has it.
+    [[ -n $ui_dist ]] || ui_dist="$(cd / && python3 -c \
+        'from astrolol.api.static import UI_DIST; print(UI_DIST or "")' 2>/dev/null || true)"
     [[ -n $ui_dist ]] || ui_dist="$SRC_DIR/../ui/dist"
 fi
 ui_dist="$(realpath -m "$ui_dist")"
@@ -179,7 +182,9 @@ if ((dry)); then
     echo "[dry-run] nginx -t && systemctl reload nginx"
 else
     nginx -t
-    if systemctl is-active --quiet nginx; then systemctl reload nginx; else systemctl enable --now nginx; fi
+    if [[ ! -d /run/systemd/system ]]; then nginx -s reload 2>/dev/null || nginx   # no systemd (a container)
+    elif systemctl is-active --quiet nginx; then systemctl reload nginx
+    else systemctl enable --now nginx; fi
     info "done — open https://$short.local/ (or https://${ips[0]:-$short}/)"
-    echo "    astrolol itself must be running on 127.0.0.1:8000 (see deploy/astrolol.service)."
+    echo "    astrolol itself must be running on 127.0.0.1:8000."
 fi

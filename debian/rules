@@ -12,6 +12,12 @@ export ASTROLOL_REQUIRE_UI=1
 execute_before_dh_installtmpfiles:
 	dh_installsysusers
 
+# nginx serves the web UI the package installs.
+execute_after_dh_install:
+	sed -i 's|^\(\s*root\s\+\).*;|\1/usr/lib/python3/dist-packages/astrolol/_ui;|' \
+		debian/astrolol/usr/share/astrolol/nginx/nginx-http.conf \
+		debian/astrolol/usr/share/astrolol/nginx/nginx-https.conf
+
 # The unit and plugin tests, from the source tree, against the distro's libraries: the oldest
 # versions astrolol supports are whatever the oldest target distro ships.
 override_dh_auto_test:

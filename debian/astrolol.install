@@ -1,2 +1,5 @@
 debian/astrolol.toml etc/astrolol/
 deploy/50-astrolol.rules usr/share/polkit-1/rules.d/
+deploy/nginx-http.conf usr/share/astrolol/nginx/
+deploy/nginx-https.conf usr/share/astrolol/nginx/
+deploy/install-nginx-https.sh usr/share/astrolol/nginx/
