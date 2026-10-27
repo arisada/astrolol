@@ -2,7 +2,7 @@
 import asyncio
 from pathlib import Path
 
-import indipyclient.events as indi_events
+import astrolol._vendor.indipyclient.events as indi_events
 import pytest
 
 from astrolol.devices.indi.client import IndiClient

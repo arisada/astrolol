@@ -26,7 +26,7 @@ def build_plugin_manager() -> pluggy.PluginManager:
     pm = pluggy.PluginManager(PROJECT_NAME)
     pm.add_hookspecs(AstrololSpec)
 
-    # Register bundled INDI plugin (gracefully skipped when indipyclient absent)
+    # Register the bundled INDI plugin
     from astrolol.devices.indi.plugin import IndiPlugin
     pm.register(IndiPlugin())
 

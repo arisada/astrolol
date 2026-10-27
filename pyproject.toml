@@ -22,7 +22,6 @@ dependencies = [
     "photutils>=1.12",
     "scipy>=1.11",
     "astroplan>=0.10",
-    "indipyclient @ {root:uri}/vendor/indipyclient",
     "psutil>=5.9",
     "pyserial>=3.5",
     "zeroconf>=0.131",
@@ -44,9 +43,6 @@ dev = [
     "ruff>=0.4",
 ]
 
-[tool.hatch.metadata]
-allow-direct-references = true
-
 [tool.hatch.build.targets.wheel]
 packages = ["astrolol"]
 # Plugin UI sources (built into the web UI) and tests are not part of the Python package.
@@ -55,6 +51,8 @@ exclude = ["astrolol/plugins/*/ui", "astrolol/plugins/*/tests"]
 [tool.ruff]
 target-version = "py311"
 line-length = 100
+# Third-party code, kept as upstream wrote it.
+extend-exclude = ["astrolol/_vendor"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM"]
@@ -63,6 +61,10 @@ select = ["E", "F", "I", "UP", "B", "SIM"]
 python_version = "3.11"
 strict = true
 plugins = ["pydantic.mypy"]
+
+[[tool.mypy.overrides]]
+module = "astrolol._vendor.*"
+ignore_errors = true
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"

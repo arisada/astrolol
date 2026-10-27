@@ -31,7 +31,7 @@ import structlog
 from astrolol.devices.indi.catalog import DriverEntry
 from astrolol.devices.indi.children import terminate
 
-if TYPE_CHECKING:  # importing the client needs indipyclient, which astrolol can run without
+if TYPE_CHECKING:  # only for the annotation: the client is imported where it is used
     from astrolol.devices.indi.client import IndiClient
 
 logger = structlog.get_logger()

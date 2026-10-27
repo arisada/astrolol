@@ -2,7 +2,7 @@
 runs the same against a real server)."""
 import asyncio
 
-import indipyclient.events as indi_events
+import astrolol._vendor.indipyclient.events as indi_events
 import pytest
 
 from astrolol.devices.indi.client import IndiClient
@@ -78,7 +78,7 @@ async def test_connect_is_sent_otherwise(state: str, connect: str) -> None:
 async def test_a_set_vector_without_timeout_keeps_the_connection() -> None:
     # INDIGO never puts a timeout on set vectors. indipyclient took the missing value as None,
     # and the next send of that vector crashed its keep-alive check, closing the connection
-    # (an exposure in flight then never got its image). vendor/indipyclient/PATCHES.md, 3.
+    # (an exposure in flight then never got its image). astrolol/_vendor/indipyclient/PATCHES.md, 3.
     received: list[bytes] = []
     closed = asyncio.Event()
 

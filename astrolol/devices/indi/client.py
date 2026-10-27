@@ -22,10 +22,10 @@ from pathlib import Path
 from typing import Any, Callable
 
 import structlog
-from indipyclient import IPyClient
-from indipyclient import events as indi_events
+from astrolol._vendor.indipyclient import IPyClient
+from astrolol._vendor.indipyclient import events as indi_events
 
-_indi_logger = logging.getLogger("indipyclient.ipyclient")
+_indi_logger = logging.getLogger("astrolol._vendor.indipyclient.ipyclient")
 
 logger = structlog.get_logger()
 

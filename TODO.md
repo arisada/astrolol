@@ -397,8 +397,8 @@ named sequences (server library) and task file download/upload.
 - **Packaging** — `deploy/` has a systemd unit, nginx configs for HTTP/HTTPS and
   `install-nginx-https.sh`; `docs/raspberry-pi-deployment.md` is the guide. Still missing:
   - **PyPI release**: ship the built UI inside the wheel (`static.py` only looks next to
-    the source tree or in `ASTROLOL_UI_DIST`), and publish or bundle `indipyclient`
-    (PyPI rejects the `vendor/` direct reference). Then the guide's checkout and UI build
+    the source tree or in `ASTROLOL_UI_DIST`; indipyclient is bundled as
+    `astrolol._vendor.indipyclient` now). Then the guide's checkout and UI build
     steps go away, and the System page's Development section (git pull) needs a pip-based
     equivalent.
   - A single installer for the service user, venv and systemd unit.

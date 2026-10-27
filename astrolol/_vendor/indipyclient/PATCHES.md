@@ -1,11 +1,16 @@
 # Local patches on top of indipyclient 0.9.3
 
 Upstream: https://github.com/bernie-skipole/indipyclient (PyPI: `indipyclient`).
-This directory is the 0.9.3 sdist plus the three patches below. None of them is
-merged upstream yet. Once they are, drop this directory and depend on the PyPI release.
+This directory is the `indipyclient/` package of the 0.9.3 sdist, plus its LICENSE (MIT) and
+the patches below. It lives inside astrolol (imported as `astrolol._vendor.indipyclient`)
+because indipyclient is in neither Debian nor Ubuntu, so the `.deb` has to bring it along, and
+PyPI refuses a dependency on a local directory. Once upstream has released all the patches,
+replace the files with the unmodified release (and keep it here for the `.deb`, or package it
+separately).
 
-To re-vendor a newer release: unpack its sdist over this directory (keep this file),
-re-apply the patches, and update this document.
+To re-vendor a newer release: copy the `indipyclient/` package of its sdist over this
+directory (keep LICENSE up to date and this file), re-apply the patches still needed, and
+update this document.
 
 ## 1. Parse the receive stream with `XMLPullParser` (`ipyclient.py`)
 
