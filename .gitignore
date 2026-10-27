@@ -33,3 +33,6 @@ ui/dist/
 BUGS.md
 SPEC.md
 /inventory.json
+
+# Local working notes, never committed
+/local/
