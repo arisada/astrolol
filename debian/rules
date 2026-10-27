@@ -1,0 +1,15 @@
+#!/usr/bin/make -f
+
+export PYBUILD_NAME=astrolol
+# The wheel must carry the built web UI (hatch_build.py): fail rather than ship without it.
+export ASTROLOL_REQUIRE_UI=1
+
+%:
+	dh $@ --with python3 --buildsystem=pybuild
+
+# The unit and plugin tests, from the source tree, against the distro's libraries: the oldest
+# versions astrolol supports are whatever the oldest target distro ships.
+override_dh_auto_test:
+ifeq (,$(filter nocheck,$(DEB_BUILD_OPTIONS)))
+	HOME=$(CURDIR)/debian/test-home python3 -m pytest tests/unit astrolol/plugins -q -m "not slow" -p no:cacheprovider
+endif

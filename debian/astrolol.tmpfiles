@@ -1,0 +1,2 @@
+d /var/lib/astrolol 0750 astrolol astrolol -
+d /var/lib/astrolol/images 0750 astrolol astrolol -

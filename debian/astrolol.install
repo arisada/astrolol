@@ -1,0 +1,2 @@
+debian/astrolol.toml etc/astrolol/
+deploy/50-astrolol.rules usr/share/polkit-1/rules.d/

@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>astrolol apt repository</title>
+<style>
+  :root { --bg: #fff; --fg: #1d2330; --muted: #5b6475; --code: #f1f3f7; }
+  @media (prefers-color-scheme: dark) { :root { --bg: #0f1218; --fg: #e3e7ef; --muted: #98a1b3; --code: #1a1f29; } }
+  body { background: var(--bg); color: var(--fg); font: 16px/1.5 system-ui, sans-serif; margin: 0 auto; max-width: 46rem; padding: 2rem 16px; }
+  pre { background: var(--code); padding: 1rem; overflow-x: auto; border-radius: 6px; }
+  p.muted { color: var(--muted); }
+  a { color: inherit; }
+</style>
+</head>
+<body>
+<h1>astrolol apt repository</h1>
+<p>Packages of <a href="https://astrolol.lol">astrolol</a> for Debian 13, Raspberry Pi OS (trixie)
+and Ubuntu 26.04.</p>
+<pre>sudo curl -fsSL https://apt.astrolol.lol/astrolol.gpg -o /etc/apt/keyrings/astrolol.gpg
+sudo tee /etc/apt/sources.list.d/astrolol.sources &lt;&lt;'EOF'
+Types: deb
+URIs: https://apt.astrolol.lol
+Suites: nightly
+Components: main
+Signed-By: /etc/apt/keyrings/astrolol.gpg
+EOF
+sudo apt update
+sudo apt install astrolol</pre>
+<p>Then open <code>http://&lt;this computer&gt;:8000</code> in a browser.</p>
+<p class="muted">Only nightly builds for now: they follow the development branch.</p>
+</body>
+</html>

@@ -1,0 +1,19 @@
+# astrolol start-up configuration, read when the service starts:
+#   sudo systemctl restart astrolol
+# Environment variables (ASTROLOL_<SETTING>) win over this file. What you change in the web UI
+# is saved in data_dir, not here. All settings: the "Configuration" section of the README.
+
+# Settings, profiles, users and logs.
+data_dir = "/var/lib/astrolol"
+
+# Raw camera files. Default: <data_dir>/images. The service user must be able to write there.
+#images_dir = "/mnt/usb/astrolol"
+
+# The INDI server; a setting given here is greyed out in Options.
+#indi_server_kind = "indi"        # or "indigo"
+#indi_manage_server = true        # false: use a server you start yourself
+#indi_host = "localhost"
+#indi_port = 7624
+
+# Other web origins allowed to call the API.
+#allowed_origins = ["https://astro.example"]

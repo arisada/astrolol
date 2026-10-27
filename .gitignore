@@ -36,3 +36,6 @@ SPEC.md
 
 # Local working notes, never committed
 /local/
+
+# Built packages (packaging/build-deb.sh)
+/packaging/out/

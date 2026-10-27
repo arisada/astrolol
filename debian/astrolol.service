@@ -1,0 +1,25 @@
+[Unit]
+Description=astrolol astronomy platform
+Documentation=https://astrolol.lol
+# Clients connect over the network.
+After=network-online.target
+Wants=network-online.target
+# Never give up restarting (the default stops after 5 starts in 10 seconds).
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+User=astrolol
+Group=astrolol
+# Settings come from /etc/astrolol/astrolol.toml (data_dir = /var/lib/astrolol).
+WorkingDirectory=/var/lib/astrolol
+ExecStart=/usr/bin/astrolol
+Restart=always
+RestartSec=3
+Environment=PYTHONUNBUFFERED=1
+# SIGTERM first so exposures and slews can be stopped cleanly; SIGKILL after 20 s.
+KillMode=mixed
+TimeoutStopSec=20
+
+[Install]
+WantedBy=multi-user.target

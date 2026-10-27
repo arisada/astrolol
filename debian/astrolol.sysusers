@@ -1,0 +1,6 @@
+# The account the astrolol service runs as. dialout: serial ports (EQMOD cables, focusers);
+# plugdev and video: USB cameras and other USB devices.
+u astrolol - "astrolol astronomy platform" /var/lib/astrolol /usr/sbin/nologin
+m astrolol dialout
+m astrolol plugdev
+m astrolol video

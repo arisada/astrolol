@@ -1,0 +1,80 @@
+Source: astrolol
+Section: science
+Priority: optional
+Maintainer: Aris Adamantiadis <aris@0xbadc0de.be>
+Build-Depends:
+ debhelper-compat (= 13),
+ dh-python,
+ pybuild-plugin-pyproject,
+ python3-all,
+ python3-hatchling,
+# For the test suite, run against the distro's libraries:
+ git,
+ python3-astroplan,
+ python3-astropy,
+ python3-dbus-next,
+ python3-fastapi,
+ python3-httpx,
+ python3-ifaddr,
+ python3-numpy,
+ python3-photutils,
+ python3-pil,
+ python3-pluggy,
+ python3-psutil,
+ python3-pydantic (>= 2.10),
+ python3-pydantic-settings (>= 2.2),
+ python3-pytest,
+ python3-pytest-asyncio,
+ python3-scipy,
+ python3-serial,
+ python3-structlog,
+ python3-uvicorn,
+ python3-zeroconf,
+Standards-Version: 4.7.0
+Homepage: https://astrolol.lol
+Vcs-Git: https://github.com/arisada/astrolol.git
+Vcs-Browser: https://github.com/arisada/astrolol
+Rules-Requires-Root: no
+
+Package: astrolol
+Architecture: all
+Depends:
+ ${misc:Depends},
+ ${python3:Depends},
+ python3-astroplan,
+ python3-astropy,
+ python3-dbus-next,
+ python3-fastapi,
+ python3-httpx,
+ python3-ifaddr,
+ python3-numpy,
+ python3-photutils,
+ python3-pil,
+ python3-pluggy,
+ python3-psutil,
+ python3-pydantic (>= 2.10),
+ python3-pydantic-settings (>= 2.2),
+ python3-scipy,
+ python3-serial,
+ python3-structlog,
+ python3-uvicorn,
+ python3-zeroconf,
+ polkitd,
+Recommends:
+ astap-cli,
+ curl,
+ indi-bin | indigo3,
+Suggests:
+ bluez,
+ indi-full,
+ network-manager,
+ nginx,
+ phd2,
+Description: telescope control and astrophotography from a web browser
+ astrolol runs on the computer attached to a telescope (a Raspberry Pi or a
+ mini PC) and drives its mount, cameras, focuser, filter wheel and guider.
+ Phones, tablets and laptops connect to it with a web browser: imaging,
+ plate solving, autofocus, guiding, polar alignment and imaging sequences.
+ .
+ Devices are reached through INDI, INDIGO, ASCOM Alpaca or astrolol's own
+ drivers.
