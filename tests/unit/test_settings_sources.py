@@ -78,3 +78,19 @@ def test_ui_dist_setting_that_does_not_exist_serves_no_ui(
 ) -> None:
     monkeypatch.setattr(settings_mod.settings, "ui_dist", tmp_path / "missing")
     assert static._find_ui_dist() is None
+
+
+def test_the_packaged_ui_comes_before_the_checkout(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # An installed astrolol (wheel or .deb) carries its UI as astrolol/_ui.
+    packaged = tmp_path / "_ui"
+    packaged.mkdir()
+    (packaged / "index.html").write_text("<html></html>")
+    monkeypatch.setattr(settings_mod.settings, "ui_dist", None)
+    monkeypatch.setattr(static, "PACKAGED_UI", packaged)
+    assert static._find_ui_dist() == packaged
+
+
+def test_an_empty_packaged_ui_directory_is_skipped(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(settings_mod.settings, "ui_dist", None)
+    monkeypatch.setattr(static, "PACKAGED_UI", tmp_path / "_ui")
+    assert static._find_ui_dist() != tmp_path / "_ui"

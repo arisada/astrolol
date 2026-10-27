@@ -43,10 +43,15 @@ def _is_page_navigation(request: Request) -> bool:
     return request.headers.get("accept", "").startswith("text/html")
 
 
+# The UI a wheel or a distro package ships inside astrolol (hatch_build.py puts it there).
+PACKAGED_UI = Path(__file__).resolve().parent.parent / "_ui"
+
+
 # Candidate locations for ui/dist, in priority order:
 #   1. settings.ui_dist (ASTROLOL_UI_DIST or the configuration file: explicit override)
-#   2. Relative to this source file (works with `pip install -e .` from a git clone)
-#   3. Current working directory (works when running `python -m astrolol.main` from the repo root)
+#   2. The UI shipped inside the installed package
+#   3. Relative to this source file (works with `pip install -e .` from a git clone)
+#   4. Current working directory (works when running `python -m astrolol.main` from the repo root)
 def _find_ui_dist() -> Path | None:
     if settings.ui_dist is not None:
         if settings.ui_dist.is_dir():
@@ -55,6 +60,7 @@ def _find_ui_dist() -> Path | None:
         return None
 
     candidates = [
+        PACKAGED_UI,
         Path(__file__).parent.parent.parent / "ui" / "dist",  # editable install / source tree
         Path.cwd() / "ui" / "dist",                           # cwd fallback (e.g. cd /repo && python -m astrolol.main)
     ]
