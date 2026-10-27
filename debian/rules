@@ -7,6 +7,11 @@ export ASTROLOL_REQUIRE_UI=1
 %:
 	dh $@ --with python3 --buildsystem=pybuild
 
+# The service account: dh only runs dh_installsysusers by itself from compat 14. Before
+# dh_installtmpfiles, so that the account exists when its directories are created.
+execute_before_dh_installtmpfiles:
+	dh_installsysusers
+
 # The unit and plugin tests, from the source tree, against the distro's libraries: the oldest
 # versions astrolol supports are whatever the oldest target distro ships.
 override_dh_auto_test:

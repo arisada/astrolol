@@ -60,6 +60,8 @@ Depends:
  python3-uvicorn,
  python3-zeroconf,
  polkitd,
+ systemd-sysusers,
+ systemd-tmpfiles,
 Recommends:
  astap-cli,
  curl,
