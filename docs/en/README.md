@@ -9,9 +9,10 @@ at once; what one of them does is shown live to everyone.
 
 ## Start here
 
-1. [Getting started](getting-started.md): open astrolol, connect your first device, build your
+1. [Installing astrolol](install.md) on the telescope computer.
+2. [Getting started](getting-started.md): open astrolol, connect your first device, build your
    inventory, create a profile.
-2. [The interface](interface.md): menu, status bar, palettes, languages, using a phone.
+3. [The interface](interface.md): menu, status bar, palettes, languages, using a phone.
 
 ## Core screens
 
@@ -65,5 +66,6 @@ Most features are plugins. They are off until you turn them on in
 
 ## Installing
 
-Installing astrolol on the telescope computer is covered in the
+[Installing astrolol](install.md) covers the package for Debian, Raspberry Pi OS and Ubuntu. To
+run it from source code instead, with a web server and HTTPS in front of it, see the
 [Raspberry Pi deployment guide](../raspberry-pi-deployment.md).

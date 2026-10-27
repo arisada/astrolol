@@ -1,8 +1,8 @@
 # Premiers pas
 
 Cette page vous mène d'une installation toute neuve à un setup que vous connectez en un clic.
-Elle suppose qu'astrolol est déjà installé et lancé sur l'ordinateur du télescope (voir le
-[guide de déploiement sur Raspberry Pi](../raspberry-pi-deployment.md), en anglais).
+Elle suppose qu'astrolol est déjà installé et lancé sur l'ordinateur du télescope (voir
+[Installer astrolol](install.md)).
 
 L'idée en bref :
 

@@ -1,8 +1,8 @@
 # Getting started
 
 This page takes you from a fresh installation to a rig you can connect with one click. It
-assumes astrolol is already installed and running on the telescope computer (see the
-[Raspberry Pi deployment guide](../raspberry-pi-deployment.md)).
+assumes astrolol is already installed and running on the telescope computer (see
+[Installing astrolol](install.md)).
 
 The idea in short:
 

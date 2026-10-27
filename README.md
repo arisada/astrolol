@@ -48,17 +48,37 @@ Source: https://github.com/arisada/astrolol
 - **Web UI** — dark-theme React app: Equipment, Profiles, Imaging, Mount, Focuser, Logs,
   Options pages, plus one page per enabled plugin.
 
-Pre-1.0: functional core with a wide plugin surface, but persistence beyond JSON files, a
-red-mode/mobile UI, and a packaged install (systemd and nginx files are in `deploy/`) are not
-finished yet — see `TODO.md`.
+Pre-1.0: functional core with a wide plugin surface, but persistence beyond JSON files and a
+red-mode/mobile UI are not finished yet — see `TODO.md`.
 
-## Requirements
+## Install
+
+On Debian 13, Raspberry Pi OS (trixie) or Ubuntu 26.04:
+
+```bash
+sudo curl -fsSL https://apt.astrolol.lol/astrolol.gpg -o /etc/apt/keyrings/astrolol.gpg
+sudo tee /etc/apt/sources.list.d/astrolol.sources <<'EOF'
+Types: deb
+URIs: https://apt.astrolol.lol
+Suites: nightly
+Components: main
+Signed-By: /etc/apt/keyrings/astrolol.gpg
+EOF
+sudo apt update
+sudo apt install astrolol
+```
+
+astrolol then runs as a service: open `http://<this computer>:8000`. Nightly builds only for now.
+The [user guide](docs/en/install.md) has the rest: recent INDI drivers, the plate solver's star
+database, where files are, updating.
+
+## Requirements (from source)
 
 - Python 3.11+
 - Node.js 18+ (for the web UI)
 - Linux (Raspberry Pi, mini-PC, or any machine at the scope)
 
-**Optional: Install astroberry (rpi only)**
+**Optional: Astroberry repository** (recent INDI and its drivers, PHD2; Debian 13 and Raspberry Pi OS)
 
 ```bash
 curl -fsSL https://astroberry.io/debian/astroberry.asc | sudo gpg --dearmor -o /etc/apt/keyrings/astroberry.gpg
@@ -117,7 +137,7 @@ via membership in the `bluetooth` group).
 
 astrolol can connect to local or remote PHD2 instances.
 
-## Install
+## Install from source
 
 ```bash
 git clone https://github.com/arisada/astrolol
