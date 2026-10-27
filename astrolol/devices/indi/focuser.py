@@ -14,6 +14,7 @@ import structlog
 
 from astrolol.devices.base.models import DeviceState, FocuserStatus
 from astrolol.devices.indi.client import IndiClient
+from astrolol.devices.indi.indigo import setup_simulator_focuser
 
 logger = structlog.get_logger()
 
@@ -75,6 +76,7 @@ class IndiFocuser:
         # Remove any stale registration first to guard against reconnects.
         self._client.remove_prop_listener(self._device_name, "ABS_FOCUS_POSITION", self._handle_position)
         self._client.add_prop_listener(self._device_name, "ABS_FOCUS_POSITION", self._handle_position)
+        await setup_simulator_focuser(self._client, self._device_name)
 
     async def disconnect(self) -> None:
         self._client.remove_prop_listener(self._device_name, "ABS_FOCUS_POSITION", self._handle_position)

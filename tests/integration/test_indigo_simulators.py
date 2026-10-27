@@ -174,15 +174,31 @@ async def focuser(client):
     await f.disconnect()
 
 
+async def test_simulator_focuser_is_set_up_like_a_real_one(focuser, client):
+    # In focus at a positive position, with a focus curve a few thousand steps wide.
+    from astrolol.devices.indi.indigo import SIMULATOR_BLUR_SCALE, SIMULATOR_FOCUS_POSITION
+    assert (await focuser.get_status()).position == SIMULATOR_FOCUS_POSITION
+    assert await client.get_number(_FOCUSER, "FOCUSER_SETUP", "FOCUS") == 0
+    assert await client.get_number(_FOCUSER, "FOCUSER_SETUP", "BLUR_SCALE") == SIMULATOR_BLUR_SCALE
+    assert client.get_switch_state_nowait(_FOCUSER, "FOCUSER_ON_POSITION_SET", "GOTO") is True
+
+
+async def test_reconnecting_the_simulator_focuser_leaves_it_alone(focuser, client):
+    from astrolol.devices.indi.indigo import SIMULATOR_FOCUS_POSITION, setup_simulator_focuser
+    await focuser.move_to(SIMULATOR_FOCUS_POSITION + 300)
+    assert await setup_simulator_focuser(client, _FOCUSER) is False
+    assert (await focuser.get_status()).position == pytest.approx(SIMULATOR_FOCUS_POSITION + 300, abs=5)
+
+
 async def test_focuser_move_to(focuser):
-    await focuser.move_to(1000)
-    assert (await focuser.get_status()).position == pytest.approx(1000, abs=5)
+    await focuser.move_to(11000)
+    assert (await focuser.get_status()).position == pytest.approx(11000, abs=5)
 
 
 async def test_focuser_move_by(focuser):
-    await focuser.move_to(1000)
+    await focuser.move_to(11000)
     await focuser.move_by(-200)
-    assert (await focuser.get_status()).position == pytest.approx(800, abs=5)
+    assert (await focuser.get_status()).position == pytest.approx(10800, abs=5)
 
 
 async def test_focuser_temperature(focuser):

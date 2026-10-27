@@ -42,6 +42,27 @@ Click **Load driver** and follow the wizard.
 For an **Other adapter**, the wizard asks for the adapter, an optional device ID and its
 **Connect params** as JSON (each adapter documents its own, e.g. `{"port": "/dev/ttyUSB0"}`).
 
+### Simulators
+
+INDI and INDIGO both ship simulators to try astrolol without hardware, but they do not behave
+the same:
+
+- **INDI's CCD simulator** draws the stars around where the simulated mount points, so they
+  move when you slew and plate solving finds the mount's position. Use it to try slewing,
+  centring and plate solving.
+- **INDIGO's CCD Imager Simulator** always shows the same picture (the Rosette Nebula),
+  wherever the mount points. Plate solving does not match the mount with it. Focusing works:
+  the picture blurs as its focuser moves away from focus. For guiding, use INDIGO's **CCD
+  Guider Simulator**, which draws a star field that answers guide pulses.
+- **INDIGO's focuser** (*CCD Imager Simulator (focuser)*) is in focus at position 0 when it
+  starts, and blurs quickly: about 500 steps away the stars are gone. When astrolol connects it,
+  it sets it up like a real focuser: it reads 10000 without moving, which is where it is in
+  focus, and its focus curve is wider (2000 steps away blur the stars by about 4 pixels). A
+  focuser that has already moved is left as it is. Both settings are in its
+  [Device properties](interface.md#device-properties): **On position set** (**Sync to
+  position** changes the position it reads without moving it) and **Focuser blur (steps/px
+  blur)** under **Focuser Setup**.
+
 ### Connected devices
 
 Each connected device shows its kind, its ID, its driver and its state (*connected*,

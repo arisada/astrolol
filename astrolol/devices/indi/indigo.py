@@ -270,6 +270,57 @@ def companion_devices(client: IndiClient, device: str) -> list[tuple[str, str]]:
     return companions
 
 
+# INDIGO's CCD simulator focuser starts in focus at position 0 (its range is ±20000) and blurs
+# by one pixel every 15 steps, so 500 steps lose the stars. Set up like a real focuser: in focus
+# at a positive position, with a curve a few thousand steps wide.
+SIMULATOR_DRIVER = "indigo_ccd_simulator"
+SIMULATOR_FOCUS_POSITION = 10000
+SIMULATOR_BLUR_SCALE = 500      # steps per pixel of blur; the driver's default is 15
+_SIMULATOR_DEFAULT_BLUR_SCALE = 15
+
+
+async def setup_simulator_focuser(client: IndiClient, device: str) -> bool:
+    """Set INDIGO's simulated focuser up like a real one, if it is still as the driver started it.
+
+    Moves the point of focus to SIMULATOR_FOCUS_POSITION (a sync: the focuser reads that
+    position without moving) and widens the focus curve. A focuser already moved, or whose
+    blur was changed, is left alone, so reconnecting changes nothing. True if it changed it.
+    """
+    if device_driver(client, device) != SIMULATOR_DRIVER:
+        return False
+    try:
+        await client.wait_for_property(device, "FOCUSER_SETUP", timeout=5.0)
+        position = await client.get_number(device, "ABS_FOCUS_POSITION", "FOCUS_ABSOLUTE_POSITION")
+        focus = await client.get_number(device, "FOCUSER_SETUP", "FOCUS")
+        backlash = await client.get_number(device, "FOCUSER_SETUP", "BACKLASH")
+        blur = await client.get_number(device, "FOCUSER_SETUP", "BLUR_SCALE")
+        changed = False
+        if position == 0 and focus == 0:
+            await client.set_switch(device, "FOCUSER_ON_POSITION_SET", ["SYNC"])
+            try:
+                await client.set_number(device, "ABS_FOCUS_POSITION",
+                                        {"FOCUS_ABSOLUTE_POSITION": SIMULATOR_FOCUS_POSITION})
+                await client._wait_cond(
+                    lambda: client.get_number_nowait(device, "ABS_FOCUS_POSITION", "FOCUS_ABSOLUTE_POSITION")
+                    == SIMULATOR_FOCUS_POSITION,
+                    timeout=5.0,
+                )
+            finally:
+                await client.set_switch(device, "FOCUSER_ON_POSITION_SET", ["GOTO"])
+            changed = True
+        if blur == _SIMULATOR_DEFAULT_BLUR_SCALE:
+            await client.set_number(device, "FOCUSER_SETUP",
+                                    {"FOCUS": focus, "BACKLASH": backlash, "BLUR_SCALE": SIMULATOR_BLUR_SCALE})
+            changed = True
+    except Exception as exc:  # a simulator nicety: never fail the connection over it
+        logger.warning("indigo.simulator_focuser_setup_failed", device=device, error=str(exc))
+        return False
+    if changed:
+        logger.info("indigo.simulator_focuser_set_up", device=device,
+                    focus_position=SIMULATOR_FOCUS_POSITION, blur_scale=SIMULATOR_BLUR_SCALE)
+    return changed
+
+
 def indi_driver_device(device: str, executable: str) -> str:
     """The name an INDIGO server gives *device* of INDI driver *executable* run with -i."""
     return f"{device} @ {Path(executable).name}"

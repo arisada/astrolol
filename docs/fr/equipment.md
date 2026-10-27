@@ -48,6 +48,30 @@ Pour un **Autre adaptateur**, l'assistant demande l'adaptateur, un ID facultatif
 **Paramètres de connexion (JSON)** (chaque adaptateur documente les siens, par ex.
 `{"port": "/dev/ttyUSB0"}`).
 
+### Simulateurs
+
+INDI et INDIGO fournissent tous deux des simulateurs pour essayer astrolol sans matériel, mais
+ils ne se comportent pas de la même façon :
+
+- **Le simulateur de caméra d'INDI** dessine les étoiles autour de l'endroit où pointe la
+  monture simulée : elles bougent quand vous pointez ailleurs, et la résolution astrométrique
+  retrouve la position de la monture. Utilisez-le pour essayer le pointage, le centrage et la
+  résolution astrométrique.
+- **Le CCD Imager Simulator d'INDIGO** montre toujours la même image (la nébuleuse de la
+  Rosette), où que pointe la monture. Avec lui, la résolution astrométrique ne correspond pas à
+  la monture. La mise au point fonctionne : l'image devient floue quand son focuser s'éloigne
+  de la mise au point. Pour le guidage, utilisez le **CCD Guider Simulator** d'INDIGO, qui
+  dessine un champ d'étoiles qui répond aux impulsions de guidage.
+- **Le focuser d'INDIGO** (*CCD Imager Simulator (focuser)*) est au point à la position 0
+  quand il démarre, et devient flou très vite : à environ 500 pas, les étoiles ont disparu.
+  Quand astrolol le connecte, il le règle comme un vrai focuser : il indique 10000 sans bouger,
+  et c'est là qu'il est au point, et sa courbe de mise au point est plus large (à 2000 pas, les
+  étoiles s'étalent d'environ 4 pixels). Un focuser qui a déjà bougé est laissé tel quel. Les
+  deux réglages sont dans ses
+  [Propriétés de l'appareil](interface.md#propriétés-des-appareils) : **On position set**
+  (**Sync to position** change la position indiquée sans le déplacer) et **Focuser blur
+  (steps/px blur)** dans **Focuser Setup**.
+
 ### Appareils connectés
 
 Chaque appareil connecté affiche son type, son ID, son pilote et son état (*connecté*,
