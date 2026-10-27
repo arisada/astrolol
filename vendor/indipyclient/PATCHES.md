@@ -1,7 +1,7 @@
 # Local patches on top of indipyclient 0.9.3
 
 Upstream: https://github.com/bernie-skipole/indipyclient (PyPI: `indipyclient`).
-This directory is the 0.9.3 sdist plus the two patches below. None of them is
+This directory is the 0.9.3 sdist plus the three patches below. None of them is
 merged upstream yet. Once they are, drop this directory and depend on the PyPI release.
 
 To re-vendor a newer release: unpack its sdist over this directory (keep this file),
@@ -34,3 +34,16 @@ property state was not updated.
 
 **Fix**: three subclasses (`newSwitchVector(setSwitchVector)` and so on) treat them like
 their `set*` counterparts.
+
+## 3. A set vector without `timeout` no longer drops the connection (`propertyvectors.py`)
+
+**Problem**: `timeout` is optional on `set*Vector`, and INDIGO servers never send it. The
+parsed event then has `timeout = None`, and `PropertyVector._setvector` copied it into the
+vector. The next time the client sent that vector (a new exposure, a focuser move), its
+timer started and `checktimedout` compared `None` with `vector_timeout_max`: the
+`TypeError` ended `_check_alive`, which closed the connection. Whatever was in flight was
+lost (an exposure waited for a BLOB that never came). Still in 0.9.4.
+
+**Fix**: `_setvector` only takes the event's timeout when there is one, and `checktimedout`
+treats a missing timeout as 0 (so the client's minimum applies).
+

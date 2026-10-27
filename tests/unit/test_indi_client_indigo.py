@@ -73,3 +73,41 @@ async def test_connect_is_sent_otherwise(state: str, connect: str) -> None:
     client = _ConnectingClient(_Connection(state, connect))
     await client.connect_device("Mount", conn_timeout=0.5)
     assert client.switches == [["CONNECT"]]
+
+
+async def test_a_set_vector_without_timeout_keeps_the_connection() -> None:
+    # INDIGO never puts a timeout on set vectors. indipyclient took the missing value as None,
+    # and the next send of that vector crashed its keep-alive check, closing the connection
+    # (an exposure in flight then never got its image). vendor/indipyclient/PATCHES.md, 3.
+    received: list[bytes] = []
+    closed = asyncio.Event()
+
+    async def serve(reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+        await reader.read(1024)                                  # getProperties
+        writer.write(
+            b'<defNumberVector device="CCD" name="CCD_EXPOSURE" state="Idle" perm="rw" timeout="60">'
+            b'<defNumber name="CCD_EXPOSURE_VALUE" format="%g" min="0" max="3600" step="1">0</defNumber>'
+            b'</defNumberVector>'
+            b'<setNumberVector device="CCD" name="CCD_EXPOSURE" state="Ok">'
+            b'<oneNumber name="CCD_EXPOSURE_VALUE">0</oneNumber></setNumberVector>'
+        )
+        await writer.drain()
+        while data := await reader.read(4096):
+            received.append(data)
+        closed.set()
+
+    server = await asyncio.start_server(serve, "127.0.0.1", 0)
+    port = server.sockets[0].getsockname()[1]
+    client = IndiClient(host="127.0.0.1", port=port)
+    try:
+        await client.connect()
+        await client.wait_for_property("CCD", "CCD_EXPOSURE", timeout=5.0)
+        await asyncio.sleep(0.3)                                 # the set vector arrives
+        await client.set_number("CCD", "CCD_EXPOSURE", {"CCD_EXPOSURE_VALUE": 1.0})
+        await asyncio.sleep(1.5)                                 # the check runs every 0.5 s
+        assert any(b"newNumberVector" in d for d in received)
+        assert not closed.is_set()
+        assert client.connected
+    finally:
+        await client.disconnect()
+        server.close()

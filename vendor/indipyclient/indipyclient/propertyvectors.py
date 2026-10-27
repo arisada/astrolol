@@ -215,12 +215,13 @@ class PropertyVector(Vector):
         if not self._timer:
             return False
         # so timer is running
-        if self.timeout > self._client.vector_timeout_max:
+        timeout = self.timeout or 0.0
+        if timeout > self._client.vector_timeout_max:
             t = self._client.vector_timeout_max
-        elif self.timeout < self._client.vector_timeout_min:
+        elif timeout < self._client.vector_timeout_min:
             t = self._client.vector_timeout_min
         else:
-            t = self.timeout
+            t = timeout
         if nowtime > self._newtimer + t:
             # timed out
             self._timer = False
@@ -261,7 +262,7 @@ class PropertyVector(Vector):
         if event.message:
             self.message = event.message
             self.message_timestamp = event.timestamp
-        if hasattr(event, 'timeout'):
+        if getattr(event, 'timeout', None) is not None:
             if self.timeout is not None:
                 self.timeout = event.timeout
         for membername, membervalue in event.items():
