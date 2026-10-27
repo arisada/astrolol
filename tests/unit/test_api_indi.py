@@ -77,3 +77,29 @@ async def test_list_drivers_no_indi_installed_returns_empty(client: AsyncClient)
     assert r_all.status_code == 200
     assert r_all.json() == []
     assert r_kind.json() == []
+
+
+@pytest.mark.asyncio
+async def test_load_driver_refuses_what_is_not_a_driver(app, client: AsyncClient) -> None:
+    # Load driver runs what it is given: a path or an unknown name is refused, with the reason.
+    from astrolol.devices.indi.allowed import DriverNotAllowed
+
+    class _Client:
+        def list_devices(self) -> list[str]:
+            return []
+
+    class _Manager:
+        server_kind = "indi"
+        client = _Client()
+
+        async def ensure_started(self) -> None:
+            return None
+
+        async def preload_driver(self, executable: str) -> None:
+            raise DriverNotAllowed(f"{executable!r} is not a driver name")
+
+    app.state.registry.indi_manager = _Manager()
+    async with client as c:
+        r = await c.post("/indi/load_driver", json={"executable": "/bin/sh", "device_name": "x"})
+    assert r.status_code == 400
+    assert "not a driver name" in r.json()["detail"]

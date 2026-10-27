@@ -12,6 +12,7 @@ from pathlib import Path
 import structlog
 from fastapi import FastAPI
 
+from astrolol.config.settings import settings
 from astrolol.core.auth import AclRule, Level
 from astrolol.core.plugin_api import LogScope, PluginContext, PluginManifest
 from astrolol.plugins.eqmod.api import router
@@ -58,7 +59,7 @@ class EqmodPlugin:
         self._ctx = ctx
         self._proxy = IndiProxyRegistration(
             getattr(ctx.device_registry, "indi_manager", None),
-            Path(getattr(ctx.device_registry, "indi_run_dir", "/tmp/astrolol")),
+            Path(getattr(ctx.device_registry, "indi_run_dir", settings.run_dir)),
         )
         app.state.eqmod_indi_proxy = self._proxy
         imager_manager = getattr(app.state, "imager_manager", None)

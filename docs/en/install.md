@@ -123,12 +123,14 @@ astrolol restarts with the new version.
 | What | Where |
 |---|---|
 | Settings, profiles, users, logs | `/var/lib/astrolol` |
-| Captured images | `/var/lib/astrolol/images` |
+| Saved images | `/var/lib/astrolol/astrolol_pictures`, one folder per night ([Options](options.md#image-saving)) |
 | Start-up configuration | `/etc/astrolol/astrolol.toml` |
 
 astrolol runs as its own user, `astrolol`, which can use serial ports and USB cameras. The
-configuration file holds the few settings read at start-up, such as another folder for images
-(`images_dir`, for example a USB drive the `astrolol` user can write to). After changing it:
+configuration file holds the few settings read at start-up, and names the folders astrolol may
+use. To save images on a USB drive the `astrolol` user can write to, add the drive there
+(`storage_roots = ["/var/lib/astrolol", "/media/astro"]`), then choose the folder in Options.
+After changing the file:
 
 ```bash
 sudo systemctl restart astrolol

@@ -17,8 +17,6 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 // ── Types ──────────────────────────────────────────────────────────────────────
 
 export interface PlatesolveSettings {
-  astap_bin: string
-  astap_db_path: string
   astap_search_radius: number
   astap_tolerance: number
   pixel_size_um: number | null
@@ -49,6 +47,7 @@ export interface SolveResult {
 export interface DbStatus {
   installed: boolean
   db_path: string
+  program: string   // the ASTAP program, from the start-up configuration
 }
 
 export type SolveJobStatus = 'pending' | 'exposing' | 'solving' | 'completed' | 'failed' | 'cancelled'

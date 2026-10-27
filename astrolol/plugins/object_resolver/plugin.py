@@ -8,6 +8,7 @@ from pathlib import Path
 import structlog
 from fastapi import FastAPI
 
+from astrolol.config.settings import OutsideStorage, storage_path
 from astrolol.core.plugin_api import LogScope, PluginContext, PluginManifest
 
 from astrolol.plugins.object_resolver.api import router
@@ -40,7 +41,11 @@ class ObjectResolverPlugin:
 
     def setup(self, app: FastAPI, ctx: PluginContext) -> None:
         cfg = ctx.get_plugin_settings("object_resolver", ObjectResolverSettings)
-        db_path = Path(cfg.db_path).expanduser()
+        try:
+            db_path = storage_path(cfg.db_path)
+        except OutsideStorage as exc:
+            logger.error("object_resolver.db_path_refused", error=str(exc))
+            db_path = Path(ObjectResolverSettings().db_path).expanduser()
 
         self._catalog = ObjectCatalog(db_path)
         self._catalog.open()

@@ -13,6 +13,7 @@ import structlog
 from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import FileResponse
 
+from astrolol.config.settings import OutsideStorage, storage_path
 from astrolol.core.mem_guard import mem_guard
 from astrolol.imaging.preview import PreviewBaseCache, auto_stretch_stats, render_auto, render_linear
 from astrolol.profiles.store import ProfileStore
@@ -86,7 +87,10 @@ def resolve_library_dir(profile_store: ProfileStore | None) -> Path:
     raw = user_settings.plugin_settings.get("viewer", {})
     viewer_settings = ViewerSettings(**raw)
     if viewer_settings.library_dir:
-        return Path(viewer_settings.library_dir).expanduser()
+        try:
+            return storage_path(viewer_settings.library_dir)
+        except OutsideStorage as exc:
+            logger.error("viewer.library_dir_refused", error=str(exc))
     return default_library_dir(user_settings.save_dir_template)
 
 
@@ -108,6 +112,11 @@ async def get_settings(request: Request) -> ViewerSettings:
 
 @router.put("/settings", response_model=ViewerSettings)
 async def put_settings(body: ViewerSettings, request: Request) -> ViewerSettings:
+    if body.library_dir:
+        try:
+            storage_path(body.library_dir)
+        except OutsideStorage as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
     store = _profile_store(request)
     current = store.get_user_settings()
     new_ps = {**current.plugin_settings, "viewer": body.model_dump()}

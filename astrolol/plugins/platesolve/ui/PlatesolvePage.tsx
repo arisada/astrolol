@@ -23,8 +23,6 @@ type AfterSolve = 'nothing' | 'sync' | 'sync_slew'
 // ── Platesolve settings defaults ──────────────────────────────────────────────
 
 const DEFAULT_PLATESOLVE_SETTINGS: PlatesolveSettings = {
-  astap_bin: 'astap_cli',
-  astap_db_path: '/opt/astap',
   astap_search_radius: 30.0,
   astap_tolerance: 0.007,
   pixel_size_um: null,
@@ -115,7 +113,11 @@ function NumericInput({ value, onChange, placeholder, allowNull }: {
   )
 }
 
-function SettingsPanel({ settings, onChange }: { settings: PlatesolveSettings; onChange: (s: PlatesolveSettings) => void }) {
+function SettingsPanel({ settings, onChange, dbStatus }: {
+  settings: PlatesolveSettings
+  onChange: (s: PlatesolveSettings) => void
+  dbStatus: DbStatus | null
+}) {
   const { t } = useTranslation('platesolve')
   const [saving, setSaving] = useState(false)
   const [local, setLocal] = useState(settings)
@@ -126,24 +128,18 @@ function SettingsPanel({ settings, onChange }: { settings: PlatesolveSettings; o
     try { onChange(await plateSolveApi.putSettings(local)) } catch { /* ignore */ } finally { setSaving(false) }
   }
 
-  const inp = (value: string, fn: (v: string) => void, placeholder?: string) => (
-    <input value={value} placeholder={placeholder}
-      onChange={(e) => fn(e.target.value)}
-      className="rounded-lg border border-surface-border bg-surface px-2 py-1.5 text-xs text-slate-200 font-mono focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent w-full"
-    />
-  )
-
   return (
     <div className="border-b border-surface-border p-4 flex flex-col gap-3">
       <h3 className="font-medium text-slate-500 label-caps">{t('settings.title')}</h3>
-      <div className="flex flex-col gap-1">
-        <span className="text-xs text-slate-400">{t('settings.bin')}</span>
-        {inp(local.astap_bin, (v) => setLocal({ ...local, astap_bin: v }))}
-      </div>
-      <div className="flex flex-col gap-1">
-        <span className="text-xs text-slate-400">{t('settings.db')}</span>
-        {inp(local.astap_db_path, (v) => setLocal({ ...local, astap_db_path: v }))}
-      </div>
+      {dbStatus && (
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-slate-400">{t('settings.bin')}</span>
+          <code className="text-xs text-slate-300 break-all">{dbStatus.program}</code>
+          <span className="text-xs text-slate-400 mt-1">{t('settings.db')}</span>
+          <code className="text-xs text-slate-300 break-all">{dbStatus.db_path}</code>
+          <p className="text-xs text-slate-500">{t('settings.fromConfig')}</p>
+        </div>
+      )}
       <div className="flex flex-col gap-1">
         <span className="text-xs text-slate-400">{t('settings.radius')}</span>
         <NumericInput value={local.astap_search_radius}
@@ -411,7 +407,7 @@ export function PlatesolvePage() {
 
         {/* Settings panel */}
         {showSettings && settings && (
-          <SettingsPanel settings={settings} onChange={setSettings} />
+          <SettingsPanel settings={settings} onChange={setSettings} dbStatus={dbStatus} />
         )}
 
         {/* DB warning */}

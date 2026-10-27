@@ -13,8 +13,8 @@ télescope avec une base d'étoiles. Ouvrez les réglages (roue dentée en haut 
 
 | Réglage | |
 |---|---|
-| Exécutable ASTAP | Chemin du programme `astap` (ou `astap_cli`). |
-| Chemin de la base d'étoiles | Dossier de la base d'étoiles. Si elle manque, **Installer d05** télécharge et installe la base D05, qui convient à la plupart des setups. |
+| Exécutable ASTAP | Le programme ASTAP qu'astrolol lance, affiché ici. Se règle dans le fichier de configuration `/etc/astrolol/astrolol.toml` (`astap_program`). |
+| Chemin de la base d'étoiles | Le dossier de la base d'étoiles, affiché ici (`astap_database` dans le fichier de configuration). Si elle manque, **Installer d05** télécharge et installe la base D05, qui convient à la plupart des setups. |
 | Rayon de recherche (°) | Jusqu'où chercher autour de la position de la monture. Plus grand, c'est plus lent mais tolère un pointage moins bon. |
 | Tolérance | La rigueur avec laquelle les motifs d'étoiles doivent correspondre. |
 | Taille de pixel (µm, facultatif) | Seulement si la caméra ne la donne pas. |

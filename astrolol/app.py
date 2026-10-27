@@ -10,6 +10,7 @@ import pluggy
 import structlog
 
 from astrolol.api.static import reorder_spa_fallback_last
+from astrolol.config.settings import settings
 from astrolol.core.plugin_api import Plugin, PluginContext
 from astrolol.plugin import AstrololSpec, PROJECT_NAME
 from astrolol.devices.registry import DeviceRegistry
@@ -38,7 +39,7 @@ def build_plugin_manager() -> pluggy.PluginManager:
 
 def build_registry(pm: pluggy.PluginManager, indi_run_dir: Optional[Path] = None) -> DeviceRegistry:
     registry = DeviceRegistry()
-    registry.indi_run_dir = indi_run_dir or Path("/tmp/astrolol")
+    registry.indi_run_dir = indi_run_dir or settings.run_dir
     pm.hook.register_devices(registry=registry)
     logger.info("devices.registered", available=registry.all_keys())
     return registry

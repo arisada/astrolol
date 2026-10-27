@@ -126,7 +126,6 @@ async def render_preview(
     preview_path/preview_path_linear files a completed exposure already carries;
     those keep using the camera's persisted settings for the *next* exposure."""
     import asyncio
-    import tempfile
 
     from astrolol.core.mem_guard import mem_guard
     from astrolol.imaging.preview import render_auto, render_linear
@@ -136,7 +135,7 @@ async def render_preview(
     if fits_path is None or not Path(fits_path).exists():
         raise HTTPException(status_code=404, detail="No exposure available yet.")
 
-    tmp_dir = Path(tempfile.gettempdir()) / "astrolol"
+    tmp_dir = imager.unsaved_dir
     tmp_dir.mkdir(parents=True, exist_ok=True)
     out_path = tmp_dir / f"live_preview_{device_id}.jpg"
 

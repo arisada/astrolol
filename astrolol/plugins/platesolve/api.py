@@ -9,6 +9,7 @@ import structlog
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel, Field
 
+from astrolol.config.settings import OutsideStorage, storage_path
 from astrolol.core.events.models import LogEvent
 from astrolol.plugins.platesolve.centering import CenterRequest, CenterRun
 from astrolol.plugins.platesolve.enrich import compute_fov, enrich_request
@@ -88,6 +89,11 @@ async def expose_and_solve(body: ExposeAndSolveRequest, request: Request) -> Sol
 @router.post("/solve", status_code=201, response_model=SolveJob)
 async def start_solve(req: SolveRequest, request: Request) -> SolveJob:
     """Submit a new plate-solve job. Returns immediately with the job id."""
+    # ASTAP reads the file and writes its results next to it.
+    try:
+        storage_path(req.fits_path)
+    except OutsideStorage as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
     req = await _enrich_request(req, request)
     return await _manager(request).submit(req)
 
@@ -145,6 +151,7 @@ async def cancel_center(request: Request) -> None:
 class DbStatus(BaseModel):
     installed: bool
     db_path: str
+    program: str   # the ASTAP program (start-up configuration)
 
 
 @router.get("/db_status", response_model=DbStatus)
@@ -152,7 +159,7 @@ async def db_status(request: Request) -> DbStatus:
     """Return whether the ASTAP star database is present at the configured path."""
     db_path = Path(_manager(request)._astap_db_path)
     installed = db_path.is_dir() and any(db_path.iterdir())
-    return DbStatus(installed=installed, db_path=str(db_path))
+    return DbStatus(installed=installed, db_path=str(db_path), program=_manager(request)._astap_bin)
 
 
 @router.post("/install_db", status_code=202)

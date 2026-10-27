@@ -77,7 +77,6 @@ function IndiServerSettings({ onRestart, restarting }: { onRestart: () => void; 
   const [form, setForm] = useState<IndiServerChoiceInfo | null>(null)
   const [host, setHost] = useState('')
   const [port, setPort] = useState('')
-  const [indigoPath, setIndigoPath] = useState('')
   const [saveError, setSaveError] = useState(false)
 
   const show = (i: IndiServerInfo) => {
@@ -85,7 +84,6 @@ function IndiServerSettings({ onRestart, restarting }: { onRestart: () => void; 
     setForm(i.next)
     setHost(i.next.host)
     setPort(String(i.next.port))
-    setIndigoPath(i.next.indigo_path)
   }
 
   useEffect(() => {
@@ -104,9 +102,9 @@ function IndiServerSettings({ onRestart, restarting }: { onRestart: () => void; 
     setSaveError(false)
     try {
       const current = await api.settings.get()
-      // What the environment fixes is not ours to save.
+      // What the start-up configuration fixes is not ours to save (the INDIGO program always is).
       const choice = Object.fromEntries(
-        Object.entries(next).filter(([k]) => !fixed(k as keyof IndiServerChoiceInfo)),
+        Object.entries(next).filter(([k]) => k !== 'indigo_path' && !fixed(k as keyof IndiServerChoiceInfo)),
       )
       await api.settings.put({ ...current, indi_server: choice })
       show(await api.indi.server())
@@ -171,16 +169,7 @@ function IndiServerSettings({ onRestart, restarting }: { onRestart: () => void; 
           label={t('indi.indigoPath')}
           hint={indigoPathOff ? t('indi.indigoPathUnused') : t('indi.indigoPathHint')}
         >
-          <Input
-            inputSize="sm"
-            value={indigoPath}
-            disabled={indigoPathOff || fixed('indigo_path')}
-            onChange={(e) => setIndigoPath(e.target.value)}
-            onBlur={() => {
-              if (indigoPath.trim() && indigoPath !== form.indigo_path) save({ ...form, indigo_path: indigoPath.trim() })
-            }}
-            className="!w-48"
-          />
+          <code className="text-xs text-slate-300 break-all">{form.indigo_path}</code>
         </Row>
       </div>
       {info.env.length > 0 && <p className="text-xs text-slate-500">{t('indi.serverEnv')}</p>}
@@ -214,13 +203,10 @@ export function Options() {
   const [saveDir, setSaveDir] = useState('~/astrolol_pictures/%D')
   const [saveFilename, setSaveFilename] = useState('%F_%N_%Es_%Gg')
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
-
-  // INDI run dir
-  const [indiRunDir, setIndiRunDir] = useState('/tmp/astrolol')
+  const [saveErrorDetail, setSaveErrorDetail] = useState('')   // e.g. a folder astrolol may not use
 
   // INDI local upload mode
   const [indiLocalUpload, setIndiLocalUpload] = useState(false)
-  const [indiLocalUploadDir, setIndiLocalUploadDir] = useState('/tmp/astrolol_upload')
 
   // Low memory mode
   const [lowMemoryMode, setLowMemoryMode] = useState(false)
@@ -241,9 +227,7 @@ export function Options() {
       .then((s) => {
         setSaveDir(s.save_dir_template)
         setSaveFilename(s.save_filename_template)
-        setIndiRunDir(s.indi_run_dir)
         setIndiLocalUpload(s.indi_local_upload ?? false)
-        setIndiLocalUploadDir(s.indi_local_upload_dir ?? '/tmp/astrolol_upload')
         setLowMemoryMode(s.low_memory_mode ?? false)
         setThemeId(s.theme ?? 'midnight')
       })
@@ -258,14 +242,14 @@ export function Options() {
         ...current,
         save_dir_template: saveDir,
         save_filename_template: saveFilename,
-        indi_run_dir: indiRunDir,
         indi_local_upload: indiLocalUpload,
-        indi_local_upload_dir: indiLocalUploadDir,
         low_memory_mode: lowMemoryMode,
       })
+      setSaveErrorDetail('')
       setSaveStatus('saved')
       setTimeout(() => setSaveStatus('idle'), 2000)
-    } catch {
+    } catch (e) {
+      setSaveErrorDetail(e instanceof Error ? e.message : '')
       setSaveStatus('error')
     }
   }
@@ -315,7 +299,7 @@ export function Options() {
     setSaveStatus('saving')
     try {
       const current = await api.settings.get()
-      await api.settings.put({ ...current, indi_local_upload: v, indi_local_upload_dir: indiLocalUploadDir })
+      await api.settings.put({ ...current, indi_local_upload: v })
       setSaveStatus('saved')
       setTimeout(() => setSaveStatus('idle'), 2000)
     } catch {
@@ -436,44 +420,20 @@ export function Options() {
           <TokenReference />
           {saveStatus === 'saving' && <p className="text-xs text-slate-500">{t('saving.saving')}</p>}
           {saveStatus === 'saved' && <p className="text-xs text-status-connected">{t('saving.saved')}</p>}
-          {saveStatus === 'error' && <p className="text-xs text-status-error">{t('saving.error')}</p>}
+          {saveStatus === 'error' && (
+            <p className="text-xs text-status-error">{t('saving.error')} {saveErrorDetail}</p>
+          )}
         </div>
       </Section>
 
       <Section title={t('indi.title')}>
         <IndiServerSettings onRestart={restartNow} restarting={restarting} />
         <Row
-          label={t('indi.runDir')}
-          hint={t('indi.runDirHint')}
-        >
-          <Input
-            inputSize="sm"
-            value={indiRunDir}
-            onChange={(e) => setIndiRunDir(e.target.value)}
-            onBlur={persistSaveSettings}
-            className="!w-48"
-          />
-        </Row>
-        <Row
           label={t('indi.localUpload')}
           hint={t('indi.localUploadHint')}
         >
           <ToggleSwitch checked={indiLocalUpload} onChange={() => persistIndiLocalUpload(!indiLocalUpload)} label={t('indi.localUpload')} />
         </Row>
-        {indiLocalUpload && (
-          <Row
-            label={t('indi.uploadDir')}
-            hint={t('indi.uploadDirHint')}
-          >
-            <Input
-              inputSize="sm"
-              value={indiLocalUploadDir}
-              onChange={(e) => setIndiLocalUploadDir(e.target.value)}
-              onBlur={persistSaveSettings}
-              className="!w-48"
-            />
-          </Row>
-        )}
 
         {/* Advanced — hidden by default */}
         <div>

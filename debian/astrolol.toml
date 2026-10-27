@@ -17,3 +17,15 @@ data_dir = "/var/lib/astrolol"
 
 # Other web origins allowed to call the API.
 #allowed_origins = ["https://astro.example"]
+
+# Folders the web UI may save images, journals and the image library in. Default: data_dir.
+# Add a USB drive here (the astrolol user must be able to write to it).
+#storage_roots = ["/var/lib/astrolol", "/media/astro"]
+
+# Drivers missing from the driver lists of the installed INDI or INDIGO.
+#extra_drivers = ["indi_my_driver"]
+
+# Programs astrolol runs.
+#indigo_server_path = "indigo_server"
+#astap_program = "astap_cli"
+#astap_database = "/opt/astap"

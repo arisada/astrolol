@@ -42,6 +42,12 @@ jetons** pour la liste :
 Par exemple `%U/astro/%O/%D` avec `%F_%f_%Es_%N` donne
 `/home/moi/astro/M 31/2026-10-13/light_Ha_300s_000042.fits`.
 
+Le dossier doit être l'un de ceux qu'astrolol peut utiliser : par défaut votre dossier personnel
+et le dossier de données d'astrolol. Pour enregistrer ailleurs, sur un disque USB par exemple,
+ajoutez cet emplacement à `storage_roots` dans le fichier de configuration
+`/etc/astrolol/astrolol.toml`, puis redémarrez astrolol. Sinon le réglage est refusé, avec la
+liste des dossiers permis.
+
 ## Serveur INDI
 
 - **Serveur** : le serveur qui pilote vos appareils INDI : *INDI* (indiserver, par défaut) ou
@@ -51,18 +57,16 @@ Par exemple `%U/astro/%O/%D` avec `%F_%f_%Es_%N` donne
   - **Démarré par astrolol** : activé, astrolol démarre le serveur à la connexion du premier
     appareil. Désactivé, il utilise un serveur que vous démarrez vous-même, sur **Hôte** et
     **Port** (7624 par défaut), éventuellement sur un autre ordinateur.
-  - **Programme du serveur INDIGO** : `indigo_server`, ou son chemin complet s'il n'est pas dans
-    le chemin de recherche. Grisé sauf quand astrolol démarre un serveur INDIGO.
+  - **Programme du serveur INDIGO** : le programme qu'astrolol démarre, affiché ici. Il se règle
+    dans le fichier de configuration (`indigo_server_path`), pas sur cette page.
   - **En service** : le serveur qu'astrolol utilise maintenant.
 
   Ils peuvent aussi se régler là où astrolol est installé, dans son fichier de configuration
   `/etc/astrolol/astrolol.toml` (`indi_server_kind = "indigo"`, `indi_manage_server`,
   `indi_host`, `indi_port`, `indigo_server_path`) ou en variables d'environnement
   (`ASTROLOL_INDI_SERVER_KIND`, …). Un réglage donné ainsi est grisé ici.
-- **Dossier d'exécution** : où le serveur INDI garde ses fichiers de contrôle.
 - **Transfert d'images local** : le pilote écrit les images directement sur le disque au lieu de
-  les envoyer par la connexion réseau. Plus rapide, surtout avec de grands capteurs. Le
-  **Dossier de dépôt** est l'endroit où le pilote les écrit.
+  les envoyer par la connexion réseau. Plus rapide, surtout avec de grands capteurs.
 - **Journal du protocole INDI** : *Désactivé*, *Balises seulement* ou *XML complet*. Enregistre
   les échanges avec les pilotes dans le [journal](logs.md). Pour le dépannage uniquement ;
   revient à Désactivé au redémarrage.

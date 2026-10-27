@@ -5,6 +5,9 @@ Read once when astrolol starts, from (highest priority first):
   2. the configuration file CONFIG_FILE (TOML, one `field = value` per line; optional),
   3. the defaults below.
 What the user changes in the UI is not here: it lives in UserSettings, in the data directory.
+
+What names a program to run, or a folder outside the storage roots, is only set here: whoever
+can edit this file runs the machine, while an astrolol admin only runs the telescope.
 """
 import os
 from pathlib import Path
@@ -41,6 +44,15 @@ class Settings(BaseSettings):
     service_token_file: Path = _in_data_dir("service_token")  # credential for astrolol's own helper processes
     # The built web UI (ui/dist), when it is not found next to the code.
     ui_dist: Path | None = None
+    # The INDI server's command pipe and state file, and astrolol's own INDI drivers.
+    run_dir: Path = _in_data_dir("run")
+    # Where a camera driver writes its frames itself (Options → INDI local upload).
+    upload_dir: Path = _in_data_dir("upload")
+    # The folders astrolol may write in (saved images, journals, its databases) and read frames
+    # from for plate solving: nothing set in the UI may point outside them.
+    storage_roots: list[Path] = Field(
+        default_factory=lambda data: [Path.home(), data["data_dir"], data["images_dir"]],
+    )
 
     # INDI server settings; Options sets them too (UserSettings.indi_server), the configuration wins.
     indi_manage_server: bool = True   # False = connect to already-running server
@@ -49,6 +61,12 @@ class Settings(BaseSettings):
     # Which server speaks INDI to astrolol: "indi" (indiserver) or "indigo" (indigo_server).
     indi_server_kind: Literal["indi", "indigo"] = "indi"
     indigo_server_path: str = "indigo_server"   # name on PATH, or a full path
+    # Drivers astrolol may run besides those in the INDI and INDIGO driver catalogs.
+    extra_drivers: list[str] = []
+
+    # The ASTAP plate solver (platesolve plugin) and its star database.
+    astap_program: str = "astap_cli"            # name on PATH, or a full path
+    astap_database: Path = Path("/opt/astap")
 
     # Extra browser origins allowed to call the API (e.g. a UI served from another
     # host). The server's own origin is always allowed. JSON list in the env var:
@@ -71,13 +89,33 @@ class Settings(BaseSettings):
 
 settings = Settings()
 
+
+class OutsideStorage(ValueError):
+    """A folder or file set in the UI is outside the storage roots."""
+
+
+def storage_path(path: str | Path) -> Path:
+    """*path*, with ~ expanded, if it lies inside one of the storage roots; else OutsideStorage.
+
+    Symbolic links are followed: a link inside a root that leads out of it is refused too.
+    """
+    p = Path(path).expanduser()
+    real = Path(os.path.realpath(p))
+    for root in settings.storage_roots:
+        if real.is_relative_to(os.path.realpath(root.expanduser())):
+            return p
+    roots = ", ".join(str(r) for r in settings.storage_roots)
+    raise OutsideStorage(
+        f"{p} is outside the folders astrolol may use ({roots}); "
+        f"storage_roots in {CONFIG_FILE} adds others"
+    )
+
 # The fields of the INDI server choice (UserSettings.indi_server) and the settings they set.
 INDI_SERVER_FIELDS = {
     "kind": "indi_server_kind",
     "managed": "indi_manage_server",
     "host": "indi_host",
     "port": "indi_port",
-    "indigo_path": "indigo_server_path",
 }
 # Settings the start-up configuration set (file or environment): they win over the choice made
 # in Options.

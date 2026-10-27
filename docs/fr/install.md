@@ -130,13 +130,15 @@ astrolol redémarre avec la nouvelle version.
 | Quoi | Où |
 |---|---|
 | Réglages, profils, utilisateurs, journaux | `/var/lib/astrolol` |
-| Images capturées | `/var/lib/astrolol/images` |
+| Images enregistrées | `/var/lib/astrolol/astrolol_pictures`, un dossier par nuit ([Options](options.md#enregistrement-des-images)) |
 | Configuration de démarrage | `/etc/astrolol/astrolol.toml` |
 
 astrolol tourne sous son propre utilisateur, `astrolol`, qui a accès aux ports série et aux
-caméras USB. Le fichier de configuration contient les quelques réglages lus au démarrage, comme
-un autre dossier pour les images (`images_dir`, par exemple un disque USB où l'utilisateur
-`astrolol` peut écrire). Après l'avoir modifié :
+caméras USB. Le fichier de configuration contient les quelques réglages lus au démarrage, et
+nomme les dossiers qu'astrolol peut utiliser. Pour enregistrer les images sur un disque USB où
+l'utilisateur `astrolol` peut écrire, ajoutez-le là
+(`storage_roots = ["/var/lib/astrolol", "/media/astro"]`), puis choisissez le dossier dans les
+Options. Après avoir modifié le fichier :
 
 ```bash
 sudo systemctl restart astrolol

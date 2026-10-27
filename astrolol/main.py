@@ -3,7 +3,6 @@ import contextlib
 import os
 import traceback
 from contextlib import asynccontextmanager
-from pathlib import Path
 
 import uvicorn
 import structlog
@@ -145,7 +144,7 @@ def create_app() -> FastAPI:
     apply_indi_server_choice(user_settings.indi_server)
 
     pm = build_plugin_manager()
-    registry = build_registry(pm, indi_run_dir=Path(user_settings.indi_run_dir))
+    registry = build_registry(pm)
     event_bus = EventBus()
     event_bus_forwarder.set_bus(event_bus)  # bridge structlog → EventBus
     device_manager = DeviceManager(registry=registry, event_bus=event_bus)

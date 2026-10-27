@@ -557,8 +557,10 @@ class IndiPlugin:
 
     @hookimpl
     def register_devices(self, registry: DeviceRegistry) -> None:
+        from astrolol.config.settings import settings
+
         try:
-            run_dir = getattr(registry, "indi_run_dir", Path("/tmp/astrolol"))
+            run_dir = getattr(registry, "indi_run_dir", settings.run_dir)
             manager = IndiConnectionManager(run_dir=run_dir)
         except RuntimeError as exc:
             logger.warning("indi.plugin_skipped", reason=str(exc))

@@ -13,10 +13,11 @@ from astrolol.config.settings import Settings
 
 @pytest.fixture()
 def config_file(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
-    """A configuration file Settings reads, and no data directory in the environment."""
+    """A configuration file Settings reads, and none of the tests' own settings in the environment."""
     path = tmp_path / "astrolol.toml"
     monkeypatch.setitem(Settings.model_config, "toml_file", path)
     monkeypatch.delenv("ASTROLOL_DATA_DIR", raising=False)
+    monkeypatch.delenv("ASTROLOL_STORAGE_ROOTS", raising=False)
     return path
 
 
@@ -94,3 +95,43 @@ def test_an_empty_packaged_ui_directory_is_skipped(tmp_path: Path, monkeypatch: 
     monkeypatch.setattr(settings_mod.settings, "ui_dist", None)
     monkeypatch.setattr(static, "PACKAGED_UI", tmp_path / "_ui")
     assert static._find_ui_dist() != tmp_path / "_ui"
+
+
+def test_run_and_upload_folders_and_storage_follow_the_data_dir(config_file: Path, tmp_path: Path) -> None:
+    config_file.write_text(f'data_dir = "{tmp_path / "data"}"\n')
+    s = Settings()
+    assert s.run_dir == tmp_path / "data" / "run"
+    assert s.upload_dir == tmp_path / "data" / "upload"
+    assert s.storage_roots == [Path.home(), tmp_path / "data", tmp_path / "data" / "images"]
+
+
+def test_storage_roots_from_the_file(config_file: Path) -> None:
+    config_file.write_text('storage_roots = ["/var/lib/astrolol", "/media/astro"]\n')
+    assert Settings().storage_roots == [Path("/var/lib/astrolol"), Path("/media/astro")]
+
+
+def test_storage_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    root = tmp_path / "root"
+    (root / "night").mkdir(parents=True)
+    monkeypatch.setattr(settings_mod.settings, "storage_roots", [root])
+    assert settings_mod.storage_path(root / "night" / "x.fits") == root / "night" / "x.fits"
+    assert settings_mod.storage_path(root / "not-yet" / "deeper") == root / "not-yet" / "deeper"
+    assert settings_mod.storage_path(root) == root
+    for outside in (tmp_path / "elsewhere", root / ".." / "elsewhere", Path("/etc/passwd"),
+                    tmp_path / "rootx"):   # a sibling sharing the root's name as a prefix
+        with pytest.raises(settings_mod.OutsideStorage, match="storage_roots"):
+            settings_mod.storage_path(outside)
+
+
+def test_storage_path_follows_links(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    root = tmp_path / "root"
+    root.mkdir()
+    (root / "out").symlink_to(tmp_path)
+    monkeypatch.setattr(settings_mod.settings, "storage_roots", [root])
+    with pytest.raises(settings_mod.OutsideStorage):
+        settings_mod.storage_path(root / "out" / "x")
+
+
+def test_storage_path_expands_home(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(settings_mod.settings, "storage_roots", [Path("~")])
+    assert settings_mod.storage_path("~/astrolol_pictures") == Path.home() / "astrolol_pictures"

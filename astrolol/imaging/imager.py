@@ -1,6 +1,5 @@
 import asyncio
 import shutil
-import tempfile
 import time as _time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
@@ -9,7 +8,7 @@ from typing import TYPE_CHECKING, Any, Awaitable, Callable
 
 import structlog
 
-from astrolol.config.settings import settings
+from astrolol.config.settings import OutsideStorage, settings, storage_path
 from astrolol.core.errors import DeviceNotFoundError
 from astrolol.core.events import (
     EventBus,
@@ -48,6 +47,12 @@ if TYPE_CHECKING:
 logger = structlog.get_logger()
 
 
+def _name_part(value: str) -> str:
+    """*value* as a single file or folder name: no separator, never "." or ".."."""
+    value = value.replace("/", "_").replace("\\", "_")
+    return "_" if value in (".", "..") else value
+
+
 def _expand_template(
     template: str,
     frame_type: str,
@@ -73,11 +78,11 @@ def _expand_template(
     result = result.replace("%D", now.strftime("%Y-%m-%d"))
     result = result.replace("%T", now.strftime("%H%M%S"))
     result = result.replace("%U", str(Path.home()))
-    result = result.replace("%O", object_name or "unknown")
-    result = result.replace("%F", frame_type)
+    result = result.replace("%O", _name_part(object_name or "unknown"))
+    result = result.replace("%F", _name_part(frame_type))
     result = result.replace("%N", f"{counter:06d}")
-    result = result.replace("%C", camera_name)
-    result = result.replace("%f", filter_name)
+    result = result.replace("%C", _name_part(camera_name))
+    result = result.replace("%f", _name_part(filter_name))
     result = result.replace("%E", f"{duration:.1f}")
     result = result.replace("%G", str(gain) if gain is not None else "")
     return result
@@ -329,6 +334,11 @@ class ImagerManager:
     def get_last_stats(self, device_id: str) -> ImageStats | None:
         return self._last_stats.get(device_id)
 
+    @property
+    def unsaved_dir(self) -> Path:
+        """Frames taken without saving them, and the live preview's images."""
+        return self._images_dir / "unsaved"
+
     def get_last_fits_path(self, device_id: str) -> str | None:
         return self._last_fits_path.get(device_id)
 
@@ -458,7 +468,7 @@ class ImagerManager:
         if self._profile_store is not None:
             _ucfg = self._profile_store.get_user_settings()
             if _ucfg.indi_local_upload:
-                _local_upload_dir = Path(_ucfg.indi_local_upload_dir)
+                _local_upload_dir = settings.upload_dir
         _set_upload_local = getattr(camera, "set_upload_local", None)
         _restore_upload_client = getattr(camera, "restore_upload_client", None)
         if _local_upload_dir is not None and _set_upload_local is not None:
@@ -497,19 +507,23 @@ class ImagerManager:
             file_part = _expand_template(
                 user_cfg.save_filename_template, request.frame_type, counter, request.duration, request.gain, **_tpl_kw
             )
-            save_dir = Path(dir_part).expanduser()
-            save_dir.mkdir(parents=True, exist_ok=True)
-            final_fits = save_dir / f"{file_part}.fits"
             try:
-                await asyncio.to_thread(shutil.move, str(fits_path), str(final_fits))
-                fits_path = final_fits
-            except Exception:
-                logger.warning("imager.save_move_failed", src=str(fits_path), dst=str(final_fits))
+                final_fits = storage_path(Path(dir_part).expanduser() / f"{file_part}.fits")
+            except OutsideStorage as exc:
+                # The frame stays in images_dir, where it was taken.
+                log.error("imager.save_refused", error=str(exc))
+            else:
+                final_fits.parent.mkdir(parents=True, exist_ok=True)
+                try:
+                    await asyncio.to_thread(shutil.move, str(fits_path), str(final_fits))
+                    fits_path = final_fits
+                except Exception:
+                    logger.warning("imager.save_move_failed", src=str(fits_path), dst=str(final_fits))
         elif not request.save:
             # Move to a deterministic per-device temp path so unsaved frames don't
             # accumulate in images_dir.  The file is overwritten on the next unsaved
             # exposure for this camera (e.g. plate-solve previews).
-            tmp_dir = Path(tempfile.gettempdir()) / "astrolol"
+            tmp_dir = self.unsaved_dir
             tmp_dir.mkdir(parents=True, exist_ok=True)
             tmp_fits = tmp_dir / f"temp_{device_id}.fits"
             try:

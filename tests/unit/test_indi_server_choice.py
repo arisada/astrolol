@@ -48,10 +48,17 @@ def test_old_settings_files_load() -> None:
 
 
 @pytest.mark.parametrize("bad", [{"port": 0}, {"port": 70000}, {"host": ""}, {"host": "a b"},
-                                 {"kind": "ascom"}, {"indigo_path": ""}])
+                                 {"kind": "ascom"}])
 def test_bad_choices_are_refused(bad: dict) -> None:
     with pytest.raises(ValueError):
         IndiServerChoice(**bad)
+
+
+def test_the_indigo_program_is_not_a_choice() -> None:
+    # Only the start-up configuration names programs to run; one saved by an older version is dropped.
+    choice = UserSettings.model_validate({"indi_server": {"kind": "indigo", "indigo_path": "/tmp/x"}}).indi_server
+    assert choice == IndiServerChoice(kind="indigo")
+    assert "indigo_path" not in choice.model_dump()
 
 
 async def _get_server(app) -> dict:  # noqa: ANN001
@@ -72,12 +79,12 @@ async def test_saved_choice_needs_a_restart() -> None:
 
     store = app.state.profile_store
     store.update_user_settings(store.get_user_settings().model_copy(
-        update={"indi_server": IndiServerChoice(kind="indigo", managed=True, indigo_path="/opt/indigo_server")},
+        update={"indi_server": IndiServerChoice(kind="indigo", managed=True)},
     ))
     info = await _get_server(app)
     assert info["kind"] == "indi"                      # still running indiserver
     assert info["next"]["kind"] == "indigo"
-    assert info["next"]["indigo_path"] == "/opt/indigo_server"
+    assert info["next"]["indigo_path"] == settings.indigo_server_path   # shown, from the configuration
     assert info["restart_needed"] is True
 
     # The next start uses it.
@@ -92,9 +99,9 @@ async def test_parts_that_do_not_matter_need_no_restart() -> None:
     settings.indi_manage_server = True
     app = create_app()
     store = app.state.profile_store
-    # The INDIGO program with indiserver, the host with a server astrolol starts.
+    # The host with a server astrolol starts.
     store.update_user_settings(store.get_user_settings().model_copy(
-        update={"indi_server": IndiServerChoice(kind="indi", managed=True, host="elsewhere", indigo_path="/x")},
+        update={"indi_server": IndiServerChoice(kind="indi", managed=True, host="elsewhere")},
     ))
     assert (await _get_server(app))["restart_needed"] is False
 

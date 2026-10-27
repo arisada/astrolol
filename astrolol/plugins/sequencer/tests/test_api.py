@@ -122,3 +122,10 @@ def test_settings_roundtrip(client: TestClient) -> None:
     s["dither_pixels"] = 7.5
     assert client.put("/plugins/sequencer/settings", json=s).status_code == 200
     assert client.get("/plugins/sequencer/settings").json()["dither_pixels"] == 7.5
+
+
+def test_a_journal_folder_outside_the_storage_roots_is_refused(client: TestClient) -> None:
+    s = client.get("/plugins/sequencer/settings").json()
+    r = client.put("/plugins/sequencer/settings", json={**s, "journal_dir": "/etc/journals"})
+    assert r.status_code == 422
+    assert client.get("/plugins/sequencer/settings").json()["journal_dir"] == s["journal_dir"]

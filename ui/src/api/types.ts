@@ -115,10 +115,8 @@ export interface UserSettings {
   save_dir_template: string
   save_filename_template: string
   enabled_plugins: string[]
-  indi_run_dir: string
   indi_local_upload: boolean
   indi_server?: IndiServerChoice
-  indi_local_upload_dir: string
   low_memory_mode: boolean
   language: string
   theme: string
@@ -155,8 +153,6 @@ export interface Phd2Settings {
 }
 
 export interface PlatesolveSettings {
-  astap_bin: string
-  astap_db_path: string
   astap_search_radius: number
   astap_tolerance: number
   pixel_size_um: number | null
@@ -1050,7 +1046,6 @@ export interface IndiServerChoice {
   managed?: boolean | null
   host?: string | null
   port?: number | null
-  indigo_path?: string | null
 }
 
 export interface IndiDeviceMessage {

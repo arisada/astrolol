@@ -22,6 +22,7 @@ from pydantic import BaseModel
 from astrolol.api.properties import PropertyOut, prop_to_out
 from astrolol.config.settings import settings
 from astrolol.devices.indi import indigo
+from astrolol.devices.indi.allowed import DriverNotAllowed
 from astrolol.devices.indi.catalog import DriverEntry, load_catalog
 
 logger = structlog.get_logger()
@@ -54,7 +55,7 @@ class IndiServerChoiceOut(BaseModel):
     managed: bool
     host: str
     port: int
-    indigo_path: str                  # the INDIGO server program
+    indigo_path: str                  # the INDIGO server program (start-up configuration only)
 
 
 class IndiServerInfo(BaseModel):
@@ -84,18 +85,16 @@ def get_server(request: Request) -> IndiServerInfo:
         key: value if field in CONFIGURED_FIELDS or getattr(choice, key) is None else getattr(choice, key)
         for (key, field), value in zip(INDI_SERVER_FIELDS.items(), running.values())
     }
-    # The INDIGO program only matters to a managed INDIGO server; the host only to an external one.
+    # The host only matters to an external server.
     relevant = ["kind", "managed", "port"]
     if not nxt["managed"]:
         relevant.append("host")
-    if nxt["kind"] == "indigo" and nxt["managed"]:
-        relevant.append("indigo_path")
     return IndiServerInfo(
         kind=getattr(manager, "server_kind", settings.indi_server_kind),
         managed=getattr(server, "manage", settings.indi_manage_server),
         host=getattr(server, "host", settings.indi_host),
         port=getattr(server, "port", settings.indi_port),
-        next=IndiServerChoiceOut(**nxt),
+        next=IndiServerChoiceOut(**nxt, indigo_path=settings.indigo_server_path),
         env=indi_server_configured_keys(),
         restart_needed=any(nxt[k] != running[k] for k in relevant),
     )
@@ -206,7 +205,10 @@ async def load_driver(body: LoadDriverRequest, request: Request) -> LoadDriverRe
     exact_name = body.device_name
 
     if getattr(manager, "server_kind", "indi") == "indigo":
-        device_names = await _load_indigo_driver(manager, body.executable)
+        try:
+            device_names = await _load_indigo_driver(manager, body.executable)
+        except DriverNotAllowed as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
         response = await _snapshot_response(client, device_names)
         response.disabled_properties = sorted(
             p.name for p in response.properties if p.name in indigo.SERVER_ONLY_PROPERTIES
@@ -230,6 +232,8 @@ async def load_driver(body: LoadDriverRequest, request: Request) -> LoadDriverRe
         try:
             if body.executable:
                 await manager.preload_driver(body.executable)
+        except DriverNotAllowed as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
         except Exception as exc:
             raise HTTPException(status_code=502, detail=f"Failed to start driver: {exc}") from exc
 
@@ -299,6 +303,8 @@ async def _load_indigo_driver(manager, executable: str) -> list[str]:  # noqa: A
     if not devices:
         try:
             await manager.preload_driver(executable)
+        except DriverNotAllowed:
+            raise
         except (ValueError, RuntimeError, TimeoutError) as exc:
             raise HTTPException(status_code=502, detail=f"Failed to start driver: {exc}") from exc
         try:

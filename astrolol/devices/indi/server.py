@@ -20,6 +20,7 @@ from pathlib import Path
 
 import structlog
 
+from astrolol.devices.indi.allowed import check_driver, indi_catalog
 from astrolol.devices.indi.children import terminate
 
 logger = structlog.get_logger()
@@ -179,6 +180,7 @@ class IndiServer:
         if not self.manage:
             return
 
+        check_driver(executable, self._run_dir, indi_catalog)
         if executable in self._loaded_drivers:
             logger.debug("indi.driver_already_loaded", driver=executable)
             return

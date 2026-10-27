@@ -35,6 +35,7 @@
     "title": "Réglages",
     "bin": "Exécutable ASTAP",
     "db": "Chemin de la base d'étoiles",
+    "fromConfig": "Défini dans le fichier de configuration de démarrage d'astrolol.",
     "radius": "Rayon de recherche (°)",
     "tolerance": "Tolérance",
     "pixel": "Taille de pixel (µm, facultatif)",

@@ -16,6 +16,7 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import JSONResponse, PlainTextResponse
 from pydantic import BaseModel
 
+from astrolol.config.settings import OutsideStorage, storage_path
 from astrolol.core.sequencer import (
     Boundary,
     ImagingTask,
@@ -250,6 +251,11 @@ async def get_settings(request: Request) -> SequencerSettings:
 
 @router.put("/settings", response_model=SequencerSettings)
 async def put_settings(body: SequencerSettings, request: Request) -> SequencerSettings:
+    if body.journal_dir:
+        try:
+            storage_path(body.journal_dir)
+        except OutsideStorage as exc:
+            raise HTTPException(status_code=422, detail=str(exc)) from exc
     request.app.state.sequencer.update_settings(body)
     store = getattr(request.app.state, "profile_store", None)
     if store is not None:

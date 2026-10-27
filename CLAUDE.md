@@ -515,6 +515,11 @@ Missing imports and wrong types that reach runtime are harder to debug than a fa
   belongs in `UserSettings`.
 - **Privileged host actions go through polkit**, never sudo: run the command as astrolol's user and
   add the action to `deploy/50-astrolol.rules` and `ACTIONS` in `plugins/system/privileges.py`.
+- **Programs and folders are not chosen from the UI.** A program astrolol runs (a server, a
+  solver) is a `Settings` field, shown read-only in the UI. A driver name goes through
+  `devices/indi/allowed.py` (plain name, in the installed catalog or `extra_drivers`). A folder or
+  file path the UI or API can set is passed through `storage_path()` (`config/settings.py`) where
+  it is used, and checked on save too; internal folders derive from `data_dir`.
 
 ## Running the app
 

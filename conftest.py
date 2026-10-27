@@ -4,6 +4,7 @@ Runs before any astrolol module is imported: the settings singleton resolves the
 directory (profiles, security.json, logs, ...) at import time, so it has to be redirected
 here or the tests would read and write the developer's real ~/.astrolol.
 """
+import json
 import os
 import shutil
 import tempfile
@@ -15,6 +16,8 @@ _DATA_DIR = Path(tempfile.mkdtemp(prefix="astrolol-test-data-"))
 os.environ["ASTROLOL_DATA_DIR"] = str(_DATA_DIR)
 # Never the configuration file of an astrolol installed on this machine (/etc/astrolol/astrolol.toml).
 os.environ["ASTROLOL_CONFIG"] = str(_DATA_DIR / "no-such-config.toml")
+# Tests keep their files in pytest's temporary folders (tmp_path): astrolol may use them.
+os.environ["ASTROLOL_STORAGE_ROOTS"] = json.dumps([tempfile.gettempdir(), str(Path.home())])
 
 # INDI drivers keep saved configs, park data and scope configs in $HOME/.indi. The simulators the
 # integration tests start get an empty home from here (tests/indi_server.py), never the developer's.

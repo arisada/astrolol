@@ -311,3 +311,10 @@ def test_rejected_dir_is_excluded_from_scanning(client: TestClient, tmp_path: Pa
 
     _scan(client, lib)  # rescan must not pick the rejected file back up
     assert client.get("/plugins/viewer/images").json()["total"] == 0
+
+
+def test_a_library_outside_the_storage_roots_is_refused(client: TestClient) -> None:
+    # The viewer can delete what is in its library.
+    resp = client.put("/plugins/viewer/settings", json={"library_dir": "/etc"})
+    assert resp.status_code == 422
+    assert "storage_roots" in resp.json()["detail"]

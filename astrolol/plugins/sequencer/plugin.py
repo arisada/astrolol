@@ -8,6 +8,7 @@ from typing import Any
 import structlog
 from fastapi import FastAPI
 
+from astrolol.config.settings import OutsideStorage, storage_path
 from astrolol.core.plugin_api import LogScope, PluginContext, PluginManifest
 from astrolol.core.sequencer import Sequencer
 from astrolol.plugins.sequencer.api import router
@@ -59,7 +60,10 @@ class SequencerPlugin:
 
         def journal_directory() -> Path:
             if service.settings.journal_dir:
-                return Path(service.settings.journal_dir).expanduser()
+                try:
+                    return storage_path(service.settings.journal_dir)
+                except OutsideStorage as exc:
+                    logger.error("sequencer.journal_dir_refused", error=str(exc))
             template = (
                 ctx.profile_store.get_user_settings().save_dir_template
                 if ctx.profile_store is not None

@@ -35,6 +35,7 @@
     "title": "Settings",
     "bin": "ASTAP binary",
     "db": "Star database path",
+    "fromConfig": "Set in astrolol's start-up configuration file.",
     "radius": "Search radius (°)",
     "tolerance": "Tolerance",
     "pixel": "Pixel size (µm, optional)",

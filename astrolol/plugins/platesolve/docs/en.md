@@ -13,8 +13,8 @@ a star database. Open the settings (gear at the top of the panel):
 
 | Setting | |
 |---|---|
-| ASTAP binary | Path to the `astap` (or `astap_cli`) program. |
-| Star database path | Folder holding the star database. If it is missing, **Install d05** downloads and installs the D05 database, which suits most setups. |
+| ASTAP binary | The ASTAP program astrolol runs, shown here. Set in the configuration file `/etc/astrolol/astrolol.toml` (`astap_program`). |
+| Star database path | The folder holding the star database, shown here (`astap_database` in the configuration file). If it is missing, **Install d05** downloads and installs the D05 database, which suits most setups. |
 | Search radius (°) | How far from the mount's position to search. Larger is slower but tolerates a worse pointing. |
 | Tolerance | How strictly star patterns must match. |
 | Pixel size (µm, optional) | Only if the camera does not report it. |

@@ -63,6 +63,7 @@ class FakeSolveManager:
     def __init__(self) -> None:
         self._jobs: dict[str, SolveJob] = {}
         self._astap_db_path = "/nonexistent/astap"  # no DB files → installed=False
+        self._astap_bin = "astap_cli"
 
     async def submit(self, request: SolveRequest) -> SolveJob:
         global _ID_COUNTER
@@ -447,8 +448,6 @@ def test_get_settings_returns_defaults(client: TestClient) -> None:
 
 def test_put_settings_persists(client: TestClient) -> None:
     payload = {
-        "astap_bin": "astap_cli",
-        "astap_db_path": "/opt/astap",
         "astap_search_radius": 15.0,
         "astap_tolerance": 0.005,
         "pixel_size_um": 3.76,
@@ -589,3 +588,10 @@ async def test_compute_fov_none_when_camera_has_no_ota(tmp_path) -> None:
     fits_path = make_fake_fits(tmp_path / "test.fits")
 
     assert await _compute_fov(str(fits_path), request) is None
+
+
+def test_solve_refuses_a_file_outside_the_storage_roots(client: TestClient) -> None:
+    # ASTAP reads the file and writes its results next to it.
+    r = client.post("/plugins/platesolve/solve", json={"fits_path": "/etc/passwd"})
+    assert r.status_code == 400
+    assert "storage_roots" in r.json()["detail"]

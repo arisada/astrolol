@@ -109,7 +109,7 @@ astrolol can drive an [INDIGO](https://www.indigo-astronomy.org) server instead 
 install INDIGO (Debian and Raspberry Pi OS: the `indigo3` package from
 `https://indigo-astronomy.github.io/indigo_ppa/ppa`; elsewhere, build it from source) and choose
 INDIGO in Options → INDI Server, or start astrolol with `ASTROLOL_INDI_SERVER_KIND=indigo`. Set
-`ASTROLOL_INDIGO_SERVER_PATH` (or the INDIGO server program in Options) if `indigo_server` is not
+`ASTROLOL_INDIGO_SERVER_PATH` (or `indigo_server_path` in the configuration file) if `indigo_server` is not
 on the `PATH`. The Equipment page then lists INDIGO's drivers.
 
 **Optional: ASCOM Alpaca devices**
@@ -182,13 +182,26 @@ once, when astrolol starts, from (highest priority first):
 data_dir = "/var/lib/astrolol"      # settings, profiles, users, logs. Default: ~/.astrolol
 images_dir = "/mnt/usb/raw"         # raw camera files. Default: <data_dir>/images
 # ui_dist = "/path/to/ui/dist"      # the built web UI, if it is not found next to the code
-# indi_server_kind = "indigo"       # also indi_manage_server, indi_host, indi_port,
-                                    # indigo_server_path: then greyed out in Options
+# indi_server_kind = "indigo"       # also indi_manage_server, indi_host, indi_port:
+                                    # then greyed out in Options
 # allowed_origins = ["https://astro.example"]
+
+# Programs and folders: only set here, never from the UI.
+# storage_roots = ["/var/lib/astrolol", "/mnt/usb"]  # where saved images, journals, the viewer's
+                                    # library may be. Default: home, data_dir, images_dir
+# extra_drivers = ["indi_my_driver"]  # drivers missing from the INDI/INDIGO driver lists
+# indigo_server_path = "/opt/indigo/bin/indigo_server"
+# astap_program = "astap_cli"       # and astap_database = "/opt/astap"
 ```
 
 The full list is `Settings` in [`astrolol/config/settings.py`](astrolol/config/settings.py). A
 misspelt setting in the file stops astrolol at start, with the name in the error.
+
+What names a program astrolol runs is only set in this file (or the environment): the INDIGO
+server, ASTAP, and drivers that are not in the driver lists of the installed INDI or INDIGO.
+Folders typed in the UI (where images are saved, the viewer's library, the session journal)
+must be inside `storage_roots`. The file belongs to whoever runs the machine; an astrolol admin
+only runs the telescope.
 
 ## Docker
 

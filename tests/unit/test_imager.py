@@ -29,8 +29,8 @@ async def test_expose_no_save_uses_temp_path(
     # File must exist and be a valid FITS
     assert fits.exists()
     assert fits.suffix == ".fits"
-    # Must NOT live inside the imager's images_dir (tmp_path in tests)
-    assert not fits.is_relative_to(tmp_path)
+    # Kept apart from the frames taken (images_dir, tmp_path in tests), one per camera
+    assert fits.parent == imager_manager.unsaved_dir == tmp_path / "unsaved"
     # Must be the deterministic per-device temp name
     assert fits.name == "temp_cam1.fits"
     # A second unsaved expose for the same camera overwrites the same path

@@ -41,6 +41,11 @@ the list:
 For example `%U/astro/%O/%D` with `%F_%f_%Es_%N` gives
 `/home/me/astro/M 31/2026-10-13/light_Ha_300s_000042.fits`.
 
+The folder must be one astrolol may use: by default your home folder and astrolol's data
+folder. To save elsewhere, on a USB drive for instance, add that place to `storage_roots` in
+the configuration file `/etc/astrolol/astrolol.toml`, then restart astrolol. Otherwise the
+setting is refused with the list of allowed folders.
+
 ## INDI Server
 
 - **Server**: which server drives your INDI devices: *INDI* (indiserver, the default) or
@@ -50,18 +55,16 @@ For example `%U/astro/%O/%D` with `%F_%f_%Es_%N` gives
   - **Started by astrolol**: on, astrolol starts the server when the first device connects. Off,
     it uses a server you start yourself, at **Host** and **Port** (7624 by default), possibly on
     another computer.
-  - **INDIGO server program**: `indigo_server`, or its full path if it is not on the search
-    path. Greyed out unless astrolol starts an INDIGO server.
+  - **INDIGO server program**: the program astrolol starts, shown here. It is set in the
+    configuration file (`indigo_server_path`), not on this page.
   - **In use**: the server astrolol is using now.
 
   These can also be set where astrolol is installed, in its configuration file
   `/etc/astrolol/astrolol.toml` (`indi_server_kind = "indigo"`, `indi_manage_server`,
   `indi_host`, `indi_port`, `indigo_server_path`) or as environment variables
   (`ASTROLOL_INDI_SERVER_KIND`, …). A setting given this way is greyed out here.
-- **Run directory**: where the INDI server keeps its control files.
 - **Local image transfer**: the driver writes images straight to disk instead of sending them
-  over the network connection. Faster, especially with large sensors. **Upload directory** is
-  where the driver writes them.
+  over the network connection. Faster, especially with large sensors.
 - **INDI protocol logging**: *Off*, *Tags only* or *Full XML*. Records the traffic with the
   drivers in the [log](logs.md). For troubleshooting only; goes back to Off on restart.
 - **Low memory mode**: processes one image or plate solve at a time. Turn it on for a

@@ -28,6 +28,7 @@ from typing import TYPE_CHECKING
 
 import structlog
 
+from astrolol.devices.indi.allowed import DriverNotAllowed, check_driver, indi_catalog
 from astrolol.devices.indi.catalog import DriverEntry
 from astrolol.devices.indi.children import terminate
 
@@ -409,7 +410,7 @@ class IndigoServer:
             # anyone on the network drive the devices without going through astrolol.
             "-b-", "-w-", "-c-",
         ]
-        indi_drivers = [d for d in self.indi_drivers if self._fits(d)]
+        indi_drivers = [d for d in self.indi_drivers if self._fits(d) and self._allowed_indi(d)]
         for driver in indi_drivers:
             cmd += ["-i", driver]
         logger.info("indigo.server_starting", cmd=" ".join(cmd))
@@ -478,6 +479,7 @@ class IndigoServer:
                 "other drivers while it runs."
             )
         await self._client.wait_for_property(SERVER_DEVICE, "LOAD", timeout=_LOAD_TIMEOUT)
+        check_driver(executable, self._run_dir, self._indigo_catalog)
         if self._is_loaded(executable):
             logger.debug("indigo.driver_already_loaded", driver=executable)
             return
@@ -510,6 +512,19 @@ class IndigoServer:
             return True
         pid = self._managed_pid or (self._read_state() or {}).get("pid")
         return bool(pid and self._is_indigo_server(pid))
+
+    def _indigo_catalog(self) -> list[str]:
+        """The INDIGO drivers on this machine, and those the server says it has."""
+        entries = load_catalog(catalog_dirs(self._server_path)) + catalog_from_server(self._client)
+        return [e.executable for e in entries]
+
+    def _allowed_indi(self, driver: str) -> bool:
+        try:
+            check_driver(driver, self._run_dir, indi_catalog)
+        except DriverNotAllowed as exc:
+            logger.error("indigo.indi_driver_refused", driver=driver, error=str(exc))
+            return False
+        return True
 
     @staticmethod
     def _fits(driver: str) -> bool:
