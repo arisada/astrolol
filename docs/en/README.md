@@ -66,6 +66,6 @@ Most features are plugins. They are off until you turn them on in
 
 ## Installing
 
-[Installing astrolol](install.md) covers the package for Debian, Raspberry Pi OS and Ubuntu. To
-run it from source code instead, with a web server and HTTPS in front of it, see the
+[Installing astrolol](install.md) covers the package for Debian, Raspberry Pi OS and Ubuntu,
+with HTTPS. To run it from source code instead, see the
 [Raspberry Pi deployment guide](../raspberry-pi-deployment.md).

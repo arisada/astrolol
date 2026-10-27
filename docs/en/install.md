@@ -80,9 +80,35 @@ It may say `chmod: cannot access '/opt/astap/astap'`: that is harmless.
 
 Until you turn on the [Security](../../astrolol/plugins/security/docs/en.md) plugin, anyone on the
 network can operate the rig: keep astrolol on a network you trust, and never open its port to the
-internet. The package serves astrolol over plain HTTP; HTTPS with a web server in front of it is
-described, for an installation from source, in the
-[Raspberry Pi deployment guide](../raspberry-pi-deployment.md).
+internet.
+
+## HTTPS, with nginx in front
+
+With the nginx web server in front of it, astrolol answers on the usual web address
+(`https://raspberrypi.local/`, no `:8000`) and over HTTPS. Use HTTPS if you turn on sign-in:
+over plain HTTP, passwords are readable by anyone on the network.
+
+```bash
+sudo apt install nginx
+sudo /usr/share/astrolol/nginx/install-nginx-https.sh
+```
+
+The script creates a certificate for this computer's name, `<name>.local` and its addresses, and
+sets nginx up with it. Run it again after changing the computer's name or address.
+
+Open `https://<telescope computer>.local/`. The browser warns that the certificate is not
+trusted, because only this computer vouches for it: accept the exception once on each device, or
+import `/etc/nginx/ssl/astrolol.crt` as a trusted certificate on your phones and computers.
+
+For plain HTTP on port 80 instead:
+
+```bash
+sudo apt install nginx
+sudo cp /usr/share/astrolol/nginx/nginx-http.conf /etc/nginx/sites-available/astrolol
+sudo ln -s /etc/nginx/sites-available/astrolol /etc/nginx/sites-enabled/
+sudo rm -f /etc/nginx/sites-enabled/default
+sudo nginx -t && sudo systemctl reload nginx
+```
 
 ## Updating
 

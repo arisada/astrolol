@@ -85,9 +85,37 @@ Il peut afficher `chmod: cannot access '/opt/astap/astap'` : c'est sans conséqu
 
 Tant que vous n'avez pas activé le module [Sécurité](../../astrolol/plugins/security/docs/fr.md),
 n'importe qui sur le réseau peut piloter l'installation : gardez astrolol sur un réseau de
-confiance et n'ouvrez jamais son port sur internet. Le paquet sert astrolol en HTTP simple ; le
-HTTPS, avec un serveur web devant, est décrit pour une installation depuis le code source dans le
-[guide de déploiement sur Raspberry Pi](../raspberry-pi-deployment.md) (en anglais).
+confiance et n'ouvrez jamais son port sur internet.
+
+## HTTPS, avec nginx devant
+
+Avec le serveur web nginx devant lui, astrolol répond à l'adresse web habituelle
+(`https://raspberrypi.local/`, sans `:8000`) et en HTTPS. Utilisez le HTTPS si vous activez la
+connexion par compte : en HTTP simple, les mots de passe sont lisibles par n'importe qui sur le
+réseau.
+
+```bash
+sudo apt install nginx
+sudo /usr/share/astrolol/nginx/install-nginx-https.sh
+```
+
+Le script crée un certificat pour le nom de cet ordinateur, `<nom>.local` et ses adresses, et
+configure nginx avec. Relancez-le après avoir changé le nom ou l'adresse de l'ordinateur.
+
+Ouvrez `https://<ordinateur du télescope>.local/`. Le navigateur prévient que le certificat n'est
+pas reconnu, car seul cet ordinateur s'en porte garant : acceptez l'exception une fois sur chaque
+appareil, ou importez `/etc/nginx/ssl/astrolol.crt` comme certificat de confiance sur vos
+téléphones et ordinateurs.
+
+Pour du HTTP simple sur le port 80 à la place :
+
+```bash
+sudo apt install nginx
+sudo cp /usr/share/astrolol/nginx/nginx-http.conf /etc/nginx/sites-available/astrolol
+sudo ln -s /etc/nginx/sites-available/astrolol /etc/nginx/sites-enabled/
+sudo rm -f /etc/nginx/sites-enabled/default
+sudo nginx -t && sudo systemctl reload nginx
+```
 
 ## Mettre à jour
 

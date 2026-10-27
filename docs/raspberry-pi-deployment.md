@@ -4,9 +4,9 @@ Run astrolol on a Raspberry Pi (or any Debian-based mini-PC) at the telescope so
 starts at boot, restarts if it ever exits, and is reachable from your phone or laptop over
 HTTPS.
 
-On Debian 13, Raspberry Pi OS (trixie) or Ubuntu 26.04, [the package](en/install.md) does the
-first steps for you (service account, systemd, permissions). This guide installs astrolol from a
-git checkout instead, with nginx and HTTPS in front of it.
+On Debian 13, Raspberry Pi OS (trixie) or Ubuntu 26.04, [the package](en/install.md) does all
+of this for you (service account, systemd, permissions; nginx and HTTPS in one command). This
+guide installs astrolol from a git checkout instead.
 
 What you end up with:
 

@@ -68,6 +68,6 @@ dans [Options → Modules](options.md#modules) puis redémarrez astrolol.
 
 ## Installation
 
-[Installer astrolol](install.md) décrit le paquet pour Debian, Raspberry Pi OS et Ubuntu. Pour
-le faire tourner depuis le code source, avec un serveur web et le HTTPS devant, voir le
+[Installer astrolol](install.md) décrit le paquet pour Debian, Raspberry Pi OS et Ubuntu, avec
+le HTTPS. Pour le faire tourner depuis le code source, voir le
 [guide de déploiement sur Raspberry Pi](../raspberry-pi-deployment.md) (en anglais).
