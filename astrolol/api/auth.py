@@ -47,7 +47,7 @@ async def login(body: LoginRequest, request: Request, response: Response) -> dic
     return {"name": result.principal.name, "level": result.principal.level.label}
 
 
-@router.post("/logout", status_code=204)
+@router.post("/logout", status_code=204, response_model=None)
 async def logout(request: Request, response: Response) -> None:
     authz = request.app.state.authorizer
     if authz is not None:

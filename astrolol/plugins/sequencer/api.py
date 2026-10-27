@@ -105,7 +105,7 @@ class ReorderBody(BaseModel):
     order: list[str]
 
 
-@router.post("/queue/reorder", status_code=204)
+@router.post("/queue/reorder", status_code=204, response_model=None)
 async def reorder(body: ReorderBody, request: Request) -> None:
     await _call(lambda: _seq(request).reorder(body.order))
 
@@ -113,7 +113,7 @@ async def reorder(body: ReorderBody, request: Request) -> None:
 _Clearable = Literal["pending", "interrupted", "completed", "failed", "skipped"]
 
 
-@router.delete("/queue", status_code=204)
+@router.delete("/queue", status_code=204, response_model=None)
 async def clear_queue(
     request: Request,
     status: Annotated[list[_Clearable], Query()] = ["completed", "skipped"],  # noqa: B006
@@ -131,7 +131,7 @@ async def update_task(task_id: str, task: ImagingTask, request: Request) -> Queu
     return await _call(lambda: _seq(request).update(task_id, task))
 
 
-@router.delete("/queue/{task_id}", status_code=204)
+@router.delete("/queue/{task_id}", status_code=204, response_model=None)
 async def remove_task(task_id: str, request: Request) -> None:
     await _call(lambda: _seq(request).remove(task_id))
 
@@ -193,25 +193,25 @@ async def start(request: Request, body: StartBody | None = None) -> dict[str, st
     return {"status": "started"}
 
 
-@router.post("/pause", status_code=204)
+@router.post("/pause", status_code=204, response_model=None)
 async def pause(request: Request, when: Boundary = "frame", body: ActorBody | None = None) -> None:
     actor = body.actor if body else "user"
     await _call(lambda: _seq(request).pause(when, actor=actor))
 
 
-@router.post("/resume", status_code=204)
+@router.post("/resume", status_code=204, response_model=None)
 async def resume(request: Request, body: ActorBody | None = None) -> None:
     actor = body.actor if body else "user"
     await _call(lambda: _seq(request).resume(actor=actor))
 
 
-@router.post("/stop", status_code=204)
+@router.post("/stop", status_code=204, response_model=None)
 async def stop(request: Request, when: Boundary = "frame", body: ActorBody | None = None) -> None:
     b = body or ActorBody()
     await _call(lambda: _seq(request).stop(when, actor=b.actor, reason=b.reason))
 
 
-@router.post("/skip_current", status_code=204)
+@router.post("/skip_current", status_code=204, response_model=None)
 async def skip_current(
     request: Request, when: Boundary = "frame", body: ActorBody | None = None
 ) -> None:
@@ -226,7 +226,7 @@ class SwitchBody(BaseModel):
     reason: str | None = None
 
 
-@router.post("/switch", status_code=204)
+@router.post("/switch", status_code=204, response_model=None)
 async def switch(body: SwitchBody, request: Request) -> None:
     await _call(
         lambda: _seq(request).switch_to(
@@ -438,7 +438,7 @@ async def get_sequence(name: str, request: Request) -> JSONResponse:
     )
 
 
-@router.delete("/sequences/{name}", status_code=204)
+@router.delete("/sequences/{name}", status_code=204, response_model=None)
 async def delete_sequence(name: str, request: Request) -> None:
     try:
         await asyncio.to_thread(_library(request).delete, name)

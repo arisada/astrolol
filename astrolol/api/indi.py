@@ -155,7 +155,7 @@ class DebugLevelRequest(BaseModel):
     level: int  # 0=off, 1=tags only, 2=full XML
 
 
-@router.post("/debug", status_code=204)
+@router.post("/debug", status_code=204, response_model=None)
 async def set_debug_level(body: DebugLevelRequest, request: Request) -> None:
     """Set INDI protocol debug verbosity (0=off, 1=tags, 2=full XML)."""
     manager = getattr(request.app.state.registry, "indi_manager", None)

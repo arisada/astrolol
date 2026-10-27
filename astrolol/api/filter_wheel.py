@@ -25,7 +25,7 @@ async def get_status(device_id: str, request: Request) -> FilterWheelStatus:
         raise HTTPException(status_code=404, detail=str(exc))
 
 
-@router.post("/{device_id}/select", status_code=204)
+@router.post("/{device_id}/select", status_code=204, response_model=None)
 async def select_filter(device_id: str, body: SelectFilterRequest, request: Request) -> None:
     try:
         await _manager(request).select_filter(device_id, body.slot)

@@ -70,7 +70,7 @@ async def rename(device_id: str, body: RenameRequest, request: Request) -> Paire
         raise HTTPException(status_code=404, detail=f"Unknown device '{device_id}'") from exc
 
 
-@router.delete("/paired/{device_id}", status_code=204)
+@router.delete("/paired/{device_id}", status_code=204, response_model=None)
 async def forget(device_id: str, request: Request) -> None:
     try:
         await _manager(request).forget(device_id)

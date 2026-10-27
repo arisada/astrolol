@@ -25,7 +25,7 @@ async def start_run(config: FlatWizardConfig, request: Request) -> FlatWizardRun
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
-@router.post("/abort", status_code=204)
+@router.post("/abort", status_code=204, response_model=None)
 async def abort_run(request: Request) -> None:
     """Abort the running flat wizard. No-op if already idle."""
     await _engine(request).abort()

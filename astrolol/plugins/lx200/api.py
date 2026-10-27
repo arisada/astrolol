@@ -32,7 +32,7 @@ async def get_status(request: Request) -> Lx200Status:
     )
 
 
-@router.post("/start", status_code=204)
+@router.post("/start", status_code=204, response_model=None)
 async def start_server(request: Request) -> None:
     """Start the LX200 TCP server."""
     try:
@@ -42,7 +42,7 @@ async def start_server(request: Request) -> None:
         raise HTTPException(status_code=500, detail=str(exc)) from exc
 
 
-@router.post("/stop", status_code=204)
+@router.post("/stop", status_code=204, response_model=None)
 async def stop_server(request: Request) -> None:
     """Stop the LX200 TCP server."""
     try:

@@ -313,7 +313,7 @@ def create_app() -> FastAPI:
             })
         return result
 
-    @app.post("/admin/log_level", status_code=204)
+    @app.post("/admin/log_level", status_code=204, response_model=None)
     async def admin_log_level(body: _LogLevelRequest, request: Request) -> None:
         """Set the verbosity level for a registered log scope."""
         import logging as _logging

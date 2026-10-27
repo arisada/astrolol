@@ -83,7 +83,7 @@ async def get_target(device_id: str, request: Request) -> Target:
     return target
 
 
-@router.delete("/{device_id}/target", status_code=204)
+@router.delete("/{device_id}/target", status_code=204, response_model=None)
 async def clear_target(device_id: str, request: Request) -> None:
     """Clear the current target."""
     try:
@@ -104,7 +104,7 @@ async def slew(device_id: str, request: Request) -> dict[str, str]:
         raise HTTPException(status_code=409, detail=str(exc))
 
 
-@router.post("/{device_id}/stop", status_code=204)
+@router.post("/{device_id}/stop", status_code=204, response_model=None)
 async def stop(device_id: str, request: Request) -> None:
     """Abort any active slew or park and halt motors."""
     try:
@@ -125,7 +125,7 @@ async def park(device_id: str, request: Request) -> dict[str, str]:
         raise HTTPException(status_code=409, detail=str(exc))
 
 
-@router.post("/{device_id}/unpark", status_code=204)
+@router.post("/{device_id}/unpark", status_code=204, response_model=None)
 async def unpark(device_id: str, request: Request) -> None:
     try:
         await _manager(request).unpark(device_id)
@@ -133,7 +133,7 @@ async def unpark(device_id: str, request: Request) -> None:
         raise HTTPException(status_code=404, detail=str(exc))
 
 
-@router.post("/{device_id}/sync", status_code=204)
+@router.post("/{device_id}/sync", status_code=204, response_model=None)
 async def sync(device_id: str, body: SyncRequest, request: Request) -> None:
     """Sync the mount coordinate model to the given ICRS position (degrees)."""
     try:
@@ -142,7 +142,7 @@ async def sync(device_id: str, body: SyncRequest, request: Request) -> None:
         raise HTTPException(status_code=404, detail=str(exc))
 
 
-@router.post("/{device_id}/tracking", status_code=204)
+@router.post("/{device_id}/tracking", status_code=204, response_model=None)
 async def set_tracking(device_id: str, body: TrackingRequest, request: Request) -> None:
     try:
         await _manager(request).set_tracking(device_id, body.enabled, body.mode)
@@ -162,7 +162,7 @@ async def meridian_flip(device_id: str, request: Request) -> dict[str, str]:
         raise HTTPException(status_code=409, detail=str(exc))
 
 
-@router.post("/{device_id}/set_park_position", status_code=204)
+@router.post("/{device_id}/set_park_position", status_code=204, response_model=None)
 async def set_park_position(device_id: str, request: Request) -> None:
     """Set the current mount position as the park position."""
     try:
@@ -181,7 +181,7 @@ class MoveRequest(BaseModel):
     duration_ms: int | None = Field(default=None, gt=0, le=10_000)
 
 
-@router.post("/{device_id}/move", status_code=204)
+@router.post("/{device_id}/move", status_code=204, response_model=None)
 async def start_move(device_id: str, body: MoveRequest, request: Request) -> None:
     """Start continuous directional motion. Send DELETE /move to stop (or give `duration_ms`)."""
     try:
@@ -192,7 +192,7 @@ async def start_move(device_id: str, body: MoveRequest, request: Request) -> Non
         raise HTTPException(status_code=409, detail=str(exc))
 
 
-@router.delete("/{device_id}/move", status_code=204)
+@router.delete("/{device_id}/move", status_code=204, response_model=None)
 async def stop_move(device_id: str, request: Request) -> None:
     """Stop all directional motion started by POST /move."""
     try:
@@ -206,7 +206,7 @@ class PulseGuideRequest(BaseModel):
     duration_ms: int = Field(gt=0, le=10_000)
 
 
-@router.post("/{device_id}/pulse_guide", status_code=204)
+@router.post("/{device_id}/pulse_guide", status_code=204, response_model=None)
 async def pulse_guide(device_id: str, body: PulseGuideRequest, request: Request) -> None:
     """Guide pulse; responds once the pulse has completed. 409 if the mount can't guide now."""
     try:

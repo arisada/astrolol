@@ -102,15 +102,15 @@ def make_app(*, enabled: set[str] | None = None, secure: bool = False) -> FastAP
         asyncio.get_running_loop().create_task(finish())
         return {"status": "slewing", "device_id": dev}
 
-    @app.post("/mount/{dev}/stop", status_code=204)
+    @app.post("/mount/{dev}/stop", status_code=204, response_model=None)
     async def stop(dev: str, request: Request):
         note(request)
 
-    @app.post("/imager/{dev}/halt", status_code=204)
+    @app.post("/imager/{dev}/halt", status_code=204, response_model=None)
     async def halt(dev: str, request: Request):
         note(request)
 
-    @app.post("/focuser/{dev}/halt", status_code=204)
+    @app.post("/focuser/{dev}/halt", status_code=204, response_model=None)
     async def fhalt(dev: str, request: Request):
         note(request)
 

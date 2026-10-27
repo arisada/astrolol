@@ -75,7 +75,7 @@ async def move_by(device_id: str, body: MoveByRequest, request: Request) -> dict
         raise HTTPException(status_code=409, detail=str(exc))
 
 
-@router.post("/{device_id}/halt", status_code=204)
+@router.post("/{device_id}/halt", status_code=204, response_model=None)
 async def halt(device_id: str, request: Request) -> None:
     """Stop any in-progress move immediately."""
     try:

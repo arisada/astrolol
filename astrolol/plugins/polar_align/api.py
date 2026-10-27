@@ -103,7 +103,7 @@ async def start_auto_refresh(body: AutoRefreshRequest, request: Request) -> Wiza
         raise HTTPException(status_code=404 if "No polar" in str(exc) else 422, detail=str(exc)) from exc
 
 
-@router.delete("/wizard/auto_refresh", status_code=204)
+@router.delete("/wizard/auto_refresh", status_code=204, response_model=None)
 async def stop_auto_refresh(request: Request) -> None:
     """Stop periodic automatic rechecks. No-op if it wasn't running."""
     try:
@@ -140,12 +140,12 @@ async def get_star_view_frame(request: Request, v: int | None = None) -> Respons
     return Response(content=data, media_type="image/jpeg", headers={"Cache-Control": "no-store"})
 
 
-@router.delete("/wizard/star_view", status_code=204)
+@router.delete("/wizard/star_view", status_code=204, response_model=None)
 async def stop_star_view(request: Request) -> None:
     await _engine(request).stop_star_view()
 
 
-@router.delete("/wizard", status_code=204)
+@router.delete("/wizard", status_code=204, response_model=None)
 async def cancel_wizard(request: Request) -> None:
     """Stop the wizard. During CONVERGING this marks the run completed (the user is
     satisfied, nothing failed); otherwise it aborts the in-progress run. No-op if already

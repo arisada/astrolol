@@ -93,7 +93,7 @@ async def update_user(name: str, body: UserUpdate, request: Request) -> UserOut:
     return UserOut(name=display, level=rec.level, created=rec.created)
 
 
-@router.delete("/users/{name}", status_code=204)
+@router.delete("/users/{name}", status_code=204, response_model=None)
 async def delete_user(name: str, request: Request) -> None:
     store = _authz(request).store
     found = store.get_user(name)
@@ -105,7 +105,7 @@ async def delete_user(name: str, request: Request) -> None:
     logger.info("security.user_deleted", user=found[0])
 
 
-@router.post("/me/password", status_code=204)
+@router.post("/me/password", status_code=204, response_model=None)
 async def change_own_password(body: PasswordChange, request: Request) -> None:
     principal = principal_of(request)
     if principal is None or principal.kind != "user":
@@ -134,7 +134,7 @@ async def create_token(body: TokenCreate, request: Request) -> dict:
     return {**_token_out(rec), "token": secret}
 
 
-@router.delete("/tokens/{token_id}", status_code=204)
+@router.delete("/tokens/{token_id}", status_code=204, response_model=None)
 async def delete_token(token_id: str, request: Request) -> None:
     if not _authz(request).store.delete_token(token_id):
         raise HTTPException(status_code=404, detail="No such token")

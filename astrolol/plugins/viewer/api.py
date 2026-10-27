@@ -181,7 +181,7 @@ async def start_rescan(request: Request) -> dict:
     return {"status": "scanning", "library_dir": str(library_dir)}
 
 
-@router.delete("/rescan", status_code=204)
+@router.delete("/rescan", status_code=204, response_model=None)
 async def cancel_rescan(request: Request) -> None:
     index = _index(request)
     if not index.is_rescanning:
@@ -374,7 +374,7 @@ def _rejected_stats(library_dir: Path) -> tuple[int, int]:
     return count, total
 
 
-@router.post("/images/{image_id}/reject", status_code=204)
+@router.post("/images/{image_id}/reject", status_code=204, response_model=None)
 async def reject_image(image_id: str, request: Request) -> None:
     record = await _require_record(request, image_id)
     library_dir = _library_dir(request)
@@ -406,7 +406,7 @@ async def list_rejected(request: Request) -> list[RejectedItem]:
     return items
 
 
-@router.post("/rejected/unreject", status_code=204)
+@router.post("/rejected/unreject", status_code=204, response_model=None)
 async def unreject_image(request: Request, body: UnrejectRequest) -> None:
     library_dir = _library_dir(request)
     src = _rejected_root(library_dir) / body.relative_path
@@ -419,7 +419,7 @@ async def unreject_image(request: Request, body: UnrejectRequest) -> None:
     logger.info("viewer.image_unrejected", path=str(dst))
 
 
-@router.post("/rejected/empty", status_code=204)
+@router.post("/rejected/empty", status_code=204, response_model=None)
 async def empty_rejected(request: Request) -> None:
     library_dir = _library_dir(request)
     root = _rejected_root(library_dir)

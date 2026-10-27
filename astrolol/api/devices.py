@@ -106,7 +106,7 @@ async def connect_device(config: DeviceConfig, request: Request) -> ConnectRespo
     return ConnectResponse(device_id=device_id)
 
 
-@router.delete("/connected/{device_id}", status_code=204)
+@router.delete("/connected/{device_id}", status_code=204, response_model=None)
 async def disconnect_device(device_id: str, request: Request) -> None:
     """Disconnect and fully remove a device by its device_id."""
     try:
@@ -120,7 +120,7 @@ async def disconnect_device(device_id: str, request: Request) -> None:
             mount_manager.stop_automation(device_id)
 
 
-@router.post("/connected/{device_id}/disconnect", status_code=204)
+@router.post("/connected/{device_id}/disconnect", status_code=204, response_model=None)
 async def soft_disconnect_device(device_id: str, request: Request) -> None:
     """Disconnect device hardware but keep it registered for quick reconnect."""
     try:
@@ -129,7 +129,7 @@ async def soft_disconnect_device(device_id: str, request: Request) -> None:
         raise HTTPException(status_code=404, detail=str(exc))
 
 
-@router.post("/connected/{device_id}/reconnect", status_code=204)
+@router.post("/connected/{device_id}/reconnect", status_code=204, response_model=None)
 async def reconnect_device(device_id: str, request: Request) -> None:
     """Reconnect a previously disconnected (but still registered) device."""
     try:

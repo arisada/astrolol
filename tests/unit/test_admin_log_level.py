@@ -32,7 +32,7 @@ def make_app(scopes: list[LogScope]) -> FastAPI:
         key: str
         level: str
 
-    @app.post("/admin/log_level", status_code=204)
+    @app.post("/admin/log_level", status_code=204, response_model=None)
     def set_level(body: _LogLevelRequest, request: Request) -> None:
         scopes_list: list[LogScope] = request.app.state.log_scopes
         scope = next((s for s in scopes_list if s.key == body.key), None)

@@ -237,13 +237,13 @@ async def test_unload_sends_unload() -> None:
     assert client.texts == [("Server", "UNLOAD", {"DRIVER": "indigo_ccd_asi"})]
 
 
-def test_a_managed_server_needs_the_binary(tmp_path: Path) -> None:
+async def test_a_managed_server_needs_the_binary(tmp_path: Path) -> None:
     server = indigo.IndigoServer(
         _FakeClient({}), manage=True, port=1, run_dir=tmp_path,  # type: ignore[arg-type]
         server_path=str(tmp_path / "no-such-indigo_server"),
     )
     with pytest.raises(RuntimeError, match="not found"):
-        asyncio.run(server.start())
+        await server.start()
 
 
 # ---------------------------------------------------------------------------

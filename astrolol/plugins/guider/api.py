@@ -95,7 +95,7 @@ async def get_frame(request: Request, v: int | None = None) -> Response:
     return Response(content=data, media_type="image/jpeg", headers={"Cache-Control": "no-store"})
 
 
-@router.post("/preview", status_code=204)
+@router.post("/preview", status_code=204, response_model=None)
 async def start_preview(request: Request) -> None:
     """Show the guide camera (and the stars it would guide on) without guiding."""
     try:
@@ -104,7 +104,7 @@ async def start_preview(request: Request) -> None:
         raise _conflict(exc) from exc
 
 
-@router.delete("/preview", status_code=204)
+@router.delete("/preview", status_code=204, response_model=None)
 async def stop_preview(request: Request) -> None:
     await _guider(request).stop_preview()
 
@@ -114,7 +114,7 @@ class StarPick(BaseModel):
     y: float
 
 
-@router.post("/star", status_code=204)
+@router.post("/star", status_code=204, response_model=None)
 async def select_star(body: StarPick, request: Request) -> None:
     """Guide on the star nearest to (x, y) in the preview."""
     g = _guider(request)
@@ -124,7 +124,7 @@ async def select_star(body: StarPick, request: Request) -> None:
         raise HTTPException(status_code=404, detail="No star there")
 
 
-@router.delete("/star", status_code=204)
+@router.delete("/star", status_code=204, response_model=None)
 async def clear_star(request: Request) -> None:
     """Let the guider choose the guide star again."""
     _guider(request).preferred_star = None
@@ -135,7 +135,7 @@ class GuideBody(BaseModel):
     recalibrate: bool = False
 
 
-@router.post("/guide", status_code=204)
+@router.post("/guide", status_code=204, response_model=None)
 async def guide(request: Request, body: GuideBody | None = None) -> None:
     """Start guiding. Returns at once; progress arrives as guiding events."""
     body = body or GuideBody()
@@ -146,17 +146,17 @@ async def guide(request: Request, body: GuideBody | None = None) -> None:
         raise _conflict(exc) from exc
 
 
-@router.post("/stop", status_code=204)
+@router.post("/stop", status_code=204, response_model=None)
 async def stop(request: Request) -> None:
     await _guider(request).stop()
 
 
-@router.post("/pause", status_code=204)
+@router.post("/pause", status_code=204, response_model=None)
 async def pause(request: Request) -> None:
     await _guider(request).pause()
 
 
-@router.post("/resume", status_code=204)
+@router.post("/resume", status_code=204, response_model=None)
 async def resume(request: Request) -> None:
     await _guider(request).resume()
 
@@ -167,7 +167,7 @@ class DitherBody(BaseModel):
     settle: SettleParams = SettleParams()
 
 
-@router.post("/dither", status_code=204)
+@router.post("/dither", status_code=204, response_model=None)
 async def dither(body: DitherBody, request: Request) -> None:
     """Dither and wait for the guider to settle."""
     try:
@@ -176,7 +176,7 @@ async def dither(body: DitherBody, request: Request) -> None:
         raise _conflict(exc) from exc
 
 
-@router.delete("/calibration", status_code=204)
+@router.delete("/calibration", status_code=204, response_model=None)
 async def clear_calibration(request: Request) -> None:
     """Forget the calibration: the next run calibrates again."""
     _guider(request).clear_calibration()
@@ -197,7 +197,7 @@ async def capture_dark(body: DarkBody, request: Request) -> DarkInfo:
     return next(d for d in g.darks.describe() if d.region == dark.region and d.exposure == dark.exposure)
 
 
-@router.delete("/darks", status_code=204)
+@router.delete("/darks", status_code=204, response_model=None)
 async def clear_darks(request: Request) -> None:
     _guider(request).darks.clear()
 

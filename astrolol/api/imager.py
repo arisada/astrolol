@@ -54,7 +54,7 @@ async def start_loop(device_id: str, body: ExposureRequest, request: Request) ->
         raise HTTPException(status_code=409, detail=str(exc))
 
 
-@router.delete("/{device_id}/loop", status_code=204)
+@router.delete("/{device_id}/loop", status_code=204, response_model=None)
 async def stop_loop(device_id: str, request: Request) -> None:
     """Stop a running loop after the current exposure completes."""
     try:
@@ -65,7 +65,7 @@ async def stop_loop(device_id: str, request: Request) -> None:
         raise HTTPException(status_code=409, detail=str(exc))
 
 
-@router.post("/{device_id}/halt", status_code=204)
+@router.post("/{device_id}/halt", status_code=204, response_model=None)
 async def halt(device_id: str, request: Request) -> None:
     """Immediately abort any running exposure and cancel any active loop."""
     try:
@@ -89,7 +89,7 @@ class SetCoolerRequest(BaseModel):
     target_temperature: float | None = None
 
 
-@router.post("/{device_id}/cooler", status_code=204)
+@router.post("/{device_id}/cooler", status_code=204, response_model=None)
 async def set_cooler(device_id: str, body: SetCoolerRequest, request: Request) -> None:
     """Enable/disable the camera cooler and optionally set a target temperature."""
     try:

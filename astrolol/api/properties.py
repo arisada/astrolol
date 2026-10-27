@@ -160,7 +160,7 @@ async def get_properties(device_id: str, request: Request) -> list[PropertyOut]:
     return result
 
 
-@router.post("/{device_id}/properties/{prop_name}", status_code=204)
+@router.post("/{device_id}/properties/{prop_name}", status_code=204, response_model=None)
 async def set_property(
     device_id: str, prop_name: str, body: SetPropertyRequest, request: Request
 ) -> None:

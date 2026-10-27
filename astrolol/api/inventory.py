@@ -69,7 +69,7 @@ async def update_item(item_id: str, item: EquipmentItem, request: Request) -> Eq
         raise HTTPException(status_code=404, detail=f"Item '{item_id}' not found.")
 
 
-@router.delete("/{item_id}", status_code=204)
+@router.delete("/{item_id}", status_code=204, response_model=None)
 async def delete_item(item_id: str, request: Request) -> None:
     try:
         _store(request).delete(item_id)

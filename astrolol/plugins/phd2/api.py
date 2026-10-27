@@ -20,7 +20,7 @@ def _client(request: Request) -> Phd2Client:
     return request.app.state.phd2_client
 
 
-@router.post("/connect", status_code=204)
+@router.post("/connect", status_code=204, response_model=None)
 async def connect(request: Request) -> None:
     """Start (or restart) the PHD2 connection loop using the current saved settings."""
     try:
@@ -35,7 +35,7 @@ async def connect(request: Request) -> None:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
 
-@router.post("/disconnect", status_code=204)
+@router.post("/disconnect", status_code=204, response_model=None)
 async def disconnect(request: Request) -> None:
     """Stop the PHD2 connection loop and close the socket."""
     try:
@@ -62,7 +62,7 @@ async def get_health(request: Request, window_s: float = 60.0) -> GuidingHealthR
     )
 
 
-@router.post("/guide", status_code=204)
+@router.post("/guide", status_code=204, response_model=None)
 async def guide(body: GuideRequest, request: Request) -> None:
     """Start PHD2 guiding (calibrate if needed, then guide)."""
     try:
@@ -84,7 +84,7 @@ async def guide(body: GuideRequest, request: Request) -> None:
         raise HTTPException(status_code=502, detail=f"PHD2: {exc}") from exc
 
 
-@router.post("/stop", status_code=204)
+@router.post("/stop", status_code=204, response_model=None)
 async def stop(request: Request) -> None:
     """Stop PHD2 capture / guiding."""
     try:
@@ -97,7 +97,7 @@ async def stop(request: Request) -> None:
         raise HTTPException(status_code=502, detail=f"PHD2: {exc}") from exc
 
 
-@router.post("/dither", status_code=204)
+@router.post("/dither", status_code=204, response_model=None)
 async def dither(body: DitherRequest, request: Request) -> None:
     """Dither the guide star and wait for settle."""
     try:
@@ -119,7 +119,7 @@ async def dither(body: DitherRequest, request: Request) -> None:
         raise HTTPException(status_code=502, detail=f"PHD2: {exc}") from exc
 
 
-@router.post("/pause", status_code=204)
+@router.post("/pause", status_code=204, response_model=None)
 async def pause(request: Request) -> None:
     """Pause PHD2 guiding output (keeps looping, no corrections sent)."""
     try:
@@ -132,7 +132,7 @@ async def pause(request: Request) -> None:
         raise HTTPException(status_code=502, detail=f"PHD2: {exc}") from exc
 
 
-@router.post("/resume", status_code=204)
+@router.post("/resume", status_code=204, response_model=None)
 async def resume(request: Request) -> None:
     """Resume PHD2 guiding output after a pause."""
     try:
@@ -145,7 +145,7 @@ async def resume(request: Request) -> None:
         raise HTTPException(status_code=502, detail=f"PHD2: {exc}") from exc
 
 
-@router.post("/debug", status_code=204)
+@router.post("/debug", status_code=204, response_model=None)
 async def set_debug(req: DebugRequest, request: Request) -> None:
     """Enable or disable raw JSON-RPC traffic logging to the server console."""
     _client(request).set_debug(req.enabled)

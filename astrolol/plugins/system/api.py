@@ -102,7 +102,7 @@ async def list_saved_connections() -> list[SavedWifiConnection]:
     return await _net.list_saved_wifi_connections()
 
 
-@router.delete("/network/saved/{name}", status_code=204)
+@router.delete("/network/saved/{name}", status_code=204, response_model=None)
 async def delete_saved_connection(name: str) -> None:
     """Delete a saved WiFi connection profile by name."""
     try:

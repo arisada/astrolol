@@ -43,17 +43,17 @@ async def get_status(request: Request) -> SimReport:
     )
 
 
-@router.post("/connect", status_code=204)
+@router.post("/connect", status_code=204, response_model=None)
 async def connect(request: Request) -> None:
     _sim(request).connect()
 
 
-@router.post("/disconnect", status_code=204)
+@router.post("/disconnect", status_code=204, response_model=None)
 async def disconnect(request: Request) -> None:
     await _sim(request).disconnect()
 
 
-@router.post("/guide", status_code=204)
+@router.post("/guide", status_code=204, response_model=None)
 async def guide(request: Request, settle: SettleParams | None = None) -> None:
     """Start guiding; returns immediately (settling continues in the background)."""
     try:
@@ -62,7 +62,7 @@ async def guide(request: Request, settle: SettleParams | None = None) -> None:
         raise HTTPException(status_code=409, detail=str(exc)) from exc
 
 
-@router.post("/stop", status_code=204)
+@router.post("/stop", status_code=204, response_model=None)
 async def stop(request: Request) -> None:
     await _sim(request).stop()
 
@@ -73,7 +73,7 @@ class DitherBody(BaseModel):
     settle: SettleParams = SettleParams()
 
 
-@router.post("/dither", status_code=204)
+@router.post("/dither", status_code=204, response_model=None)
 async def dither(body: DitherBody, request: Request) -> None:
     """Dither and wait for settle."""
     try:
@@ -89,12 +89,12 @@ class StarLossBody(BaseModel):
     duration_s: float | None = Field(default=30.0, gt=0, description="null = until cleared")
 
 
-@router.post("/faults/star_loss", status_code=204)
+@router.post("/faults/star_loss", status_code=204, response_model=None)
 async def star_loss(body: StarLossBody, request: Request) -> None:
     await _sim(request).lose_star(body.duration_s)
 
 
-@router.post("/faults/stop_guiding", status_code=204)
+@router.post("/faults/stop_guiding", status_code=204, response_model=None)
 async def stop_guiding_fault(request: Request) -> None:
     await _sim(request).stop_guiding_fault()
 
@@ -103,12 +103,12 @@ class SettleFailuresBody(BaseModel):
     count: int = Field(default=1, ge=0)
 
 
-@router.post("/faults/settle_failures", status_code=204)
+@router.post("/faults/settle_failures", status_code=204, response_model=None)
 async def settle_failures(body: SettleFailuresBody, request: Request) -> None:
     _sim(request).fail_settles(body.count)
 
 
-@router.post("/faults/clear", status_code=204)
+@router.post("/faults/clear", status_code=204, response_model=None)
 async def clear_faults(request: Request) -> None:
     _sim(request).clear_faults()
 

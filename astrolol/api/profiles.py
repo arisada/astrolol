@@ -107,7 +107,7 @@ async def update_profile(profile_id: str, profile: Profile, request: Request) ->
 # Active profile — must come before /{profile_id} routes
 # ---------------------------------------------------------------------------
 
-@router.delete("/active", status_code=204)
+@router.delete("/active", status_code=204, response_model=None)
 async def deactivate(request: Request) -> None:
     outgoing: Profile | None = request.app.state.active_profile
     if outgoing is not None:
@@ -121,7 +121,7 @@ async def deactivate(request: Request) -> None:
 # Per-profile CRUD (parameterised — registered after static routes)
 # ---------------------------------------------------------------------------
 
-@router.delete("/{profile_id}", status_code=204)
+@router.delete("/{profile_id}", status_code=204, response_model=None)
 async def delete_profile(profile_id: str, request: Request) -> None:
     # Clear active if it was this profile
     if getattr(request.app.state.active_profile, "id", None) == profile_id:

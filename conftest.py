@@ -33,3 +33,18 @@ def _empty_data_dir():
 def pytest_sessionfinish(session, exitstatus):
     shutil.rmtree(_DATA_DIR, ignore_errors=True)
     shutil.rmtree(_INDI_HOME, ignore_errors=True)
+
+
+def pytest_collection_modifyitems(items):
+    """Async tests run in the module's event loop, like their fixtures.
+
+    pyproject's asyncio_default_test_loop_scope says the same, but pytest-asyncio before 1.0
+    (Debian 13 ships 0.25) ignores that option.
+    """
+    from pytest_asyncio import is_async_test
+
+    module_loop = pytest.mark.asyncio(loop_scope="module")
+    for item in items:
+        marker = item.get_closest_marker("asyncio")
+        if is_async_test(item) and not (marker and marker.kwargs):
+            item.add_marker(module_loop, append=False)

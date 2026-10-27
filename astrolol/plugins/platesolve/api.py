@@ -107,7 +107,7 @@ async def get_job_status(job_id: str, request: Request) -> SolveJob:
     return job
 
 
-@router.delete("/{job_id}/cancel", status_code=204)
+@router.delete("/{job_id}/cancel", status_code=204, response_model=None)
 async def cancel_job(job_id: str, request: Request) -> None:
     """Cancel a running solve. No-op if already in a terminal state."""
     try:
@@ -137,7 +137,7 @@ async def get_center(request: Request) -> CenterRun:
     return run
 
 
-@router.delete("/center", status_code=204)
+@router.delete("/center", status_code=204, response_model=None)
 async def cancel_center(request: Request) -> None:
     await _manager(request).cancel_center()
 
