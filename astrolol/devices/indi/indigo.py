@@ -22,7 +22,6 @@ import json
 import os
 import re
 import shutil
-import signal
 import socket
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -30,6 +29,7 @@ from typing import TYPE_CHECKING
 import structlog
 
 from astrolol.devices.indi.catalog import DriverEntry
+from astrolol.devices.indi.children import terminate
 
 if TYPE_CHECKING:  # importing the client needs indipyclient, which astrolol can run without
     from astrolol.devices.indi.client import IndiClient
@@ -358,6 +358,7 @@ class IndigoServer:
         self._state_path = run_dir / _STATE_NAME
         self._server_path = server_path
         self._managed_pid: int | None = None
+        self._process: asyncio.subprocess.Process | None = None   # when this run started it
         # INDI drivers to run alongside, set before start(); those the running server has.
         self.indi_drivers: list[str] = []
         self._loaded_drivers: set[str] = set()
@@ -424,9 +425,11 @@ class IndigoServer:
                 raise RuntimeError(f"indigo_server exited immediately (rc={process.returncode})")
             if asyncio.get_running_loop().time() > deadline:
                 process.kill()
+                await process.wait()
                 raise RuntimeError(f"indigo_server did not open port {self.port}")
             await asyncio.sleep(0.2)
         self._managed_pid = process.pid
+        self._process = process
         self._loaded_drivers = set(indi_drivers)
         self._save_state()
         logger.info("indigo.server_started", pid=process.pid, port=self.port)
@@ -440,22 +443,9 @@ class IndigoServer:
             logger.info("indigo.server_not_running")
             return
         logger.info("indigo.server_stopping", pid=pid)
-        try:
-            os.kill(pid, signal.SIGTERM)
-            for _ in range(50):
-                await asyncio.sleep(0.1)
-                try:
-                    os.kill(pid, 0)
-                except ProcessLookupError:
-                    break
-            else:
-                try:
-                    os.kill(pid, signal.SIGKILL)
-                except ProcessLookupError:
-                    pass
-        except ProcessLookupError:
-            pass
+        await terminate(pid, self._process)
         self._managed_pid = None
+        self._process = None
         self._loaded_drivers = set()
         self._cleanup_state()
         logger.info("indigo.server_stopped", pid=pid)

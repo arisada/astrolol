@@ -15,11 +15,12 @@ import asyncio
 import errno
 import json
 import os
-import signal
 import socket
 from pathlib import Path
 
 import structlog
+
+from astrolol.devices.indi.children import terminate
 
 logger = structlog.get_logger()
 
@@ -60,6 +61,7 @@ class IndiServer:
         self._fifo_path = run_dir / _FIFO_NAME
         self._state_path = run_dir / _STATE_NAME
         self._managed_pid: int | None = None
+        self._process: asyncio.subprocess.Process | None = None   # when this run started it
         self._loaded_drivers: set[str] = set()
 
     # ------------------------------------------------------------------
@@ -126,6 +128,7 @@ class IndiServer:
             )
 
         self._managed_pid = process.pid
+        self._process = process
         self._loaded_drivers = set()
         self._save_state()
         logger.info("indi.server_started", pid=process.pid, port=self.port)
@@ -147,25 +150,10 @@ class IndiServer:
             return
 
         logger.info("indi.server_stopping", pid=pid)
-        try:
-            os.kill(pid, signal.SIGTERM)
-            # Wait up to 5 s for graceful exit
-            for _ in range(50):
-                await asyncio.sleep(0.1)
-                try:
-                    os.kill(pid, 0)  # probe: raises ProcessLookupError if dead
-                except ProcessLookupError:
-                    break
-            else:
-                # Force kill if still alive after 5 s
-                try:
-                    os.kill(pid, signal.SIGKILL)
-                except ProcessLookupError:
-                    pass
-        except ProcessLookupError:
-            pass  # already dead
+        await terminate(pid, self._process)
 
         self._managed_pid = None
+        self._process = None
         self._loaded_drivers.clear()
         self._cleanup_state()
         self._cleanup_fifo()

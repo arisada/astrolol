@@ -395,6 +395,10 @@ def create_app() -> FastAPI:
 
 
 def run() -> None:
+    # After POST /admin/restart, children of the previous run (an INDI server) may have exited
+    # with nobody to wait for them.
+    from astrolol.devices.indi.children import reap_exited_children
+    reap_exited_children()
     uvicorn.run("astrolol.main:create_app", factory=True, host="0.0.0.0", port=8000, reload=False)
 
 
