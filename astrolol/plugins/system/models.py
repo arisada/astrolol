@@ -11,6 +11,11 @@ class CommandResult(BaseModel):
     output: str
 
 
+class DevelopmentInfo(BaseModel):
+    checkout: bool   # running from a git checkout: git pull and the UI rebuild are available
+    version: str
+
+
 class NetworkMode(str, Enum):
     wifi = "wifi"
     hotspot = "hotspot"
@@ -85,11 +90,14 @@ class SystemSettings(BaseModel):
     throttle_check_interval_seconds: int = Field(default=1, ge=1, le=3600)
 
 
-class SudoSetup(BaseModel):
-    nmcli_sudo_ok: bool
-    reboot_sudo_ok: bool
-    shutdown_sudo_ok: bool
-    setup_commands: list[str]
+class PermissionSetup(BaseModel):
+    """Which host-management actions polkit allows astrolol (see privileges.py)."""
+    network_ok: bool
+    reboot_ok: bool
+    shutdown_ok: bool
+    hostname_ok: bool
+    timezone_ok: bool
+    setup_commands: list[str]   # to run as root when some are missing (installs from source)
 
 
 class TimeInfo(BaseModel):

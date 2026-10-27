@@ -52,11 +52,20 @@ La barre d'état affiche le mode réseau, pour savoir à quel réseau se connect
 
 **Redémarrer l'application**, **Redémarrer l'appareil**, **Éteindre l'appareil**. Cliquez une fois
 pour armer, une seconde fois pour confirmer. Le redémarrage et l'extinction de l'appareil
-nécessitent les permissions listées sous **Permissions sudo**, avec les commandes pour les
-configurer.
+nécessitent les autorisations listées sous **Autorisations**.
 
 ## Développement
 
-**Git pull** et **Reconstruire l'interface** mettent à jour une installation faite à partir du
-code source. Redémarrez ensuite l'application pour exécuter le nouveau code du serveur ;
-rechargez la page après une reconstruction de l'interface.
+Affiche la version installée. **Git pull** et **Reconstruire l'interface** mettent à jour une
+installation faite à partir du code source. Redémarrez ensuite l'application pour exécuter le
+nouveau code du serveur ; rechargez la page après une reconstruction de l'interface. Un astrolol
+installé comme paquet du système n'a pas ces boutons : il se met à jour avec les mises à jour
+logicielles du système (`sudo apt upgrade`).
+
+## Autorisations
+
+Les réglages de la machine qu'astrolol peut modifier : le réseau (Wi-Fi, point d'accès), le nom
+d'hôte, le fuseau horaire, le redémarrage et l'arrêt. Installé comme paquet du système, astrolol
+les a tous. Installé à partir du code source, **Comment autoriser celles qui manquent** donne la
+commande à lancer une fois sur l'ordinateur, en administrateur ; le changement s'applique tout
+de suite.

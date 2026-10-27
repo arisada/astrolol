@@ -156,18 +156,21 @@
     "confirmReboot": "Confirm Reboot",
     "shutdown": "Shutdown Device",
     "confirmShutdown": "Confirm Shutdown",
-    "hint": "Click once to arm, again to confirm. Reboot/Shutdown require passwordless sudo."
+    "hint": "Click once to arm, again to confirm. Reboot and Shutdown need the permissions below."
   },
-  "sudo": {
-    "title": "Sudo Permissions",
-    "nmcli": "nmcli (network management)",
-    "reboot": "reboot",
-    "shutdown": "shutdown / poweroff",
-    "setup": "Setup instructions",
-    "runAsRoot": "Run as root on the host:"
+  "permissions": {
+    "title": "Permissions",
+    "network": "Network (Wi-Fi, access point)",
+    "hostname": "Host name",
+    "timezone": "Time zone",
+    "reboot": "Reboot",
+    "shutdown": "Shut down",
+    "setup": "How to allow the missing ones",
+    "runOnHost": "Run on the host, as an administrator:"
   },
   "development": {
     "title": "Development",
+    "version": "Version {{version}}",
     "gitPull": "Git pull",
     "pulling": "Pulling…",
     "rebuildUi": "Rebuild UI",
@@ -180,7 +183,8 @@
       "ok": "UI rebuilt",
       "failed": "UI build failed"
     },
-    "hint": "Git pull only fast-forwards. Restart the app to run new backend code; reload the page after a UI rebuild."
+    "hint": "Git pull only fast-forwards. Restart the app to run new backend code; reload the page after a UI rebuild.",
+    "packagedHint": "Installed as a system package: astrolol updates with the system's software updates (sudo apt upgrade)."
   },
   "widget": {
     "health": "System health",

@@ -156,18 +156,21 @@
     "confirmReboot": "Confirmer le redémarrage",
     "shutdown": "Éteindre l'appareil",
     "confirmShutdown": "Confirmer l'extinction",
-    "hint": "Cliquez une fois pour armer, une seconde fois pour confirmer. Le redémarrage et l'extinction nécessitent sudo sans mot de passe."
+    "hint": "Cliquez une fois pour armer, une seconde fois pour confirmer. Le redémarrage et l'extinction nécessitent les autorisations ci-dessous."
   },
-  "sudo": {
-    "title": "Permissions sudo",
-    "nmcli": "nmcli (gestion du réseau)",
-    "reboot": "reboot",
-    "shutdown": "shutdown / poweroff",
-    "setup": "Instructions de configuration",
-    "runAsRoot": "À exécuter en root sur la machine :"
+  "permissions": {
+    "title": "Autorisations",
+    "network": "Réseau (Wi-Fi, point d'accès)",
+    "hostname": "Nom d'hôte",
+    "timezone": "Fuseau horaire",
+    "reboot": "Redémarrage",
+    "shutdown": "Arrêt",
+    "setup": "Comment autoriser celles qui manquent",
+    "runOnHost": "À lancer sur la machine, en administrateur :"
   },
   "development": {
     "title": "Développement",
+    "version": "Version {{version}}",
     "gitPull": "Git pull",
     "pulling": "Mise à jour…",
     "rebuildUi": "Reconstruire l'interface",
@@ -180,7 +183,8 @@
       "ok": "Interface reconstruite",
       "failed": "Échec de la construction de l'interface"
     },
-    "hint": "Git pull ne fait que des avances rapides. Redémarrez l'application pour exécuter le nouveau code du serveur ; rechargez la page après une reconstruction de l'interface."
+    "hint": "Git pull ne fait que des avances rapides. Redémarrez l'application pour exécuter le nouveau code du serveur ; rechargez la page après une reconstruction de l'interface.",
+    "packagedHint": "Installé comme paquet du système : astrolol se met à jour avec les mises à jour logicielles du système (sudo apt upgrade)."
   },
   "widget": {
     "health": "État du système",

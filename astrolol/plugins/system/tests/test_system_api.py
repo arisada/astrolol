@@ -288,17 +288,24 @@ def test_put_settings_reconfigures_throttle_monitor(client: TestClient) -> None:
     mock_apply.assert_awaited_once_with(enabled=True, interval_seconds=45)
 
 
-# ── Sudo setup ─────────────────────────────────────────────────────────────────
+# ── Permissions (polkit) ───────────────────────────────────────────────────────
 
-def test_sudo_setup_endpoint(client: TestClient) -> None:
-    fake_perms = {"nmcli": True, "reboot": False, "shutdown": False}
-    with patch("astrolol.plugins.system.api._net.check_sudo_permissions", AsyncMock(return_value=fake_perms)):
-        r = client.get("/plugins/system/sudo")
+def test_permissions_endpoint(client: TestClient) -> None:
+    fake = {"network": True, "reboot": False, "shutdown": False, "hostname": True, "timezone": True}
+    with patch("astrolol.plugins.system.api._priv.check", AsyncMock(return_value=fake)):
+        r = client.get("/plugins/system/permissions")
     assert r.status_code == 200
     data = r.json()
-    assert data["nmcli_sudo_ok"] is True
-    assert data["reboot_sudo_ok"] is False
-    assert len(data["setup_commands"]) > 0
+    assert data["network_ok"] is True
+    assert data["reboot_ok"] is False
+    # Run from the checkout: the rule to install is in deploy/.
+    assert any("50-astrolol.rules" in c for c in data["setup_commands"])
+
+
+def test_no_setup_commands_when_everything_is_allowed(client: TestClient) -> None:
+    fake = dict.fromkeys(("network", "reboot", "shutdown", "hostname", "timezone"), True)
+    with patch("astrolol.plugins.system.api._priv.check", AsyncMock(return_value=fake)):
+        assert client.get("/plugins/system/permissions").json()["setup_commands"] == []
 
 
 # ── Power controls ─────────────────────────────────────────────────────────────

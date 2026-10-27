@@ -184,23 +184,21 @@ Alternatively, `sudo setfacl -m u:www-data:x /home/astrolol` grants only nginx t
 
 ## 7. Optional: let the System page manage the Pi
 
-The `system` plugin can configure Wi-Fi/access-point mode (through NetworkManager) and
-reboot or shut the Pi down. It runs `sudo` for these, so grant exactly those commands to the
-service user:
+The `system` plugin can configure Wi-Fi/access-point mode (through NetworkManager), change the
+host name and time zone, and reboot or shut the Pi down. astrolol does this as its own user,
+never as root: a polkit rule allows exactly these actions for the `astrolol` user and nothing
+else. Install it once:
 
 ```bash
-command -v nmcli reboot shutdown          # note the full paths
-sudo visudo -f /etc/sudoers.d/astrolol
+sudo install -m 644 /home/astrolol/astrolol/deploy/50-astrolol.rules /etc/polkit-1/rules.d/
 ```
 
-```
-astrolol ALL=(ALL) NOPASSWD: /usr/bin/nmcli
-astrolol ALL=(ALL) NOPASSWD: /usr/sbin/reboot
-astrolol ALL=(ALL) NOPASSWD: /usr/sbin/shutdown
-```
+polkit reads it at once; nothing to restart. The System page lists under **Permissions** what is
+allowed, and gives this command when something is missing. If astrolol runs as another user,
+change `"astrolol"` in the file. Without the rule, the rest of astrolol works normally.
 
-Use the paths printed by `command -v`. The plugin reports in its page whether each
-permission is in place. Without it, the rest of astrolol works normally.
+Older installs used sudoers lines (`/etc/sudoers.d/astrolol*`) for this; astrolol no longer
+uses them, so they can be removed once the rule is installed.
 
 ## 8. Updating
 

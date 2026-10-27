@@ -5,7 +5,7 @@ import type {
   StorageDisk,
   SystemSettings,
   SystemStatus,
-  SudoSetup,
+  PermissionSetup,
   ThrottleStatus,
   TimeInfo,
   UsbDevice,
@@ -26,6 +26,7 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 }
 
 export interface CommandResult { ok: boolean; output: string }
+export interface DevelopmentInfo { checkout: boolean; version: string }
 
 export const getSystemStatus = () =>
   request<SystemStatus>('/plugins/system/status')
@@ -66,8 +67,8 @@ export const putSettings = (s: SystemSettings) =>
     body: JSON.stringify(s),
   })
 
-export const getSudoSetup = () =>
-  request<SudoSetup>('/plugins/system/sudo')
+export const getPermissions = () =>
+  request<PermissionSetup>('/plugins/system/permissions')
 
 export const getUsbDevices = () =>
   request<UsbDevice[]>('/plugins/system/usb')
@@ -101,6 +102,9 @@ export const setHostname = (hostname: string) =>
     method: 'PUT',
     body: JSON.stringify({ hostname }),
   })
+
+export const getDevelopmentInfo = () =>
+  request<DevelopmentInfo>('/plugins/system/dev')
 
 export const gitPull = () =>
   request<CommandResult>('/plugins/system/dev/git_pull', { method: 'POST' })

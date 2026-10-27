@@ -1,0 +1,29 @@
+// 50-astrolol.rules — lets the astrolol service manage this machine from its System page
+// (Wi-Fi and access point, host name, time zone, reboot, power off) without sudo.
+//
+// Only the user "astrolol" gets these, and only these actions; astrolol never runs as root.
+//
+// The Debian package installs this file in /usr/share/polkit-1/rules.d/. For an install from
+// source, copy it to /etc/polkit-1/rules.d/ (as root, mode 644). If astrolol runs as another
+// user, change "astrolol" below. polkit picks up the change at once, no restart needed.
+// Keep the action list in sync with ACTIONS in astrolol/plugins/system/privileges.py.
+
+polkit.addRule(function (action, subject) {
+    if (subject.user !== "astrolol") {
+        return polkit.Result.NOT_HANDLED;
+    }
+    var allowed = [
+        "org.freedesktop.login1.reboot",
+        "org.freedesktop.login1.reboot-multiple-sessions",
+        "org.freedesktop.login1.power-off",
+        "org.freedesktop.login1.power-off-multiple-sessions",
+        "org.freedesktop.hostname1.set-hostname",
+        "org.freedesktop.hostname1.set-static-hostname",
+        "org.freedesktop.timedate1.set-timezone"
+    ];
+    // Every NetworkManager action: connecting, the access point and saved connections.
+    if (action.id.indexOf("org.freedesktop.NetworkManager.") === 0 || allowed.indexOf(action.id) >= 0) {
+        return polkit.Result.YES;
+    }
+    return polkit.Result.NOT_HANDLED;
+});

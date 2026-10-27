@@ -1,15 +1,11 @@
 """Network management via nmcli (NetworkManager CLI).
 
 All shell commands run with asyncio.create_subprocess_exec for non-blocking
-operation. Commands that require elevated privileges use `sudo nmcli`.
+operation. nmcli runs as astrolol's own user: NetworkManager asks polkit, and
+deploy/50-astrolol.rules allows the changes (see privileges.py).
 
-On Raspberry Pi OS, add the following to /etc/sudoers.d/astrolol:
-    <user> ALL=(ALL) NOPASSWD: /usr/bin/nmcli
-    <user> ALL=(ALL) NOPASSWD: /sbin/reboot
-    <user> ALL=(ALL) NOPASSWD: /sbin/shutdown
-
-The module degrades gracefully when nmcli is not present or the user lacks
-sudo access — callers receive an error detail rather than an exception crash.
+The module degrades gracefully when nmcli is not present or polkit refuses —
+callers receive an error detail rather than an exception crash.
 """
 from __future__ import annotations
 
@@ -48,9 +44,9 @@ def nmcli_available() -> bool:
     return shutil.which("nmcli") is not None
 
 
-async def _run(*args: str, sudo: bool = False) -> tuple[int, str, str]:
+async def _run(*args: str) -> tuple[int, str, str]:
     """Run a command and return (returncode, stdout, stderr)."""
-    cmd = (["sudo"] if sudo else []) + list(args)
+    cmd = list(args)
     try:
         proc = await asyncio.create_subprocess_exec(
             *cmd,
@@ -255,7 +251,7 @@ async def connect_wifi(ssid: str, password: str, interface: str | None = None) -
         args += ["ifname", iface]
 
     logger.info("system.wifi_connecting", ssid=ssid, interface=iface)
-    rc, out, err = await _run(*args, sudo=True)
+    rc, out, err = await _run(*args)
     if rc != 0:
         logger.error("system.wifi_connect_failed", ssid=ssid, error=err or out)
         raise RuntimeError(err or out or f"nmcli exited {rc}")
@@ -271,7 +267,7 @@ async def disconnect_wifi(interface: str | None = None) -> None:
     if not iface:
         raise RuntimeError("No wireless interface found")
 
-    rc, _, err = await _run("nmcli", "device", "disconnect", iface, sudo=True)
+    rc, _, err = await _run("nmcli", "device", "disconnect", iface)
     if rc != 0:
         raise RuntimeError(err or f"nmcli exited {rc}")
     logger.info("system.wifi_disconnected", interface=iface)
@@ -291,7 +287,7 @@ async def start_hotspot(ssid: str, password: str, interface: str | None = None) 
         raise RuntimeError("No wireless interface found")
 
     # Remove any existing hotspot connection
-    await _run("nmcli", "connection", "delete", _HOTSPOT_CON_NAME, sudo=True)
+    await _run("nmcli", "connection", "delete", _HOTSPOT_CON_NAME)
 
     # Create a new hotspot connection
     rc, out, err = await _run(
@@ -311,14 +307,13 @@ async def start_hotspot(ssid: str, password: str, interface: str | None = None) 
         "wifi-sec.pairwise", "ccmp",
         "wifi-sec.group", "ccmp",
         "wifi-sec.psk", password,
-        sudo=True,
     )
     if rc != 0:
         logger.error("system.hotspot_create_failed", error=err or out)
         raise RuntimeError(err or out or f"nmcli exited {rc}")
 
     # Bring it up
-    rc, out, err = await _run("nmcli", "connection", "up", _HOTSPOT_CON_NAME, sudo=True)
+    rc, out, err = await _run("nmcli", "connection", "up", _HOTSPOT_CON_NAME)
     if rc != 0:
         logger.error("system.hotspot_start_failed", error=err or out)
         raise RuntimeError(err or out or f"nmcli exited {rc}")
@@ -331,12 +326,12 @@ async def stop_hotspot() -> None:
     if not nmcli_available():
         raise RuntimeError("nmcli not available")
 
-    rc, _, err = await _run("nmcli", "connection", "down", _HOTSPOT_CON_NAME, sudo=True)
+    rc, _, err = await _run("nmcli", "connection", "down", _HOTSPOT_CON_NAME)
     if rc != 0:
         raise RuntimeError(err or f"nmcli exited {rc}")
 
     # Clean up the connection profile
-    await _run("nmcli", "connection", "delete", _HOTSPOT_CON_NAME, sudo=True)
+    await _run("nmcli", "connection", "delete", _HOTSPOT_CON_NAME)
     logger.info("system.hotspot_stopped")
 
 
@@ -371,32 +366,7 @@ async def delete_saved_connection(name: str) -> None:
     """Delete a saved NetworkManager connection profile by name."""
     if not nmcli_available():
         raise RuntimeError("nmcli not available")
-    rc, _, err = await _run("nmcli", "connection", "delete", name, sudo=True)
+    rc, _, err = await _run("nmcli", "connection", "delete", name)
     if rc != 0:
         raise RuntimeError(err or f"nmcli exited {rc}")
     logger.info("system.connection_deleted", name=name)
-
-
-async def check_sudo_permissions() -> dict[str, bool]:
-    """Check which sudo commands are available without a password prompt."""
-    results: dict[str, bool] = {}
-
-    async def _check(label: str, *cmd: str) -> None:
-        rc, _, _ = await _run("sudo", "-n", *cmd, "--version")
-        # sudo -n returns 1 if password required; the sub-command itself may also fail
-        # We only care that sudo didn't ask for a password (rc != 1 for sudo -n).
-        # A better check: sudo -n -l <cmd>
-        results[label] = rc != 1
-
-    # Use sudo -n -l to list allowed commands
-    rc, out, _ = await _run("sudo", "-n", "-l")
-    if rc == 0:
-        results["nmcli"] = "nmcli" in out
-        results["reboot"] = "reboot" in out
-        results["shutdown"] = "shutdown" in out or "poweroff" in out
-    else:
-        results["nmcli"] = False
-        results["reboot"] = False
-        results["shutdown"] = False
-
-    return results

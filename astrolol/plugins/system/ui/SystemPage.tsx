@@ -32,7 +32,7 @@ import type {
   StorageDisk,
   SystemSettings,
   SystemStatus,
-  SudoSetup,
+  PermissionSetup,
   ThrottleStatus,
   TimeInfo,
   UsbDevice,
@@ -210,8 +210,11 @@ function Section({ title, icon: Icon, children }: {
 
 function DevelopmentSection() {
   const { t } = useTranslation('system')
+  const [info, setInfo] = useState<api.DevelopmentInfo | null>(null)
   const [running, setRunning] = useState<'pull' | 'build' | null>(null)
   const [result, setResult] = useState<{ what: 'pull' | 'build'; ok: boolean; output: string } | null>(null)
+
+  useEffect(() => { api.getDevelopmentInfo().then(setInfo).catch(() => {}) }, [])
 
   const run = async (what: 'pull' | 'build') => {
     setRunning(what)
@@ -227,8 +230,18 @@ function DevelopmentSection() {
   }
 
   const btn = 'flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-surface-border bg-surface-overlay text-xs text-slate-200 hover:text-slate-50 disabled:opacity-50 transition-colors'
+  if (info && !info.checkout) {
+    // An installed package: it is updated with the system's software, not from here.
+    return (
+      <Section title={t('development.title')} icon={Code}>
+        <p className="text-sm text-slate-300">{t('development.version', { version: info.version })}</p>
+        <p className="text-xs text-slate-600 mt-3">{t('development.packagedHint')}</p>
+      </Section>
+    )
+  }
   return (
     <Section title={t('development.title')} icon={Code}>
+      {info && <p className="text-sm text-slate-300 mb-3">{t('development.version', { version: info.version })}</p>}
       <div className="flex flex-wrap gap-2">
         <button className={btn} disabled={running !== null} onClick={() => run('pull')}>
           <GitPullRequestArrow size={13} /> {running === 'pull' ? t('development.pulling') : t('development.gitPull')}
@@ -307,7 +320,7 @@ export function SystemPage() {
   const [throttleStatus, setThrottleStatus] = useState<ThrottleStatus | null>(null)
   const [netStatus, setNetStatus]   = useState<NetworkStatus | null>(null)
   const [networks, setNetworks]     = useState<WifiNetwork[] | null>(null)
-  const [sudoSetup, setSudoSetup]   = useState<SudoSetup | null>(null)
+  const [permissions, setPermissions] = useState<PermissionSetup | null>(null)
   const [settings, setSettings]     = useState<SystemSettings | null>(null)
   const [storage, setStorage]             = useState<StorageDisk[] | null>(null)
   const [timeInfo, setTimeInfo]           = useState<TimeInfo | null>(null)
@@ -325,7 +338,7 @@ export function SystemPage() {
   const [error, setError]                     = useState<string | null>(null)
   const [successMsg, setSuccessMsg]           = useState<string | null>(null)
 
-  const [showSudoHelp, setShowSudoHelp]       = useState(false)
+  const [showPermissionHelp, setShowPermissionHelp] = useState(false)
   const [editingSettings, setEditingSettings] = useState(false)
   const [draftSettings, setDraftSettings]     = useState<SystemSettings | null>(null)
   const [draftHostname, setDraftHostname]     = useState('')
@@ -367,7 +380,7 @@ export function SystemPage() {
 
   useEffect(() => {
     Promise.all([
-      api.getSudoSetup().then(setSudoSetup).catch(() => {}),
+      api.getPermissions().then(setPermissions).catch(() => {}),
       api.getStorage().then(setStorage).catch(() => {}),
       api.getTimeInfo().then((ti) => { setTimeInfo(ti); setSelectedTz(ti.timezone) }).catch(() => {}),
       api.getHostname().then((h) => { setHostname(h); setDraftHostname(h.hostname) }).catch(() => {}),
@@ -1030,33 +1043,35 @@ export function SystemPage() {
       {/* ── Development ───────────────────────────────────────────────────── */}
       <DevelopmentSection />
 
-      {/* ── Sudo permissions ──────────────────────────────────────────────── */}
-      {sudoSetup && (
-        <Section title={t('sudo.title')} icon={Shield}>
+      {/* ── Permissions (polkit) ──────────────────────────────────────────── */}
+      {permissions && (
+        <Section title={t('permissions.title')} icon={Shield}>
           <div className="space-y-2">
             {[
-              { label: t('sudo.nmcli'), ok: sudoSetup.nmcli_sudo_ok },
-              { label: t('sudo.reboot'), ok: sudoSetup.reboot_sudo_ok },
-              { label: t('sudo.shutdown'), ok: sudoSetup.shutdown_sudo_ok },
+              { label: t('permissions.network'), ok: permissions.network_ok },
+              { label: t('permissions.hostname'), ok: permissions.hostname_ok },
+              { label: t('permissions.timezone'), ok: permissions.timezone_ok },
+              { label: t('permissions.reboot'), ok: permissions.reboot_ok },
+              { label: t('permissions.shutdown'), ok: permissions.shutdown_ok },
             ].map(({ label, ok }) => (
               <div key={label} className="flex items-center gap-2 text-xs">
                 {ok ? <CheckCircle size={12} className="text-emerald-400 flex-none" /> : <XCircle size={12} className="text-rose-400 flex-none" />}
                 <span className={ok ? 'text-slate-300' : 'text-slate-500'}>{label}</span>
               </div>
             ))}
-            {(!sudoSetup.nmcli_sudo_ok || !sudoSetup.reboot_sudo_ok || !sudoSetup.shutdown_sudo_ok) && (
+            {permissions.setup_commands.length > 0 && (
               <div className="mt-3">
                 <button
-                  onClick={() => setShowSudoHelp((v) => !v)}
+                  onClick={() => setShowPermissionHelp((v) => !v)}
                   className="text-xs text-accent hover:underline flex items-center gap-1"
                 >
-                  {showSudoHelp ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
-                  {t('sudo.setup')}
+                  {showPermissionHelp ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+                  {t('permissions.setup')}
                 </button>
-                {showSudoHelp && (
+                {showPermissionHelp && (
                   <div className="mt-2 rounded bg-surface-overlay border border-surface-border p-3 space-y-1">
-                    <p className="text-xs text-slate-400 mb-2">{t('sudo.runAsRoot')}</p>
-                    {sudoSetup.setup_commands.map((cmd, i) => (
+                    <p className="text-xs text-slate-400 mb-2">{t('permissions.runOnHost')}</p>
+                    {permissions.setup_commands.map((cmd, i) => (
                       <pre key={i} className="text-xs text-slate-300 font-mono break-all whitespace-pre-wrap">{cmd}</pre>
                     ))}
                   </div>

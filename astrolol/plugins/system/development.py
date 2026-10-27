@@ -39,6 +39,11 @@ async def _run(cmd: list[str], cwd: Path, timeout: float) -> CommandResult:
     return CommandResult(ok=proc.returncode == 0, output=text)
 
 
+def is_checkout() -> bool:
+    """Whether astrolol runs from a git checkout: the only install these commands can update."""
+    return (REPO_ROOT / ".git").exists()
+
+
 async def git_pull() -> CommandResult:
     """Fast-forward the checkout; never merges or rewrites local work."""
     return await _run(["git", "pull", "--ff-only"], REPO_ROOT, timeout=120)

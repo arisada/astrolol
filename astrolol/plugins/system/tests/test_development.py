@@ -91,3 +91,19 @@ def test_endpoints(monkeypatch: pytest.MonkeyPatch) -> None:
     r = client.post("/plugins/system/dev/git_pull")
     assert r.status_code == 200
     assert r.json() == {"ok": True, "output": "Already up to date."}
+
+
+def test_a_checkout_offers_the_commands() -> None:
+    # The test suite runs from the git checkout.
+    r = TestClient(_make_app()).get("/plugins/system/dev")
+    assert r.status_code == 200
+    assert r.json()["checkout"] is True and r.json()["version"]
+
+
+def test_a_packaged_install_refuses_them(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # Installed from a package: no .git next to the code, updates come with the system's.
+    monkeypatch.setattr(development, "REPO_ROOT", tmp_path)
+    client = TestClient(_make_app())
+    assert client.get("/plugins/system/dev").json()["checkout"] is False
+    assert client.post("/plugins/system/dev/git_pull").status_code == 409
+    assert client.post("/plugins/system/dev/rebuild_ui").status_code == 409

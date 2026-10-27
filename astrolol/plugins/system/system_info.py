@@ -195,9 +195,9 @@ async def get_hostname_info() -> HostnameInfo:
 
 
 async def set_hostname(new_hostname: str) -> None:
-    """Change the system hostname via hostnamectl. Requires sudo."""
+    """Change the system hostname via hostnamectl (polkit decides, see privileges.py)."""
     proc = await asyncio.create_subprocess_exec(
-        "sudo", "hostnamectl", "set-hostname", new_hostname,
+        "hostnamectl", "set-hostname", new_hostname,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
     )
@@ -246,9 +246,9 @@ async def get_usb_devices() -> list[UsbDevice]:
 
 
 async def set_timezone(tz: str) -> None:
-    """Set system timezone via timedatectl. Requires sudo."""
+    """Set system timezone via timedatectl (polkit decides, see privileges.py)."""
     proc = await asyncio.create_subprocess_exec(
-        "sudo", "timedatectl", "set-timezone", tz,
+        "timedatectl", "set-timezone", tz,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
     )

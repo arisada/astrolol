@@ -1409,10 +1409,12 @@ export interface ThrottleStatus {
   underpowered: boolean
 }
 
-export interface SudoSetup {
-  nmcli_sudo_ok: boolean
-  reboot_sudo_ok: boolean
-  shutdown_sudo_ok: boolean
+export interface PermissionSetup {
+  network_ok: boolean
+  reboot_ok: boolean
+  shutdown_ok: boolean
+  hostname_ok: boolean
+  timezone_ok: boolean
   setup_commands: string[]
 }
 

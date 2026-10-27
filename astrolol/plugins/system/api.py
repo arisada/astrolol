@@ -10,17 +10,19 @@ from fastapi import APIRouter, HTTPException, Request
 
 from astrolol.plugins.system import development as _dev
 from astrolol.plugins.system import network as _net
+from astrolol.plugins.system import privileges as _priv
 from astrolol.plugins.system import system_info as _si
 from astrolol.plugins.system import throttle as _throttle
 from astrolol.plugins.system.models import (
     CommandResult,
+    DevelopmentInfo,
     HostnameInfo,
     HotspotStartRequest,
     NetworkStatus,
     SavedWifiConnection,
     SetHostnameRequest,
     StorageDisk,
-    SudoSetup,
+    PermissionSetup,
     SystemSettings,
     SystemStatus,
     ThrottleStatus,
@@ -29,6 +31,7 @@ from astrolol.plugins.system.models import (
     WifiConnectRequest,
     WifiNetwork,
 )
+from astrolol.version import SERVER_VERSION
 
 logger = structlog.get_logger()
 
@@ -170,24 +173,19 @@ async def put_settings(body: SystemSettings, request: Request) -> SystemSettings
     return body
 
 
-# ── Sudo / capabilities ────────────────────────────────────────────────────────
+# ── Permissions (polkit) ───────────────────────────────────────────────────────
 
-@router.get("/sudo", response_model=SudoSetup)
-async def get_sudo_setup() -> SudoSetup:
-    """Check which privileged operations are available."""
-    perms = await _net.check_sudo_permissions()
-    username = os.environ.get("USER", "pi")
-    setup_commands = [
-        f"echo '{username} ALL=(ALL) NOPASSWD: /usr/bin/nmcli' | sudo tee /etc/sudoers.d/astrolol-nmcli",
-        f"echo '{username} ALL=(ALL) NOPASSWD: /sbin/reboot' | sudo tee /etc/sudoers.d/astrolol-reboot",
-        f"echo '{username} ALL=(ALL) NOPASSWD: /sbin/shutdown' | sudo tee /etc/sudoers.d/astrolol-shutdown",
-        "sudo chmod 440 /etc/sudoers.d/astrolol-*",
-    ]
-    return SudoSetup(
-        nmcli_sudo_ok=perms.get("nmcli", False),
-        reboot_sudo_ok=perms.get("reboot", False),
-        shutdown_sudo_ok=perms.get("shutdown", False),
-        setup_commands=setup_commands,
+@router.get("/permissions", response_model=PermissionSetup)
+async def get_permissions() -> PermissionSetup:
+    """Which host-management actions polkit allows astrolol, and how to allow the others."""
+    ok = await _priv.check()
+    return PermissionSetup(
+        network_ok=ok["network"],
+        reboot_ok=ok["reboot"],
+        shutdown_ok=ok["shutdown"],
+        hostname_ok=ok["hostname"],
+        timezone_ok=ok["timezone"],
+        setup_commands=[] if all(ok.values()) else _priv.setup_commands(),
     )
 
 
@@ -223,7 +221,7 @@ async def list_timezones() -> list[str]:
 
 @router.put("/time/timezone", status_code=200)
 async def set_timezone(body: dict, request: Request) -> dict[str, str]:
-    """Set the system timezone. Requires passwordless sudo for timedatectl."""
+    """Set the system timezone (timedatectl; allowed by the polkit rule)."""
     tz = body.get("timezone", "").strip()
     if not tz:
         raise HTTPException(status_code=400, detail="timezone is required")
@@ -244,7 +242,7 @@ async def get_hostname() -> HostnameInfo:
 
 @router.put("/hostname", status_code=200, response_model=HostnameInfo)
 async def set_hostname(body: SetHostnameRequest) -> HostnameInfo:
-    """Change the system hostname. Requires passwordless sudo for hostnamectl."""
+    """Change the system hostname (hostnamectl; allowed by the polkit rule)."""
     import re
     if not re.match(r'^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?$', body.hostname):
         raise HTTPException(
@@ -262,11 +260,11 @@ async def set_hostname(body: SetHostnameRequest) -> HostnameInfo:
 
 @router.post("/reboot", status_code=202)
 async def reboot_system() -> dict[str, str]:
-    """Reboot the host system. Requires passwordless sudo for /sbin/reboot."""
+    """Reboot the host system (systemd; allowed by the polkit rule)."""
     async def _do() -> None:
         await asyncio.sleep(0.5)
         logger.info("system.rebooting")
-        proc = await asyncio.create_subprocess_exec("sudo", "reboot")
+        proc = await asyncio.create_subprocess_exec("systemctl", "reboot")
         await proc.wait()
 
     asyncio.create_task(_do())
@@ -275,11 +273,11 @@ async def reboot_system() -> dict[str, str]:
 
 @router.post("/shutdown", status_code=202)
 async def shutdown_system() -> dict[str, str]:
-    """Shut down the host system. Requires passwordless sudo for /sbin/shutdown."""
+    """Power off the host system (systemd; allowed by the polkit rule)."""
     async def _do() -> None:
         await asyncio.sleep(0.5)
         logger.info("system.shutting_down")
-        proc = await asyncio.create_subprocess_exec("sudo", "shutdown", "-h", "now")
+        proc = await asyncio.create_subprocess_exec("systemctl", "poweroff")
         await proc.wait()
 
     asyncio.create_task(_do())
@@ -300,8 +298,17 @@ async def restart_astrolol() -> dict[str, str]:
 
 # ── Development ────────────────────────────────────────────────────────────────
 
+@router.get("/dev", response_model=DevelopmentInfo)
+async def dev_info() -> DevelopmentInfo:
+    """The installed version, and whether this install can update itself from git."""
+    return DevelopmentInfo(checkout=_dev.is_checkout(), version=SERVER_VERSION)
+
+
 async def _exclusive_dev(request: Request, command):  # noqa: ANN001, ANN202
     """Run one development command at a time (a second click while one runs is refused)."""
+    if not _dev.is_checkout():
+        # A packaged install: updates come with the system's package updates.
+        raise HTTPException(status_code=409, detail="astrolol is not running from a git checkout")
     lock: asyncio.Lock | None = getattr(request.app.state, "system_dev_lock", None)
     if lock is None:
         lock = request.app.state.system_dev_lock = asyncio.Lock()

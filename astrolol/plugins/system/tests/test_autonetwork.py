@@ -182,7 +182,7 @@ async def test_status_detects_hotspot_from_profile_mode() -> None:
             (0, "IP4.ADDRESS[1]:10.42.0.1/24\nIP4.GATEWAY:", ""),
     }
 
-    async def fake_run(*args: str, sudo: bool = False) -> tuple[int, str, str]:
+    async def fake_run(*args: str) -> tuple[int, str, str]:
         return answers[args]
 
     with patch.object(net, "_run", fake_run), patch.object(net, "nmcli_available", lambda: True):
@@ -193,7 +193,7 @@ async def test_status_detects_hotspot_from_profile_mode() -> None:
 
 
 async def test_ethernet_connected_parses_device_status() -> None:
-    async def fake_run(*args: str, sudo: bool = False) -> tuple[int, str, str]:
+    async def fake_run(*args: str) -> tuple[int, str, str]:
         return 0, "wifi:disconnected\nethernet:connected\nloopback:unmanaged", ""
 
     with patch.object(net, "_run", fake_run), patch.object(net, "nmcli_available", lambda: True):
@@ -203,7 +203,7 @@ async def test_ethernet_connected_parses_device_status() -> None:
 async def test_hotspot_is_created_with_wpa2_and_fixed_address() -> None:
     calls: list[tuple[str, ...]] = []
 
-    async def fake_run(*args: str, sudo: bool = False) -> tuple[int, str, str]:
+    async def fake_run(*args: str) -> tuple[int, str, str]:
         calls.append(args)
         return 0, "", ""
 
