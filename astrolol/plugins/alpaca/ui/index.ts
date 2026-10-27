@@ -1,8 +1,8 @@
-import { Network } from 'lucide-react'
+import { AlpacaIcon } from './AlpacaIcon'
 import { AlpacaPage } from './AlpacaPage'
 
 export default {
-  icon: Network,
-  label: 'ASCOM Alpaca',
+  icon: AlpacaIcon,
+  label: 'Alpaca',
   Component: AlpacaPage,
 }

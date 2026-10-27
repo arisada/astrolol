@@ -5,7 +5,7 @@ Connecte les caméras, montures, focusers, roues à filtres, rotateurs et pannea
 pilotes ASCOM Windows partagés avec ASCOM Remote, et les simulateurs OmniSim d'ASCOM.
 
 Activez le module dans [Options → Modules](../../../../docs/fr/options.md#modules) (astrolol
-redémarre), puis ouvrez **ASCOM Alpaca** dans la partie Équipement du menu.
+redémarre), puis ouvrez **Alpaca** dans la partie Équipement du menu.
 
 ![La page ASCOM Alpaca](alpaca.jpg)
 

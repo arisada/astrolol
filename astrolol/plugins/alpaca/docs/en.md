@@ -5,7 +5,7 @@ calibrators) that speak ASCOM Alpaca over the network: devices with Alpaca built
 ASCOM drivers shared with ASCOM Remote, and ASCOM's OmniSim simulators.
 
 Turn the plugin on in [Options → Plugins](../../../../docs/en/options.md#plugins) (astrolol
-restarts), then open **ASCOM Alpaca** in the Equipment section of the menu.
+restarts), then open **Alpaca** in the Equipment section of the menu.
 
 ![The ASCOM Alpaca page](alpaca.jpg)
 

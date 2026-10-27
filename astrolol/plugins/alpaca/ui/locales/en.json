@@ -1,5 +1,5 @@
 {
-  "label": "ASCOM Alpaca",
+  "label": "Alpaca",
   "manifest": {
     "name": "ASCOM Alpaca",
     "description": "Cameras, mounts, focusers, filter wheels, rotators and flat panels that speak ASCOM Alpaca over the network."
