@@ -82,10 +82,17 @@ async def test_rebuild_ui_runs_npm_build_in_ui_dir(monkeypatch: pytest.MonkeyPat
     assert calls == [(["npm", "run", "build"], development.UI_DIR)]
 
 
-def test_endpoints(monkeypatch: pytest.MonkeyPatch) -> None:
+def _checkout(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    # Not the source tree itself: the package build runs the tests from an exported tree.
+    (tmp_path / ".git").mkdir()
+    monkeypatch.setattr(development, "REPO_ROOT", tmp_path)
+
+
+def test_endpoints(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     async def fake_pull() -> CommandResult:
         return CommandResult(ok=True, output="Already up to date.")
 
+    _checkout(tmp_path, monkeypatch)
     monkeypatch.setattr(development, "git_pull", fake_pull)
     client = TestClient(_make_app())
     r = client.post("/plugins/system/dev/git_pull")
@@ -93,8 +100,8 @@ def test_endpoints(monkeypatch: pytest.MonkeyPatch) -> None:
     assert r.json() == {"ok": True, "output": "Already up to date."}
 
 
-def test_a_checkout_offers_the_commands() -> None:
-    # The test suite runs from the git checkout.
+def test_a_checkout_offers_the_commands(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    _checkout(tmp_path, monkeypatch)
     r = TestClient(_make_app()).get("/plugins/system/dev")
     assert r.status_code == 200
     assert r.json()["checkout"] is True and r.json()["version"]
