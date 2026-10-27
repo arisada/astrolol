@@ -1,10 +1,11 @@
-import os
 from pathlib import Path
 
 import structlog
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
+
+from astrolol.config.settings import settings
 
 logger = structlog.get_logger()
 
@@ -43,15 +44,14 @@ def _is_page_navigation(request: Request) -> bool:
 
 
 # Candidate locations for ui/dist, in priority order:
-#   1. ASTROLOL_UI_DIST env var (explicit override)
+#   1. settings.ui_dist (ASTROLOL_UI_DIST or the configuration file: explicit override)
 #   2. Relative to this source file (works with `pip install -e .` from a git clone)
 #   3. Current working directory (works when running `python -m astrolol.main` from the repo root)
 def _find_ui_dist() -> Path | None:
-    if env := os.environ.get("ASTROLOL_UI_DIST"):
-        p = Path(env)
-        if p.is_dir():
-            return p
-        logger.warning("static.ui_dist_env_not_found", path=str(p))
+    if settings.ui_dist is not None:
+        if settings.ui_dist.is_dir():
+            return settings.ui_dist
+        logger.warning("static.ui_dist_not_found", path=str(settings.ui_dist))
         return None
 
     candidates = [
@@ -79,7 +79,7 @@ def mount_ui(app: FastAPI) -> None:
             message=(
                 "ui/dist not found — UI will not be served. "
                 "Run `npm run build` inside the ui/ directory, or set the "
-                "ASTROLOL_UI_DIST environment variable to the dist path."
+                "ui_dist setting (ASTROLOL_UI_DIST) to the dist path."
             ),
         )
         return

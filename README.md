@@ -147,6 +147,29 @@ python3 -m astrolol.main
 
 API docs: `http://localhost:8000/docs`
 
+## Configuration
+
+What you change in the UI is saved in the data directory. A few start-up settings are read
+once, when astrolol starts, from (highest priority first):
+
+1. environment variables, `ASTROLOL_<SETTING>` (e.g. `ASTROLOL_INDI_PORT=7625`),
+2. the configuration file `/etc/astrolol/astrolol.toml`, if it exists (`ASTROLOL_CONFIG` names
+   another file),
+3. the defaults.
+
+```toml
+# /etc/astrolol/astrolol.toml
+data_dir = "/var/lib/astrolol"      # settings, profiles, users, logs. Default: ~/.astrolol
+images_dir = "/mnt/usb/raw"         # raw camera files. Default: <data_dir>/images
+# ui_dist = "/path/to/ui/dist"      # the built web UI, if it is not found next to the code
+# indi_server_kind = "indigo"       # also indi_manage_server, indi_host, indi_port,
+                                    # indigo_server_path: then greyed out in Options
+# allowed_origins = ["https://astro.example"]
+```
+
+The full list is `Settings` in [`astrolol/config/settings.py`](astrolol/config/settings.py). A
+misspelt setting in the file stops astrolol at start, with the name in the error.
+
 ## Docker
 
 ```bash

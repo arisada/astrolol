@@ -12,8 +12,7 @@
 #                        it in. For another venv, use <venv>/bin/astrolol; for
 #                        `pipx install` it is ~/.local/bin/astrolol of the
 #                        service user.
-# 3. WorkingDirectory=   Relative paths, such as the default images directory
-#                        (./images), resolve here.
+# 3. WorkingDirectory=   Relative paths in the configuration resolve here.
 # 4. Environment=        Optional ASTROLOL_* overrides (see astrolol/config/
 #                        settings.py), e.g. ASTROLOL_UI_DIST if the UI build is
 #                        not found automatically.
@@ -73,7 +72,8 @@ RestartSec=3
 
 # Python: don't buffer output, so journalctl shows lines as they happen.
 Environment=PYTHONUNBUFFERED=1
-# Examples (uncomment to use):
+# Examples (uncomment to use; the same settings can go in /etc/astrolol/astrolol.toml,
+# see the README's Configuration):
 #Environment=ASTROLOL_DATA_DIR=/var/lib/astrolol
 #Environment=ASTROLOL_IMAGES_DIR=/home/astrolol/images
 # INDIGO drivers instead of INDI ones (astrolol starts indigo_server instead of indiserver)

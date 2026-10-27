@@ -54,10 +54,10 @@ For example `%U/astro/%O/%D` with `%F_%f_%Es_%N` gives
     path. Greyed out unless astrolol starts an INDIGO server.
   - **In use**: the server astrolol is using now.
 
-  These can also be set where astrolol is installed (environment variables, e.g. in its service
-  file): `ASTROLOL_INDI_SERVER_KIND` (`indi` or `indigo`), `ASTROLOL_INDI_MANAGE_SERVER`,
-  `ASTROLOL_INDI_HOST`, `ASTROLOL_INDI_PORT` and `ASTROLOL_INDIGO_SERVER_PATH`. A setting given
-  this way is greyed out here.
+  These can also be set where astrolol is installed, in its configuration file
+  `/etc/astrolol/astrolol.toml` (`indi_server_kind = "indigo"`, `indi_manage_server`,
+  `indi_host`, `indi_port`, `indigo_server_path`) or as environment variables
+  (`ASTROLOL_INDI_SERVER_KIND`, …). A setting given this way is greyed out here.
 - **Run directory**: where the INDI server keeps its control files.
 - **Local image transfer**: the driver writes images straight to disk instead of sending them
   over the network connection. Faster, especially with large sensors. **Upload directory** is

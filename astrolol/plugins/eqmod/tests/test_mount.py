@@ -9,6 +9,7 @@ import astropy.units as u
 import pytest
 from astropy.coordinates import SkyCoord
 
+from astrolol.config.settings import settings
 from astrolol.devices.base.models import TrackingMode
 from astrolol.plugins.eqmod import mount as mount_module
 from astrolol.mount.sky import icrs_to_jnow, jnow_to_icrs, local_sidereal_time_h
@@ -141,7 +142,7 @@ def _fast_and_deterministic(monkeypatch, tmp_path):
     monkeypatch.setattr(mount_module, "AXIS_STOP_POLL_INTERVAL", 0)
     monkeypatch.setattr(mount_module, "GOTO_POLL_INTERVAL", 0)
     monkeypatch.setattr(mount_module, "_now", lambda: NOW)
-    monkeypatch.setenv("ASTROLOL_DATA_DIR", str(tmp_path))
+    monkeypatch.setattr(settings, "data_dir", tmp_path)
 
 
 async def _connected(controller: _FakeController | None = None, located: bool = True, **params):

@@ -55,10 +55,10 @@ Par exemple `%U/astro/%O/%D` avec `%F_%f_%Es_%N` donne
     le chemin de recherche. Grisé sauf quand astrolol démarre un serveur INDIGO.
   - **En service** : le serveur qu'astrolol utilise maintenant.
 
-  Ils peuvent aussi se régler là où astrolol est installé (variables d'environnement, par ex.
-  dans son fichier de service) : `ASTROLOL_INDI_SERVER_KIND` (`indi` ou `indigo`),
-  `ASTROLOL_INDI_MANAGE_SERVER`, `ASTROLOL_INDI_HOST`, `ASTROLOL_INDI_PORT` et
-  `ASTROLOL_INDIGO_SERVER_PATH`. Un réglage donné ainsi est grisé ici.
+  Ils peuvent aussi se régler là où astrolol est installé, dans son fichier de configuration
+  `/etc/astrolol/astrolol.toml` (`indi_server_kind = "indigo"`, `indi_manage_server`,
+  `indi_host`, `indi_port`, `indigo_server_path`) ou en variables d'environnement
+  (`ASTROLOL_INDI_SERVER_KIND`, …). Un réglage donné ainsi est grisé ici.
 - **Dossier d'exécution** : où le serveur INDI garde ses fichiers de contrôle.
 - **Transfert d'images local** : le pilote écrit les images directement sur le disque au lieu de
   les envoyer par la connexion réseau. Plus rapide, surtout avec de grands capteurs. Le

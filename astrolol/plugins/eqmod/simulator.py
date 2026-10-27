@@ -33,8 +33,7 @@ Design points carried over from planning:
 - Slew and nudge move incrementally over a simulated realistic duration
   (see _SLEW_RATE_DEG_PER_SEC and rates.py) rather than
   teleporting, pushing intermediate positions so the UI shows real motion.
-- State is persisted per state_key under ~/.astrolol/eqmod/ (or
-  $ASTROLOL_DATA_DIR/eqmod/) so a restarted astrolol process reconnects
+- State is persisted per state_key under <data_dir>/eqmod/ so a restarted astrolol process reconnects
   without losing the plate-solve sync — mirroring how a real EQMOD mount's
   motor controller keeps running independently of the serial connection.
   _position_time is persisted too, so drift keeps accruing correctly across
@@ -57,7 +56,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-import os
 import secrets
 from datetime import datetime, timezone
 from pathlib import Path
@@ -68,6 +66,7 @@ import structlog
 from astropy.coordinates import TETE, AltAz, EarthLocation, SkyCoord
 from astropy.time import Time
 
+from astrolol.config.settings import settings
 from astrolol.devices.base.models import DeviceState, MountStatus, TrackingMode
 from astrolol.plugins.eqmod.protocol import SIDEREAL_DEG_PER_SEC
 from astrolol.mount.rates import nudge_speed_x_sidereal
@@ -93,9 +92,7 @@ def _now() -> datetime:
 # --- Persisted state (module-level so simulate_power_cycle() needs no live instance) ---
 
 def _state_dir() -> Path:
-    env = os.environ.get("ASTROLOL_DATA_DIR")
-    base = Path(env) if env else Path.home() / ".astrolol"
-    return base / "eqmod"
+    return settings.data_dir / "eqmod"
 
 
 def _state_path(state_key: str) -> Path:

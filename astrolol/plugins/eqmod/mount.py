@@ -8,7 +8,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-import os
 import time
 from dataclasses import asdict, dataclass
 from datetime import datetime, timezone
@@ -18,6 +17,7 @@ from typing import Any, Callable
 import structlog
 from astropy.coordinates import SkyCoord
 
+from astrolol.config.settings import settings
 from astrolol.devices.base.models import DeviceState, MountStatus, TrackingMode
 from astrolol.mount.sky import alt_az, icrs_to_jnow, jnow_to_icrs, local_sidereal_time_h
 from astrolol.mount.rates import nudge_speed_x_sidereal
@@ -65,8 +65,7 @@ def _now() -> datetime:
 
 
 def _state_path(key: str) -> Path:
-    env = os.environ.get("ASTROLOL_DATA_DIR")
-    return (Path(env) if env else Path.home() / ".astrolol") / "eqmod" / f"{key}.json"
+    return settings.data_dir / "eqmod" / f"{key}.json"
 
 
 def _check_meridian_limit(degrees: float) -> None:

@@ -7,6 +7,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
+from astrolol.config.settings import settings
 from astrolol.core.events import EventBus
 from astrolol.core.plugin_api import Plugin, PluginContext
 from astrolol.devices.config import DeviceConfig
@@ -19,7 +20,7 @@ from astrolol.plugins.eqmod.simulator import EqmodSimMount
 
 @pytest.fixture(autouse=True)
 def _isolated_state_dir(tmp_path, monkeypatch):
-    monkeypatch.setenv("ASTROLOL_DATA_DIR", str(tmp_path))
+    monkeypatch.setattr(settings, "data_dir", tmp_path)
 
 
 def _make_app(tmp_path) -> tuple[FastAPI, DeviceManager]:

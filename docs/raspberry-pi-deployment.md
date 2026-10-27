@@ -229,3 +229,4 @@ sudo systemctl restart astrolol
 | Camera or mount not found | `groups astrolol` should list `dialout plugdev video`; unplug and replug the device, then restart the service. Group changes need a service restart |
 | Certificate warning returns after a name/IP change | Re-run `install-nginx-https.sh` and trust the new certificate |
 | Settings, profiles, logs | `/home/astrolol/.astrolol/` (`profiles.json`, `astrolol.log`) |
+| Raw camera files | `/home/astrolol/.astrolol/images/` (`images_dir`, see the README's Configuration) |

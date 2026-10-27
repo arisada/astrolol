@@ -1,6 +1,6 @@
 """The INDI server chosen in Options: saved in the user settings, used from the next start.
 
-The environment (ASTROLOL_INDI_*) wins over the choice.
+The start-up configuration (ASTROLOL_INDI_*, or the configuration file) wins over the choice.
 """
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ def _restore_settings(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
     for field in INDI_SERVER_FIELDS.values():
         monkeypatch.setattr(settings, field, getattr(settings, field))
     monkeypatch.setattr(settings, "profiles_file", tmp_path / "profiles.json")
-    monkeypatch.setattr(settings_mod, "ENV_FIELDS", frozenset())
+    monkeypatch.setattr(settings_mod, "CONFIGURED_FIELDS", frozenset())
 
 
 def test_choice_is_applied() -> None:
@@ -36,11 +36,11 @@ def test_unset_parts_keep_the_default() -> None:
 
 
 def test_environment_wins(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(settings_mod, "ENV_FIELDS", frozenset({"indi_port"}))
+    monkeypatch.setattr(settings_mod, "CONFIGURED_FIELDS", frozenset({"indi_port"}))
     monkeypatch.setattr(settings, "indi_port", 7700)
     apply_indi_server_choice(IndiServerChoice(kind="indigo", port=7625))
     assert (settings.indi_server_kind, settings.indi_port) == ("indigo", 7700)
-    assert settings_mod.indi_server_env_keys() == ["port"]
+    assert settings_mod.indi_server_configured_keys() == ["port"]
 
 
 def test_old_settings_files_load() -> None:
@@ -102,7 +102,7 @@ async def test_parts_that_do_not_matter_need_no_restart() -> None:
 async def test_environment_fixed_parts_are_listed(monkeypatch: pytest.MonkeyPatch) -> None:
     from astrolol.main import create_app
 
-    monkeypatch.setattr(settings_mod, "ENV_FIELDS", frozenset({"indi_server_kind"}))
+    monkeypatch.setattr(settings_mod, "CONFIGURED_FIELDS", frozenset({"indi_server_kind"}))
     settings.indi_server_kind = "indi"
     app = create_app()
     store = app.state.profile_store

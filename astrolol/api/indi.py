@@ -63,7 +63,8 @@ class IndiServerInfo(BaseModel):
     host: str
     port: int
     # The server used from the next start (Options' choice, UserSettings.indi_server), the
-    # parts of it the environment fixes, and whether it differs from the running one.
+    # parts of it the start-up configuration fixes (file or environment), and whether it
+    # differs from the running one.
     next: IndiServerChoiceOut
     env: list[str] = []
     restart_needed: bool = False
@@ -72,7 +73,7 @@ class IndiServerInfo(BaseModel):
 @router.get("/server", response_model=IndiServerInfo)
 def get_server(request: Request) -> IndiServerInfo:
     """Which server astrolol talks INDI to, and how; and the one chosen for the next start."""
-    from astrolol.config.settings import INDI_SERVER_FIELDS, ENV_FIELDS, indi_server_env_keys
+    from astrolol.config.settings import CONFIGURED_FIELDS, INDI_SERVER_FIELDS, indi_server_configured_keys
 
     manager = getattr(request.app.state.registry, "indi_manager", None)
     server = getattr(manager, "_server", None)
@@ -80,7 +81,7 @@ def get_server(request: Request) -> IndiServerInfo:
     running = {key: getattr(settings, field) for key, field in INDI_SERVER_FIELDS.items()}
     choice = request.app.state.profile_store.get_user_settings().indi_server
     nxt = {
-        key: value if field in ENV_FIELDS or getattr(choice, key) is None else getattr(choice, key)
+        key: value if field in CONFIGURED_FIELDS or getattr(choice, key) is None else getattr(choice, key)
         for (key, field), value in zip(INDI_SERVER_FIELDS.items(), running.values())
     }
     # The INDIGO program only matters to a managed INDIGO server; the host only to an external one.
@@ -95,7 +96,7 @@ def get_server(request: Request) -> IndiServerInfo:
         host=getattr(server, "host", settings.indi_host),
         port=getattr(server, "port", settings.indi_port),
         next=IndiServerChoiceOut(**nxt),
-        env=indi_server_env_keys(),
+        env=indi_server_configured_keys(),
         restart_needed=any(nxt[k] != running[k] for k in relevant),
     )
 

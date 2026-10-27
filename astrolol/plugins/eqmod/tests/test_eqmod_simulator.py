@@ -14,6 +14,7 @@ import pytest
 from astropy.coordinates import SkyCoord
 import astropy.units as u
 
+from astrolol.config.settings import settings
 from astrolol.devices.base.models import TrackingMode
 from astrolol.plugins.eqmod import simulator
 from astrolol.plugins.eqmod.simulator import EqmodSimMount, simulate_power_cycle
@@ -21,7 +22,7 @@ from astrolol.plugins.eqmod.simulator import EqmodSimMount, simulate_power_cycle
 
 @pytest.fixture(autouse=True)
 def _isolated_state_dir(tmp_path, monkeypatch):
-    monkeypatch.setenv("ASTROLOL_DATA_DIR", str(tmp_path))
+    monkeypatch.setattr(settings, "data_dir", tmp_path)
 
 
 @pytest.fixture(autouse=True)
