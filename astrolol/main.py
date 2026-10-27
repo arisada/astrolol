@@ -39,6 +39,7 @@ from astrolol.app import (
     build_plugin_manager,
     build_registry,
     discover_plugins,
+    log_auto_enabled,
     resolve_enabled_plugins,
     setup_plugins,
 )
@@ -197,6 +198,7 @@ def create_app() -> FastAPI:
     # requires "object_resolver") without persisting that back to user settings —
     # disabling "target" later naturally drops the dependency too.
     resolved_enabled = resolve_enabled_plugins(discovered_plugins, user_settings.enabled_plugins)
+    log_auto_enabled(discovered_plugins, user_settings.enabled_plugins, resolved_enabled)
     setup_plugins(app, plugin_ctx, discovered_plugins, resolved_enabled)
 
     app.state.discovered_plugins = discovered_plugins

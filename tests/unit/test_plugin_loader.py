@@ -8,8 +8,9 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from fastapi import FastAPI
+from structlog.testing import capture_logs
 
-from astrolol.app import discover_plugins, resolve_enabled_plugins, setup_plugins, sync_enabled_plugins
+from astrolol.app import discover_plugins, log_auto_enabled, resolve_enabled_plugins, setup_plugins, sync_enabled_plugins
 from astrolol.core.plugin_api import Plugin, PluginContext, PluginManifest
 
 
@@ -202,6 +203,29 @@ def test_resolve_preserves_order_of_originally_enabled() -> None:
 
     resolved = resolve_enabled_plugins(discovered, ["p2", "p1"])
     assert resolved == ["p2", "p1"]
+
+
+def _requiring() -> dict:
+    child = _make_plugin("child")
+    child.manifest = PluginManifest(id="child", name="Child", version="0.1.0", requires=["parent"])
+    return {"child": child, "parent": _make_plugin("parent")}
+
+
+def test_only_dependencies_nobody_enabled_are_logged_as_auto_enabled() -> None:
+    discovered = _requiring()
+    with capture_logs() as logs:
+        log_auto_enabled(discovered, ["child"], resolve_enabled_plugins(discovered, ["child"]))
+        log_auto_enabled(discovered, ["child", "parent"], resolve_enabled_plugins(discovered, ["child", "parent"]))
+    assert [(e["event"], e["plugin_id"], e["required_by"]) for e in logs] == [
+        ("plugin.auto_enabled", "parent", ["child"]),
+    ]
+
+
+def test_resolving_logs_nothing() -> None:
+    # GET /plugins resolves on every page load.
+    with capture_logs() as logs:
+        resolve_enabled_plugins(_requiring(), ["child"])
+    assert logs == []
 
 
 def test_setup_order_matches_enabled_list() -> None:

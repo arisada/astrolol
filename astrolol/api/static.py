@@ -31,6 +31,10 @@ def _is_page_navigation(request: Request) -> bool:
     """True for a user typing/reloading a URL, never for a script's fetch()/XHR."""
     if request.method not in ("GET", "HEAD"):
         return False
+    # A navigation passed on by a service worker's fetch() keeps mode "navigate" but has
+    # dest "empty"; a script can never make a "navigate" request itself.
+    if request.headers.get("sec-fetch-mode") == "navigate":
+        return True
     dest = request.headers.get("sec-fetch-dest")
     if dest is not None:
         return dest == "document"
@@ -86,9 +90,16 @@ def mount_ui(app: FastAPI) -> None:
     @app.middleware("http")
     async def page_navigation(request: Request, call_next):
         first, _, rest = request.url.path.strip("/").partition("/")
-        if first in _CLIENT_ROUTES_SHADOWING_API and not rest and _is_page_navigation(request):
-            return FileResponse(UI_DIST / "index.html")
-        return await call_next(request)
+        if first not in _CLIENT_ROUTES_SHADOWING_API or rest:
+            return await call_next(request)
+        # One URL, two answers: without these headers the browser cached the shell it got on
+        # reload and handed it to the page's fetch() of the same URL (JSON parse error).
+        if _is_page_navigation(request):
+            response = FileResponse(UI_DIST / "index.html", headers={"Cache-Control": "no-store"})
+        else:
+            response = await call_next(request)
+        response.headers["Vary"] = "Sec-Fetch-Mode, Sec-Fetch-Dest, Accept"
+        return response
 
     @app.get("/{full_path:path}", include_in_schema=False)
     async def spa_fallback(full_path: str) -> FileResponse:

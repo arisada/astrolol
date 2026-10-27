@@ -1,5 +1,4 @@
 // Minimal service worker — satisfies Chrome's PWA installability requirement.
-// No caching: every request goes to the network as normal.
-self.addEventListener('fetch', (event) => {
-  event.respondWith(fetch(event.request))
-})
+// No caching, and requests are not intercepted: passing them on with fetch() would change
+// their headers (a page reload would no longer look like a navigation to the server).
+self.addEventListener('fetch', () => {})

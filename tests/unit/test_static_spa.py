@@ -13,7 +13,7 @@ from fastapi.testclient import TestClient
 from astrolol.api import static
 
 NAVIGATE = {"Sec-Fetch-Dest": "document", "Accept": "text/html,application/xhtml+xml,*/*;q=0.8"}
-FETCH = {"Sec-Fetch-Dest": "empty", "Accept": "*/*"}
+FETCH = {"Sec-Fetch-Dest": "empty", "Sec-Fetch-Mode": "cors", "Accept": "*/*"}
 
 
 @pytest.fixture()
@@ -43,6 +43,12 @@ def test_navigation_gets_the_app_shell(client: TestClient, path: str) -> None:
     assert "spa shell" in resp.text
 
 
+def test_navigation_passed_on_by_the_service_worker_gets_the_shell(client: TestClient) -> None:
+    # Chrome: the service worker's fetch(event.request) of a reload.
+    resp = client.get("/profiles", headers={**NAVIGATE, "Sec-Fetch-Dest": "empty", "Sec-Fetch-Mode": "navigate"})
+    assert "spa shell" in resp.text
+
+
 def test_navigation_without_fetch_metadata_uses_accept(client: TestClient) -> None:
     resp = client.get("/profiles", headers={"Accept": "text/html,*/*"})
     assert "spa shell" in resp.text
@@ -55,6 +61,14 @@ def test_fetch_still_reaches_the_api(client: TestClient, headers: dict[str, str]
 
 def test_api_subpaths_stay_api_for_navigations(client: TestClient) -> None:
     assert client.get("/mount/status", headers=NAVIGATE).json() == {"api": "status"}
+
+
+def test_the_shell_and_the_api_are_never_cached_for_each_other(client: TestClient) -> None:
+    # The browser cached the shell from a reload and gave it to fetch("/profiles").
+    shell = client.get("/profiles", headers=NAVIGATE)
+    assert shell.headers["cache-control"] == "no-store"
+    assert shell.headers["vary"] == "Sec-Fetch-Mode, Sec-Fetch-Dest, Accept"
+    assert client.get("/profiles", headers=FETCH).headers["vary"] == "Sec-Fetch-Mode, Sec-Fetch-Dest, Accept"
 
 
 def test_only_get_is_a_navigation(client: TestClient) -> None:

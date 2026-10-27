@@ -83,6 +83,7 @@ def resolve_enabled_plugins(discovered: dict[str, Plugin], enabled: list[str]) -
     Preserves the original order and appends newly auto-enabled dependencies
     right after the plugin that pulled them in. A required plugin that isn't
     among *discovered* is left out here — ``setup_plugins`` still warns about it.
+    Logs nothing: ``GET /plugins`` calls it on every page load.
     """
     resolved: list[str] = []
     seen: set[str] = set()
@@ -97,13 +98,21 @@ def resolve_enabled_plugins(discovered: dict[str, Plugin], enabled: list[str]) -
             return
         for req in plugin.manifest.requires:
             if req in discovered and req not in seen:
-                logger.info("plugin.auto_enabled", plugin_id=req, required_by=plugin_id)
                 _add(req)
 
     for plugin_id in enabled:
         _add(plugin_id)
 
     return resolved
+
+
+def log_auto_enabled(discovered: dict[str, Plugin], enabled: list[str], resolved: list[str]) -> None:
+    """Log each plugin in *resolved* that only runs because another one requires it (at startup)."""
+    for plugin_id in resolved:
+        if plugin_id in enabled:
+            continue
+        required_by = [p for p in resolved if p in discovered and plugin_id in discovered[p].manifest.requires]
+        logger.info("plugin.auto_enabled", plugin_id=plugin_id, required_by=required_by)
 
 
 def setup_plugins(
