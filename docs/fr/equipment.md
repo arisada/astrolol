@@ -95,6 +95,11 @@ Un élément dont l'appareil est enregistré dans l'onglet Connexions (voir [App
 son état (*connecté*, *occupé*, *erreur*, *déconnecté*…) à côté de son nom. Un élément sans état
 n'est pas connecté. Les sites, télescopes et GPS n'en affichent jamais.
 
+Une petite étiquette à côté du nom d'un appareil indique ce qui le pilote : **INDI**, **INDIGO**,
+ou le plugin dont il vient (par exemple **ASCOM Alpaca** ou **Monture EQMOD**). C'est utile quand
+une installation mélange des appareils de plusieurs sortes. Un appareil dont le plugin est
+désactivé affiche sa clé d'adaptateur à la place.
+
 Pour les appareils, le **Pilote INDI** (par ex. `indi_eqmod_telescope`) et le **Nom de
 l'appareil INDI** (tel que le pilote l'annonce, par ex. `EQ6 Mount`) indiquent à astrolol comment
 le connecter. Pour un adaptateur non INDI, renseignez plutôt la **Clé d'adaptateur** (par ex.

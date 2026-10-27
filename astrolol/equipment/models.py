@@ -42,6 +42,9 @@ class MountItem(BaseModel):
     # _find_device_for_item() when indi_device_name is absent.
     adapter_key: str | None = None
     connect_params: dict = {}
+    # What drives it — "indi", "indigo" or the id of the plugin providing adapter_key. Filled in
+    # by the server when it lists the inventory (astrolol/equipment/source.py), never stored.
+    source: str | None = None
 
 
 class OTAItem(BaseModel):
@@ -60,6 +63,9 @@ class CameraItem(BaseModel):
     indi_device_name: str | None = None
     adapter_key: str | None = None
     connect_params: dict = {}
+    # What drives it — "indi", "indigo" or the id of the plugin providing adapter_key. Filled in
+    # by the server when it lists the inventory (astrolol/equipment/source.py), never stored.
+    source: str | None = None
     pixel_size_um: float | None = None
     default_gain: int | None = Field(
         default=None,
@@ -77,6 +83,9 @@ class FilterWheelItem(BaseModel):
     indi_device_name: str | None = None
     adapter_key: str | None = None
     connect_params: dict = {}
+    # What drives it — "indi", "indigo" or the id of the plugin providing adapter_key. Filled in
+    # by the server when it lists the inventory (astrolol/equipment/source.py), never stored.
+    source: str | None = None
     filter_names: list[str] = []
 
 
@@ -88,6 +97,9 @@ class FocuserItem(BaseModel):
     indi_device_name: str | None = None
     adapter_key: str | None = None
     connect_params: dict = {}
+    # What drives it — "indi", "indigo" or the id of the plugin providing adapter_key. Filled in
+    # by the server when it lists the inventory (astrolol/equipment/source.py), never stored.
+    source: str | None = None
 
 
 class RotatorItem(BaseModel):
@@ -98,6 +110,9 @@ class RotatorItem(BaseModel):
     indi_device_name: str | None = None
     adapter_key: str | None = None
     connect_params: dict = {}
+    # What drives it — "indi", "indigo" or the id of the plugin providing adapter_key. Filled in
+    # by the server when it lists the inventory (astrolol/equipment/source.py), never stored.
+    source: str | None = None
 
 
 class FlatPanelItem(BaseModel):
@@ -108,6 +123,9 @@ class FlatPanelItem(BaseModel):
     indi_device_name: str | None = None
     adapter_key: str | None = None
     connect_params: dict = {}
+    # What drives it — "indi", "indigo" or the id of the plugin providing adapter_key. Filled in
+    # by the server when it lists the inventory (astrolol/equipment/source.py), never stored.
+    source: str | None = None
 
 
 class GpsItem(BaseModel):
@@ -118,6 +136,9 @@ class GpsItem(BaseModel):
     indi_device_name: str | None = None
     adapter_key: str | None = None
     connect_params: dict = {}
+    # What drives it — "indi", "indigo" or the id of the plugin providing adapter_key. Filled in
+    # by the server when it lists the inventory (astrolol/equipment/source.py), never stored.
+    source: str | None = None
 
 
 EquipmentItem = Annotated[

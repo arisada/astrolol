@@ -22,6 +22,7 @@ import { Tabs } from '@/components/ui/tabs'
 import { GettingStartedHint } from '@/help/HelpPanel'
 import { useHelpTopic } from '@/help/store'
 import { useDeviceConfigs } from '@/hooks/useDeviceConfigs'
+import { DeviceSourceTag } from '@/components/DeviceSourceTag'
 import { itemsInTree } from '@/utils/profile-tree'
 import { DEVICE_ITEM_TYPE, isInInventory, itemDeviceStates } from '@/utils/inventory-match'
 import { GETTING_STARTED_TOPIC } from '@/help/paths'
@@ -1341,6 +1342,7 @@ function InventorySection({ items, deviceStates, reload, importItem, onImportDon
                       <div>
                         <div className="flex items-center gap-3">
                           <p className="text-sm font-medium text-slate-200">{item.name}</p>
+                          <DeviceSourceTag item={item} />
                           {deviceStates[item.id] && <StateBadge state={deviceStates[item.id]} />}
                         </div>
                         {itemSubtitle(item) && (

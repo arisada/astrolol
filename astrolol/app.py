@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import importlib
+from contextlib import AbstractContextManager, nullcontext
 from pathlib import Path
 from typing import Optional
 
@@ -115,6 +116,12 @@ def log_auto_enabled(discovered: dict[str, Plugin], enabled: list[str], resolved
         logger.info("plugin.auto_enabled", plugin_id=plugin_id, required_by=required_by)
 
 
+def _registering_for(ctx: PluginContext, plugin_id: str) -> AbstractContextManager[None]:
+    """Record the adapters *plugin_id* registers during its setup as its own."""
+    registry = ctx.device_registry
+    return registry.registering_for(plugin_id) if registry is not None else nullcontext()
+
+
 def setup_plugins(
     app: "FastAPI",  # type: ignore[name-defined]  # avoid circular at module level
     ctx: PluginContext,
@@ -141,7 +148,8 @@ def setup_plugins(
                 )
 
         try:
-            plugin.setup(app, ctx)
+            with _registering_for(ctx, plugin_id):
+                plugin.setup(app, ctx)
             logger.info("plugin.setup_ok", plugin_id=plugin_id, name=plugin.manifest.name)
         except Exception as exc:
             logger.error("plugin.setup_failed", plugin_id=plugin_id, error=str(exc), exc_info=True)
@@ -175,7 +183,8 @@ async def sync_enabled_plugins(
         if not all(req in app.state.enabled_plugin_ids for req in plugin.manifest.requires):
             continue
         try:
-            plugin.setup(app, ctx)
+            with _registering_for(ctx, plugin_id):
+                plugin.setup(app, ctx)
             # setup() just appended this plugin's router after the SPA catch-all
             # (added by mount_ui() at startup) — push the catch-all back to the
             # end so it doesn't swallow the plugin's new routes. No-op in dev

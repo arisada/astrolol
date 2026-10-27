@@ -180,5 +180,10 @@
     "resize": "Glisser pour redimensionner",
     "latest": "Dernier",
     "empty": "Rien dans le journal pour l'instant"
+  },
+  "deviceSource": {
+    "indi": "INDI",
+    "indigo": "INDIGO",
+    "title": "Piloté par {{source}}"
   }
 }

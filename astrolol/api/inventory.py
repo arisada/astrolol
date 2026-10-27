@@ -5,6 +5,7 @@ from fastapi import APIRouter, HTTPException, Request
 from pydantic import TypeAdapter
 
 from astrolol.equipment.models import EquipmentItem
+from astrolol.equipment.source import with_source, without_source
 from astrolol.equipment.store import EquipmentStore
 
 router = APIRouter(prefix="/inventory", tags=["inventory"])
@@ -27,6 +28,10 @@ def _store(request: Request) -> EquipmentStore:
     return request.app.state.equipment_store
 
 
+def _out(item: EquipmentItem, request: Request) -> EquipmentItem:
+    return with_source(item, request.app.state.registry)
+
+
 @router.get("/timezones")
 async def list_timezones() -> dict:
     """Return sorted list of IANA timezone names and the system default."""
@@ -37,19 +42,19 @@ async def list_timezones() -> dict:
 @router.get("", response_model=list[EquipmentItem])
 async def list_items(request: Request) -> list[EquipmentItem]:
     """Return all inventory items."""
-    return _store(request).list()
+    return [_out(i, request) for i in _store(request).list()]
 
 
 @router.post("", response_model=EquipmentItem, status_code=201)
 async def create_item(item: EquipmentItem, request: Request) -> EquipmentItem:
     """Add a new item to the inventory."""
-    return _store(request).create(item)
+    return _out(_store(request).create(without_source(item)), request)
 
 
 @router.get("/{item_id}", response_model=EquipmentItem)
 async def get_item(item_id: str, request: Request) -> EquipmentItem:
     try:
-        return _store(request).get(item_id)
+        return _out(_store(request).get(item_id), request)
     except KeyError:
         raise HTTPException(status_code=404, detail=f"Item '{item_id}' not found.")
 
@@ -59,7 +64,7 @@ async def update_item(item_id: str, item: EquipmentItem, request: Request) -> Eq
     if item.id != item_id:  # type: ignore[union-attr]
         raise HTTPException(status_code=400, detail="Item id in URL and body must match.")
     try:
-        return _store(request).update(item)
+        return _out(_store(request).update(without_source(item)), request)
     except KeyError:
         raise HTTPException(status_code=404, detail=f"Item '{item_id}' not found.")
 

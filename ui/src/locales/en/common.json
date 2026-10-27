@@ -180,5 +180,10 @@
     "resize": "Drag to resize",
     "latest": "Latest",
     "empty": "Nothing logged yet"
+  },
+  "deviceSource": {
+    "indi": "INDI",
+    "indigo": "INDIGO",
+    "title": "Driven by {{source}}"
   }
 }

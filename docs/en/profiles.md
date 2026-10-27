@@ -24,6 +24,9 @@ one. The **+** next to an item (*Attach child item*) adds something under
 it; *Remove from tree* takes it out of the tree (it stays in the inventory). Each inventory item can
 appear only once in a tree.
 
+Devices in the tree, and in the list that opens when you add or replace one, carry the same tag
+as in the inventory, saying what drives them (INDI, INDIGO or a plugin).
+
 To change a piece of equipment without rebuilding the tree, hover over it and click the
 *Replace with another item* button. Pick another inventory item of the same kind (another
 telescope, another mount, another camera…): it takes the old one's place and everything attached

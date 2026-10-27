@@ -26,6 +26,10 @@ n'en avez pas), et il n'y en a qu'un. Le **+** à côté d'un
 l'arborescence* l'enlève de l'arborescence (il reste dans l'inventaire). Chaque élément de
 l'inventaire ne peut figurer qu'une fois dans une arborescence.
 
+Les appareils de l'arborescence, et ceux de la liste qui s'ouvre quand vous en ajoutez ou en
+remplacez un, portent la même étiquette que dans l'inventaire, qui indique ce qui les pilote
+(INDI, INDIGO ou un plugin).
+
 Pour changer un équipement sans reconstruire l'arborescence, survolez-le et cliquez sur le
 bouton *Remplacer par un autre élément*. Choisissez un autre élément de l'inventaire du même
 type (un autre télescope, une autre monture, une autre caméra…) : il prend la place de

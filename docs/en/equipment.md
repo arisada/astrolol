@@ -88,6 +88,10 @@ An item whose device is registered on the Connections tab (see [Connected device
 (*connected*, *busy*, *error*, *disconnected*…) next to its name. An item with no state is not
 connected. Sites, telescopes and GPS never show one.
 
+A small tag next to a device's name says what drives it: **INDI**, **INDIGO**, or the plugin it
+comes from (such as **ASCOM Alpaca** or **EQMOD Mount**). It helps when one setup mixes devices
+of several kinds. A device whose plugin is turned off shows its adapter key instead.
+
 For devices, the **INDI driver** (e.g. `indi_eqmod_telescope`) and the **INDI device name** (as
 the driver announces it, e.g. `EQ6 Mount`) tell astrolol how to connect it. For a non-INDI
 adapter, fill in the **Adapter key** (e.g. `eqmod`) and its **Connect params** instead. The

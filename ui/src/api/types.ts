@@ -849,6 +849,8 @@ export interface MountEquipmentItem extends BaseEquipmentItem {
   indi_device_name: string | null
   adapter_key: string | null
   connect_params: Record<string, unknown>
+  /** What drives it: 'indi', 'indigo' or a plugin id; set by the server, ignored on save. */
+  source?: string | null
 }
 export interface OTAEquipmentItem extends BaseEquipmentItem {
   type: 'ota'
@@ -861,6 +863,8 @@ export interface CameraEquipmentItem extends BaseEquipmentItem {
   indi_device_name: string | null
   adapter_key: string | null
   connect_params: Record<string, unknown>
+  /** What drives it: 'indi', 'indigo' or a plugin id; set by the server, ignored on save. */
+  source?: string | null
   pixel_size_um: number | null
   default_gain: number | null
 }
@@ -870,6 +874,8 @@ export interface FilterWheelEquipmentItem extends BaseEquipmentItem {
   indi_device_name: string | null
   adapter_key: string | null
   connect_params: Record<string, unknown>
+  /** What drives it: 'indi', 'indigo' or a plugin id; set by the server, ignored on save. */
+  source?: string | null
   filter_names: string[]
 }
 export interface FocuserEquipmentItem extends BaseEquipmentItem {
@@ -878,6 +884,8 @@ export interface FocuserEquipmentItem extends BaseEquipmentItem {
   indi_device_name: string | null
   adapter_key: string | null
   connect_params: Record<string, unknown>
+  /** What drives it: 'indi', 'indigo' or a plugin id; set by the server, ignored on save. */
+  source?: string | null
 }
 export interface RotatorEquipmentItem extends BaseEquipmentItem {
   type: 'rotator'
@@ -885,6 +893,8 @@ export interface RotatorEquipmentItem extends BaseEquipmentItem {
   indi_device_name: string | null
   adapter_key: string | null
   connect_params: Record<string, unknown>
+  /** What drives it: 'indi', 'indigo' or a plugin id; set by the server, ignored on save. */
+  source?: string | null
 }
 export interface FlatPanelEquipmentItem extends BaseEquipmentItem {
   type: 'flat_panel'
@@ -892,6 +902,8 @@ export interface FlatPanelEquipmentItem extends BaseEquipmentItem {
   indi_device_name: string | null
   adapter_key: string | null
   connect_params: Record<string, unknown>
+  /** What drives it: 'indi', 'indigo' or a plugin id; set by the server, ignored on save. */
+  source?: string | null
 }
 export interface GpsEquipmentItem extends BaseEquipmentItem {
   type: 'gps'
@@ -899,6 +911,8 @@ export interface GpsEquipmentItem extends BaseEquipmentItem {
   indi_device_name: string | null
   adapter_key: string | null
   connect_params: Record<string, unknown>
+  /** What drives it: 'indi', 'indigo' or a plugin id; set by the server, ignored on save. */
+  source?: string | null
 }
 
 export type EquipmentItem =

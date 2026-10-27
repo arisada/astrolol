@@ -37,6 +37,7 @@ import { Input } from '@/components/ui/input'
 import { StateBadge } from '@/components/ui/badge'
 import { useStore } from '@/store'
 import { useDeviceConfigs } from '@/hooks/useDeviceConfigs'
+import { DeviceSourceTag } from '@/components/DeviceSourceTag'
 import { itemDeviceStates } from '@/utils/inventory-match'
 import { cloneTree, copyName, replaceItemAtPath } from '@/utils/profile-tree'
 import { Page } from '@/components/Page'
@@ -156,8 +157,9 @@ function ItemPicker({
             <span className={alreadyUsed ? 'text-slate-500' : 'text-slate-200'}>
               {itemLabel(item)}
             </span>
+            <DeviceSourceTag item={item} />
             {alreadyUsed && (
-              <span className="ml-auto text-slate-600 text-[10px]">{t('picker.used')}</span>
+              <span className="ml-auto pl-2 text-slate-600 text-[10px] whitespace-nowrap">{t('picker.used')}</span>
             )}
           </button>
         )
@@ -217,6 +219,7 @@ function TreeNodeRow({
           {node.role && (
             <span className="text-slate-600 text-[10px] ml-1">· {node.role}</span>
           )}
+          {item && <DeviceSourceTag item={item} />}
           {deviceStates?.[node.item_id] && (
             <span className="ml-1"><StateBadge state={deviceStates[node.item_id]} /></span>
           )}
