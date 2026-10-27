@@ -4,7 +4,7 @@
 #   packaging/smoke-test.sh DEB [--runner docker|podman|"sudo docker"] [--image IMAGE] [--platform PLATFORM]
 #
 #   IMAGE     debian:trixie (default) or ubuntu:26.04
-#   PLATFORM  linux/amd64 (default) or linux/arm64 (needs qemu-user-static and binfmt on the host)
+#   PLATFORM  linux/amd64 (default) or linux/arm64 (needs qemu-user-binfmt, or qemu-user-static, on the host)
 #
 # Checks: apt resolves every dependency from the distro alone, the service account and data
 # directory exist, the files are in place, and astrolol starts as its user, answers /health and

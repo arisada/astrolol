@@ -39,7 +39,7 @@ uses something newer than Debian 13 ships.
 ```bash
 packaging/smoke-test.sh packaging/out/astrolol_*_all.deb
 packaging/smoke-test.sh packaging/out/astrolol_*_all.deb --image ubuntu:26.04
-packaging/smoke-test.sh packaging/out/astrolol_*_all.deb --platform linux/arm64   # needs qemu-user-static
+packaging/smoke-test.sh packaging/out/astrolol_*_all.deb --platform linux/arm64   # needs qemu-user-binfmt (qemu-user-static before Ubuntu 26.04)
 ```
 
 ## Publishing
