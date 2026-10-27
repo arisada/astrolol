@@ -505,6 +505,16 @@ Missing imports and wrong types that reach runtime are harder to debug than a fa
   Never pass raw dicts between layers.
 - **No module-level mutable state in plugins.** Store everything on `app.state` so each
   `TestClient` gets a clean slate.
+- **Dependencies stay within Debian 13.** The `.deb` (`debian/`, `packaging/README.md`) runs on the
+  distro's own Python libraries, so a minimum in `pyproject.toml` must not exceed what Debian 13
+  ships (the package build runs the tests against those versions). A newer pure-Python library goes
+  into `astrolol/_vendor/` like indipyclient; a compiled one needs rethinking first.
+- **Start-up configuration** is `Settings` (`config/settings.py`): code defaults, then
+  `/etc/astrolol/astrolol.toml`, then `ASTROLOL_*` environment variables. Paths derive from
+  `data_dir`; read `settings.data_dir`, never the environment. What the user changes in the UI
+  belongs in `UserSettings`.
+- **Privileged host actions go through polkit**, never sudo: run the command as astrolol's user and
+  add the action to `deploy/50-astrolol.rules` and `ACTIONS` in `plugins/system/privileges.py`.
 
 ## Running the app
 
