@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # smoke-test.sh — install a built astrolol .deb in a clean distro and check that it runs.
 #
-#   packaging/smoke-test.sh DEB [--runner docker|podman] [--image IMAGE] [--platform PLATFORM]
+#   packaging/smoke-test.sh DEB [--runner docker|podman|"sudo docker"] [--image IMAGE] [--platform PLATFORM]
 #
 #   IMAGE     debian:trixie (default) or ubuntu:26.04
 #   PLATFORM  linux/amd64 (default) or linux/arm64 (needs qemu-user-static and binfmt on the host)
@@ -25,15 +25,15 @@ while [[ $# -gt 0 ]]; do
 done
 [[ -f "$deb" ]] || { echo "usage: $0 DEB [options]" >&2; exit 2; }
 if [[ -z "$runner" ]]; then
-    for r in docker podman; do
-        if command -v "$r" >/dev/null && "$r" info >/dev/null 2>&1; then runner="$r"; break; fi
+    for r in docker podman "sudo -n docker"; do
+        if command -v "${r##* }" >/dev/null && $r info >/dev/null 2>&1; then runner="$r"; break; fi
     done
     [[ -n "$runner" ]] || { echo "no usable docker or podman" >&2; exit 1; }
 fi
 
 dir="$(cd "$(dirname "$deb")" && pwd)" name="$(basename "$deb")"
 echo "== $name on $image ($platform) with $runner"
-"$runner" run --rm --platform "$platform" -v "$dir:/debs:ro" "$image" bash -c '
+$runner run --rm --platform "$platform" -v "$dir:/debs:ro" "$image" bash -c '
 set -euo pipefail
 export DEBIAN_FRONTEND=noninteractive
 apt-get update -qq

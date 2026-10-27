@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # build-deb.sh — build astrolol's .deb from a git commit.
 #
-#   packaging/build-deb.sh [--runner docker|podman|host] [--ref REF] [--out DIR] [--nocheck]
+#   packaging/build-deb.sh [--runner docker|podman|"sudo docker"|host] [--ref REF] [--out DIR] [--nocheck]
 #
 # Steps (see local/packaging_plan.md):
 #   1. the web UI: npm ci, typecheck, lint, test, build      (here, needs network for npm)
@@ -14,8 +14,8 @@
 # Version: pyproject's version for a tagged commit (v0.2.0 → 0.2.0-1), otherwise a nightly
 # 0.2.0~git20261027.1a2b3c4-1, which sorts before the 0.2.0 release.
 #
-# --runner: docker or podman runs step 3 and 4 in a debian:trixie container (default: whichever
-# works); host builds on this machine, which then needs the Build-Depends of debian/control.
+# --runner: docker, podman or "sudo docker" runs step 3 and 4 in a debian:trixie container (default:
+# the first that works); host builds on this machine, which then needs the Build-Depends of debian/control.
 set -euo pipefail
 
 runner="" ref="HEAD" out="" nocheck=""
@@ -35,8 +35,8 @@ out="${out:-$repo/packaging/out}"
 image="debian:trixie"
 
 if [[ -z "$runner" ]]; then
-    for r in docker podman; do
-        if command -v "$r" >/dev/null && "$r" info >/dev/null 2>&1; then runner="$r"; break; fi
+    for r in docker podman "sudo -n docker"; do
+        if command -v "${r##* }" >/dev/null && $r info >/dev/null 2>&1; then runner="$r"; break; fi
     done
     [[ -n "$runner" ]] || { echo "no usable docker or podman: pass --runner host, or see packaging/README.md" >&2; exit 1; }
 fi
@@ -96,14 +96,14 @@ if [[ "$runner" == host ]]; then
         cd "$work" && { lintian --info --no-tag-display-limit ./*.changes || true; }
     )
 else
-    "$runner" run --rm -v "$work:/build" "$image" bash -c "set -e
+    $runner run --rm -v "$work:/build" "$image" bash -c "set -e
+        trap 'chown -R $(id -u):$(id -g) /build' EXIT
         export DEBIAN_FRONTEND=noninteractive
         apt-get update -qq
         apt-get install -y -qq --no-install-recommends devscripts equivs lintian >/dev/null
-        cd /build/$(basename "$src") && mk-build-deps -i -r -t 'apt-get install -y -qq --no-install-recommends' debian/control >/dev/null
+        cd /build/$(basename "$src") && mk-build-deps -i -r -t 'apt-get -y -qq --no-install-recommends' debian/control >/dev/null
         rm -f /build/$(basename "$src")/astrolol-build-deps_*
-        $build_cmd
-        chown -R $(id -u):$(id -g) /build"
+        $build_cmd"
 fi
 
 cp "$work"/astrolol_"${version}"_all.deb "$work"/astrolol_"${version}"_*.buildinfo "$out"/

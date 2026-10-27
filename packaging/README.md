@@ -24,7 +24,7 @@ packaging/build-deb.sh --nocheck       # skip the test suite in the package buil
 ```
 
 The build works from **committed** files (`git archive`): commit first. It needs `npm` here,
-and docker or podman to build in a clean Debian 13 (`--runner host` builds on this machine
+and docker or podman (or docker through `sudo`, found by itself when `sudo -n` works) to build in a clean Debian 13 (`--runner host` builds on this machine
 instead, with the Build-Depends of `debian/control` installed).
 
 Versions: a commit tagged `v<version of pyproject.toml>` gives `<version>-1`; any other commit a
