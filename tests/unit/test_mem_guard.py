@@ -129,3 +129,23 @@ async def test_guard_releases_on_exception():
     async with mem_guard():
         acquired = True
     assert acquired
+
+
+def test_total_memory_is_the_smaller_of_ram_and_cgroup_limit(tmp_path):
+    meminfo = tmp_path / "meminfo"
+    meminfo.write_text("MemTotal:        8123456 kB\nMemFree:  100 kB\n")
+    cgroup = tmp_path / "memory.max"
+
+    cgroup.write_text("max\n")
+    assert _mod.total_memory_bytes(meminfo, cgroup) == 8123456 * 1024
+    cgroup.write_text("1073741824\n")
+    assert _mod.total_memory_bytes(meminfo, cgroup) == 1073741824
+    cgroup.unlink()
+    meminfo.unlink()
+    assert _mod.total_memory_bytes(meminfo, cgroup) is None
+
+
+def test_host_is_low_memory_below_two_gib(monkeypatch):
+    for total, low in [(1 * 1024 ** 3, True), (2 * 1024 ** 3 - 1, True), (2 * 1024 ** 3, False), (None, False)]:
+        monkeypatch.setattr(_mod, "total_memory_bytes", lambda t=total: t)
+        assert _mod.host_is_low_memory() is low

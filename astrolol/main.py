@@ -138,6 +138,12 @@ def create_app() -> FastAPI:
 
     # Wire up the global memory-pressure guard so it reads the live setting.
     from astrolol.core import mem_guard as _mem_guard_mod
+    if not user_settings.low_memory_mode and _mem_guard_mod.host_is_low_memory():
+        # Shown in Options, where it can be turned off again (until the next start).
+        user_settings = profile_store.update_user_settings(
+            user_settings.model_copy(update={"low_memory_mode": True})
+        )
+        logger.info("startup.low_memory_mode_enabled", total_bytes=_mem_guard_mod.total_memory_bytes())
     _mem_guard_mod.configure(lambda: profile_store.get_user_settings().low_memory_mode)
 
     from astrolol.config.settings import apply_indi_server_choice

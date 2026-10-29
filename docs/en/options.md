@@ -69,7 +69,8 @@ setting is refused with the list of allowed folders.
   drivers in the [log](logs.md). For troubleshooting only; goes back to Off on restart.
 - **Low memory mode**: processes one image or plate solve at a time. Turn it on for a
   Raspberry Pi or another computer with little memory, if astrolol gets killed while
-  downloading images.
+  downloading images. It switches itself on at start when the computer has less than 2 GiB
+  of memory.
 
 ## Plugins
 

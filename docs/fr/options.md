@@ -72,7 +72,8 @@ liste des dossiers permis.
   revient à Désactivé au redémarrage.
 - **Mode faible mémoire** : traite une image ou une résolution astrométrique à la fois.
   Activez-le sur un Raspberry Pi ou un autre ordinateur avec peu de mémoire, si astrolol est
-  tué pendant le téléchargement des images.
+  tué pendant le téléchargement des images. Il s'active tout seul au démarrage quand
+  l'ordinateur a moins de 2 Go de mémoire.
 
 ## Modules
 

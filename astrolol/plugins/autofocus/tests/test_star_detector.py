@@ -264,3 +264,160 @@ def test_measure_star_rejects_a_lone_hot_pixel() -> None:
     data = 100.0 + rng.normal(0.0, 5.0, size=(80, 80))
     data[40, 40] += 4000.0
     assert _measure_star(data, 40.0, 40.0, 1.0) is None
+
+
+# ---------------------------------------------------------------------------
+# Tiling: memory stays bounded and stars on tile borders are neither lost nor doubled
+# ---------------------------------------------------------------------------
+
+def _star_at(data: np.ndarray, cx: float, cy: float, fwhm: float, flux: float) -> None:
+    sigma = fwhm / 2.3548
+    r = int(6 * sigma) + 2
+    y0, x0 = int(cy) - r, int(cx) - r
+    yy, xx = np.mgrid[y0:y0 + 2 * r + 1, x0:x0 + 2 * r + 1]
+    data[y0:y0 + 2 * r + 1, x0:x0 + 2 * r + 1] += flux / (2 * np.pi * sigma ** 2) * np.exp(
+        -((xx - cx) ** 2 + (yy - cy) ** 2) / (2 * sigma ** 2)
+    )
+
+
+def test_stars_on_tile_borders_and_corners_are_found_once(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from astrolol.plugins.autofocus import star_detector
+
+    monkeypatch.setattr(star_detector, "_TILE", 128)
+    monkeypatch.setattr(star_detector, "_HALO", 48)
+    rng = np.random.default_rng(3)
+    data = _BACKGROUND + rng.normal(0.0, _NOISE, size=(400, 520))
+    # On the borders (x or y = 127.5 / 128 / 255.5 / 256), at a crossing and in the image corners.
+    centres = [(128.0, 60.0), (127.5, 200.0), (60.0, 256.0), (300.0, 255.5), (256.0, 128.0),
+               (30.0, 30.0), (490.0, 370.0), (30.0, 370.0), (490.0, 30.0)]
+    for cx, cy in centres:
+        _star_at(data, cx, cy, 4.0, _FLUX)
+    path = tmp_path / "tiles.fits"
+    fits.PrimaryHDU(data.astype(np.float32)).writeto(path, overwrite=True)
+
+    _, count, stars = _detect_sync(str(path), "fwhm")
+
+    assert count == len(centres)
+    for cx, cy in centres:
+        near = [s for s in stars if np.hypot(s["x"] - cx, s["y"] - cy) < 1.5]
+        assert len(near) == 1, f"star at ({cx}, {cy}) found {len(near)} times"
+
+
+def test_unsigned_16_bit_files_are_read_with_their_scaling(tmp_path: Path) -> None:
+    """Cameras write uint16 as int16 + BZERO=32768; the tiles must undo that."""
+    rng = np.random.default_rng(4)
+    data = _BACKGROUND + rng.normal(0.0, _NOISE, size=_FRAME)
+    _star_at(data, 300.0, 200.0, 5.0, _FLUX)
+    path = tmp_path / "u16.fits"
+    fits.PrimaryHDU(np.clip(data, 0, 65535).astype(np.uint16)).writeto(path, overwrite=True)
+    with fits.open(path) as hdul:
+        assert hdul[0].header["BZERO"] == 32768
+
+    value, count, stars = _detect_sync(str(path), "fwhm")
+
+    assert count == 1
+    assert np.hypot(stars[0]["x"] - 300.0, stars[0]["y"] - 200.0) < 1.0
+    assert value == pytest.approx(5.0, rel=0.2)
+
+
+def test_a_20_megapixel_frame_needs_a_fraction_of_its_float64_size(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Regression: the whole frame was converted to float64 (160 MB at 20 MP) and filtered in one go,
+    which got the process OOM-killed on a small Pi."""
+    import tracemalloc
+    from astrolol.plugins.autofocus import star_detector
+
+    monkeypatch.setattr(star_detector, "_workers", lambda: 1)   # memory of one tile in flight
+
+    h, w = 3672, 5496   # ASI183 at bin 1
+    rng = np.random.default_rng(5)
+    data = np.full((h, w), 1000, dtype=np.uint16)
+    data += rng.integers(0, 40, size=(h, w), dtype=np.uint16)
+    # One star in the middle of a tile and one across a tile border.
+    for cx, cy in [(2000.0, 1500.0), (1024.0, 3000.0)]:
+        sigma = 2.0
+        yy, xx = np.mgrid[int(cy) - 14:int(cy) + 15, int(cx) - 14:int(cx) + 15]
+        data[int(cy) - 14:int(cy) + 15, int(cx) - 14:int(cx) + 15] += (
+            20000 / (2 * np.pi * sigma ** 2) * np.exp(-((xx - cx) ** 2 + (yy - cy) ** 2) / (2 * sigma ** 2))
+        ).astype(np.uint16)
+    path = tmp_path / "big.fits"
+    fits.PrimaryHDU(data).writeto(path)
+    del data
+
+    tracemalloc.start()
+    try:
+        _, count, stars = _detect_sync(str(path), "hfd")
+        _, peak = tracemalloc.get_traced_memory()
+    finally:
+        tracemalloc.stop()
+
+    assert count == 2
+    assert {round(s["x"] / 100) for s in stars} == {20, 10}
+    assert peak < 120 * 1024 * 1024, f"peak {peak / 1e6:.0f} MB"
+
+
+def test_local_maxima_match_a_maximum_filter() -> None:
+    from scipy import ndimage as ndi
+    from astrolol.plugins.autofocus import star_detector
+    from astrolol.plugins.autofocus.star_detector import _local_maxima
+
+    rng = np.random.default_rng(7)
+    z = rng.normal(0.0, 3.0, size=(90, 120)).astype(np.float32)
+    z[10, 10] = z[10, 11] = 40.0   # a tie
+    z[0, 0] = 30.0                 # in a corner
+    z[89, 119] = 30.0
+    for r in (2, 3, 4):
+        expected = np.argwhere((z == ndi.maximum_filter(z, size=2 * r + 1)) & (z > 6.0))
+        ys, xs = _local_maxima(z, r, 6.0)
+        assert sorted(zip(ys.tolist(), xs.tolist())) == sorted(map(tuple, expected.tolist()))
+    # The fallback for huge bright areas gives the same answer.
+    old = star_detector._MAX_PEAK_PIXELS
+    star_detector._MAX_PEAK_PIXELS = 0
+    try:
+        ys, xs = _local_maxima(z, 3, 6.0)
+    finally:
+        star_detector._MAX_PEAK_PIXELS = old
+    expected = np.argwhere((z == ndi.maximum_filter(z, size=7)) & (z > 6.0))
+    assert sorted(zip(ys.tolist(), xs.tolist())) == sorted(map(tuple, expected.tolist()))
+
+
+def test_threads_give_the_same_stars_as_one_worker(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    from astrolol.plugins.autofocus import star_detector
+
+    monkeypatch.setattr(star_detector, "_TILE", 128)
+    monkeypatch.setattr(star_detector, "_HALO", 48)
+    path, centres, _ = _field(tmp_path, 5.0, n_stars=20)
+    monkeypatch.setattr(star_detector, "_workers", lambda: 1)
+    serial = _detect_sync(path, "hfd")
+    monkeypatch.setattr(star_detector, "_workers", lambda: 4)
+    threaded = _detect_sync(path, "hfd")
+    assert threaded == serial
+    assert serial[1] >= 0.7 * len(centres)
+
+
+@pytest.mark.parametrize("fwhm", [40.0, 60.0, 90.0])
+def test_very_defocused_stars_are_found_across_tile_borders(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, fwhm: float,
+) -> None:
+    """Autofocus starts from badly out-of-focus frames: huge, dim stars whose kernel and measuring
+    stamp (up to ~230 px at FWHM 90) are far larger than a tile's core, and some sit on a border."""
+    from astrolol.plugins.autofocus import star_detector
+
+    monkeypatch.setattr(star_detector, "_TILE", 512)   # smaller than the stars' own stamp
+    rng = np.random.default_rng(11)
+    data = 1000.0 + rng.normal(0.0, 8.0, size=(1500, 2300))
+    centres = [(1024.0, 700.0), (1700.0, 512.0), (512.0, 1024.0), (1400.0, 1000.0), (2000.0, 1150.0)]
+    for cx, cy in centres:
+        _star_at(data, cx, cy, fwhm, 3e5)
+    path = tmp_path / "defocused.fits"
+    fits.PrimaryHDU(data.astype(np.float32)).writeto(path, overwrite=True)
+
+    value, count, stars = _detect_sync(str(path), "fwhm")
+
+    assert count == len(centres)
+    assert value == pytest.approx(fwhm, rel=0.15)
+    for cx, cy in centres:
+        assert sum(np.hypot(s["x"] - cx, s["y"] - cy) < 3.0 for s in stars) == 1

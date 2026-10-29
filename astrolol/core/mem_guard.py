@@ -26,7 +26,11 @@ from __future__ import annotations
 
 import asyncio
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Callable
+
+# Hosts with less memory than this run in low-memory mode (a Pi with 1 GB cannot afford two image jobs at once).
+LOW_MEMORY_THRESHOLD = 2 * 1024 ** 3
 
 # Single global semaphore — limit of 1 means at most one guarded block runs at
 # a time when low-memory mode is active. Created lazily, bound to whichever
@@ -51,6 +55,32 @@ def _current_sem() -> asyncio.Semaphore:
         _sem = asyncio.Semaphore(1)
         _sem_loop = loop
     return _sem
+
+
+def total_memory_bytes(
+    meminfo: Path = Path("/proc/meminfo"), cgroup_limit: Path = Path("/sys/fs/cgroup/memory.max"),
+) -> int | None:
+    """Memory astrolol can use: the machine's RAM, or the cgroup limit when that is lower
+    (a container or a systemd ``MemoryMax=``). ``None`` when it cannot be read."""
+    total: int | None = None
+    try:
+        for line in meminfo.read_text().splitlines():
+            if line.startswith("MemTotal:"):
+                total = int(line.split()[1]) * 1024
+                break
+    except (OSError, ValueError, IndexError):
+        pass
+    try:
+        limit = int(cgroup_limit.read_text().strip())   # "max" when unlimited
+        total = limit if total is None else min(total, limit)
+    except (OSError, ValueError):
+        pass
+    return total
+
+
+def host_is_low_memory() -> bool:
+    total = total_memory_bytes()
+    return total is not None and total < LOW_MEMORY_THRESHOLD
 
 
 def configure(check_fn: Callable[[], bool]) -> None:

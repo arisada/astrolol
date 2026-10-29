@@ -10,10 +10,19 @@ local stamp (local background, windowed-moment FWHM, half-flux diameter).
 Isolated hot pixels are removed before anything else, since a single hot pixel
 keeps its full peak at any focus position and would otherwise be the one thing
 detected on a badly defocused frame.
+
+The frame is processed in overlapping tiles read straight from the file, so the
+memory needed does not grow with the sensor: a 20 MP frame used to need several
+hundred MB of float64 temporaries, more than a small Pi has to spare. Stars are
+always measured at the file's own resolution (bin 1 stays bin 1) and reported in
+full-frame pixel coordinates.
 """
 from __future__ import annotations
 
 import asyncio
+import os
+from concurrent.futures import ThreadPoolExecutor
+
 import structlog
 
 logger = structlog.get_logger()
@@ -26,11 +35,14 @@ Metric = str  # "fwhm" | "hfd"
 _SCALES = (1.0, 1.5, 2.25, 3.4, 5.1, 7.6, 11.4, 17.1, 25.6, 38.4)
 _DETECT_SIGMA = 6.0      # peak significance (in robust noise sigmas) to accept a blob
 _MAX_CANDIDATES = 400    # strongest candidates kept for de-duplication
+_MAX_PEAK_PIXELS = 20000  # px above the detection level beyond which peaks are found with a maximum filter
 _MAX_STARS = 150         # cap on stars measured per frame
 _HOT_SIGMA = 5.0         # a pixel this far above its neighbours' median may be hot...
 _HOT_COMPACT = 0.12      # ...if its brightest neighbour is under this fraction of its height above the sky
 _MAX_PEAK_FRACTION = 0.7 # a source with more of its flux than this in one pixel is a hot pixel, not a star
 _MAX_ELLIPTICITY = 0.6   # trails, cosmic-ray tracks and blended pairs are not focus targets
+_TILE = 1024             # px, side of the area of a tile whose stars it reports...
+_HALO = 256              # ...and the extra border read around it, wider than the largest kernel and measuring stamp
 _MATCH_RADIUS = 8.0      # px, full-res — max centroid drift to still count as "the same star"
 
 
@@ -175,6 +187,12 @@ def _robust_noise(values: "np.ndarray") -> float:  # type: ignore[name-defined]
     return float(1.4826 * np.median(np.abs(values - np.median(values))))
 
 
+def _sample(values: "np.ndarray") -> "np.ndarray":  # type: ignore[name-defined]
+    """Every third pixel in each direction: plenty to estimate a median / robust noise (a
+    median over the whole tile is a sort of millions of values, the slowest step otherwise)."""
+    return values[::3, ::3]
+
+
 def _suppress_hot_pixels(data: "np.ndarray") -> tuple["np.ndarray", int]:  # type: ignore[name-defined]
     """Replace isolated single-pixel spikes by the median of their neighbours.
 
@@ -188,20 +206,32 @@ def _suppress_hot_pixels(data: "np.ndarray") -> tuple["np.ndarray", int]:  # typ
     import numpy as np
     from scipy import ndimage as ndi
 
-    near = np.ones((3, 3), dtype=bool)
-    near[1, 1] = False
-    neighbour_median = ndi.median_filter(data, footprint=near, mode="nearest")
-    excess = data - neighbour_median
-    noise = _robust_noise(excess)
+    ring1 = [(dy, dx) for dy in (-1, 0, 1) for dx in (-1, 0, 1) if (dy, dx) != (0, 0)]
+    padded = np.pad(data, 2, mode="edge")
+    h, w = data.shape
+
+    def neighbour_median_at(ys: "np.ndarray", xs: "np.ndarray") -> "np.ndarray":  # type: ignore[name-defined]
+        return np.median([padded[ys + 2 + dy, xs + 2 + dx] for dy, dx in ring1], axis=0)
+
+    # The noise of (pixel - median of its 8 neighbours) from a sample of pixels only.
+    sy, sx = np.mgrid[0:h:3, 0:w:3]
+    sy, sx = sy.ravel(), sx.ravel()
+    noise = _robust_noise(data[sy, sx] - neighbour_median_at(sy, sx))
     if noise <= 0:
         noise = max(1e-6, 1e-3 * float(np.ptp(data)))
-    ys, xs = np.nonzero(excess > _HOT_SIGMA * noise)
+    # A pixel is at most (itself - its darkest neighbour) above the neighbours' median, so
+    # this cheap filter finds every possible spike; the median is then taken only there.
+    candidate = (data - ndi.minimum_filter(data, size=3, mode="nearest")) > _HOT_SIGMA * noise
+    ys, xs = np.nonzero(candidate)
+    if ys.size == 0:
+        return data, 0
+    neighbour_median = neighbour_median_at(ys, xs)
+    spiking = (data[ys, xs] - neighbour_median) > _HOT_SIGMA * noise
+    ys, xs, neighbour_median = ys[spiking], xs[spiking], neighbour_median[spiking]
     if ys.size == 0:
         return data, 0
 
     # Only the few spiking pixels need the (expensive) sky / brightest-neighbour test.
-    padded = np.pad(data, 2, mode="edge")
-    ring1 = [(dy, dx) for dy in (-1, 0, 1) for dx in (-1, 0, 1) if (dy, dx) != (0, 0)]
     ring2 = [(dy, dx) for dy in range(-2, 3) for dx in range(-2, 3) if max(abs(dy), abs(dx)) == 2]
     neighbour_max = np.max([padded[ys + 2 + dy, xs + 2 + dx] for dy, dx in ring1], axis=0)
     sky = np.median([padded[ys + 2 + dy, xs + 2 + dx] for dy, dx in ring2], axis=0)
@@ -209,11 +239,37 @@ def _suppress_hot_pixels(data: "np.ndarray") -> tuple["np.ndarray", int]:  # typ
     if not is_hot.any():
         return data, 0
     cleaned = data.copy()
-    cleaned[ys[is_hot], xs[is_hot]] = neighbour_median[ys[is_hot], xs[is_hot]]
+    cleaned[ys[is_hot], xs[is_hot]] = neighbour_median[is_hot]
     return cleaned, int(is_hot.sum())
 
 
-def _find_blobs(data: "np.ndarray") -> list[tuple[float, float, float, float]]:  # type: ignore[name-defined]
+def _local_maxima(z: "np.ndarray", r: int, threshold: float) -> tuple["np.ndarray", "np.ndarray"]:  # type: ignore[name-defined]
+    """(ys, xs) of the pixels above *threshold* that no pixel within *r* exceeds.
+
+    Only the few pixels above the threshold are compared with their neighbours (a maximum
+    filter over the whole array costs far more). Ties count as maxima, like ``z == maximum_filter(z)``.
+    """
+    import numpy as np
+    from scipy import ndimage as ndi
+
+    ys, xs = np.nonzero(z > threshold)
+    if ys.size > _MAX_PEAK_PIXELS:   # a huge, saturated area: the filter is cheaper than the gathers
+        ys, xs = np.nonzero((z == ndi.maximum_filter(z, size=2 * r + 1)) & (z > threshold))
+        return ys, xs
+    h, w = z.shape
+    here = z[ys, xs]
+    is_max = np.ones(ys.size, dtype=bool)
+    for dy in range(-r, r + 1):
+        for dx in range(-r, r + 1):
+            if dy or dx:
+                is_max &= here >= z[np.clip(ys + dy, 0, h - 1), np.clip(xs + dx, 0, w - 1)]
+    return ys[is_max], xs[is_max]
+
+
+def _find_blobs(
+    data: "np.ndarray",  # type: ignore[name-defined]
+    core: tuple[int, int, int, int] | None = None,
+) -> list[tuple[float, float, float, float]]:
     """Scale-space blob detection. Returns ``(x, y, sigma, significance)`` strongest first.
 
     Each kernel size is a matched filter for stars of that size, so a star is
@@ -221,6 +277,10 @@ def _find_blobs(data: "np.ndarray") -> list[tuple[float, float, float, float]]: 
     that a fixed small kernel buries in the noise stand out at a larger kernel.
     Large kernels run on block-averaged copies of the frame (cheap, and the
     averaging is where the signal-to-noise comes from anyway).
+
+    *core* = ``(y0, y1, x0, x1)``, when the caller only wants stars in that part of *data*:
+    the small kernels, which run at full resolution and need little surrounding, are then
+    applied to the core and a narrow margin instead of the whole array.
     """
     import numpy as np
     from scipy import ndimage as ndi
@@ -230,23 +290,30 @@ def _find_blobs(data: "np.ndarray") -> list[tuple[float, float, float, float]]: 
         b = 1
         while b * 2 <= sigma / 1.5:
             b *= 2
-        img = _bin_mean(data, b) if b > 1 else data
         s = sigma / b
+        oy = ox = 0
+        if b > 1:
+            img = _bin_mean(data, b)
+        elif core is None:
+            img = data
+        else:
+            pad = int(np.ceil(7.0 * s)) + 4   # filter reach + edge margin + peak window
+            oy, ox = max(0, core[0] - pad), max(0, core[2] - pad)
+            img = data[oy:core[1] + pad, ox:core[3] + pad]
         # Scale-normalised, sign-flipped LoG: positive on bright blobs of size ~sigma.
         response = -ndi.gaussian_laplace(img, s, mode="reflect") * s * s
-        centre = float(np.median(response))
-        noise = _robust_noise(response)
+        centre = float(np.median(_sample(response)))
+        noise = _robust_noise(_sample(response))
         if noise <= 0:  # noiseless frame (e.g. a synthetic image): fall back to the dynamic range
             noise = max(1e-9, 1e-3 * float(np.ptp(response)))
         z = (response - centre) / noise
         r = max(2, int(round(1.5 * s)))
-        peaks = (z == ndi.maximum_filter(z, size=2 * r + 1)) & (z > _DETECT_SIGMA)
-        ys, xs = np.nonzero(peaks)
+        ys, xs = _local_maxima(z, r, _DETECT_SIGMA)
         # A star whose 3-sigma disc leaves the frame can't be measured faithfully.
         margin = int(np.ceil(3.0 * s))
         inside = (xs >= margin) & (xs < img.shape[1] - margin) & (ys >= margin) & (ys < img.shape[0] - margin)
         for x, y in zip(xs[inside], ys[inside]):
-            candidates.append((x * b + (b - 1) / 2, y * b + (b - 1) / 2, sigma, float(z[y, x])))
+            candidates.append((ox + x * b + (b - 1) / 2, oy + y * b + (b - 1) / 2, sigma, float(z[y, x])))
 
     # The same star is a peak at several neighbouring scales: keep the most
     # significant, drop anything inside its footprint.
@@ -335,6 +402,36 @@ def _measure_star(
     return {"x": cx, "y": cy, "fwhm": fwhm, "hfd": hfd}
 
 
+def _workers() -> int:
+    """Tiles processed at once: one more tile in memory per worker, so fewer on a small host."""
+    from astrolol.core.mem_guard import host_is_low_memory
+
+    return min(2 if host_is_low_memory() else 4, os.cpu_count() or 1)
+
+
+def _tile_origins(size: int) -> range:
+    return range(0, size, _TILE)
+
+
+def _read_tile(
+    raw: "np.ndarray", bzero: float, bscale: float, y0: int, y1: int, x0: int, x1: int,  # type: ignore[name-defined]
+) -> "np.ndarray":  # type: ignore[name-defined]
+    """One region of the (memory-mapped, unscaled) image as physical float32 values.
+
+    float32 is exact for the 14-16 bit integers cameras write, and half the size of float64.
+    """
+    import numpy as np
+
+    out = raw[y0:y1, x0:x1].astype(np.float32)
+    if bscale != 1:
+        out *= np.float32(bscale)
+    if bzero:
+        out += np.float32(bzero)
+    if not np.issubdtype(raw.dtype, np.integer):
+        np.nan_to_num(out, copy=False, nan=0.0, posinf=0.0, neginf=0.0)
+    return out
+
+
 def _detect_sync(
     fits_path: str, metric: Metric = "fwhm", reference_stars: list[dict] | None = None,
 ) -> tuple[float, int, list[dict]]:
@@ -347,32 +444,64 @@ def _detect_sync(
             f"scipy and astropy are required for star detection. Error: {exc}"
         ) from exc
 
-    with fits.open(fits_path) as hdul:
-        data = hdul[0].data  # type: ignore[index]
-        if data is None:
+    with fits.open(fits_path, memmap=True, do_not_scale_image_data=True) as hdul:
+        hdu = hdul[0]
+        raw = hdu.data  # type: ignore[union-attr]
+        if raw is None:
             logger.error("autofocus.detecting_stars.no_data", fits_path=fits_path)
             return 0.0, 0, []
-        data = data.astype(float)
+        bzero = float(hdu.header.get("BZERO", 0.0))  # type: ignore[union-attr]
+        bscale = float(hdu.header.get("BSCALE", 1.0))  # type: ignore[union-attr]
+        # Collapse multi-dimensional data (e.g. [1, H, W]) to 2D
+        while raw.ndim > 2:
+            raw = raw[0]
+        height, width = raw.shape
 
-    # Collapse multi-dimensional data (e.g. [1, H, W]) to 2D
-    while data.ndim > 2:
-        data = data[0]
-    if float(np.ptp(data)) <= 0:
+        def one_tile(origin: tuple[int, int]) -> tuple[list[tuple[float, dict]], int, int, bool]:
+            ty, tx = origin
+            cy1, cx1 = min(ty + _TILE, height), min(tx + _TILE, width)
+            y0, y1 = max(0, ty - _HALO), min(height, cy1 + _HALO)
+            x0, x1 = max(0, tx - _HALO), min(width, cx1 + _HALO)
+            data = _read_tile(raw, bzero, bscale, y0, y1, x0, x1)
+            if float(np.ptp(data)) <= 0:
+                return [], 0, 0, True
+            data, hot = _suppress_hot_pixels(data)
+            # Each star belongs to the tile whose core holds its centre; the halo only
+            # gives the filters and the measuring stamp the surroundings they need.
+            blobs = [
+                b for b in _find_blobs(data, core=(ty - y0, cy1 - y0, tx - x0, cx1 - x0))
+                if ty <= b[1] + y0 < cy1 and tx <= b[0] + x0 < cx1
+            ]
+            tile_found: list[tuple[float, dict]] = []
+            for bx, by, bsigma, significance in blobs:
+                measured = _measure_star(data, bx, by, bsigma)
+                if measured is None:
+                    continue
+                measured["x"] += x0
+                measured["y"] += y0
+                tile_found.append((significance, measured))
+                if len(tile_found) >= _MAX_STARS:
+                    break
+            return tile_found, hot, len(blobs), False
+
+        origins = [(ty, tx) for ty in _tile_origins(height) for tx in _tile_origins(width)]
+        with ThreadPoolExecutor(max_workers=_workers()) as pool:
+            results = list(pool.map(one_tile, origins))   # the filters release the GIL
+
+    found = [f for tile_found, *_ in results for f in tile_found]
+    n_hot = sum(r[1] for r in results)
+    n_blobs = sum(r[2] for r in results)
+    n_tiles = len(results)
+    n_flat = sum(r[3] for r in results)
+
+    if n_flat == n_tiles:
         logger.error("autofocus.detecting_stars.flat_image", fits_path=fits_path)
         return 0.0, 0, []
 
-    data, n_hot = _suppress_hot_pixels(data)
-    blobs = _find_blobs(data)
-
-    stars: list[dict] = []
-    for bx, by, bsigma, _ in blobs:
-        measured = _measure_star(data, bx, by, bsigma)
-        if measured is not None:
-            stars.append(measured)
-            if len(stars) >= _MAX_STARS:
-                break
+    found.sort(key=lambda f: -f[0])
+    stars = [star for _, star in found[:_MAX_STARS]]
     logger.info(
-        "autofocus.detection", hot_pixels=n_hot, blobs=len(blobs), stars=len(stars),
+        "autofocus.detection", hot_pixels=n_hot, blobs=n_blobs, stars=len(stars), tiles=n_tiles,
     )
     if not stars:
         return 0.0, 0, []

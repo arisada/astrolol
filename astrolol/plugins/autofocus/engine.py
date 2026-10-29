@@ -78,18 +78,12 @@ def _annotate_preview(
 
 
 def _read_fits_shape(fits_path: str) -> tuple[int, int]:
-    """Return (width, height) by reading the FITS header directly."""
+    """Return (width, height) from the FITS header, without reading the pixels."""
     try:
         from astropy.io import fits
-        with fits.open(fits_path) as hdul:
-            data = hdul[0].data
-            if data is None:
-                return 0, 0
-            # Shape is (..., H, W) in numpy convention
-            shape = data.shape
-            while len(shape) > 2:
-                shape = shape[1:]
-            return int(shape[1]), int(shape[0])  # (width, height)
+        with fits.open(fits_path, memmap=True, do_not_scale_image_data=True) as hdul:
+            header = hdul[0].header
+            return int(header["NAXIS1"]), int(header["NAXIS2"])
     except Exception:
         return 0, 0
 

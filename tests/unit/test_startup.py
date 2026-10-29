@@ -1,6 +1,7 @@
 import asyncio
 
 from astrolol import main as main_mod
+from astrolol.config.settings import settings
 
 
 async def test_api_is_up_while_profile_restores(monkeypatch):
@@ -40,3 +41,17 @@ async def test_shutdown_cancels_pending_restore(monkeypatch):
     async with app.router.lifespan_context(app):
         pass
     assert app.state.profile_restore_task.done()
+
+
+def test_low_memory_mode_is_switched_on_at_start_on_a_small_host(monkeypatch, tmp_path):
+    monkeypatch.setattr(settings, "profiles_file", tmp_path / "profiles.json")
+    monkeypatch.setattr("astrolol.core.mem_guard.host_is_low_memory", lambda: True)
+    app = main_mod.create_app()
+    assert app.state.profile_store.get_user_settings().low_memory_mode is True
+
+
+def test_low_memory_mode_stays_off_on_a_big_host(monkeypatch, tmp_path):
+    monkeypatch.setattr(settings, "profiles_file", tmp_path / "profiles.json")
+    monkeypatch.setattr("astrolol.core.mem_guard.host_is_low_memory", lambda: False)
+    app = main_mod.create_app()
+    assert app.state.profile_store.get_user_settings().low_memory_mode is False
