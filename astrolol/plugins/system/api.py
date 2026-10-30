@@ -258,29 +258,37 @@ async def set_hostname(body: SetHostnameRequest) -> HostnameInfo:
 
 # ── Power controls ─────────────────────────────────────────────────────────────
 
+async def _systemctl(verb: str) -> None:
+    """Run ``systemctl <verb>`` and raise HTTP 500 with systemd's message when it is refused
+    (missing polkit permission, no systemd)."""
+    try:
+        proc = await asyncio.create_subprocess_exec(
+            "systemctl", verb,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        _, stderr = await proc.communicate()
+    except OSError as exc:
+        raise HTTPException(status_code=500, detail=f"systemctl {verb}: {exc}") from exc
+    if proc.returncode != 0:
+        detail = stderr.decode().strip() or f"systemctl {verb} exited {proc.returncode}"
+        logger.warning("system.power_refused", action=verb, error=detail)
+        raise HTTPException(status_code=500, detail=detail)
+
+
 @router.post("/reboot", status_code=202)
 async def reboot_system() -> dict[str, str]:
     """Reboot the host system (systemd; allowed by the polkit rule)."""
-    async def _do() -> None:
-        await asyncio.sleep(0.5)
-        logger.info("system.rebooting")
-        proc = await asyncio.create_subprocess_exec("systemctl", "reboot")
-        await proc.wait()
-
-    asyncio.create_task(_do())
+    logger.info("system.rebooting")
+    await _systemctl("reboot")
     return {"status": "rebooting"}
 
 
 @router.post("/shutdown", status_code=202)
 async def shutdown_system() -> dict[str, str]:
     """Power off the host system (systemd; allowed by the polkit rule)."""
-    async def _do() -> None:
-        await asyncio.sleep(0.5)
-        logger.info("system.shutting_down")
-        proc = await asyncio.create_subprocess_exec("systemctl", "poweroff")
-        await proc.wait()
-
-    asyncio.create_task(_do())
+    logger.info("system.shutting_down")
+    await _systemctl("poweroff")
     return {"status": "shutting_down"}
 
 

@@ -23,6 +23,8 @@
   "password": "Mot de passe",
   "connect": "Connecter",
   "errors": {
+    "reboot": "Échec du redémarrage de l'appareil",
+    "shutdown": "Échec de l'arrêt de l'appareil",
     "unreachable": "Impossible de joindre le serveur",
     "scan": "Échec de la recherche",
     "connect": "Échec de la connexion",

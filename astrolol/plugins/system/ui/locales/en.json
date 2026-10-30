@@ -23,6 +23,8 @@
   "password": "Password",
   "connect": "Connect",
   "errors": {
+    "reboot": "Reboot failed",
+    "shutdown": "Shutdown failed",
     "unreachable": "Cannot reach backend",
     "scan": "Scan failed",
     "connect": "Connection failed",

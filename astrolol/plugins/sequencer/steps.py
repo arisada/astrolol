@@ -603,12 +603,24 @@ class Steps:
             t0,
             {
                 "reason": reason,
+                "filter": await self._current_filter(devices),
                 "position": run.optimal_position,
                 "best_fwhm": round(best, 2) if best is not None else None,
                 "samples": len(run.data_points),
             },
         )
         return True
+
+    async def _current_filter(self, devices: LaneDevices) -> str | None:
+        """Name of the filter in the beam, best effort (journal entries)."""
+        fwm = self._state("filter_wheel_manager")
+        if fwm is None or devices.filter_wheel_id is None:
+            return None
+        try:
+            status = await fwm.get_status(devices.filter_wheel_id)
+            return status.filter_names[status.current_slot - 1] if status.current_slot else None
+        except Exception:
+            return None
 
     async def frame_context(self, devices: LaneDevices) -> dict[str, Any]:
         """Altitude, hour angle, focuser position and sensor temperature, best effort —

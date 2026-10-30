@@ -1034,8 +1034,8 @@ export function SystemPage() {
       <Section title={t('controls.title')} icon={Power}>
         <div className="flex flex-wrap gap-2">
           <ConfirmButton label={t('controls.restart')} confirmLabel={t('controls.confirmRestart')} icon={RotateCcw} onClick={async () => { try { await api.restartApp() } catch {} }} variant="warning" />
-          <ConfirmButton label={t('controls.reboot')} confirmLabel={t('controls.confirmReboot')} icon={RefreshCw} onClick={async () => { try { await api.reboot() } catch {} }} variant="warning" />
-          <ConfirmButton label={t('controls.shutdown')} confirmLabel={t('controls.confirmShutdown')} icon={Power} onClick={async () => { try { await api.shutdown() } catch {} }} variant="danger" />
+          <ConfirmButton label={t('controls.reboot')} confirmLabel={t('controls.confirmReboot')} icon={RefreshCw} onClick={async () => { try { setError(null); await api.reboot() } catch (e) { setError(e instanceof Error ? e.message : t('errors.reboot')) } }} variant="warning" />
+          <ConfirmButton label={t('controls.shutdown')} confirmLabel={t('controls.confirmShutdown')} icon={Power} onClick={async () => { try { setError(null); await api.shutdown() } catch (e) { setError(e instanceof Error ? e.message : t('errors.shutdown')) } }} variant="danger" />
         </div>
         <p className="text-xs text-slate-600 mt-3">{t('controls.hint')}</p>
       </Section>

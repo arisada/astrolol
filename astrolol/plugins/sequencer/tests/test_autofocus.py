@@ -47,6 +47,21 @@ async def test_autofocus_on_each_filter_change(tmp_path: Path) -> None:
     assert reasons == ["filter R", "filter G"]
 
 
+async def test_autofocus_journal_names_the_filter(tmp_path: Path) -> None:
+    rig = _rig(tmp_path)
+    rig.fwm.slot = None
+    task = make_task(dither_every=None)
+    groups = [
+        ExposureGroup(filter_name="R", duration=1, count=1),
+        ExposureGroup(filter_name="G", duration=1, count=1),
+    ]
+    task.lanes = [Lane(groups=groups, autofocus_on_filter_change=True)]
+    await rig.svc.add(task)
+    await _run(rig)
+    filters = [e.details["filter"] for e in rig.of("sequencer.step_finished") if e.step == "autofocus"]
+    assert filters == ["R", "G"]
+
+
 async def test_no_autofocus_without_triggers(tmp_path: Path) -> None:
     rig = _rig(tmp_path)
     await rig.svc.add(make_task())

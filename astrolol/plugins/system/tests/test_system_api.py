@@ -318,18 +318,41 @@ def test_restart_returns_202(client: TestClient) -> None:
     assert r.json()["status"] == "restarting"
 
 
+def _systemctl_proc(returncode: int, stderr: bytes = b"") -> AsyncMock:
+    proc = MagicMock(returncode=returncode, communicate=AsyncMock(return_value=(b"", stderr)))
+    return AsyncMock(return_value=proc)
+
+
 def test_reboot_returns_202(client: TestClient) -> None:
-    with patch("asyncio.create_subprocess_exec", AsyncMock(return_value=MagicMock(wait=AsyncMock()))):
+    with patch("asyncio.create_subprocess_exec", _systemctl_proc(0)) as spawn:
         r = client.post("/plugins/system/reboot")
     assert r.status_code == 202
     assert r.json()["status"] == "rebooting"
+    assert spawn.call_args.args[:2] == ("systemctl", "reboot")
 
 
 def test_shutdown_returns_202(client: TestClient) -> None:
-    with patch("asyncio.create_subprocess_exec", AsyncMock(return_value=MagicMock(wait=AsyncMock()))):
+    with patch("asyncio.create_subprocess_exec", _systemctl_proc(0)) as spawn:
         r = client.post("/plugins/system/shutdown")
     assert r.status_code == 202
     assert r.json()["status"] == "shutting_down"
+    assert spawn.call_args.args[:2] == ("systemctl", "poweroff")
+
+
+@pytest.mark.parametrize("path", ["reboot", "shutdown"])
+def test_power_action_refused_reports_the_reason(client: TestClient, path: str) -> None:
+    msg = b"Failed to power off system via logind: Interactive authentication required."
+    with patch("asyncio.create_subprocess_exec", _systemctl_proc(1, msg)):
+        r = client.post(f"/plugins/system/{path}")
+    assert r.status_code == 500
+    assert "Interactive authentication required" in r.json()["detail"]
+
+
+def test_power_action_without_systemctl(client: TestClient) -> None:
+    with patch("asyncio.create_subprocess_exec", AsyncMock(side_effect=FileNotFoundError("systemctl"))):
+        r = client.post("/plugins/system/shutdown")
+    assert r.status_code == 500
+    assert "systemctl" in r.json()["detail"]
 
 
 # ── Storage ────────────────────────────────────────────────────────────────────
