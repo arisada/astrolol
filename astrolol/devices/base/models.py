@@ -31,6 +31,7 @@ class Image(BaseModel):
     width: int
     height: int
     exposure_duration: float
+    gain: int | None = Field(default=None, description="Gain the camera reported for this frame; None = unknown")
 
 
 class CameraStatus(BaseModel):

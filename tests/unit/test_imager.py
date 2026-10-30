@@ -437,3 +437,37 @@ async def test_expose_uses_persisted_per_camera_preview_settings(
     # Black point at −1σ (not the default −2.8σ) below the displayed background.
     assert stats.display_sigma > 0
     assert stats.stretch_low == pytest.approx(stats.display_median - 1.0 * stats.display_sigma, rel=1e-4)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "asked, reported, expected",
+    [(111, 200, "g200_000001.fits"),    # the camera did not take the gain: the file says what it had
+     (None, 111, "g111_000001.fits"),   # no gain asked: the camera's current gain, not an empty token
+     (111, None, "g111_000001.fits"),   # camera cannot tell: what was asked
+     (None, None, "g_000001.fits")],
+)
+async def test_saved_file_name_carries_the_gain_the_camera_reported(
+    manager: DeviceManager, event_bus, tmp_path: Path, asked, reported, expected,
+) -> None:
+    from astrolol.profiles.store import ProfileStore
+
+    profile_store = ProfileStore(tmp_path / "profiles.json")
+    profile_store.update_user_settings(
+        profile_store.get_user_settings().model_copy(update={"save_filename_template": "g%G_%N"})
+    )
+    imager_manager = ImagerManager(
+        device_manager=manager, event_bus=event_bus, images_dir=tmp_path, profile_store=profile_store,
+    )
+    await connected_camera(manager)
+    camera = manager.get_camera("cam1")
+    expose = camera.expose
+
+    async def expose_reporting_gain(params):
+        return (await expose(params)).model_copy(update={"gain": reported})
+
+    camera.expose = expose_reporting_gain  # type: ignore[method-assign]
+
+    result = await imager_manager.expose("cam1", ExposureRequest(duration=1.0, gain=asked, save=True))
+
+    assert Path(result.fits_path).name == expected

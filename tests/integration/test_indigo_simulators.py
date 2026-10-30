@@ -282,6 +282,16 @@ async def test_camera_expose_returns_image(camera):
         assert hdul[0].data.shape == (1200, 1600)
 
 
+async def test_camera_gain_is_applied_and_reported_with_the_frame(camera):
+    from astrolol.devices.base.models import ExposureParams
+    control = camera._gain_control()
+    if control is None:
+        pytest.skip("this simulator has no gain control")
+    image = await camera.expose(ExposureParams(duration=0.2, gain=40))
+    assert image.gain == 40
+    assert camera._client.get_number_nowait(camera._device_name, *control) == 40
+
+
 async def test_camera_local_upload_expose(camera, tmp_path_factory):
     """Local upload mode: the driver writes the file itself and reports its path."""
     from astrolol.devices.base.models import ExposureParams

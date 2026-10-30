@@ -393,6 +393,33 @@ class IndiClient(IPyClient):
         except Exception:
             return None
 
+    def find_number(
+        self, device_name: str, element: str, prefer: tuple[str, ...] = (), prefix: str = ""
+    ) -> tuple[str, str] | None:
+        """(property, element) of a writable number element called *element* (by name or label,
+        any case), among the device's properties starting with *prefix*; *prefer* names are tried
+        first. Drivers disagree on where such a value lives (``CCD_GAIN/GAIN`` for most,
+        ``CCD_CONTROLS/Gain`` for ZWO)."""
+        device = self.data.get(device_name)
+        if device is None:
+            return None
+        wanted = element.lower()
+
+        def match(prop_name: str) -> tuple[str, str] | None:
+            v = device.data.get(prop_name)
+            if v is None or v.vectortype != "NumberVector" or getattr(v, "perm", "rw") == "ro":
+                return None
+            for name, member in v.data.items():
+                if name.lower() == wanted or str(getattr(member, "label", "")).lower() == wanted:
+                    return prop_name, name
+            return None
+
+        for prop_name in [*prefer, *(n for n in device.data if n.startswith(prefix) and n not in prefer)]:
+            found = match(prop_name)
+            if found is not None:
+                return found
+        return None
+
     async def get_switch_state(
         self, device_name: str, prop_name: str, element: str
     ) -> bool:

@@ -226,6 +226,20 @@ async def test_camera_expose_fits_valid(camera):
         assert len(hdul) > 0
 
 
+async def test_camera_gain_is_applied_and_reported_with_the_frame(camera):
+    """The gain asked for with an exposure reaches the driver and is what the image reports."""
+    from astrolol.devices.base.models import ExposureParams
+    control = camera._gain_control()
+    if control is None:
+        pytest.skip("this simulator has no gain control")
+    for gain in (30, 70):
+        image = await camera.expose(ExposureParams(duration=0.1, gain=gain))
+        assert image.gain == gain
+        assert camera._client.get_number_nowait(camera._device_name, *control) == gain
+    # No gain asked: the frame still reports the one the camera has.
+    assert (await camera.expose(ExposureParams(duration=0.1))).gain == 70
+
+
 async def test_camera_get_status_has_temperature(camera):
     assert (await camera.get_status()).temperature is not None
 

@@ -8,7 +8,7 @@ INDI CCD properties used:
   CCD_COOLER     SWITCH  COOLER_ON / COOLER_OFF
   CCD_INFO        NUMBER CCD_MAX_X, CCD_MAX_Y
   CCD_BINNING    NUMBER  HOR_BIN, VER_BIN
-  CCD_GAIN       NUMBER  GAIN  (not all cameras have this)
+  CCD_GAIN       NUMBER  GAIN  (not all cameras have this; ZWO drivers use CCD_CONTROLS/Gain)
 """
 from __future__ import annotations
 
@@ -44,6 +44,11 @@ from astrolol.devices.indi.pulse import (
 )
 
 logger = structlog.get_logger()
+
+# Where drivers keep the gain, tried first; any other writable CCD_* number called "gain" works too.
+_GAIN_PROPERTIES = ("CCD_GAIN", "CCD_CONTROLS")
+_GAIN_CONFIRM_POLLS = 20        # the driver confirms a write with an update of the vector...
+_GAIN_CONFIRM_INTERVAL = 0.1    # ...usually well within a second
 
 
 class IndiCamera:
@@ -159,20 +164,8 @@ class IndiCamera:
                 error=str(exc),
             )
 
-        # Set gain if supported (best-effort)
         if params.gain is not None:
-            try:
-                await self._client.set_number(
-                    self._device_name,
-                    "CCD_GAIN",
-                    {"GAIN": float(params.gain)},
-                )
-            except Exception as exc:
-                logger.debug(
-                    "indi.camera_gain_skipped",
-                    device=self._device_name,
-                    error=str(exc),
-                )
+            await self._apply_gain(params.gain)
 
         timeout = params.duration + self._exposure_timeout_extra
 
@@ -223,11 +216,13 @@ class IndiCamera:
             fits=str(fits_path),
             duration=params.duration,
         )
+        gain = self._read_gain()
         return Image(
             fits_path=str(fits_path),
             width=width,
             height=height,
             exposure_duration=params.duration,
+            gain=None if gain is None else round(gain),
         )
 
     # ------------------------------------------------------------------
@@ -253,7 +248,7 @@ class IndiCamera:
             raise RuntimeError("already streaming")
         dev, client = self._device_name, self._client
         if params.gain is not None:
-            await self._best_effort("gain", client.set_number(dev, "CCD_GAIN", {"GAIN": float(params.gain)}))
+            await self._apply_gain(params.gain)
         await self._best_effort(
             "binning",
             client.set_number(dev, "CCD_BINNING", {"HOR_BIN": float(params.binning), "VER_BIN": float(params.binning)}),
@@ -332,6 +327,45 @@ class IndiCamera:
                 ),
             )
         )
+
+    def _gain_control(self) -> tuple[str, str] | None:
+        return self._client.find_number(self._device_name, "gain", prefer=_GAIN_PROPERTIES, prefix="CCD_")
+
+    def _read_gain(self) -> float | None:
+        """The gain the driver reports now, None when it has no gain control."""
+        control = self._gain_control()
+        if control is None:
+            return None
+        return self._client.get_number_nowait(self._device_name, *control)
+
+    async def _apply_gain(self, gain: int) -> None:
+        """Set the sensor gain and check that the driver took it.
+
+        A gain that is not applied makes every frame of a run wrong without any error, so
+        a missing control, a refused write or a different value read back are warnings
+        (the driver may clamp to its own range); the frames record the gain that was read back.
+        """
+        device = self._device_name
+        control = self._gain_control()
+        if control is None:
+            logger.warning("indi.camera_gain_unsupported", device=device, requested=gain)
+            return
+        try:
+            await self._client.set_number(device, control[0], {control[1]: float(gain)})
+        except Exception as exc:
+            logger.warning("indi.camera_gain_failed", device=device, requested=gain, error=str(exc))
+            return
+        applied = self._read_gain()
+        for _ in range(_GAIN_CONFIRM_POLLS):
+            if applied is not None and abs(applied - gain) < 0.5:
+                return
+            await asyncio.sleep(_GAIN_CONFIRM_INTERVAL)
+            applied = self._read_gain()
+        if applied is None or abs(applied - gain) >= 0.5:
+            logger.warning(
+                "indi.camera_gain_not_applied", device=device, requested=gain, applied=applied,
+                control=f"{control[0]}/{control[1]}",
+            )
 
     async def _best_effort(self, what: str, call) -> None:  # noqa: ANN001
         try:

@@ -498,14 +498,15 @@ class ImagerManager:
         # Optionally move to save directory, or park unsaved frames in a fixed temp path
         if request.save and self._profile_store is not None:
             user_cfg = self._profile_store.get_user_settings()
+            gain = image.gain if image.gain is not None else request.gain   # what the camera had, not what was asked
             counter = self._save_counters.get(device_id, 0) + 1
             self._save_counters[device_id] = counter
             _tpl_kw = dict(camera_name=device_id, filter_name=filter_name, object_name=object_name)
             dir_part = _expand_template(
-                user_cfg.save_dir_template, request.frame_type, counter, request.duration, request.gain, **_tpl_kw
+                user_cfg.save_dir_template, request.frame_type, counter, request.duration, gain, **_tpl_kw
             )
             file_part = _expand_template(
-                user_cfg.save_filename_template, request.frame_type, counter, request.duration, request.gain, **_tpl_kw
+                user_cfg.save_filename_template, request.frame_type, counter, request.duration, gain, **_tpl_kw
             )
             try:
                 final_fits = storage_path(Path(dir_part).expanduser() / f"{file_part}.fits")
