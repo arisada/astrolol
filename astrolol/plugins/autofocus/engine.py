@@ -88,6 +88,64 @@ def _read_fits_shape(fits_path: str) -> tuple[int, int]:
         return 0, 0
 
 
+# Sweeps added, at most, when the minimum lies beyond the end of the swept range (a focus that
+# moved a lot, e.g. after a filter change): each one is centred past the end where the
+# measurements were still improving, and its points join those already measured.
+_MAX_RECENTRES = 2
+
+
+def _edge_direction(run: AutofocusRun) -> int:
+    """+1 / -1 when the focus is clearly beyond the highest / lowest position swept, else 0.
+
+    That is the case when the fitted optimum itself lies outside the swept range, or when there
+    is no valid fit and the best measured sample has fewer than two samples beyond it on one
+    side: the curve has no arm there to fit, and is still falling towards that end. A best
+    sample well inside with no valid fit is noise or a flat curve, which more sweeps do not help.
+    """
+    valid = [dp for dp in run.data_points if dp.fwhm > 0 and dp.star_count > 0]
+    if len(valid) < 3:
+        return 0
+    positions = [dp.position for dp in run.data_points]
+    lo, hi = min(positions), max(positions)
+    fit = run.curve_fit
+    if fit is not None:
+        if fit.optimal_position > hi:
+            return 1
+        if fit.optimal_position < lo:
+            return -1
+        return 0
+    best = min(valid, key=lambda dp: dp.fwhm).position
+    above = sum(1 for p in positions if p > best)
+    below = sum(1 for p in positions if p < best)
+    if above < 2 and above <= below:
+        return 1
+    if below < 2 and lo > 0:
+        return -1
+    return 0
+
+
+def next_sweep(run: AutofocusRun) -> list[int] | None:
+    """Positions of one more sweep when the minimum is beyond the swept range, else None.
+
+    Centred half a sweep past the end the measurements point to, on the grid already used, and
+    without the positions already measured. Listed from the old end outwards.
+    """
+    direction = _edge_direction(run)
+    if direction == 0:
+        return None
+    config = run.config
+    measured = {dp.position for dp in run.data_points}
+    end = max(measured) if direction > 0 else min(measured)
+    centre = end + direction * round(config.num_steps / 2) * config.step_size
+    wanted = {
+        max(0, centre + (i - config.num_steps) * config.step_size)
+        for i in range(2 * config.num_steps + 1)
+    } - measured
+    if not wanted:
+        return None
+    return sorted(wanted, key=lambda p: (p - end) * direction)
+
+
 class AutofocusEngine:
     """Manages one autofocus run at a time."""
 
@@ -217,101 +275,115 @@ class AutofocusEngine:
             # a step where none of these stars can be matched reports no stars.
             reference_stars: list[dict] | None = None
 
-            for step_idx, position in enumerate(positions):
-                run.current_step = step_idx + 1
+            sweep = positions
+            for pass_no in range(1 + _MAX_RECENTRES):
+                for position in sweep:
+                    run.current_step = len(run.data_points) + 1
 
-                # 1. Move focuser
-                logger.info(
-                    "autofocus.moving",
-                    step=run.current_step,
-                    total=run.total_steps,
-                    position=position,
-                )
-                await asyncio.wait_for(focuser.move_to(position), timeout=_MOVE_TIMEOUT)
+                    # 1. Move focuser
+                    logger.info(
+                        "autofocus.moving",
+                        step=run.current_step,
+                        total=run.total_steps,
+                        position=position,
+                    )
+                    await asyncio.wait_for(focuser.move_to(position), timeout=_MOVE_TIMEOUT)
 
-                # 2. Expose
-                logger.info(
-                    "autofocus.exposing",
-                    step=run.current_step,
-                    duration=config.exposure_time,
-                )
-                image = await asyncio.wait_for(camera.expose(params), timeout=_EXPOSE_TIMEOUT)
+                    # 2. Expose
+                    logger.info(
+                        "autofocus.exposing",
+                        step=run.current_step,
+                        duration=config.exposure_time,
+                    )
+                    image = await asyncio.wait_for(camera.expose(params), timeout=_EXPOSE_TIMEOUT)
 
-                # Always derive dimensions from the FITS file itself so that
-                # binning and subframe settings are reflected correctly.
-                fits_w, fits_h = await asyncio.to_thread(_read_fits_shape, image.fits_path)
-                run.image_width = fits_w or None
-                run.image_height = fits_h or None
+                    # Always derive dimensions from the FITS file itself so that
+                    # binning and subframe settings are reflected correctly.
+                    fits_w, fits_h = await asyncio.to_thread(_read_fits_shape, image.fits_path)
+                    run.image_width = fits_w or None
+                    run.image_height = fits_h or None
 
-                # 3. Detect stars and measure sharpness (FWHM or HFD).
-                # Wrapped in mem_guard so the heavy numpy/scipy work is
-                # serialised with other memory-intensive tasks on low-RAM hosts.
-                logger.info("autofocus.detecting_stars", step=run.current_step, metric=config.metric)
-                async with mem_guard():
-                    fwhm, star_count, raw_stars = await detect_stars(
-                        image.fits_path,
+                    # 3. Detect stars and measure sharpness (FWHM or HFD).
+                    # Wrapped in mem_guard so the heavy numpy/scipy work is
+                    # serialised with other memory-intensive tasks on low-RAM hosts.
+                    logger.info("autofocus.detecting_stars", step=run.current_step, metric=config.metric)
+                    async with mem_guard():
+                        fwhm, star_count, raw_stars = await detect_stars(
+                            image.fits_path,
+                            metric=config.metric,
+                            reference_stars=reference_stars if config.lock_stars else None,
+                        )
+
+                    if config.lock_stars and reference_stars is None and raw_stars:
+                        reference_stars = raw_stars
+
+                    run.latest_stars = [StarInfo(x=s["x"], y=s["y"], fwhm=s["fwhm"]) for s in raw_stars]
+
+                    # 4. Generate preview JPEGs (auto-stretch + linear) with star
+                    # circles burned in. Done AFTER star detection so circles are
+                    # always in the final file. _preview_paths is registered here
+                    # too, so the API endpoint never serves a circle-free version.
+                    auto_path = str(preview_dir / f"step_{run.current_step:02d}.jpg")
+                    linear_path = str(preview_dir / f"step_{run.current_step:02d}_linear.jpg")
+                    try:
+                        from astrolol.imaging.preview import load_preview_base, render_auto, render_linear
+
+                        def _render_step_previews(fits_path: Path, quality: int) -> None:
+                            base = load_preview_base(fits_path)  # one read for both previews
+                            render_auto(base, Path(auto_path), quality)
+                            render_linear(base, Path(linear_path), quality)
+
+                        async with mem_guard():
+                            await asyncio.to_thread(
+                                _render_step_previews, Path(image.fits_path), settings.jpeg_quality,
+                            )
+                        if raw_stars:
+                            for p in (auto_path, linear_path):
+                                await asyncio.to_thread(_annotate_preview, p, raw_stars, fits_w, fits_h)
+                        self._preview_paths[run.current_step] = {"auto": auto_path, "linear": linear_path}
+                    except Exception as exc:
+                        logger.warning("autofocus.preview_failed", step=run.current_step, error=str(exc))
+
+                    dp = FocusDataPoint(
+                        step=run.current_step,
+                        position=position,
+                        fwhm=fwhm,
+                        star_count=star_count,
+                    )
+                    run.data_points.append(dp)
+
+                    # 5. Refit the curve (live update for the UI)
+                    self._refit_curve(run)
+
+                    await self._bus.publish(AutofocusDataPointEvent(
+                        run_id=run.id,
+                        step=run.current_step,
+                        total_steps=run.total_steps,
+                        position=position,
+                        fwhm=fwhm,
+                        star_count=star_count,
+                    ))
+
+                    logger.info(
+                        "autofocus.data_point",
+                        step=run.current_step,
+                        position=position,
                         metric=config.metric,
-                        reference_stars=reference_stars if config.lock_stars else None,
+                        value=round(fwhm, 2),
+                        stars=star_count,
                     )
 
-                if config.lock_stars and reference_stars is None and raw_stars:
-                    reference_stars = raw_stars
-
-                run.latest_stars = [StarInfo(x=s["x"], y=s["y"], fwhm=s["fwhm"]) for s in raw_stars]
-
-                # 4. Generate preview JPEGs (auto-stretch + linear) with star
-                # circles burned in. Done AFTER star detection so circles are
-                # always in the final file. _preview_paths is registered here
-                # too, so the API endpoint never serves a circle-free version.
-                auto_path = str(preview_dir / f"step_{run.current_step:02d}.jpg")
-                linear_path = str(preview_dir / f"step_{run.current_step:02d}_linear.jpg")
-                try:
-                    from astrolol.imaging.preview import load_preview_base, render_auto, render_linear
-
-                    def _render_step_previews(fits_path: Path, quality: int) -> None:
-                        base = load_preview_base(fits_path)  # one read for both previews
-                        render_auto(base, Path(auto_path), quality)
-                        render_linear(base, Path(linear_path), quality)
-
-                    async with mem_guard():
-                        await asyncio.to_thread(
-                            _render_step_previews, Path(image.fits_path), settings.jpeg_quality,
-                        )
-                    if raw_stars:
-                        for p in (auto_path, linear_path):
-                            await asyncio.to_thread(_annotate_preview, p, raw_stars, fits_w, fits_h)
-                    self._preview_paths[run.current_step] = {"auto": auto_path, "linear": linear_path}
-                except Exception as exc:
-                    logger.warning("autofocus.preview_failed", step=run.current_step, error=str(exc))
-
-                dp = FocusDataPoint(
-                    step=run.current_step,
-                    position=position,
-                    fwhm=fwhm,
-                    star_count=star_count,
-                )
-                run.data_points.append(dp)
-
-                # 5. Refit the curve (live update for the UI)
                 self._refit_curve(run)
-
-                await self._bus.publish(AutofocusDataPointEvent(
-                    run_id=run.id,
-                    step=run.current_step,
-                    total_steps=run.total_steps,
-                    position=position,
-                    fwhm=fwhm,
-                    star_count=star_count,
-                ))
-
+                further = next_sweep(run) if pass_no < _MAX_RECENTRES else None
+                if further is None:
+                    break
                 logger.info(
-                    "autofocus.data_point",
-                    step=run.current_step,
-                    position=position,
-                    metric=config.metric,
-                    value=round(fwhm, 2),
-                    stars=star_count,
+                    "autofocus.recentring",
+                    run_id=run.id, pass_no=pass_no + 2, positions=further,
+                    reason="the minimum is not inside the swept range",
                 )
+                run.total_steps += len(further)
+                sweep = further
 
             # ── Move to optimal position ───────────────────────────────────────
             self._refit_curve(run)
@@ -330,6 +402,13 @@ class AutofocusEngine:
                 # minimum in range). Silently picking the lowest-FWHM sample here
                 # would report success on data that isn't a real focus curve, so
                 # this is treated as a failure and the focuser is restored below.
+                direction = _edge_direction(run)
+                if direction != 0:
+                    raise RuntimeError(
+                        "The best focus is beyond the swept range (the sharpness was still "
+                        f"improving towards {'higher' if direction > 0 else 'lower'} focuser positions "
+                        "at the end of the last sweep). Start from a position closer to focus."
+                    )
                 raise RuntimeError(
                     "Focus curve did not fit a valid V shape — the measured points "
                     "don't converge to a minimum in range. Try a larger step size, "
@@ -382,6 +461,15 @@ class AutofocusEngine:
         valid = [(dp.position, dp.fwhm) for dp in run.data_points if dp.fwhm > 0]
         if len(valid) < 3:
             return
+        config = run.config
+        if len(run.data_points) > 2 * config.num_steps + 1:
+            # Extra sweeps leave the points lopsided around the minimum (a long arm on one side,
+            # a short one on the other), which pulls a parabola towards the short side. Fit what
+            # a sweep centred on the best sample would have measured.
+            best = min(valid, key=lambda point: point[1])[0]
+            valid = [(p, f) for p, f in valid if abs(p - best) <= config.num_steps * config.step_size]
+            if len(valid) < 3:
+                return
         fit_fn = fit_hyperbola if run.config.fit_algo == "hyperbola" else fit_parabola
         result = fit_fn([p for p, _ in valid], [f for _, f in valid])
         if result is not None:

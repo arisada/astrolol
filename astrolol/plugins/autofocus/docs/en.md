@@ -38,6 +38,12 @@ Click **Start Autofocus**. During the run:
 - **Progress** shows the step, position and number of stars;
 - the status bar shows the run.
 
+If the sharpest position is not inside the range you set (after changing filter, say, or as the
+night cools), autofocus adds up to two more sweeps in that direction, so the number of steps
+grows during the run. The result is then fitted on the positions around the best one. If it is
+still not found, the run stops and says in which direction, and the focuser goes back to where
+it started: start again from a position closer to focus.
+
 **Abort** stops it and returns the focuser to where it started.
 
 At the end, the fitted curve is drawn and the focuser moves to the **Optimal position**. The

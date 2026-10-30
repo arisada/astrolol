@@ -40,6 +40,13 @@ Cliquez sur **Lancer l'autofocus**. Pendant le déroulement :
 - **Progression** donne le pas, la position et le nombre d'étoiles ;
 - la barre d'état montre l'opération.
 
+Si la position la plus nette n'est pas dans la plage choisie (après un changement de filtre, par
+exemple, ou quand la nuit se refroidit), l'autofocus ajoute jusqu'à deux balayages dans cette
+direction : le nombre de pas augmente donc pendant l'opération. Le résultat est alors calculé sur
+les positions autour de la meilleure. S'il n'est toujours pas trouvé, l'opération s'arrête en
+indiquant la direction et le focuser revient à son point de départ : relancez depuis une position
+plus proche de la mise au point.
+
 **Interrompre** l'arrête et ramène le focuser à son point de départ.
 
 À la fin, la courbe ajustée est tracée et le focuser va à la **Position optimale**. Le

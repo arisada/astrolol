@@ -179,3 +179,131 @@ async def test_focus_while_running_is_refused(rig: SimpleNamespace) -> None:
         await rig.engine.focus("cam", "foc")
     rig.focuser.gate.set()
     await first
+
+
+# ── The minimum lies beyond the swept range (after a filter change, say) ──────────────
+
+def _focus_at(rig: SimpleNamespace, monkeypatch: pytest.MonkeyPatch, best: int) -> None:
+    """Stars whose HFD is a V around *best* (hyperbolic: round bottom, straight arms)."""
+    async def detect(
+        fits_path: str, metric: str = "fwhm", reference_stars: list[Any] | None = None,
+    ) -> tuple[float, int, list[Any]]:
+        d = rig.focuser.position - best
+        return 2.0 + 0.02 * ((d * d + 60 * 60) ** 0.5 - 60), 25, []
+
+    monkeypatch.setattr(engine_mod, "detect_stars", detect)
+
+
+@pytest.mark.parametrize("best", [1400, 500])
+async def test_a_minimum_beyond_the_sweep_is_found_with_more_sweeps(
+    rig: SimpleNamespace, monkeypatch: pytest.MonkeyPatch, best: int,
+) -> None:
+    """Start 900, sweep 750-1050: a focus at 1400 (or 500) is out of range and used to fail."""
+    _focus_at(rig, monkeypatch, best)
+
+    run = await rig.engine.focus("cam", "foc")
+
+    assert run.status == "completed", run.error
+    assert abs(run.optimal_position - best) <= 30
+    assert abs(rig.focuser.position - best) <= 30
+    assert run.total_steps > 7 and run.total_steps == len(run.data_points)
+    positions = [dp.position for dp in run.data_points]
+    assert len(positions) == len(set(positions))        # no position measured twice
+    assert positions[:7] == [750, 800, 850, 900, 950, 1000, 1050]
+    assert [dp.step for dp in run.data_points] == list(range(1, len(positions) + 1))
+
+
+async def test_a_minimum_inside_the_sweep_needs_no_more_sweeps(
+    rig: SimpleNamespace, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _focus_at(rig, monkeypatch, 1000)
+
+    run = await rig.engine.focus("cam", "foc")
+
+    assert run.status == "completed"
+    assert run.total_steps == 7 and len(run.data_points) == 7
+
+
+async def test_a_focus_too_far_away_fails_with_the_direction_and_restores_focus(
+    rig: SimpleNamespace, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _focus_at(rig, monkeypatch, 6000)
+
+    run = await rig.engine.focus("cam", "foc")
+
+    assert run.status == "failed"
+    assert "beyond the swept range" in run.error and "higher" in run.error
+    assert rig.focuser.position == 900                  # back where it started
+    assert run.total_steps == len(run.data_points) <= 7 + 2 * 11
+
+
+def _run(points: list[tuple[int, float, int]], fit_at: float | None = None):  # noqa: ANN202
+    from astrolol.plugins.autofocus.models import AutofocusConfig, AutofocusRun, CurveFit, FocusDataPoint
+
+    run = AutofocusRun(
+        config=AutofocusConfig(camera_id="c", focuser_id="f", step_size=50, num_steps=3),
+        data_points=[FocusDataPoint(step=i + 1, position=p, fwhm=v, star_count=n) for i, (p, v, n) in enumerate(points)],
+    )
+    if fit_at is not None:
+        run.curve_fit = CurveFit(a=1.0, b=0.0, c=0.0, optimal_position=fit_at)
+    return run
+
+
+def test_next_sweep_goes_past_the_end_where_the_curve_is_still_falling() -> None:
+    from astrolol.plugins.autofocus.engine import next_sweep
+
+    run = _run([(750, 5.0, 20), (800, 4.0, 20), (850, 3.0, 20), (900, 2.5, 20), (950, 2.2, 20), (1000, 2.1, 20), (1050, 2.0, 20)])
+
+    assert next_sweep(run) == [1100, 1150, 1200, 1250, 1300]   # on the grid, outward from the end
+
+
+def test_next_sweep_is_empty_when_the_minimum_is_bracketed_or_unclear() -> None:
+    from astrolol.plugins.autofocus.engine import next_sweep
+
+    v = [(750, 4.0, 20), (800, 3.0, 20), (850, 2.2, 20), (900, 2.0, 20), (950, 2.3, 20), (1000, 3.1, 20), (1050, 4.2, 20)]
+    assert next_sweep(_run(v)) is None                                      # best sample in the middle
+    assert next_sweep(_run(v, fit_at=905.0)) is None                       # valid fit inside the range
+    noisy = [(750, 3.0, 20), (800, 2.6, 20), (850, 4.0, 20), (900, 2.0, 20), (950, 5.0, 20), (1000, 3.0, 20), (1050, 4.0, 20)]
+    assert next_sweep(_run(noisy)) is None                                  # best in the middle, no fit: noise
+    assert next_sweep(_run([(750, 2.0, 20), (800, 0.0, 0), (850, 0.0, 0)])) is None   # too few stars to steer by
+
+
+def test_next_sweep_follows_an_extrapolated_fit_and_stops_at_zero() -> None:
+    from astrolol.plugins.autofocus.engine import next_sweep
+
+    v = [(750, 4.0, 20), (800, 3.0, 20), (850, 2.2, 20), (900, 2.0, 20), (950, 2.3, 20), (1000, 3.1, 20), (1050, 4.2, 20)]
+    assert next_sweep(_run(v, fit_at=1120.0)) is not None                  # the fit itself points outside
+
+    low = [(0, 2.0, 20), (50, 2.5, 20), (100, 3.0, 20), (150, 3.5, 20), (200, 4.0, 20), (250, 4.5, 20), (300, 5.0, 20)]
+    assert next_sweep(_run(low)) is None                                    # cannot go below position 0
+
+
+def test_next_sweep_also_extends_towards_an_end_with_no_arm_left_to_fit() -> None:
+    """The best sample one step from the end: no valid fit is possible there, so the sweep
+    must go on that way (the failure seen after changing filter)."""
+    from astrolol.plugins.autofocus.engine import next_sweep
+
+    near_end = [(750, 6.0, 20), (800, 5.0, 20), (850, 4.0, 20), (900, 3.2, 20), (950, 2.6, 20), (1000, 2.0, 20), (1050, 2.5, 20)]
+    assert next_sweep(_run(near_end)) == [1100, 1150, 1200, 1250, 1300]
+    near_start = [(750, 2.6, 20), (800, 2.0, 20), (850, 2.6, 20), (900, 3.2, 20), (950, 4.0, 20), (1000, 5.0, 20), (1050, 6.0, 20)]
+    assert next_sweep(_run(near_start)) == [700, 650, 600, 550, 500]
+    assert next_sweep(_run([(750, 3.0, 20), (800, 2.6, 20), (850, 2.0, 20), (900, 2.6, 20), (950, 3.0, 20), (1000, 4.0, 20), (1050, 5.0, 20)])) is None  # two samples each side
+
+
+async def test_a_minimum_one_step_inside_the_end_of_a_wide_sweep_is_found(
+    rig: SimpleNamespace, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Parabola fit (the page's default) of a V-shaped curve whose centre is 100 steps from the
+    end of an 11-point sweep with 100-step spacing: the fit is rejected, which ended the run."""
+    from astrolol.plugins.autofocus.models import AutofocusConfig
+
+    rig.focuser.position = 22900
+    _focus_at(rig, monkeypatch, 23300)
+    config = AutofocusConfig(camera_id="cam", focuser_id="foc", step_size=100, num_steps=5, exposure_time=1.0)
+
+    run = await rig.engine.start(config)
+    await rig.engine._task
+
+    assert run.status == "completed", run.error
+    assert abs(run.optimal_position - 23300) <= 40
+    assert len(run.data_points) > 11
