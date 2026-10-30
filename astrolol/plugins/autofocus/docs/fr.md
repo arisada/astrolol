@@ -5,6 +5,11 @@ chacune et va à la position la plus nette. Une caméra et un focuser doivent ê
 
 ## Réglages
 
+Chaque modification est enregistrée aussitôt, et la page s'ouvre sur la dernière caméra
+utilisée. Le [séquenceur](../../sequencer/docs/fr.md) lance son propre autofocus avec ces mêmes
+réglages : vous pouvez donc les ajuster pendant une séquence, ils s'appliquent dès le prochain
+autofocus.
+
 **Caméra** et **Focuser** : lesquels utiliser. Choisissez un focuser placé devant la caméra dans
 le profil.
 

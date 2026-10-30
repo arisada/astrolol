@@ -65,6 +65,7 @@
   "abort": "Interrompre",
   "needDevices": "Une caméra et un focuser doivent être connectés.",
   "startFailed": "Impossible de démarrer l'autofocus",
+  "saveFailed": "Impossible d'enregistrer les réglages",
   "progress": {
     "title": "Progression",
     "step": "Pas {{current}} / {{total}}",

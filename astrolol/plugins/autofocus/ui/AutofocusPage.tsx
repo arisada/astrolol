@@ -44,6 +44,7 @@ const RUN_PILL_VARIANT: Record<AutofocusRun['status'], StatusPillVariant> = {
 // ── Default settings ──────────────────────────────────────────────────────────
 
 const DEFAULT_SETTINGS: AutofocusSettings = {
+  camera_id: null,
   step_size: 100,
   num_steps: 5,
   exposure_time: 2.0,
@@ -74,8 +75,12 @@ export function AutofocusPage() {
   const [cameraId,  setCameraId]  = useState<string>('')
   const [focuserId, setFocuserId] = useState<string>('')
   const [settings, setSettings]   = useState<AutofocusSettings>(DEFAULT_SETTINGS)
+  const [settingsLoaded, setSettingsLoaded] = useState(false)
   const [filterWheelStatus, setFilterWheelStatus] = useState<FilterWheelStatus | null>(null)
-  const settingsLoadedRef = useRef(false)
+  const settingsFetchedRef = useRef(false)
+  // The camera is the user's own choice once they have picked one; until then the saved (or
+  // first) camera is followed as devices connect.
+  const cameraPickedRef = useRef(false)
 
   // Per-camera focuser/filter-wheel association resolved from the active profile's
   // equipment tree — same data Imaging.tsx uses to avoid cross-wiring devices between
@@ -102,15 +107,47 @@ export function AutofocusPage() {
     : null
   const filterWheelCandidates = opticalPath ? (resolvedFilterWheel ? [resolvedFilterWheel] : []) : filterWheels
 
+  // ── Saving ─────────────────────────────────────────────────────────────────
+  // The settings are what the sequencer runs its autofocus with, so every change is saved
+  // (shortly after the last one), not only the ones made before pressing Start.
+  const [error, setError] = useState<string | null>(null)
+  const [saveError, setSaveError] = useState<string | null>(null)
+  const settingsRef = useRef(settings)
+  const dirtyRef = useRef(false)
+  useEffect(() => { settingsRef.current = settings }, [settings])
+
+  const flushSettings = useCallback(() => {
+    if (!dirtyRef.current) return
+    dirtyRef.current = false
+    autofocusApi.putSettings(settingsRef.current)
+      .then(() => setSaveError(null))
+      .catch(() => { dirtyRef.current = true; setSaveError(t('saveFailed')) })
+  }, [t])
+
+  useEffect(() => {
+    if (!dirtyRef.current) return
+    const id = setTimeout(flushSettings, 500)
+    return () => clearTimeout(id)
+  }, [settings, flushSettings])
+
+  // Leaving the page within that half second must not lose the last change.
+  useEffect(() => flushSettings, [flushSettings])
+
   // Helper to patch a single settings key
   const patchSettings = useCallback(<K extends keyof AutofocusSettings>(key: K, value: AutofocusSettings[K]) => {
+    dirtyRef.current = true
     setSettings((s) => ({ ...s, [key]: value }))
   }, [])
+
+  const pickCamera = useCallback((id: string) => {
+    cameraPickedRef.current = true
+    setCameraId(id)
+    patchSettings('camera_id', id)
+  }, [patchSettings])
 
   // ── Run state ──────────────────────────────────────────────────────────────
   const [run, setRun]   = useState<AutofocusRun | null>(null)
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState<string | null>(null)
 
   const [previewStep, setPreviewStep] = useState<number | null>(null)
   const [previewKey,  setPreviewKey]  = useState(0)
@@ -123,17 +160,24 @@ export function AutofocusPage() {
 
   // ── Load persisted settings on mount ──────────────────────────────────────
   useEffect(() => {
-    if (settingsLoadedRef.current) return
-    settingsLoadedRef.current = true
+    if (settingsFetchedRef.current) return
+    settingsFetchedRef.current = true
     autofocusApi.getSettings()
-      .then((s) => setSettings(s))
+      .then((s) => { if (!dirtyRef.current) setSettings(s) })   // a change made meanwhile wins
       .catch(() => {/* use defaults */})
+      .finally(() => setSettingsLoaded(true))
   }, [])
 
-  // Auto-select first available device when devices change
+  // The camera used last time, else the first one. Devices may connect after the page opens,
+  // so keep following that choice until the user picks a camera themselves.
   useEffect(() => {
-    if (!cameraId && cameras.length > 0) setCameraId(cameras[0].device_id)
-  }, [cameras])  // eslint-disable-line react-hooks/exhaustive-deps
+    if (!settingsLoaded || cameras.length === 0) return
+    const preferred = cameras.find((d) => d.device_id === settings.camera_id) ?? cameras[0]
+    const stillThere = cameras.some((d) => d.device_id === cameraId)
+    if (!cameraId || !stillThere || (!cameraPickedRef.current && cameraId !== preferred.device_id)) {
+      setCameraId(preferred.device_id)
+    }
+  }, [cameras, settingsLoaded, settings.camera_id])  // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (opticalPath) {
@@ -191,15 +235,15 @@ export function AutofocusPage() {
     setRun(null)
     setPreviewStep(null)
 
-    // Persist settings before starting
-    autofocusApi.putSettings(settings).catch(() => {})
+    flushSettings()
 
+    const { camera_id: _savedCamera, ...runSettings } = settings
     const config: AutofocusConfig = {
       camera_id: cameraId,
       focuser_id: focuserId,
       filter_wheel_id: resolvedFilterWheel?.device_id ?? null,
       start_position: startPositionRaw ? parseInt(startPositionRaw, 10) : null,
-      ...settings,
+      ...runSettings,
     }
 
     try {
@@ -210,7 +254,7 @@ export function AutofocusPage() {
       setBusy(false)
       setError(err instanceof Error ? err.message : t('startFailed'))
     }
-  }, [cameraId, focuserId, resolvedFilterWheel, settings, startPositionRaw, fetchRun, t])
+  }, [cameraId, focuserId, resolvedFilterWheel, settings, startPositionRaw, fetchRun, flushSettings, t])
 
   const handleAbort = useCallback(async () => {
     try { await autofocusApi.abort(); await fetchRun() }
@@ -292,7 +336,7 @@ export function AutofocusPage() {
           ) : cameras.length === 1 ? (
             <span className="text-xs text-slate-300 font-mono">{cameras[0].device_id}</span>
           ) : (
-            <select value={cameraId} onChange={(e) => setCameraId(e.target.value)}
+            <select value={cameraId} onChange={(e) => pickCamera(e.target.value)}
               className="w-full rounded-lg bg-surface border border-surface-border px-2 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-accent focus:ring-1 focus:ring-accent">
               {cameras.map((d) => <option key={d.device_id} value={d.device_id}>{d.device_id}</option>)}
             </select>
@@ -454,6 +498,7 @@ export function AutofocusPage() {
         {/* Action */}
         <div className="px-4 py-3 border-b border-surface-border flex flex-col gap-2">
           {error && <p className="text-xs text-red-400">{error}</p>}
+          {saveError && <p className="text-xs text-red-400">{saveError}</p>}
           <Button
             onClick={handleStart}
             disabled={busy || cameras.length === 0 || focuserCandidates.length === 0}

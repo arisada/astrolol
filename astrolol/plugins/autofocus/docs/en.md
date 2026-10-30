@@ -5,6 +5,10 @@ each, and goes to the sharpest position. A camera and a focuser must be connecte
 
 ## Settings
 
+Every change is saved as you make it, and the page opens on the camera you used last. The
+[sequencer](../../sequencer/docs/en.md) runs its own autofocus with these same settings, so
+you can adjust them while a sequence is running; they apply from the next autofocus.
+
 **Camera** and **Focuser**: which ones to use. Choose a focuser that sits in front of the
 camera in the profile.
 

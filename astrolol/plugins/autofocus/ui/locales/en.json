@@ -65,6 +65,7 @@
   "abort": "Abort",
   "needDevices": "Camera and focuser must be connected.",
   "startFailed": "Failed to start autofocus",
+  "saveFailed": "Could not save the settings",
   "progress": {
     "title": "Progress",
     "step": "Step {{current}} / {{total}}",

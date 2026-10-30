@@ -21,7 +21,8 @@ def _now() -> datetime:
 # ── Persistent UI settings (stored in plugin_settings['autofocus']) ────────────
 
 class AutofocusSettings(BaseModel):
-    """User-facing parameters persisted across page visits."""
+    """User-facing parameters, saved as they are changed. The sequencer runs its autofocus with them."""
+    camera_id: str | None = Field(default=None, description="Camera last chosen on the page")
     step_size: int = Field(default=100, gt=0)
     num_steps: int = Field(default=5, ge=3, le=15)
     exposure_time: float = Field(default=2.0, gt=0)

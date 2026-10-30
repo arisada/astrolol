@@ -280,3 +280,52 @@ async def test_select_filter_no_wheel_connected_is_a_noop() -> None:
     await engine._select_filter(1, None)  # must not raise
 
     device_manager.get_filter_wheel.assert_not_called()
+
+
+# ── Settings: saved as the page changes them, read live by the sequencer's autofocus ──
+
+def _app_with_store(tmp_path) -> FastAPI:  # noqa: ANN001
+    from astrolol.profiles.store import ProfileStore
+
+    app = FastAPI()
+    store = ProfileStore(tmp_path / "profiles.json")
+    ctx = PluginContext(
+        event_bus=EventBus(), device_manager=MagicMock(), device_registry=MagicMock(), profile_store=store,
+    )
+    app.state.profile_store = store
+    AutofocusPlugin().setup(app, ctx)
+    return app
+
+
+def test_settings_round_trip_including_the_chosen_camera(tmp_path) -> None:  # noqa: ANN001
+    client = TestClient(_app_with_store(tmp_path))
+    assert client.get("/plugins/autofocus/settings").json()["camera_id"] is None
+
+    body = {**client.get("/plugins/autofocus/settings").json(), "camera_id": "asi183", "step_size": 200, "num_steps": 8}
+    assert client.put("/plugins/autofocus/settings", json=body).status_code == 200
+
+    saved = client.get("/plugins/autofocus/settings").json()
+    assert (saved["camera_id"], saved["step_size"], saved["num_steps"]) == ("asi183", 200, 8)
+
+
+def test_settings_saved_without_a_camera_keep_loading(tmp_path) -> None:  # noqa: ANN001
+    """Settings written before the camera was stored have no camera_id."""
+    app = _app_with_store(tmp_path)
+    store = app.state.profile_store
+    current = store.get_user_settings()
+    store.update_user_settings(current.model_copy(update={"plugin_settings": {"autofocus": {"step_size": 40}}}))
+
+    saved = TestClient(app).get("/plugins/autofocus/settings").json()
+
+    assert (saved["step_size"], saved["camera_id"]) == (40, None)
+
+
+def test_the_sequencers_autofocus_uses_what_the_page_saved(tmp_path) -> None:  # noqa: ANN001
+    app = _app_with_store(tmp_path)
+    client = TestClient(app)
+    body = {**client.get("/plugins/autofocus/settings").json(), "step_size": 250, "num_steps": 9, "exposure_time": 4.0}
+    client.put("/plugins/autofocus/settings", json=body)
+
+    used = app.state.autofocus_engine._settings_provider()
+
+    assert (used.step_size, used.num_steps, used.exposure_time) == (250, 9, 4.0)

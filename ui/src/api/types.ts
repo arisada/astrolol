@@ -164,6 +164,7 @@ export type FitAlgo = 'parabola' | 'hyperbola'
 export type FocusMetric = 'fwhm' | 'hfd'
 
 export interface AutofocusSettings {
+  camera_id: string | null
   step_size: number
   num_steps: number
   exposure_time: number
