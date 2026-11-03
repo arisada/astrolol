@@ -557,3 +557,75 @@ async def test_halt_api_reports_the_halted_exposure_as_conflict(
     imager_manager.expose = halted   # type: ignore[method-assign]
     r = TestClient(app).post("/imager/cam1/expose", json={"duration": 1})
     assert r.status_code == 409
+
+
+# --- gain after a restart ---
+
+async def _gain_rig(manager: DeviceManager, event_bus, tmp_path: Path, driver_default: int = 200):
+    """An imager with a profile store, and a camera that behaves like a driver: it keeps the gain
+    it is given and starts at ``driver_default``. Returns (imager, store, gains_used, reconnect)."""
+    from astrolol.profiles.store import ProfileStore
+
+    store = ProfileStore(tmp_path / "profiles.json")
+    imager = ImagerManager(
+        device_manager=manager, event_bus=event_bus, images_dir=tmp_path, profile_store=store,
+    )
+    used: list[int | None] = []
+    connections: list[int] = []
+
+    async def connect() -> None:
+        if connections:   # a restart: a fresh adapter, driver back at its default
+            await manager.disconnect("cam1")
+        connections.append(1)
+        await connected_camera(manager)
+        camera = manager.get_camera("cam1")
+        expose = camera.expose
+        state = {"gain": driver_default}
+
+        async def driver_expose(params):
+            used.append(params.gain)
+            if params.gain is not None:
+                state["gain"] = params.gain
+            return (await expose(params)).model_copy(update={"gain": state["gain"]})
+
+        camera.expose = driver_expose  # type: ignore[method-assign]
+
+    await connect()
+    return imager, store, used, connect
+
+
+@pytest.mark.asyncio
+async def test_gain_used_before_the_restart_comes_back(manager: DeviceManager, event_bus, tmp_path: Path) -> None:
+    imager, store, used, reconnect = await _gain_rig(manager, event_bus, tmp_path)
+    await imager.expose("cam1", ExposureRequest(duration=1.0, gain=111))
+    assert store.get_user_settings().camera_gains == {"cam1": 111}
+
+    await reconnect()
+    await imager.expose("cam1", ExposureRequest(duration=1.0))   # autofocus, sequencer: no gain given
+    await imager.expose("cam1", ExposureRequest(duration=1.0))
+
+    assert used == [111, 111, None]   # restored once per connection, then left to the driver
+
+
+@pytest.mark.asyncio
+async def test_a_gain_asked_for_wins_over_the_remembered_one(
+    manager: DeviceManager, event_bus, tmp_path: Path
+) -> None:
+    imager, store, used, reconnect = await _gain_rig(manager, event_bus, tmp_path)
+    await imager.expose("cam1", ExposureRequest(duration=1.0, gain=111))
+    await reconnect()
+    await imager.expose("cam1", ExposureRequest(duration=1.0, gain=50))
+
+    assert used == [111, 50]
+    assert store.get_user_settings().camera_gains == {"cam1": 50}
+
+
+@pytest.mark.asyncio
+async def test_a_gain_set_outside_an_exposure_is_the_one_remembered(
+    manager: DeviceManager, event_bus, tmp_path: Path
+) -> None:
+    """Gain changed on the camera itself (Imaging page, property write) shows in the next frame."""
+    imager, store, used, reconnect = await _gain_rig(manager, event_bus, tmp_path, driver_default=90)
+    await imager.expose("cam1", ExposureRequest(duration=1.0))   # nothing remembered yet: driver's own
+    assert used == [None]
+    assert store.get_user_settings().camera_gains == {"cam1": 90}

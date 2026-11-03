@@ -96,6 +96,8 @@ class CameraImager:
     _loop_task: asyncio.Task | None = field(default=None, repr=False)
     # Bumped by halt(): an exposure that started before it never delivers a frame.
     halt_epoch: int = 0
+    # The camera object of the last exposure: a new one means a new connection.
+    last_camera: object | None = field(default=None, repr=False)
 
 
 _IMAGETYP = {
@@ -366,6 +368,20 @@ class ImagerManager:
         raw = self._profile_store.get_user_settings().imager_settings.get(device_id, {})
         return ImagerDeviceSettings(**raw)
 
+    def _remembered_gain(self, device_id: str) -> int | None:
+        if self._profile_store is None:
+            return None
+        return self._profile_store.get_user_settings().camera_gains.get(device_id)
+
+    def _remember_gain(self, device_id: str, gain: int) -> None:
+        """Keep the gain the camera really exposed with (written only when it changes)."""
+        if self._profile_store is None or self._remembered_gain(device_id) == gain:
+            return
+        current = self._profile_store.get_user_settings()
+        self._profile_store.update_user_settings(
+            current.model_copy(update={"camera_gains": {**current.camera_gains, device_id: gain}})
+        )
+
     def _require_idle(self, imager: CameraImager) -> None:
         if imager.state != ImagerState.IDLE:
             raise ValueError(
@@ -380,9 +396,17 @@ class ImagerManager:
         log = logger.bind(device_id=device_id, duration=request.duration)
 
         camera = self._device_manager.get_camera(device_id)
+        gain = request.gain
+        if gain is None and imager.last_camera is not camera:
+            # First exposure after (re)connecting that does not ask for a gain: the driver is
+            # back at its default, not at the gain the camera was last used with.
+            gain = self._remembered_gain(device_id)
+            if gain is not None:
+                log.info("imager.gain_restored", gain=gain)
+        imager.last_camera = camera
         params = ExposureParams(
             duration=request.duration,
-            gain=request.gain,
+            gain=gain,
             binning=request.binning,
             frame_type=request.frame_type,
         )
@@ -461,7 +485,7 @@ class ImagerManager:
             ExposureStarted(
                 device_id=device_id,
                 duration=request.duration,
-                gain=request.gain,
+                gain=gain,
                 binning=request.binning,
             )
         )
@@ -496,6 +520,9 @@ class ImagerManager:
         finally:
             if _local_upload_dir is not None and _restore_upload_client is not None:
                 await _restore_upload_client()
+
+        if image.gain is not None:
+            self._remember_gain(device_id, image.gain)
 
         fits_path = Path(image.fits_path)
         if imager.halt_epoch != epoch:

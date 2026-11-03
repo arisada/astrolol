@@ -61,6 +61,7 @@ class UserSettings(BaseModel):
     dock: DockSettings = Field(default_factory=DockSettings)  # widgets pinned to the UI dock
     plugin_settings: dict[str, dict] = {}     # opaque per-plugin settings, keyed by plugin id
     imager_settings: dict[str, dict] = {}     # per-device imager settings, keyed by device_id
+    camera_gains: dict[str, int] = {}         # last gain each camera exposed with, keyed by device_id
     mount_settings: dict[str, dict] = {}      # per-device mount settings, keyed by device_id
     focuser_settings: dict[str, dict] = {}    # per-device focuser settings, keyed by device_id
 
