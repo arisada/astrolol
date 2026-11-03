@@ -266,7 +266,7 @@ _NGC_WITH_DATA = "\n".join([
 ])
 
 
-_CALDWELL_ONLY = {"Mel 25", "Coalsack"}   # created in every catalogue, and well known
+_CALDWELL_ONLY = {"Mel 25", "Coalsack", "M 45"}   # created in every catalogue, and well known
 
 
 def _notable(cat: ObjectCatalog, groups=None) -> set[str]:
@@ -372,3 +372,47 @@ def test_a_database_without_the_new_columns_is_upgraded(tmp_path: Path) -> None:
     assert _notable(cat) == {"NGC 224"}   # Messier is known without a refresh
     assert cat.search("M 31")[0]["mag"] is None
     cat.close()
+
+
+# --- names people type ---
+
+def _catalog_with_targets(catalog: ObjectCatalog) -> ObjectCatalog:
+    catalog._load_all(
+        "\n".join([
+            _NGC_HEADER,
+            _ngc_row(Name="NGC0869", Type="OC", RA="02:19:00.00", Dec="+57:08:00.0"),
+            _ngc_row(Name="NGC0884", Type="OC", RA="02:22:00.00", Dec="+57:08:00.0"),
+        ]),
+        "\n".join([
+            "_RAJ2000\t_DEJ2000\tSh2\tDiam",
+            "deg\tdeg\t \tarcmin",
+            "----------\t----------\t----\t----",
+            "344.0\t62.0\t 155\t 50",
+        ]),
+        HIPPARCOS_TSV,
+    )
+    return catalog
+
+
+@pytest.mark.parametrize("query", ["Perseus Double Cluster", "double cluster", "Double Cluster in Perseus"])
+def test_double_cluster_is_found_by_name(catalog: ObjectCatalog, query: str) -> None:
+    assert _catalog_with_targets(catalog).search(query)[0]["name"] == "NGC 869"
+
+
+@pytest.mark.parametrize("query", ["Sh2-155", "Sh 2-155", "sh2 155", "SH2155", "Sharpless 155", "Cave Nebula", "Caldwell 9", "C9"])
+def test_cave_nebula_is_found_however_it_is_written(catalog: ObjectCatalog, query: str) -> None:
+    assert _catalog_with_targets(catalog).search(query)[0]["name"] == "Sh2-155"
+
+
+def test_pleiades_exist_although_they_have_no_ngc_number(catalog: ObjectCatalog) -> None:
+    catalog = _catalog_with_targets(catalog)
+    for q in ("Pleiades", "M45", "M 45", "Seven Sisters", "Melotte 22"):
+        assert catalog.search(q)[0]["name"] == "M 45"
+    assert any(o["name"] == "M 45" for o in catalog.notable())   # a Messier object like the others
+
+
+def test_apostrophes_and_spaces_do_not_matter(catalog: ObjectCatalog) -> None:
+    catalog.load_csv(NGC_CSV)
+    catalog.apply_common_names()
+    # a name whose target is not in this catalogue is simply not added
+    assert catalog.search("Markarians Chain") == []

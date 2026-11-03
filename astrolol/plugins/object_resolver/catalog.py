@@ -16,6 +16,7 @@ import httpx
 import structlog
 
 from astrolol.plugins.object_resolver.caldwell import CALDWELL, CALDWELL_EXTRA, caldwell_aliases
+from astrolol.plugins.object_resolver.common_names import COMMON_NAMES, EXTRA_OBJECTS
 from astrolol.plugins.object_resolver.double_stars import DOUBLE_STARS
 from astrolol.plugins.object_resolver.star_names import STAR_ALIASES, STAR_NAMES
 
@@ -138,6 +139,11 @@ def _parse_dec(s: str) -> float:
     return -val if neg else val
 
 
+def _squash(name: str) -> str:
+    """A name for comparing: lower case, letters and digits only."""
+    return re.sub(r"[^0-9a-z]", "", name.lower())
+
+
 def _normalize_name(raw: str) -> str:
     """NGC0224 → 'NGC 224', IC0001 → 'IC 1'.
 
@@ -206,6 +212,7 @@ class ObjectCatalog:
         self._db_path.parent.mkdir(parents=True, exist_ok=True)
         self._conn = sqlite3.connect(str(self._db_path), check_same_thread=False)
         self._conn.row_factory = sqlite3.Row
+        self._conn.create_function("squash", 1, _squash, deterministic=True)
         self._conn.execute("PRAGMA journal_mode=WAL")
         self._init_schema()
         self.apply_extra_names()  # catalogues synced before these names existed get them too
@@ -246,6 +253,8 @@ class ObjectCatalog:
         ):
             if column not in have:
                 self._conn.execute(f"ALTER TABLE objects ADD COLUMN {column} {ddl}")
+        if "key" not in {r["name"] for r in self._conn.execute("PRAGMA table_info(object_names)")}:
+            self._conn.execute("ALTER TABLE object_names ADD COLUMN key TEXT")
         self._conn.commit()
 
     # ── Status ─────────────────────────────────────────────────────────────────
@@ -524,7 +533,30 @@ class ObjectCatalog:
         self.apply_star_names()
         self.apply_caldwell()
         self.apply_double_stars()
+        self.apply_common_names()
         self.apply_notable()
+        self._fill_keys()
+
+    def _fill_keys(self) -> None:
+        """Give every name the squashed form that search() falls back on."""
+        assert self._conn is not None
+        self._conn.execute("UPDATE object_names SET key=squash(name) WHERE key IS NULL")
+        self._conn.commit()
+
+    def apply_common_names(self) -> None:
+        """Add the extra showpiece objects and the common names OpenNGC lacks (idempotent)."""
+        assert self._conn is not None
+        for name, (kind, ra, dec, mag, size, aliases) in EXTRA_OBJECTS.items():
+            self._conn.execute(
+                "INSERT OR IGNORE INTO objects (primary_name, object_type, ra, dec, mag, size_arcmin)"
+                " VALUES (?, ?, ?, ?, ?, ?)",
+                (name, kind, ra, dec, mag, size),
+            )
+            for alias in (name, *aliases):
+                self._add_alias(name, alias)
+        for alias, name in COMMON_NAMES.items():
+            self._add_alias(name, alias)
+        self._conn.commit()
 
     def apply_caldwell(self) -> int:
         """Add "C 5" / "C5" / "Caldwell 5" to each Caldwell object (idempotent); returns aliases added."""
@@ -644,6 +676,22 @@ class ObjectCatalog:
             """,
             (query, f"{query}%", f"%{query}%", *extra, limit),
         ).fetchall()
+        if not rows and (key := _squash(query)):
+            # "Sh 2-155", "m 31", "Markarians Chain": spaces, hyphens and apostrophes are ignored.
+            self._fill_keys()
+            rows = self._conn.execute(
+                f"""
+                SELECT o.id, o.primary_name, o.object_type, o.ra, o.dec, o.mag, o.size_arcmin,
+                       MIN(CASE WHEN n.key = ? THEN 0 ELSE 1 END) AS rank
+                FROM object_names n
+                JOIN objects o ON o.id = n.object_id
+                WHERE n.key LIKE ?{clause}
+                GROUP BY o.id
+                ORDER BY rank, o.id
+                LIMIT ?
+                """,
+                (key, f"%{key}%", *extra, limit),
+            ).fetchall()
         return [self._enrich(row) for row in rows]
 
     def notable(self, groups: Collection[str] | None = None) -> list[dict[str, Any]]:
