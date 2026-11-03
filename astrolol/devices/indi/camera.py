@@ -15,13 +15,16 @@ from __future__ import annotations
 import asyncio
 import re
 import time
+from collections.abc import Coroutine
 from pathlib import Path
+from typing import Any, TypeVar
 
 import astropy.io.fits as astropy_fits
 import numpy as np
 import structlog
 
 from astrolol.config.settings import settings
+from astrolol.core.errors import ExposureHalted
 from astrolol.devices.base.models import (
     CameraStatus,
     DeviceState,
@@ -46,9 +49,14 @@ from astrolol.devices.indi.pulse import (
 logger = structlog.get_logger()
 
 # Where drivers keep the gain, tried first; any other writable CCD_* number called "gain" works too.
+_T = TypeVar("_T")
+
 _GAIN_PROPERTIES = ("CCD_GAIN", "CCD_CONTROLS")
 _GAIN_CONFIRM_POLLS = 20        # the driver confirms a write with an update of the vector...
 _GAIN_CONFIRM_INTERVAL = 0.1    # ...usually well within a second
+_ABORT_GRACE = 3.0              # seconds a driver gets to stop exposing after an abort
+_ABORT_RETRY = 5.0
+_LATE_FRAME_GRACE = 1.0         # a frame follows the end of the exposure by about this
 
 
 class IndiCamera:
@@ -76,6 +84,8 @@ class IndiCamera:
         self._current_upload_dir: Path | None = None  # set while UPLOAD_LOCAL is active
         self._broadcaster = FrameBroadcaster()
         self._stream_params: StreamParams | None = None
+        self._aborted: asyncio.Event | None = None   # set by abort() while an exposure waits
+        self._abandoned_until = 0.0                  # monotonic: a driver that ignored abort() is done by then
         self._stream_seq = 0
         self._stream_bad_size_logged = False
 
@@ -114,6 +124,7 @@ class IndiCamera:
     async def expose(self, params: ExposureParams) -> Image:
         if self._stream_params is not None:
             raise RuntimeError("camera is streaming: stop the stream before exposing")
+        await self._settle_aborted_exposure()
         self._state = DeviceState.BUSY
 
         # Set frame type if supported (best-effort)
@@ -180,7 +191,9 @@ class IndiCamera:
                 "CCD_EXPOSURE",
                 {"CCD_EXPOSURE_VALUE": params.duration},
             )
-            fits_path = await self._client.wait_for_local_image(self._device_name, timeout=timeout)
+            fits_path = await self._wait_unless_aborted(
+                self._client.wait_for_local_image(self._device_name, timeout=timeout)
+            )
         else:
             # CLIENT mode: enable BLOBs for this camera only for the duration of
             # this exposure.  "Never" is the default; keeping BLOBs off between
@@ -192,7 +205,9 @@ class IndiCamera:
                 "CCD_EXPOSURE",
                 {"CCD_EXPOSURE_VALUE": params.duration},
             )
-            blob = await self._client.wait_for_blob(self._device_name, "CCD1", timeout=timeout)
+            blob = await self._wait_unless_aborted(
+                self._client.wait_for_blob(self._device_name, "CCD1", timeout=timeout)
+            )
             # Save blob data received over the network to disk
             self._images_dir.mkdir(parents=True, exist_ok=True)
             self._image_counter += 1
@@ -373,11 +388,64 @@ class IndiCamera:
         except Exception as exc:
             logger.debug("indi.camera_stream_setting_skipped", device=self._device_name, setting=what, error=str(exc))
 
-    async def abort(self) -> None:
+    async def _send_abort(self) -> None:
+        await self._client.set_switch(self._device_name, "CCD_ABORT_EXPOSURE", ["ABORT"])
+
+    def _exposing(self) -> bool:
+        return self._client._vector_state(self._device_name, "CCD_EXPOSURE") == "Busy"
+
+    async def _wait_unless_aborted(self, wait: Coroutine[Any, Any, _T]) -> _T:
+        """Await the frame, but stop at once when abort() is called (ExposureHalted)."""
+        aborted = self._aborted = asyncio.Event()
+        frame = asyncio.ensure_future(wait)
+        stop = asyncio.ensure_future(aborted.wait())
         try:
-            await self._client.set_switch(
-                self._device_name, "CCD_ABORT_EXPOSURE", ["ABORT"]
-            )
+            await asyncio.wait({frame, stop}, return_when=asyncio.FIRST_COMPLETED)
+            if not frame.done():
+                raise ExposureHalted("Exposure halted")
+            return frame.result()
+        finally:
+            for task in (frame, stop):
+                task.cancel()
+            await asyncio.gather(frame, stop, return_exceptions=True)
+            self._aborted = None
+
+    async def _settle_aborted_exposure(self) -> None:
+        """Let a driver that kept exposing after abort() finish before a new exposure starts.
+
+        Some drivers ignore the abort and deliver the frame anyway; it would otherwise be
+        taken for the next exposure's image.
+        """
+        until, self._abandoned_until = self._abandoned_until, 0.0
+        if not until or not self._exposing():
+            return
+        logger.warning("indi.camera_waiting_for_aborted_exposure", device=self._device_name)
+        next_abort = 0.0
+        while self._exposing() and time.monotonic() < until:
+            if time.monotonic() >= next_abort:
+                next_abort = time.monotonic() + _ABORT_RETRY
+                try:
+                    await self._send_abort()
+                except Exception:
+                    pass
+            await asyncio.sleep(0.2)
+        await asyncio.sleep(_LATE_FRAME_GRACE)   # the frame follows the state change
+
+    async def abort(self) -> None:
+        if self._aborted is not None:
+            self._aborted.set()
+        try:
+            remaining = self._client.get_number_nowait(self._device_name, "CCD_EXPOSURE", "CCD_EXPOSURE_VALUE")
+            await self._send_abort()
+            deadline = time.monotonic() + _ABORT_GRACE
+            while self._exposing() and time.monotonic() < deadline:
+                await asyncio.sleep(0.1)
+            if self._exposing():
+                # The driver is carrying on: the next exposure waits for it.
+                self._abandoned_until = time.monotonic() + (remaining or 0.0) + self._exposure_timeout_extra
+                logger.warning(
+                    "indi.camera_abort_ignored", device=self._device_name, remaining=remaining
+                )
         except Exception as exc:
             logger.warning("indi.camera_abort_failed", device=self._device_name, error=str(exc))
         finally:

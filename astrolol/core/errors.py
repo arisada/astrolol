@@ -20,3 +20,7 @@ class DeviceNotFoundError(AstrolollError):
 
 class DeviceKindError(AstrolollError):
     """The connected device is not of the expected kind."""
+
+
+class ExposureHalted(AstrolollError):
+    """The exposure was halted before it finished; its frame, if one still arrives, is dropped."""

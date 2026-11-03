@@ -4,7 +4,7 @@ from fastapi import APIRouter, HTTPException, Query, Request
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
-from astrolol.core.errors import DeviceNotFoundError, DeviceKindError
+from astrolol.core.errors import DeviceNotFoundError, DeviceKindError, ExposureHalted
 from astrolol.devices.base.models import CameraStatus
 from astrolol.imaging.imager import ImagerManager
 from astrolol.core.events import ImageStats
@@ -36,7 +36,7 @@ async def expose(device_id: str, body: ExposureRequest, request: Request) -> Exp
         return await _imager(request).expose(device_id, body)
     except (DeviceNotFoundError, DeviceKindError) as exc:
         raise HTTPException(status_code=404, detail=str(exc))
-    except ValueError as exc:
+    except (ValueError, ExposureHalted) as exc:
         raise HTTPException(status_code=409, detail=str(exc))
     except Exception as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc

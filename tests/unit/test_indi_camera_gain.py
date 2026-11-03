@@ -1,4 +1,5 @@
 """Gain is written to whichever property the driver keeps it in, and checked."""
+import asyncio
 import types
 from pathlib import Path
 
@@ -169,3 +170,71 @@ async def test_a_refused_write_is_logged_and_does_not_stop_the_exposure() -> Non
 
 def test_exposure_params_gain_is_optional() -> None:
     assert ExposureParams(duration=1.0).gain is None
+
+
+# --- abort ---
+
+class AbortClient(FakeClient):
+    """Adds what expose()/abort() use: the exposure state, a frame wait, and the abort switch."""
+
+    def __init__(self, *, obeys_abort: bool) -> None:
+        super().__init__(_zwo_props())
+        self.obeys_abort = obeys_abort
+        self.exposure_state = "Busy"
+        self.aborts = 0
+        self.frame = None   # asyncio.Event set when the driver delivers
+
+    def _vector_state(self, device: str, prop: str):
+        return self.exposure_state
+
+    async def set_switch(self, device: str, prop: str, on: list[str]) -> None:
+        self.aborts += 1
+        if self.obeys_abort:
+            self.exposure_state = "Idle"
+
+
+@pytest.fixture
+def quick(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(camera_mod, "_ABORT_GRACE", 0.3)
+    monkeypatch.setattr(camera_mod, "_ABORT_RETRY", 0.1)
+    monkeypatch.setattr(camera_mod, "_LATE_FRAME_GRACE", 0.0)
+
+
+async def test_abort_ends_the_exposure_that_is_waiting(quick) -> None:
+    from astrolol.core.errors import ExposureHalted
+
+    cam = _camera(AbortClient(obeys_abort=True))
+    hung = asyncio.Event()
+    waiting = asyncio.create_task(cam._wait_unless_aborted(hung.wait()))
+    await asyncio.sleep(0.05)
+
+    await cam.abort()
+
+    with pytest.raises(ExposureHalted):
+        await waiting
+    assert cam._abandoned_until == 0.0
+
+
+async def test_next_exposure_waits_for_a_driver_that_ignored_abort(quick) -> None:
+    client = AbortClient(obeys_abort=False)
+    cam = _camera(client)
+
+    await cam.abort()                       # the driver carries on
+    assert cam._abandoned_until > 0
+    asyncio.get_running_loop().call_later(0.5, lambda: setattr(client, "exposure_state", "Ok"))
+
+    t0 = asyncio.get_running_loop().time()
+    await cam._settle_aborted_exposure()
+
+    assert asyncio.get_running_loop().time() - t0 >= 0.4
+    assert client.aborts >= 3               # asked again while waiting
+    assert cam._abandoned_until == 0.0
+
+
+async def test_no_wait_when_the_driver_obeyed_abort(quick) -> None:
+    client = AbortClient(obeys_abort=True)
+    cam = _camera(client)
+    await cam.abort()
+    t0 = asyncio.get_running_loop().time()
+    await cam._settle_aborted_exposure()
+    assert asyncio.get_running_loop().time() - t0 < 0.1

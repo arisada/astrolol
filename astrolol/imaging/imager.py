@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING, Any, Awaitable, Callable
 import structlog
 
 from astrolol.config.settings import OutsideStorage, settings, storage_path
-from astrolol.core.errors import DeviceNotFoundError
+from astrolol.core.errors import DeviceNotFoundError, ExposureHalted
 from astrolol.core.events import (
     EventBus,
     ExposureCompleted,
@@ -94,6 +94,8 @@ class CameraImager:
     device_id: str
     state: ImagerState = ImagerState.IDLE
     _loop_task: asyncio.Task | None = field(default=None, repr=False)
+    # Bumped by halt(): an exposure that started before it never delivers a frame.
+    halt_epoch: int = 0
 
 
 _IMAGETYP = {
@@ -304,6 +306,10 @@ class ImagerManager:
                 pass
             imager._loop_task = None
 
+        # Whatever exposure is in flight (a single one has no task of its own to cancel)
+        # must not deliver its frame, even if the driver finishes it after all.
+        imager.halt_epoch += 1
+
         # Abort the in-progress hardware exposure
         try:
             camera = self._device_manager.get_camera(device_id)
@@ -474,9 +480,14 @@ class ImagerManager:
         if _local_upload_dir is not None and _set_upload_local is not None:
             await _set_upload_local(_local_upload_dir)
 
+        epoch = imager.halt_epoch
         try:
             image = await camera.expose(params)
         except Exception as exc:
+            if imager.halt_epoch != epoch:
+                # halt() already reset the state and told everyone; a new exposure may be running.
+                log.info("imager.exposure_halted")
+                raise ExposureHalted("Exposure halted") from exc
             imager.state = ImagerState.IDLE
             reason = str(exc)
             await self._event_bus.publish(ExposureFailed(device_id=device_id, reason=reason))
@@ -487,6 +498,11 @@ class ImagerManager:
                 await _restore_upload_client()
 
         fits_path = Path(image.fits_path)
+        if imager.halt_epoch != epoch:
+            # The driver delivered the frame after the halt: it is not wanted, not a light.
+            await asyncio.to_thread(fits_path.unlink, missing_ok=True)
+            log.info("imager.halted_frame_dropped", fits=str(fits_path))
+            raise ExposureHalted("Exposure halted")
         self._images_dir.mkdir(parents=True, exist_ok=True)
 
         await asyncio.to_thread(_write_imagetyp, fits_path, request.frame_type)
@@ -643,6 +659,8 @@ class ImagerManager:
         except asyncio.CancelledError:
             logger.info("imager.loop_cancelled", device_id=imager.device_id, exposures=count)
             raise
+        except ExposureHalted:
+            logger.info("imager.loop_halted", device_id=imager.device_id, exposures=count)
         except Exception as exc:
             imager.state = ImagerState.ERROR
             logger.error("imager.loop_error", device_id=imager.device_id, error=str(exc), exc_info=True)

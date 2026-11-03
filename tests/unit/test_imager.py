@@ -471,3 +471,89 @@ async def test_saved_file_name_carries_the_gain_the_camera_reported(
     result = await imager_manager.expose("cam1", ExposureRequest(duration=1.0, gain=asked, save=True))
 
     assert Path(result.fits_path).name == expected
+
+
+# --- halt ---
+
+async def _halt_during_expose(imager_manager: ImagerManager, manager: DeviceManager, *, aborts: bool):
+    """A single exposure in flight when halt() is called. ``aborts``: whether the camera notices
+    (raises) or carries on and delivers its frame anyway, as a driver that ignores the abort does."""
+    camera = manager.get_camera("cam1")
+    real_expose = camera.expose
+    release = asyncio.Event()
+    started = asyncio.Event()
+
+    async def slow_expose(params):
+        started.set()
+        await release.wait()
+        if aborts:
+            raise RuntimeError("aborted")
+        return await real_expose(params)
+
+    camera.expose = slow_expose
+    task = asyncio.create_task(
+        imager_manager.expose("cam1", ExposureRequest(duration=300.0, save=True))
+    )
+    await started.wait()
+    await imager_manager.halt("cam1")
+    release.set()
+    return task
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("aborts", [True, False])
+async def test_halted_exposure_never_delivers_a_frame(
+    imager_manager: ImagerManager, manager: DeviceManager, event_bus, tmp_path: Path, aborts: bool
+) -> None:
+    from astrolol.core.errors import ExposureHalted
+
+    await connected_camera(manager)
+    q = event_bus.subscribe()
+    task = await _halt_during_expose(imager_manager, manager, aborts=aborts)
+    with pytest.raises(ExposureHalted):
+        await task
+    events = []
+    while not q.empty():
+        events.append(await q.get())
+    assert not [e for e in events if isinstance(e, ExposureCompleted)]
+    assert imager_manager.get_status("cam1").state == ImagerState.IDLE
+    assert not list(tmp_path.glob("**/fake_*.fits"))   # the late frame is deleted, not kept as a light
+
+
+@pytest.mark.asyncio
+async def test_exposure_after_a_halt_is_normal(
+    imager_manager: ImagerManager, manager: DeviceManager
+) -> None:
+    from astrolol.core.errors import ExposureHalted
+
+    await connected_camera(manager)
+    task = await _halt_during_expose(imager_manager, manager, aborts=False)
+    with pytest.raises(ExposureHalted):
+        await task
+    manager.get_camera("cam1").expose = type(manager.get_camera("cam1")).expose.__get__(
+        manager.get_camera("cam1")
+    )
+    result = await imager_manager.expose("cam1", ExposureRequest(duration=1.0))
+    assert Path(result.fits_path).exists()
+
+
+@pytest.mark.asyncio
+async def test_halt_api_reports_the_halted_exposure_as_conflict(
+    imager_manager: ImagerManager, manager: DeviceManager
+) -> None:
+    from fastapi import FastAPI
+    from fastapi.testclient import TestClient
+
+    from astrolol.api.imager import router
+    from astrolol.core.errors import ExposureHalted
+
+    app = FastAPI()
+    app.include_router(router)
+    app.state.imager_manager = imager_manager
+
+    async def halted(*_a, **_k):
+        raise ExposureHalted("Exposure halted")
+
+    imager_manager.expose = halted   # type: ignore[method-assign]
+    r = TestClient(app).post("/imager/cam1/expose", json={"duration": 1})
+    assert r.status_code == 409
