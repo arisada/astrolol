@@ -18,9 +18,38 @@ def _now() -> datetime:
     return datetime.now(timezone.utc)
 
 
+# ── What to do about a doubtful result ────────────────────────────────────────
+
+# warn: keep the result and flag it (a run with no usable fit still fails); retry: measure again;
+# fail: stop, and put the focuser back where it started.
+FocusAction = Literal["warn", "retry", "fail"]
+
+
+class DoubtPolicy(BaseModel):
+    """How a run reacts to each cause of a doubtful result (see quality.py)."""
+    on_edge: FocusAction = Field(
+        default="retry",
+        description="The minimum is not bracketed: sweep again around the best position "
+        "(at most twice, on top of max_retries).",
+    )
+    on_flat: FocusAction = Field(default="retry", description="The sharpness hardly changes over the sweep.")
+    on_noisy: FocusAction = Field(default="retry", description="The samples do not follow a V.")
+    on_few_stars: FocusAction = Field(default="retry", description="Too many steps found too few stars.")
+    max_retries: int = Field(
+        default=2, ge=0, le=5,
+        description="Complete new sweeps, with a longer exposure, for a flat, noisy or starless curve.",
+    )
+    retry_exposure_factor: float = Field(
+        default=2.0, ge=1.0, le=4.0, description="Exposure of a retry, as a multiple of the previous one.",
+    )
+    max_exposure: float = Field(
+        default=16.0, gt=0, description="Longest exposure a retry may use, in seconds.",
+    )
+
+
 # ── Persistent UI settings (stored in plugin_settings['autofocus']) ────────────
 
-class AutofocusSettings(BaseModel):
+class AutofocusSettings(DoubtPolicy):
     """User-facing parameters, saved as they are changed. The sequencer runs its autofocus with them."""
     camera_id: str | None = Field(default=None, description="Camera last chosen on the page")
     step_size: int = Field(default=100, gt=0)
@@ -42,7 +71,7 @@ class AutofocusSettings(BaseModel):
 
 # ── Configuration ─────────────────────────────────────────────────────────────
 
-class AutofocusConfig(BaseModel):
+class AutofocusConfig(DoubtPolicy):
     camera_id: str
     focuser_id: str
     step_size: int = Field(default=100, gt=0, description="Focuser steps between sample positions")
@@ -121,6 +150,13 @@ class FocusQuality(BaseModel):
 AutofocusRunStatus = Literal["running", "completed", "failed", "aborted"]
 
 
+class FocusAttempt(BaseModel):
+    """A sweep that was judged doubtful and measured again."""
+    exposure_time: float
+    data_points: list[FocusDataPoint]
+    quality: FocusQuality
+
+
 class AutofocusRun(BaseModel):
     id: str = Field(default_factory=_uid)
     config: AutofocusConfig
@@ -132,6 +168,10 @@ class AutofocusRun(BaseModel):
     optimal_position: int | None = None
     # How far the result can be trusted, set when the run completes.
     quality: FocusQuality | None = None
+    # Exposure of the sweep in progress or last made (longer than config.exposure_time after a retry).
+    exposure_time: float | None = None
+    # Sweeps given up on for a doubtful curve, before the one in data_points.
+    attempts: list[FocusAttempt] = []
     # Where the focuser was before the run touched it (a manual start_position does not change this).
     initial_position: int | None = None
     error: str | None = None

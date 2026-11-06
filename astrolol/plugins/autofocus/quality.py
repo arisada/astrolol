@@ -35,7 +35,8 @@ def edge_direction(data_points: list[FocusDataPoint], fit: CurveFit | None) -> i
 
     That is the case when the fitted optimum itself lies outside the swept range, or when there
     is no valid fit and the best measured sample has fewer than two samples beyond it on one
-    side: the curve has no arm there to fit, and is still falling towards that end. A best
+    side: the curve has no arm there to fit, and is still falling towards that end. With a fit,
+    the same when fewer than two samples lie beyond its optimum on one side. A best
     sample well inside with no valid fit is noise or a flat curve, which more sweeps do not help.
     """
     valid = usable(data_points)
@@ -47,6 +48,12 @@ def edge_direction(data_points: list[FocusDataPoint], fit: CurveFit | None) -> i
         if fit.optimal_position > hi:
             return 1
         if fit.optimal_position < lo:
+            return -1
+        below = sum(1 for dp in valid if dp.position < fit.optimal_position)
+        above = sum(1 for dp in valid if dp.position > fit.optimal_position)
+        if above < MIN_BRACKET <= below:
+            return 1
+        if below < MIN_BRACKET <= above and lo > 0:
             return -1
         return 0
     best = min(valid, key=lambda dp: dp.fwhm).position

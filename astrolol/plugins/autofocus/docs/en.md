@@ -29,6 +29,21 @@ If the curve looks flat, increase the step size; if the stars disappear at the e
 **Exposure**: **Duration**, **Binning**, **Gain** (empty = driver default), and **Filter**
 (**Keep current** or a slot). Use a few seconds; enough to see a dozen stars.
 
+**Doubtful results**: what to do when the curve looks unreliable. Each cause has its own choice:
+**keep** (use the result and flag it), **retry** (measure again) or **stop** (the run fails and
+the focuser goes back to where it started).
+
+| Cause | Retry means |
+|---|---|
+| Minimum at the edge | Sweep again around the best position, up to two more times. |
+| Flat curve | A new sweep with a longer exposure, centred on the best position. |
+| Noisy curve | The same. |
+| Too few stars | The same. A sky with no star at all is not measured again; the sequencer tries again later. |
+
+**New sweeps allowed** limits the new sweeps for the last three causes. **Exposure of a new sweep**
+is the multiple of the previous exposure, up to **Longest exposure**. Earlier sweeps stay on the
+chart in grey. If a result cannot be fitted at all, the run fails whatever the choice.
+
 ## Running
 
 Click **Start Autofocus**. During the run:

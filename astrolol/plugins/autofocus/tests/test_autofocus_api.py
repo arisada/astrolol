@@ -329,3 +329,18 @@ def test_the_sequencers_autofocus_uses_what_the_page_saved(tmp_path) -> None:  #
     used = app.state.autofocus_engine._settings_provider()
 
     assert (used.step_size, used.num_steps, used.exposure_time) == (250, 9, 4.0)
+
+
+def test_what_to_do_about_a_doubtful_result_is_saved_and_defaults_keep_the_old_behaviour(tmp_path) -> None:  # noqa: ANN001
+    client = TestClient(_app_with_store(tmp_path))
+    first = client.get("/plugins/autofocus/settings").json()
+    assert (first["on_edge"], first["on_flat"], first["max_retries"]) == ("retry", "retry", 2)
+
+    body = {**first, "on_flat": "fail", "on_few_stars": "warn", "max_retries": 0, "retry_exposure_factor": 1.5, "max_exposure": 8.0}
+    assert client.put("/plugins/autofocus/settings", json=body).status_code == 200
+    saved = client.get("/plugins/autofocus/settings").json()
+    assert (saved["on_flat"], saved["on_few_stars"], saved["max_retries"]) == ("fail", "warn", 0)
+    assert (saved["retry_exposure_factor"], saved["max_exposure"]) == (1.5, 8.0)
+
+    assert client.put("/plugins/autofocus/settings", json={**first, "on_noisy": "ignore"}).status_code == 422
+    assert client.put("/plugins/autofocus/settings", json={**first, "max_retries": 50}).status_code == 422

@@ -610,6 +610,8 @@ class Steps:
                 "samples": len(run.data_points),
                 "quality": quality.verdict if quality else None,
                 "quality_causes": ", ".join(quality.causes) if quality else None,
+                "retries": len(getattr(run, "attempts", None) or []),
+                "exposure_s": getattr(run, "exposure_time", None),
             },
         )
         return True

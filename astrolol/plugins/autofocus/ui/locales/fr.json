@@ -71,7 +71,8 @@
     "step": "Pas {{current}} / {{total}}",
     "steps": "{{total}} pas",
     "position": "Position :",
-    "stars": "Étoiles :"
+    "stars": "Étoiles :",
+    "retry": "Nouveau balayage {{count}} avec une pose de {{exposure}} s"
   },
   "result": {
     "title": "Résultat",
@@ -101,5 +102,23 @@
       "noisy": "Les mesures ne suivent pas un V net.",
       "few_stars": "Plusieurs pas ont trouvé trop peu d'étoiles pour mesurer."
     }
+  },
+  "doubt": {
+    "title": "Résultats douteux",
+    "hint": "Que faire quand la courbe semble peu fiable : garder le résultat en le signalant, mesurer à nouveau, ou s'arrêter et remettre le focuser en place.",
+    "cause": {
+      "edge": "Minimum au bord",
+      "flat": "Courbe plate",
+      "noisy": "Courbe bruitée",
+      "few_stars": "Trop peu d'étoiles"
+    },
+    "action": {
+      "warn": "garder",
+      "retry": "réessayer",
+      "fail": "arrêter"
+    },
+    "maxRetries": "Nouveaux balayages permis",
+    "factor": "Pose d'un nouveau balayage",
+    "maxExposure": "Pose maximale"
   }
 }

@@ -71,7 +71,8 @@
     "step": "Step {{current}} / {{total}}",
     "steps": "{{total}} steps",
     "position": "Position:",
-    "stars": "Stars:"
+    "stars": "Stars:",
+    "retry": "New sweep {{count}} with a {{exposure}} s exposure"
   },
   "result": {
     "title": "Result",
@@ -101,5 +102,23 @@
       "noisy": "The measurements do not follow a clean V.",
       "few_stars": "Several steps found too few stars to measure."
     }
+  },
+  "doubt": {
+    "title": "Doubtful results",
+    "hint": "What to do when the curve looks unreliable: keep the result and flag it, measure again, or stop and put the focuser back.",
+    "cause": {
+      "edge": "Minimum at the edge",
+      "flat": "Flat curve",
+      "noisy": "Noisy curve",
+      "few_stars": "Too few stars"
+    },
+    "action": {
+      "warn": "keep",
+      "retry": "retry",
+      "fail": "stop"
+    },
+    "maxRetries": "New sweeps allowed",
+    "factor": "Exposure of a new sweep",
+    "maxExposure": "Longest exposure"
   }
 }

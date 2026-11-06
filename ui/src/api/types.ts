@@ -163,7 +163,19 @@ export interface PlatesolveSettings {
 export type FitAlgo = 'parabola' | 'hyperbola'
 export type FocusMetric = 'fwhm' | 'hfd'
 
-export interface AutofocusSettings {
+export type FocusAction = 'warn' | 'retry' | 'fail'
+
+export interface DoubtPolicy {
+  on_edge: FocusAction
+  on_flat: FocusAction
+  on_noisy: FocusAction
+  on_few_stars: FocusAction
+  max_retries: number
+  retry_exposure_factor: number
+  max_exposure: number
+}
+
+export interface AutofocusSettings extends DoubtPolicy {
   camera_id: string | null
   step_size: number
   num_steps: number
@@ -176,7 +188,7 @@ export interface AutofocusSettings {
   lock_stars: boolean
 }
 
-export interface AutofocusConfig {
+export interface AutofocusConfig extends Partial<DoubtPolicy> {
   camera_id: string
   focuser_id: string
   step_size?: number
@@ -228,6 +240,12 @@ export interface FocusQuality {
   }
 }
 
+export interface FocusAttempt {
+  exposure_time: number
+  data_points: FocusDataPoint[]
+  quality: FocusQuality
+}
+
 export type AutofocusRunStatus = 'running' | 'completed' | 'failed' | 'aborted'
 
 export interface AutofocusRun {
@@ -240,6 +258,8 @@ export interface AutofocusRun {
   curve_fit: CurveFit | null
   optimal_position: number | null
   quality: FocusQuality | null
+  exposure_time: number | null
+  attempts: FocusAttempt[]
   initial_position: number | null
   error: string | null
   started_at: string

@@ -34,7 +34,10 @@ from astrolol.plugins.autofocus.models import (
     AutofocusSettings,
     AutofocusStartedEvent,
     CurveFit,
+    DoubtPolicy,
+    FocusAttempt,
     FocusDataPoint,
+    FocusQuality,
     StarInfo,
 )
 from astrolol.plugins.autofocus.quality import assess, edge_direction
@@ -95,6 +98,10 @@ def _read_fits_shape(fits_path: str) -> tuple[int, int]:
 _MAX_RECENTRES = 2
 
 
+def _action(config: AutofocusConfig, cause: str) -> str:
+    return getattr(config, f"on_{cause}")
+
+
 def next_sweep(run: AutofocusRun) -> list[int] | None:
     """Positions of one more sweep when the minimum is beyond the swept range, else None.
 
@@ -107,7 +114,11 @@ def next_sweep(run: AutofocusRun) -> list[int] | None:
     config = run.config
     measured = {dp.position for dp in run.data_points}
     end = max(measured) if direction > 0 else min(measured)
-    centre = end + direction * round(config.num_steps / 2) * config.step_size
+    if run.curve_fit is not None:
+        # The fit says where the minimum is: sweep around it, on the grid already used.
+        centre = end + round((run.curve_fit.optimal_position - end) / config.step_size) * config.step_size
+    else:
+        centre = end + direction * round(config.num_steps / 2) * config.step_size
     wanted = {
         max(0, centre + (i - config.num_steps) * config.step_size)
         for i in range(2 * config.num_steps + 1)
@@ -133,6 +144,8 @@ class AutofocusEngine:
         self._task: asyncio.Task | None = None
         # Maps step number (1-indexed) → {"auto": path, "linear": path}
         self._preview_paths: dict[int, dict[str, str]] = {}
+        # Stars of the first step that found any, kept to measure again at every later step (lock_stars).
+        self._reference_stars: list[dict] | None = None
 
     @property
     def current_run(self) -> AutofocusRun | None:
@@ -172,6 +185,7 @@ class AutofocusEngine:
             fit_algo=s.fit_algo,
             metric=s.metric,
             lock_stars=s.lock_stars,
+            **s.model_dump(include=set(DoubtPolicy.model_fields)),
         )
         run = await self.start(config)
         task = self._task
@@ -234,127 +248,54 @@ class AutofocusEngine:
                 total_steps=run.total_steps,
             ))
 
-            params = ExposureParams(
-                duration=config.exposure_time,
-                gain=config.gain,
-                binning=config.binning,
-                frame_type="light",
-            )
-
-            # When lock_stars is set, frozen after the first step that detects any
-            # stars, and reused as the preferred population for every later step —
-            # a step where none of these stars can be matched reports no stars.
-            reference_stars: list[dict] | None = None
-
+            exposure = config.exposure_time
+            retries = 0
             sweep = positions
-            for pass_no in range(1 + _MAX_RECENTRES):
-                for position in sweep:
-                    run.current_step = len(run.data_points) + 1
-
-                    # 1. Move focuser
-                    logger.info(
-                        "autofocus.moving",
-                        step=run.current_step,
-                        total=run.total_steps,
-                        position=position,
-                    )
-                    await asyncio.wait_for(focuser.move_to(position), timeout=_MOVE_TIMEOUT)
-
-                    # 2. Expose
-                    logger.info(
-                        "autofocus.exposing",
-                        step=run.current_step,
-                        duration=config.exposure_time,
-                    )
-                    image = await asyncio.wait_for(camera.expose(params), timeout=_EXPOSE_TIMEOUT)
-
-                    # Always derive dimensions from the FITS file itself so that
-                    # binning and subframe settings are reflected correctly.
-                    fits_w, fits_h = await asyncio.to_thread(_read_fits_shape, image.fits_path)
-                    run.image_width = fits_w or None
-                    run.image_height = fits_h or None
-
-                    # 3. Detect stars and measure sharpness (FWHM or HFD).
-                    # Wrapped in mem_guard so the heavy numpy/scipy work is
-                    # serialised with other memory-intensive tasks on low-RAM hosts.
-                    logger.info("autofocus.detecting_stars", step=run.current_step, metric=config.metric)
-                    async with mem_guard():
-                        fwhm, star_count, raw_stars = await detect_stars(
-                            image.fits_path,
-                            metric=config.metric,
-                            reference_stars=reference_stars if config.lock_stars else None,
-                        )
-
-                    if config.lock_stars and reference_stars is None and raw_stars:
-                        reference_stars = raw_stars
-
-                    run.latest_stars = [StarInfo(x=s["x"], y=s["y"], fwhm=s["fwhm"]) for s in raw_stars]
-
-                    # 4. Generate preview JPEGs (auto-stretch + linear) with star
-                    # circles burned in. Done AFTER star detection so circles are
-                    # always in the final file. _preview_paths is registered here
-                    # too, so the API endpoint never serves a circle-free version.
-                    auto_path = str(preview_dir / f"step_{run.current_step:02d}.jpg")
-                    linear_path = str(preview_dir / f"step_{run.current_step:02d}_linear.jpg")
-                    try:
-                        from astrolol.imaging.preview import load_preview_base, render_auto, render_linear
-
-                        def _render_step_previews(fits_path: Path, quality: int) -> None:
-                            base = load_preview_base(fits_path)  # one read for both previews
-                            render_auto(base, Path(auto_path), quality)
-                            render_linear(base, Path(linear_path), quality)
-
-                        async with mem_guard():
-                            await asyncio.to_thread(
-                                _render_step_previews, Path(image.fits_path), settings.jpeg_quality,
-                            )
-                        if raw_stars:
-                            for p in (auto_path, linear_path):
-                                await asyncio.to_thread(_annotate_preview, p, raw_stars, fits_w, fits_h)
-                        self._preview_paths[run.current_step] = {"auto": auto_path, "linear": linear_path}
-                    except Exception as exc:
-                        logger.warning("autofocus.preview_failed", step=run.current_step, error=str(exc))
-
-                    dp = FocusDataPoint(
-                        step=run.current_step,
-                        position=position,
-                        fwhm=fwhm,
-                        star_count=star_count,
-                    )
-                    run.data_points.append(dp)
-
-                    # 5. Refit the curve (live update for the UI)
-                    self._refit_curve(run)
-
-                    await self._bus.publish(AutofocusDataPointEvent(
-                        run_id=run.id,
-                        step=run.current_step,
-                        total_steps=run.total_steps,
-                        position=position,
-                        fwhm=fwhm,
-                        star_count=star_count,
-                    ))
-
-                    logger.info(
-                        "autofocus.data_point",
-                        step=run.current_step,
-                        position=position,
-                        metric=config.metric,
-                        value=round(fwhm, 2),
-                        stars=star_count,
-                    )
-
-                self._refit_curve(run)
-                further = next_sweep(run) if pass_no < _MAX_RECENTRES else None
-                if further is None:
-                    break
-                logger.info(
-                    "autofocus.recentring",
-                    run_id=run.id, pass_no=pass_no + 2, positions=further,
-                    reason="the minimum is not inside the swept range",
+            while True:
+                run.exposure_time = exposure
+                params = ExposureParams(
+                    duration=exposure,
+                    gain=config.gain,
+                    binning=config.binning,
+                    frame_type="light",
                 )
-                run.total_steps += len(further)
-                sweep = further
+                # When lock_stars is set, frozen after the first step that detects any
+                # stars, and reused as the preferred population for every later step —
+                # a step where none of these stars can be matched reports no stars.
+                self._reference_stars = None
+
+                for pass_no in range(1 + _MAX_RECENTRES):
+                    for position in sweep:
+                        await self._measure_step(run, camera, focuser, params, exposure, position, preview_dir)
+
+                    self._refit_curve(run)
+                    further = next_sweep(run) if pass_no < _MAX_RECENTRES and config.on_edge == "retry" else None
+                    if further is None:
+                        break
+                    logger.info(
+                        "autofocus.recentring",
+                        run_id=run.id, pass_no=pass_no + 2, positions=further,
+                        reason="the minimum is not bracketed by the swept range",
+                    )
+                    run.total_steps += len(further)
+                    sweep = further
+
+                verdict = assess(run.data_points, run.curve_fit)
+                failing = [c for c in verdict.causes if _action(config, c) == "fail"]
+                if failing:
+                    run.sky_problem = "few_stars" in failing
+                    raise RuntimeError(
+                        f"The focus curve is not reliable ({', '.join(failing)}) and this "
+                        "autofocus is set to stop in that case."
+                    )
+                again = self._retry_sweep(run, verdict, exposure, retries)
+                if again is None:
+                    break
+                retries += 1
+                exposure, sweep = again
+                run.total_steps = run.current_step + len(sweep)
+
+
 
             # ── Move to optimal position ───────────────────────────────────────
             self._refit_curve(run)
@@ -424,6 +365,139 @@ class AutofocusEngine:
             await self._restore_focus(config.focuser_id, restore_to)
             await self._bus.publish(AutofocusFailedEvent(run_id=run.id, reason=str(exc)))
             logger.error("autofocus.failed", run_id=run.id, error=str(exc), exc_info=True)
+
+    async def _measure_step(
+        self, run: AutofocusRun, camera, focuser, params: ExposureParams, exposure: float,  # noqa: ANN001
+        position: int, preview_dir: Path,
+    ) -> None:
+        """Move to *position*, expose, measure the stars, and record the data point."""
+        config = run.config
+        run.current_step += 1
+
+        # 1. Move focuser
+        logger.info(
+            "autofocus.moving",
+            step=run.current_step,
+            total=run.total_steps,
+            position=position,
+        )
+        await asyncio.wait_for(focuser.move_to(position), timeout=_MOVE_TIMEOUT)
+
+        # 2. Expose
+        logger.info(
+            "autofocus.exposing",
+            step=run.current_step,
+            duration=exposure,
+        )
+        image = await asyncio.wait_for(camera.expose(params), timeout=_EXPOSE_TIMEOUT)
+
+        # Always derive dimensions from the FITS file itself so that
+        # binning and subframe settings are reflected correctly.
+        fits_w, fits_h = await asyncio.to_thread(_read_fits_shape, image.fits_path)
+        run.image_width = fits_w or None
+        run.image_height = fits_h or None
+
+        # 3. Detect stars and measure sharpness (FWHM or HFD).
+        # Wrapped in mem_guard so the heavy numpy/scipy work is
+        # serialised with other memory-intensive tasks on low-RAM hosts.
+        logger.info("autofocus.detecting_stars", step=run.current_step, metric=config.metric)
+        async with mem_guard():
+            fwhm, star_count, raw_stars = await detect_stars(
+                image.fits_path,
+                metric=config.metric,
+                reference_stars=self._reference_stars if config.lock_stars else None,
+            )
+
+        if config.lock_stars and self._reference_stars is None and raw_stars:
+            self._reference_stars = raw_stars
+
+        run.latest_stars = [StarInfo(x=s["x"], y=s["y"], fwhm=s["fwhm"]) for s in raw_stars]
+
+        # 4. Generate preview JPEGs (auto-stretch + linear) with star
+        # circles burned in. Done AFTER star detection so circles are
+        # always in the final file. _preview_paths is registered here
+        # too, so the API endpoint never serves a circle-free version.
+        auto_path = str(preview_dir / f"step_{run.current_step:02d}.jpg")
+        linear_path = str(preview_dir / f"step_{run.current_step:02d}_linear.jpg")
+        try:
+            from astrolol.imaging.preview import load_preview_base, render_auto, render_linear
+
+            def _render_step_previews(fits_path: Path, quality: int) -> None:
+                base = load_preview_base(fits_path)  # one read for both previews
+                render_auto(base, Path(auto_path), quality)
+                render_linear(base, Path(linear_path), quality)
+
+            async with mem_guard():
+                await asyncio.to_thread(
+                    _render_step_previews, Path(image.fits_path), settings.jpeg_quality,
+                )
+            if raw_stars:
+                for p in (auto_path, linear_path):
+                    await asyncio.to_thread(_annotate_preview, p, raw_stars, fits_w, fits_h)
+            self._preview_paths[run.current_step] = {"auto": auto_path, "linear": linear_path}
+        except Exception as exc:
+            logger.warning("autofocus.preview_failed", step=run.current_step, error=str(exc))
+
+        dp = FocusDataPoint(
+            step=run.current_step,
+            position=position,
+            fwhm=fwhm,
+            star_count=star_count,
+        )
+        run.data_points.append(dp)
+
+        # 5. Refit the curve (live update for the UI)
+        self._refit_curve(run)
+
+        await self._bus.publish(AutofocusDataPointEvent(
+            run_id=run.id,
+            step=run.current_step,
+            total_steps=run.total_steps,
+            position=position,
+            fwhm=fwhm,
+            star_count=star_count,
+        ))
+
+        logger.info(
+            "autofocus.data_point",
+            step=run.current_step,
+            position=position,
+            metric=config.metric,
+            value=round(fwhm, 2),
+            stars=star_count,
+        )
+
+
+    def _retry_sweep(
+        self, run: AutofocusRun, verdict: FocusQuality, exposure: float, retries: int,
+    ) -> tuple[float, list[int]] | None:
+        """Exposure and positions of a new sweep when the policy asks to measure again, else None.
+
+        Only a flat, noisy or starless curve is measured again here (an edge is handled by
+        sweeping further, in the sweep loop), with a longer exposure and a fresh set of
+        samples centred on the best one; the sweep given up on is kept in run.attempts.
+        """
+        config = run.config
+        causes = [c for c in verdict.causes if c != "edge" and _action(config, c) == "retry"]
+        if not causes or retries >= config.max_retries:
+            return None
+        if verdict.metrics.valid_points == 0:
+            return None   # no star at any position: a longer exposure will not change the sky
+        longer = min(exposure * config.retry_exposure_factor, config.max_exposure)
+        if longer < exposure * 1.05:
+            logger.info("autofocus.no_retry", run_id=run.id, causes=causes, reason="longest exposure reached")
+            return None
+        valid = [dp for dp in run.data_points if dp.fwhm > 0 and dp.star_count > 0]
+        best = min(valid, key=lambda dp: dp.fwhm).position
+        positions = [max(0, best + (i - config.num_steps) * config.step_size) for i in range(2 * config.num_steps + 1)]
+        run.attempts.append(FocusAttempt(exposure_time=exposure, data_points=run.data_points, quality=verdict))
+        run.data_points = []
+        run.curve_fit = None
+        logger.info(
+            "autofocus.retrying",
+            run_id=run.id, attempt=retries + 2, causes=causes, exposure=longer, centre=best,
+        )
+        return longer, sorted(set(positions))
 
     async def _restore_focus(self, focuser_id: str, position: int | None) -> None:
         """After a failed or aborted run, put the focuser back where it started — the last

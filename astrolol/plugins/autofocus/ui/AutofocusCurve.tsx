@@ -5,12 +5,15 @@ import type { CurveFit, FitAlgo, FocusDataPoint, FocusMetric } from '@/api/types
 
 export function UCurveChart({
   dataPoints,
+  previous = [],
   curveFit,
   optimal,
   fitAlgo,
   metric,
 }: {
   dataPoints: FocusDataPoint[]
+  /** Sweeps given up on for a doubtful curve: drawn faint, under the current one. */
+  previous?: FocusDataPoint[]
   curveFit: CurveFit | null
   optimal: number | null
   fitAlgo: FitAlgo
@@ -22,7 +25,7 @@ export function UCurveChart({
   const cw = W - pad.l - pad.r
   const ch = H - pad.t - pad.b
 
-  if (dataPoints.length === 0) {
+  if (dataPoints.length + previous.length === 0) {
     return (
       <div className="flex items-center justify-center h-[150px] text-xs text-slate-600">
         {t('noData')}
@@ -30,8 +33,9 @@ export function UCurveChart({
     )
   }
 
-  const positions = dataPoints.map((d) => d.position)
-  const fwhms = dataPoints.filter((d) => d.fwhm > 0).map((d) => d.fwhm)
+  const shown = [...previous, ...dataPoints]
+  const positions = shown.map((d) => d.position)
+  const fwhms = shown.filter((d) => d.fwhm > 0).map((d) => d.fwhm)
   if (fwhms.length === 0) return null
 
   const minX = Math.min(...positions)
@@ -98,6 +102,11 @@ export function UCurveChart({
         <line x1={toX(optimal!)} y1={pad.t} x2={toX(optimal!)} y2={pad.t + ch}
           className="stroke-green-400" strokeWidth={1} strokeDasharray="3,2" />
       )}
+
+      {previous.filter((dp) => dp.fwhm > 0).map((dp) => (
+        <circle key={`p${dp.step}`} cx={toX(dp.position)} cy={toY(dp.fwhm)}
+          r={2.5} className="fill-slate-600 opacity-50" />
+      ))}
 
       {dataPoints.filter((dp) => dp.fwhm > 0).map((dp, i) => (
         <circle key={i} cx={toX(dp.position)} cy={toY(dp.fwhm)}

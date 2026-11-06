@@ -30,6 +30,22 @@ plate, augmentez la taille du pas ; si les étoiles disparaissent aux extrémit�
 **Pose** : **Durée**, **Binning**, **Gain** (vide = défaut du pilote) et **Filtre** (**Garder
 l'actuel** ou une position). Quelques secondes suffisent, de quoi voir une dizaine d'étoiles.
 
+**Résultats douteux** : que faire quand la courbe semble peu fiable. Chaque cause a son choix :
+**garder** (utiliser le résultat en le signalant), **réessayer** (mesurer à nouveau) ou
+**arrêter** (l'opération échoue et le focuser revient à son point de départ).
+
+| Cause | Réessayer signifie |
+|---|---|
+| Minimum au bord | Balayer à nouveau autour de la meilleure position, jusqu'à deux fois. |
+| Courbe plate | Un nouveau balayage avec une pose plus longue, centré sur la meilleure position. |
+| Courbe bruitée | Idem. |
+| Trop peu d'étoiles | Idem. Un ciel sans aucune étoile n'est pas remesuré ; le séquenceur réessaie plus tard. |
+
+**Nouveaux balayages permis** limite les nouveaux balayages pour les trois dernières causes.
+**Pose d'un nouveau balayage** est le multiple de la pose précédente, jusqu'à **Pose maximale**.
+Les balayages précédents restent sur le graphique, en gris. Si un résultat ne peut pas du tout être
+ajusté, l'opération échoue quel que soit le choix.
+
 ## Lancer
 
 Cliquez sur **Lancer l'autofocus**. Pendant le déroulement :

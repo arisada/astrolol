@@ -22,6 +22,7 @@ import type {
   AutofocusSettings,
   FilterWheelStatus,
   FitAlgo,
+  FocusAction,
   FocusDataPoint,
   FocusMetric,
   OpticalPath,
@@ -54,7 +55,19 @@ const DEFAULT_SETTINGS: AutofocusSettings = {
   fit_algo: 'parabola',
   metric: 'hfd',
   lock_stars: false,
+  on_edge: 'retry',
+  on_flat: 'retry',
+  on_noisy: 'retry',
+  on_few_stars: 'retry',
+  max_retries: 2,
+  retry_exposure_factor: 2,
+  max_exposure: 16,
 }
+
+const FOCUS_ACTIONS: FocusAction[] = ['warn', 'retry', 'fail']
+const DOUBT_CAUSES = ['edge', 'flat', 'noisy', 'few_stars'] as const
+const MAX_RETRIES = [0, 1, 2, 3, 4, 5]
+const EXPOSURE_FACTORS = [1.5, 2, 3, 4]
 
 // ── Main page component ───────────────────────────────────────────────────────
 
@@ -495,6 +508,51 @@ export function AutofocusPage() {
           </div>
         </SidebarSection>
 
+        {/* A doubtful result */}
+        <SidebarSection title={t('doubt.title')}>
+          <div className="flex flex-col gap-3">
+            <p className="text-[10px] text-slate-600">{t('doubt.hint')}</p>
+            {DOUBT_CAUSES.map((cause) => {
+              const key = `on_${cause}` as const
+              return (
+                <PillGroup
+                  key={cause}
+                  options={FOCUS_ACTIONS}
+                  value={settings[key]}
+                  onChange={(a) => patchSettings(key, a)}
+                  label={t(`doubt.cause.${cause}`)}
+                  formatLabel={(a) => t(`doubt.action.${a}`)}
+                />
+              )
+            })}
+            <PillGroup
+              options={MAX_RETRIES}
+              value={settings.max_retries}
+              onChange={(n) => patchSettings('max_retries', n)}
+              label={t('doubt.maxRetries')}
+            />
+            {settings.max_retries > 0 && (
+              <>
+                <PillGroup
+                  options={EXPOSURE_FACTORS}
+                  value={settings.retry_exposure_factor}
+                  onChange={(f) => patchSettings('retry_exposure_factor', f)}
+                  label={t('doubt.factor')}
+                  formatLabel={(f) => `×${f}`}
+                />
+                <div className="flex flex-col gap-1">
+                  <label className="text-xs text-slate-400">{t('doubt.maxExposure')}</label>
+                  <DurationStepper
+                    steps={AUTOFOCUS_EXPOSURE_STEPS}
+                    value={settings.max_exposure}
+                    onChange={(v) => patchSettings('max_exposure', v)}
+                  />
+                </div>
+              </>
+            )}
+          </div>
+        </SidebarSection>
+
         {/* Action */}
         <div className="px-4 py-3 border-b border-surface-border flex flex-col gap-2">
           {error && <p className="text-xs text-red-400">{error}</p>}
@@ -558,6 +616,12 @@ export function AutofocusPage() {
                 )
               })()}
 
+              {run.attempts.length > 0 && run.exposure_time != null && (
+                <p className="text-xs text-amber-400">
+                  {t('progress.retry', { count: run.attempts.length, exposure: run.exposure_time })}
+                </p>
+              )}
+
               {run.error && <p className="text-xs text-red-400 break-words">{run.error}</p>}
             </div>
           </SidebarSection>
@@ -598,6 +662,7 @@ export function AutofocusPage() {
           <SidebarSection title={t('vcurve.title')}>
             <UCurveChart
               dataPoints={run.data_points}
+              previous={run.attempts.flatMap((a) => a.data_points)}
               curveFit={run.curve_fit}
               optimal={run.optimal_position}
               fitAlgo={run.config.fit_algo ?? 'parabola'}

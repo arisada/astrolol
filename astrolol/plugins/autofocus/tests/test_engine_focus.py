@@ -38,9 +38,11 @@ class Camera:
     def __init__(self, tmp: Path) -> None:
         self.tmp = tmp
         self.n = 0
+        self.durations: list[float] = []
 
     async def expose(self, params: Any) -> Any:
         self.n += 1
+        self.durations.append(params.duration)
         return SimpleNamespace(
             fits_path=str(make_fake_fits(self.tmp / f"af_{self.n}.fits", 16, 16))
         )
@@ -216,7 +218,7 @@ async def test_a_minimum_beyond_the_sweep_is_found_with_more_sweeps(
 async def test_a_minimum_inside_the_sweep_needs_no_more_sweeps(
     rig: SimpleNamespace, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    _focus_at(rig, monkeypatch, 1000)
+    _focus_at(rig, monkeypatch, 900)
 
     run = await rig.engine.focus("cam", "foc")
 
@@ -327,13 +329,150 @@ async def test_a_completed_run_says_how_far_it_can_be_trusted(
     assert len(done) == 1 and done[0].quality == "good" and done[0].causes == []
 
 
-async def test_a_minimum_close_to_the_end_of_the_sweep_is_reported_as_an_edge(
+async def test_a_minimum_close_to_the_end_of_the_sweep_is_swept_around_and_ends_reliable(
     rig: SimpleNamespace, monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """Sweep 750-1050 with the minimum at 1000: accepted, but only one sample lies beyond it."""
+    """Sweep 750-1050 with the minimum at 1000: one sample lies beyond it, so sweep again around it."""
     _focus_at(rig, monkeypatch, 1000)
 
     run = await rig.engine.focus("cam", "foc")
 
     assert run.status == "completed"
+    assert len(run.data_points) > 7
+    assert run.quality.verdict == "good"
+    assert abs(run.optimal_position - 1000) <= 20
+
+
+async def test_with_edge_set_to_warn_the_sweep_is_not_extended(
+    rig: SimpleNamespace, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _focus_at(rig, monkeypatch, 1000)
+    rig.engine._settings_provider = lambda: AutofocusSettings(
+        step_size=50, num_steps=3, exposure_time=1.0, on_edge="warn",
+    )
+
+    run = await rig.engine.focus("cam", "foc")
+
+    assert run.status == "completed" and len(run.data_points) == 7
     assert run.quality.verdict == "poor" and run.quality.causes == ["edge"]
+
+
+# ── A flat, noisy or starless curve: measured again with a longer exposure ──────────────
+
+def _by_exposure(rig: SimpleNamespace, monkeypatch: pytest.MonkeyPatch, curve: Any) -> None:
+    """Stars whose sharpness is curve(distance from focus, exposure of the frame just taken)."""
+    async def detect(
+        fits_path: str, metric: str = "fwhm", reference_stars: list[Any] | None = None,
+    ) -> tuple[float, int, list[Any]]:
+        value = curve(rig.focuser.position - 900, rig.camera.durations[-1])
+        return (value, 25, []) if value else (0.0, 0, [])
+
+    monkeypatch.setattr(engine_mod, "detect_stars", detect)
+
+
+def _settings(rig: SimpleNamespace, **fields: Any) -> None:
+    rig.engine._settings_provider = lambda: AutofocusSettings(
+        step_size=50, num_steps=3, exposure_time=1.0, **fields,
+    )
+
+
+def _flat_until_4s(d: float, exposure: float) -> float:
+    amplitude = 0.00002 if exposure < 4 else 0.0004
+    return 2.0 + amplitude * d * d
+
+
+async def test_a_flat_curve_is_measured_again_with_a_longer_exposure(
+    rig: SimpleNamespace, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _by_exposure(rig, monkeypatch, _flat_until_4s)
+
+    run = await rig.engine.focus("cam", "foc")
+
+    assert run.status == "completed", run.error
+    assert sorted(set(rig.camera.durations)) == [1.0, 2.0, 4.0]
+    assert run.exposure_time == 4.0
+    assert [a.exposure_time for a in run.attempts] == [1.0, 2.0]
+    assert all(a.quality.causes == ["flat"] for a in run.attempts)
+    assert len(run.data_points) == 7                       # only the last sweep is the curve
+    assert run.quality.verdict == "good"
+    steps = [dp.step for a in run.attempts for dp in a.data_points] + [dp.step for dp in run.data_points]
+    assert steps == list(range(1, 22))                     # steps, and so previews, are never reused
+    assert abs(run.optimal_position - 900) <= 15
+
+
+async def test_the_retries_are_limited_and_the_exposure_capped(
+    rig: SimpleNamespace, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _by_exposure(rig, monkeypatch, lambda d, exposure: 2.0 + 0.00002 * d * d)   # never gets better
+    _settings(rig, max_retries=3, max_exposure=3.0)
+
+    run = await rig.engine.focus("cam", "foc")
+
+    assert max(rig.camera.durations) == 3.0
+    assert sorted(set(rig.camera.durations)) == [1.0, 2.0, 3.0]
+    assert run.status == "completed" and run.quality.causes == ["flat"]   # kept, flagged
+
+
+async def test_no_retry_when_max_retries_is_zero(
+    rig: SimpleNamespace, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _by_exposure(rig, monkeypatch, _flat_until_4s)
+    _settings(rig, max_retries=0)
+
+    run = await rig.engine.focus("cam", "foc")
+
+    assert run.attempts == [] and set(rig.camera.durations) == {1.0}
+    assert run.quality.causes == ["flat"]
+
+
+async def test_flat_set_to_warn_keeps_the_result_and_flags_it(
+    rig: SimpleNamespace, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _by_exposure(rig, monkeypatch, _flat_until_4s)
+    _settings(rig, on_flat="warn")
+
+    run = await rig.engine.focus("cam", "foc")
+
+    assert run.status == "completed" and run.attempts == []
+    assert run.quality.verdict == "poor" and run.quality.causes == ["flat"]
+
+
+async def test_flat_set_to_fail_stops_and_puts_the_focuser_back(
+    rig: SimpleNamespace, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _by_exposure(rig, monkeypatch, _flat_until_4s)
+    _settings(rig, on_flat="fail")
+
+    run = await rig.engine.focus("cam", "foc")
+
+    assert run.status == "failed" and "flat" in run.error
+    assert run.sky_problem is False
+    assert rig.focuser.position == 900
+
+
+async def test_too_few_stars_are_measured_again_and_a_failure_there_is_a_sky_problem(
+    rig: SimpleNamespace, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    def faint(d: float, exposure: float) -> float:
+        if exposure < 2 and abs(d) > 50:
+            return 0.0                                     # defocused stars vanish in a short frame
+        return 2.0 + 0.0004 * d * d
+
+    _by_exposure(rig, monkeypatch, faint)
+    run = await rig.engine.focus("cam", "foc")
+    assert run.status == "completed" and run.exposure_time == 2.0
+    assert "few_stars" in run.attempts[0].quality.causes
+
+    _settings(rig, on_few_stars="fail")
+    run = await rig.engine.focus("cam", "foc")
+    assert run.status == "failed" and run.sky_problem is True
+    assert rig.focuser.position == 900
+
+
+async def test_a_sky_without_any_star_is_not_measured_again(rig: SimpleNamespace) -> None:
+    rig.stars["on"] = False
+
+    run = await rig.engine.focus("cam", "foc")
+
+    assert run.status == "failed" and run.sky_problem is True
+    assert run.attempts == [] and rig.camera.n == 7
