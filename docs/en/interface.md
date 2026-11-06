@@ -63,6 +63,13 @@ On the Imaging and Mount pages, the small gear next to a device name opens
 plus the **messages** the driver sent. Use it for anything astrolol does not show on its own
 pages (USB bandwidth, read-out mode, driver-specific options). Change a value and click **Set**.
 
+Some drivers forget what you set when they restart (a camera's cooling ramp, for one). The pin
+at the right of a setting's name keeps its value: astrolol sets it again every time the device
+connects, and **Set** on a pinned setting keeps the new value. Click the pin again to stop. Pins
+are stored with the device in the [equipment inventory](equipment.md), so the device has to be
+there; buttons that start something (abort, save, connect) and the gain cannot be pinned. A gain
+is always given with the exposure.
+
 ## Palettes and languages
 
 Options → **Palette** changes the colours. *Night red* and *Night crimson* keep your eyes

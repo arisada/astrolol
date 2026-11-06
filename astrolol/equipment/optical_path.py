@@ -16,6 +16,7 @@ import structlog
 from pydantic import BaseModel
 
 from astrolol.devices.config import DeviceConfig
+from astrolol.devices.indi.pins import PINNED_KEY
 from astrolol.equipment.models import (
     CameraItem, EquipmentItem, FilterWheelItem, FlatPanelItem, FocuserItem, MountItem,
     OTAItem, RotatorItem, SiteItem,
@@ -57,7 +58,7 @@ class OpticalPath(BaseModel):
 
 
 def _clean_params(params: dict) -> dict:
-    return {k: v for k, v in params.items() if k != "pre_connect_props"}
+    return {k: v for k, v in params.items() if k not in ("pre_connect_props", PINNED_KEY)}
 
 
 def _find_entry_for_item(device_manager: "DeviceManager", kind: str, item: EquipmentItem):
@@ -82,6 +83,14 @@ def _find_entry_for_item(device_manager: "DeviceManager", kind: str, item: Equip
         if adapter_key and entry.config.adapter_key == adapter_key:
             if _clean_params(entry.config.params) == connect_params:
                 return entry
+    return None
+
+
+def find_item_for_entry(device_manager: "DeviceManager", equipment_store: "EquipmentStore", entry) -> EquipmentItem | None:  # noqa: ANN001
+    """The inventory item a connected device was made from (the reverse of ``_find_entry_for_item``)."""
+    for item in equipment_store.list():
+        if item.type in _CONNECTABLE_KINDS and _find_entry_for_item(device_manager, item.type, item) is entry:
+            return item
     return None
 
 
@@ -112,10 +121,11 @@ def item_device_config(item: EquipmentItem, device_id: str | None = None) -> Dev
     indi_name = getattr(item, "indi_device_name", None)
     if indi_driver and indi_name:
         # The INDI adapters load the driver themselves when given its executable.
-        return DeviceConfig(
-            device_id=device_id, kind=item.type, adapter_key=f"indi_{item.type}",
-            params={"device_name": indi_name, "executable": indi_driver},
-        )
+        params: dict = {"device_name": indi_name, "executable": indi_driver}
+        pins = (getattr(item, "connect_params", None) or {}).get(PINNED_KEY)
+        if pins:
+            params[PINNED_KEY] = pins
+        return DeviceConfig(device_id=device_id, kind=item.type, adapter_key=f"indi_{item.type}", params=params)
     return None
 
 

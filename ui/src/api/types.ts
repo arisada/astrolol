@@ -995,6 +995,8 @@ export interface DeviceProperty {
   permission: PropertyPermission
   switch_rule?: SwitchRule
   widgets: PropertyWidget[]
+  pinnable?: boolean // its value can be kept and set again at every connection
+  pinned?: boolean
 }
 
 export interface SetPropertyRequest {

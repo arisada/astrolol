@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ChevronRight, X } from 'lucide-react'
+import { ChevronRight, Pin, PinOff, X } from 'lucide-react'
 import { api } from '@/api/client'
 import type { DeviceProperty, IndiDeviceMessage, PropertyWidget } from '@/api/types'
 import { Button } from '@/components/ui/button'
@@ -243,12 +243,41 @@ function LightProperty({ widgets }: { widgets: PropertyWidget[] }) {
 // Single property row — stacked layout so widgets get the full panel width
 // ---------------------------------------------------------------------------
 
+function PinButton({ prop, deviceId, onChanged }: { prop: DeviceProperty; deviceId: string; onChanged: () => void }) {
+  const { t } = useTranslation()
+  const [error, setError] = useState<string | null>(null)
+  if (!prop.pinnable) return null
+  const toggle = () => {
+    const done = prop.pinned ? api.devices.unpinProperty(deviceId, prop.name) : api.devices.pinProperty(deviceId, prop.name)
+    done.then(() => { setError(null); onChanged() }).catch((e: Error) => setError(e.message))
+  }
+  return (
+    <>
+      {error && <span className="text-xs text-status-error">{error}</span>}
+      <button
+        onClick={toggle}
+        title={prop.pinned ? t('deviceProps.unpin') : t('deviceProps.pin')}
+        aria-label={prop.pinned ? t('deviceProps.unpin') : t('deviceProps.pin')}
+        aria-pressed={prop.pinned}
+        className={[
+          'ml-auto p-1 rounded transition-colors',
+          prop.pinned ? 'text-accent hover:text-slate-300' : 'text-slate-600 hover:text-slate-300',
+        ].join(' ')}
+      >
+        {prop.pinned ? <Pin size={13} className="fill-current" /> : <PinOff size={13} />}
+      </button>
+    </>
+  )
+}
+
 function PropertyRow({
   prop,
   deviceId,
+  onChanged,
 }: {
   prop: DeviceProperty
   deviceId: string
+  onChanged: () => void
 }) {
   const { t } = useTranslation()
   return (
@@ -262,6 +291,7 @@ function PropertyRow({
         {prop.label && prop.label !== prop.name && (
           <span className="text-xs text-slate-600 font-mono">{prop.name}</span>
         )}
+        <PinButton prop={prop} deviceId={deviceId} onChanged={onChanged} />
       </div>
 
       {/* Widgets — full width */}
@@ -370,6 +400,7 @@ export function DevicePropertiesPanel({ deviceId, onClose }: Props) {
     }).catch(() => {/* non-INDI device or endpoint unavailable */})
   }, [deviceId])
 
+  const [reloads, setReloads] = useState(0)
   useEffect(() => {
     let alive = true
 
@@ -393,7 +424,7 @@ export function DevicePropertiesPanel({ deviceId, onClose }: Props) {
       alive = false
       clearInterval(id)
     }
-  }, [deviceId])
+  }, [deviceId, reloads])
 
   const groups = groupBy(properties, (p) => p.group || 'General')
 
@@ -465,7 +496,7 @@ export function DevicePropertiesPanel({ deviceId, onClose }: Props) {
                   {isOpen && (
                     <div className="px-4">
                       {props.map((p) => (
-                        <PropertyRow key={p.name} prop={p} deviceId={deviceId} />
+                        <PropertyRow key={p.name} prop={p} deviceId={deviceId} onChanged={() => setReloads((n) => n + 1)} />
                       ))}
                     </div>
                   )}

@@ -9,6 +9,9 @@ from typing import Any
 from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 
+from astrolol.devices.indi import pins as pinlib
+from astrolol.equipment.optical_path import find_item_for_entry
+
 router = APIRouter(prefix="/devices", tags=["properties"])
 
 # ---------------------------------------------------------------------------
@@ -39,6 +42,10 @@ class PropertyOut(BaseModel):
     # "1ofmany" | "atmost1" | "nofmany" — only for switches
     switch_rule: str | None = None
     widgets: list[PropertyWidget]
+    # Whether its value can be kept (pinned) so that it is set again at every connection,
+    # and whether it is. Only filled in by GET /devices/{device_id}/properties.
+    pinnable: bool = False
+    pinned: bool = False
 
 
 # ---------------------------------------------------------------------------
@@ -148,16 +155,74 @@ def _get_indi_client(request: Request):
 # Endpoints
 # ---------------------------------------------------------------------------
 
+def _item_and_pins(request: Request, device_id: str):  # noqa: ANN202
+    """(the device's inventory item or None, the pins it holds)."""
+    entry = request.app.state.device_manager._devices.get(device_id)
+    store = getattr(request.app.state, "equipment_store", None)
+    if entry is None or store is None:
+        return None, {}
+    item = find_item_for_entry(request.app.state.device_manager, store, entry)
+    pins = pinlib.clean_pins((getattr(item, "connect_params", None) or {}).get(pinlib.PINNED_KEY)) if item else {}
+    return item, pins
+
+
+def _store_pins(request: Request, device_id: str, item, pins: dict) -> None:  # noqa: ANN001
+    """Keep *pins* with the inventory item, and on the live device for its next reconnection."""
+    params = {k: v for k, v in (item.connect_params or {}).items() if k != pinlib.PINNED_KEY}
+    if pins:
+        params[pinlib.PINNED_KEY] = pins
+    request.app.state.equipment_store.update(item.model_copy(update={"connect_params": params}))
+    entry = request.app.state.device_manager._devices[device_id]
+    if pins:
+        entry.config.params[pinlib.PINNED_KEY] = pins
+    else:
+        entry.config.params.pop(pinlib.PINNED_KEY, None)
+
+
 @router.get("/{device_id}/properties", response_model=list[PropertyOut])
 async def get_properties(device_id: str, request: Request) -> list[PropertyOut]:
     """Return a live snapshot of all INDI properties for a connected device."""
     client = _get_indi_client(request)
     indi_name = _resolve_indi_name(device_id, request)
     snapshot = await client.get_properties_snapshot(indi_name)
+    item, pins = _item_and_pins(request, device_id)
     props = [prop_to_out(p) for p in snapshot.values()]
     result = [p for p in props if p is not None]
+    for p in result:
+        p.pinnable = item is not None and pinlib.pinnable(p.name, p.type, p.permission, p.switch_rule)
+        p.pinned = p.name in pins
     result.sort(key=lambda x: (x.group, x.name))
     return result
+
+
+@router.put("/{device_id}/pins/{prop_name}", response_model=dict)
+async def pin_property(device_id: str, prop_name: str, request: Request) -> dict:
+    """Keep the property's current value: it is set again every time the device connects."""
+    client = _get_indi_client(request)
+    indi_name = _resolve_indi_name(device_id, request)
+    item, pins = _item_and_pins(request, device_id)
+    if item is None:
+        raise HTTPException(status_code=409, detail="This device is not in the equipment inventory: add it there first.")
+    snapshot = await client.get_properties_snapshot(indi_name)
+    raw = snapshot.get(prop_name)
+    out = prop_to_out(raw) if raw is not None else None
+    if out is None:
+        raise HTTPException(status_code=404, detail=f"The device has no property '{prop_name}'.")
+    if not pinlib.pinnable(out.name, out.type, out.permission, out.switch_rule):
+        raise HTTPException(status_code=409, detail=f"'{prop_name}' cannot be pinned.")
+    spec = pinlib.pin_spec(out.type, {w.name: w.value for w in out.widgets})
+    if spec is None:
+        raise HTTPException(status_code=409, detail=f"'{prop_name}' has no value to keep.")
+    _store_pins(request, device_id, item, {**pins, prop_name: spec})
+    return spec
+
+
+@router.delete("/{device_id}/pins/{prop_name}", status_code=204, response_model=None)
+async def unpin_property(device_id: str, prop_name: str, request: Request) -> None:
+    """Stop keeping the property's value."""
+    item, pins = _item_and_pins(request, device_id)
+    if item is not None and prop_name in pins:
+        _store_pins(request, device_id, item, {k: v for k, v in pins.items() if k != prop_name})
 
 
 @router.post("/{device_id}/properties/{prop_name}", status_code=204, response_model=None)
@@ -181,3 +246,20 @@ async def set_property(
                                       {k: str(v) for k, v in body.values.items()})
     except Exception as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
+    _follow_pin(request, device_id, prop_name, body)
+
+
+def _follow_pin(request: Request, device_id: str, prop_name: str, body: SetPropertyRequest) -> None:
+    """A pinned property that is set again keeps the new value."""
+    item, pins = _item_and_pins(request, device_id)
+    if item is None or prop_name not in pins:
+        return
+    if body.on_elements is not None:
+        spec = pinlib.pin_spec("switch", {name: True for name in body.on_elements})
+    elif body.values is not None:
+        first = next(iter(body.values.values()), None)
+        spec = pinlib.pin_spec("number" if isinstance(first, (int, float)) else "text", body.values)
+    else:
+        return
+    if spec is not None:
+        _store_pins(request, device_id, item, {**pins, prop_name: spec})

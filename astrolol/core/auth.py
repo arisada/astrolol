@@ -164,6 +164,8 @@ def default_acl() -> Acl:
         AclRule("/devices/connect", Level.ADMIN, ("POST",)),
         AclRule("/devices/connected/*", Level.ADMIN, ("DELETE",)),
         AclRule("/devices/bluetooth/**", Level.ADMIN, _W),
+        # Pinning edits the equipment inventory.
+        AclRule("/devices/*/pins/**", Level.ADMIN, _W),
         AclRule("/indi/load_driver", Level.ADMIN, _W),
         AclRule("/indi/debug", Level.ADMIN, _W),
     )

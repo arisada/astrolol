@@ -104,7 +104,9 @@
     "tabs": {
       "properties": "properties",
       "messages": "messages"
-    }
+    },
+    "pin": "Keep this value: it is set again every time the device connects",
+    "unpin": "Stop keeping this value"
   },
   "frameType": {
     "light": "light",

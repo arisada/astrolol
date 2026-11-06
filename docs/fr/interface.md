@@ -68,6 +68,14 @@ pilote les groupe, ainsi que les **messages** envoyés par le pilote. Servez-vou
 qu'astrolol n'affiche pas sur ses propres pages (bande passante USB, mode de lecture, options
 propres au pilote). Changez une valeur et cliquez sur **Appliquer**.
 
+Certains pilotes oublient ce que vous avez réglé quand ils redémarrent (la rampe de
+refroidissement d'une caméra, par exemple). L'épingle à droite du nom d'un réglage garde sa
+valeur : astrolol la rétablit à chaque connexion de l'appareil, et **Appliquer** sur un réglage
+épinglé garde la nouvelle valeur. Cliquez de nouveau sur l'épingle pour arrêter. Les épingles
+sont enregistrées avec l'appareil dans l'[inventaire du matériel](equipment.md) : il faut donc
+qu'il y figure ; les boutons qui déclenchent une action (interrompre, enregistrer, connecter) et
+le gain ne peuvent pas être épinglés. Le gain est toujours donné avec la pose.
+
 ## Palettes et langues
 
 Options → **Palette** change les couleurs. *Rouge nuit* et *Cramoisi nuit* préservent votre

@@ -73,6 +73,10 @@ export const api = {
       request<DeviceConfig>(`/devices/connected/${deviceId}/config`),
     properties: (deviceId: string) =>
       request<DeviceProperty[]>(`/devices/${deviceId}/properties`),
+    pinProperty: (deviceId: string, propName: string) =>
+      request<Record<string, unknown>>(`/devices/${deviceId}/pins/${propName}`, { method: 'PUT' }),
+    unpinProperty: (deviceId: string, propName: string) =>
+      request<void>(`/devices/${deviceId}/pins/${propName}`, { method: 'DELETE' }),
     setProperty: (deviceId: string, propName: string, body: SetPropertyRequest) =>
       request<void>(`/devices/${deviceId}/properties/${propName}`, {
         method: 'POST',

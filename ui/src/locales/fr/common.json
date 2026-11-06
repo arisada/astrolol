@@ -104,7 +104,9 @@
     "tabs": {
       "properties": "propriétés",
       "messages": "messages"
-    }
+    },
+    "pin": "Garder cette valeur : elle est rétablie à chaque connexion de l'appareil",
+    "unpin": "Ne plus garder cette valeur"
   },
   "frameType": {
     "light": "light",

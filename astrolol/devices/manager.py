@@ -22,17 +22,24 @@ from astrolol.core.events import (
 from astrolol.devices.base import ICamera, IFocuser, IFilterWheel, IMount, IRotator, IFlatPanel
 from astrolol.devices.base.models import DeviceState
 from astrolol.devices.config import DeviceConfig
+from astrolol.devices.indi.pins import PINNED_KEY, apply_pins
 from astrolol.devices.registry import DeviceRegistry
 
 logger = structlog.get_logger()
 
 CONNECT_TIMEOUT = 30.0  # seconds
+PINS_TIMEOUT = 30.0  # seconds to set the pinned properties of a device
 WATCHDOG_INTERVAL = 30.0  # seconds between ping checks
 WATCHDOG_PING_TIMEOUT = 10.0  # seconds to wait for ping response
 
 # Device kinds where only one instance may be active at a time.
 # Connecting a new device of a singleton kind evicts any existing device of that kind.
 _SINGLETON_KINDS: frozenset[str] = frozenset({"mount"})
+
+
+def _adapter_params(config: DeviceConfig) -> dict[str, Any]:
+    """The params the adapter is built with: what astrolol keeps in them for itself stays out."""
+    return {k: v for k, v in config.params.items() if k != PINNED_KEY}
 
 
 @dataclass
@@ -79,7 +86,7 @@ class DeviceManager:
                     log.warning("device.evict_failed", evicted_id=did, error=str(exc))
 
         adapter_class = self._lookup_adapter(config)
-        instance = adapter_class(**config.params)
+        instance = adapter_class(**_adapter_params(config))
 
         await self._publish_state_change(
             config, DeviceState.DISCONNECTED, DeviceState.CONNECTING
@@ -113,6 +120,7 @@ class DeviceManager:
             config, DeviceState.CONNECTING, DeviceState.CONNECTED
         )
         log.info("device.connected")
+        await self._apply_pins(config)
 
         # Wire real-time property listeners for adapters that support them.
         # Duck-typed so non-INDI adapters (FakeMount, FakeFocuser, etc.) are unaffected.
@@ -262,6 +270,19 @@ class DeviceManager:
         )
         await self._publish_state_change(entry.config, DeviceState.CONNECTING, DeviceState.CONNECTED)
         log.info("device.connected")
+        await self._apply_pins(entry.config)
+
+    async def _apply_pins(self, config: DeviceConfig) -> None:
+        """Set the values the user pinned on this device (INDI devices only, best effort)."""
+        pins = config.params.get(PINNED_KEY)
+        client = self.registry.indi_client
+        name = config.params.get("device_name")
+        if not pins or client is None or not name:
+            return
+        try:
+            await asyncio.wait_for(apply_pins(client, str(name), pins), timeout=PINS_TIMEOUT)
+        except Exception as exc:  # a device that does not take its pins is still a device
+            logger.warning("device.pinned_properties_failed", device_id=config.device_id, error=str(exc) or type(exc).__name__)
 
     def get_camera(self, device_id: str) -> ICamera:
         return self._get_typed(device_id, "camera")  # type: ignore[return-value]
@@ -358,7 +379,7 @@ class DeviceManager:
             )
 
         adapter_class = self._lookup_adapter(config)
-        instance = adapter_class(**config.params)
+        instance = adapter_class(**_adapter_params(config))
 
         await self._publish_state_change(config, DeviceState.DISCONNECTED, DeviceState.CONNECTING)
         log.info("device.companion_connecting")
