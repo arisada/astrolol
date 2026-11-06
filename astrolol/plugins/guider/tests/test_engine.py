@@ -315,3 +315,17 @@ def test_relocate_finds_the_pattern_after_a_big_move() -> None:
     shift = tracker.relocate(detect_stars(field(moved, seed=11), edge=3))
     assert shift == pytest.approx((40, -25), abs=0.3)
     assert tracker.update(field(moved, seed=12)).found == 3
+
+
+def test_relocate_refuses_to_pick_among_look_alikes_for_a_single_star() -> None:
+    """With one guide star the only evidence is its brightness: several stars of about the same
+    brightness are several possible answers, and a wrong one drags the mount (A2, 28 Oct)."""
+    tracker = StarTracker(select_guide_stars(detect_stars(field([(50.0, 40.0, 700.0)])), count=1))
+    others = [(130.0, 60.0, 650.0), (90.0, 130.0, 720.0)]
+    assert tracker.relocate(detect_stars(field(others, seed=3), edge=3)) is None
+
+
+def test_relocate_still_takes_the_only_star_that_looks_like_it() -> None:
+    tracker = StarTracker(select_guide_stars(detect_stars(field([(50.0, 40.0, 700.0)])), count=1))
+    shift = tracker.relocate(detect_stars(field([(90.0, 20.0, 680.0), (30.0, 100.0, 90.0)], seed=3), edge=3))
+    assert shift == pytest.approx((40, -20), abs=0.4)

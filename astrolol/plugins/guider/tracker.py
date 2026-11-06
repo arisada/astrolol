@@ -254,16 +254,21 @@ class StarTracker:
 
         Each detected star that looks like the primary proposes a shift; the shift under which
         the most guide stars land on a detected star wins (one star alone must also match in
-        brightness). On success every star's expected position moves by it.
+        brightness and not be one of several that look alike). On success every star's expected
+        position moves by it.
         """
         if not detected:
             return None
         n = len(self._last)
         best: tuple[int, float, tuple[float, float]] | None = None
+        candidates = 0
         for d in detected:
             ratio = d.flux / max(self._ref_flux[0], 1e-6)
             if not self._min_flux_ratio <= ratio <= self._max_flux_ratio:
                 continue
+            if not MIN_FWHM_RATIO * self._ref_fwhm[0] <= d.fwhm <= self._max_fwhm_ratio * max(self._ref_fwhm[0], 1.0):
+                continue
+            candidates += 1
             shift = (d.x - self._last[0][0], d.y - self._last[0][1])
             score = 1
             for j in range(1, n):
@@ -275,6 +280,8 @@ class StarTracker:
                 best = (score, size, shift)
         if best is None or best[0] < min(n, 2):
             return None
+        if n == 1 and candidates > 1:
+            return None  # one star alone, and several that look like it: any of them could be it
         self.shift_last(*best[2])
         return best[2]
 
