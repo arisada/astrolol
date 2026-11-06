@@ -23,7 +23,7 @@ from astrolol.core.events import EventBus
 from astrolol.core.mem_guard import mem_guard
 from astrolol.devices.base.models import ExposureParams
 from astrolol.devices.manager import DeviceManager
-from astrolol.plugins.autofocus.algorithms import fit_hyperbola, fit_parabola, fit_r_squared
+from astrolol.plugins.autofocus.algorithms import fit_hyperbola, fit_minimum, fit_parabola, fit_r_squared
 from astrolol.plugins.autofocus.models import (
     AutofocusAbortedEvent,
     AutofocusCompletedEvent,
@@ -40,7 +40,7 @@ from astrolol.plugins.autofocus.models import (
     FocusQuality,
     StarInfo,
 )
-from astrolol.plugins.autofocus.quality import assess, edge_direction
+from astrolol.plugins.autofocus.quality import assess, edge_direction, mismatched
 from astrolol.plugins.autofocus.star_detector import detect_stars
 
 logger = structlog.get_logger()
@@ -289,6 +289,8 @@ class AutofocusEngine:
                         "autofocus is set to stop in that case."
                     )
                 again = self._retry_sweep(run, verdict, exposure, retries)
+                if again is None and config.verify_after_move and run.curve_fit is not None:
+                    again = await self._verify(run, camera, focuser, params, exposure, verdict, retries)
                 if again is None:
                     break
                 retries += 1
@@ -335,6 +337,9 @@ class AutofocusEngine:
             run.status = "completed"
             run.completed_at = datetime.now(timezone.utc)
             run.quality = assess(run.data_points, run.curve_fit)
+            if run.expected_value is not None and mismatched(run.check_value, run.expected_value):
+                run.quality.causes.append("mismatch")
+                run.quality.verdict = "poor"
 
             await self._bus.publish(AutofocusCompletedEvent(
                 run_id=run.id,
@@ -489,15 +494,63 @@ class AutofocusEngine:
             return None
         valid = [dp for dp in run.data_points if dp.fwhm > 0 and dp.star_count > 0]
         best = min(valid, key=lambda dp: dp.fwhm).position
-        positions = [max(0, best + (i - config.num_steps) * config.step_size) for i in range(2 * config.num_steps + 1)]
+        return longer, self._resweep(run, verdict, exposure, retries, best, causes, longer)
+
+    def _resweep(
+        self, run: AutofocusRun, verdict: FocusQuality, exposure: float, retries: int,
+        centre: int, causes: list[str], new_exposure: float,
+    ) -> list[int]:
+        """Put the sweep just made in run.attempts and return the positions of a fresh one around *centre*."""
+        config = run.config
+        positions = [max(0, centre + (i - config.num_steps) * config.step_size) for i in range(2 * config.num_steps + 1)]
         run.attempts.append(FocusAttempt(exposure_time=exposure, data_points=run.data_points, quality=verdict))
         run.data_points = []
         run.curve_fit = None
         logger.info(
             "autofocus.retrying",
-            run_id=run.id, attempt=retries + 2, causes=causes, exposure=longer, centre=best,
+            run_id=run.id, attempt=retries + 2, causes=causes, exposure=new_exposure, centre=centre,
         )
-        return longer, sorted(set(positions))
+        return sorted(set(positions))
+
+    async def _verify(
+        self, run: AutofocusRun, camera, focuser, params: ExposureParams, exposure: float,  # noqa: ANN001
+        verdict: FocusQuality, retries: int,
+    ) -> tuple[float, list[int]] | None:
+        """Take a frame at the fitted optimum and compare its sharpness with what the fit predicts.
+
+        Not part of the curve. When the frame is clearly less sharp, the policy decides: keep
+        (the run is flagged), stop, or sweep again around the optimum (same exposure).
+        """
+        config = run.config
+        fit = run.curve_fit
+        assert fit is not None
+        optimal = max(0, round(fit.optimal_position))
+        await asyncio.wait_for(focuser.move_to(optimal), timeout=_MOVE_TIMEOUT)
+        image = await asyncio.wait_for(camera.expose(params), timeout=_EXPOSE_TIMEOUT)
+        async with mem_guard():
+            measured, star_count, _stars = await detect_stars(
+                image.fits_path,
+                metric=config.metric,
+                reference_stars=self._reference_stars if config.lock_stars else None,
+            )
+        expected = fit_minimum(config.fit_algo, fit.a, fit.b, fit.c)
+        run.check_value = measured if star_count > 0 else None
+        run.expected_value = expected
+        bad = mismatched(run.check_value, expected)
+        logger.info(
+            "autofocus.checked", run_id=run.id, position=optimal, measured=round(measured, 2),
+            expected=round(expected, 2), stars=star_count, mismatch=bad,
+        )
+        if not bad:
+            return None
+        if config.on_mismatch == "fail":
+            raise RuntimeError(
+                f"The check frame at the result is not as sharp as the fit says "
+                f"({measured:.2f} against {expected:.2f}) and this autofocus is set to stop in that case."
+            )
+        if config.on_mismatch == "retry" and retries < config.max_retries:
+            return exposure, self._resweep(run, verdict, exposure, retries, optimal, ["mismatch"], exposure)
+        return None
 
     async def _restore_focus(self, focuser_id: str, position: int | None) -> None:
         """After a failed or aborted run, put the focuser back where it started — the last

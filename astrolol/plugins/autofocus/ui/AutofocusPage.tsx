@@ -59,6 +59,8 @@ const DEFAULT_SETTINGS: AutofocusSettings = {
   on_flat: 'retry',
   on_noisy: 'retry',
   on_few_stars: 'retry',
+  verify_after_move: false,
+  on_mismatch: 'warn',
   max_retries: 2,
   retry_exposure_factor: 2,
   max_exposure: 16,
@@ -525,6 +527,26 @@ export function AutofocusPage() {
                 />
               )
             })}
+            <div className="flex items-center justify-between gap-2">
+              <label className="text-xs text-slate-400 leading-tight">
+                {t('doubt.verify')}
+                <span className="block text-[10px] text-slate-600">{t('doubt.verifyHint')}</span>
+              </label>
+              <ToggleSwitch
+                label={t('doubt.verify')}
+                checked={settings.verify_after_move}
+                onChange={() => patchSettings('verify_after_move', !settings.verify_after_move)}
+              />
+            </div>
+            {settings.verify_after_move && (
+              <PillGroup
+                options={FOCUS_ACTIONS}
+                value={settings.on_mismatch}
+                onChange={(a) => patchSettings('on_mismatch', a)}
+                label={t('doubt.cause.mismatch')}
+                formatLabel={(a) => t(`doubt.action.${a}`)}
+              />
+            )}
             <PillGroup
               options={MAX_RETRIES}
               value={settings.max_retries}

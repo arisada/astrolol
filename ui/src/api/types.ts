@@ -170,6 +170,8 @@ export interface DoubtPolicy {
   on_flat: FocusAction
   on_noisy: FocusAction
   on_few_stars: FocusAction
+  verify_after_move: boolean
+  on_mismatch: FocusAction
   max_retries: number
   retry_exposure_factor: number
   max_exposure: number
@@ -225,7 +227,7 @@ export interface CurveFit {
   r_squared: number | null
 }
 
-export type FocusCause = 'edge' | 'flat' | 'noisy' | 'few_stars'
+export type FocusCause = 'edge' | 'flat' | 'noisy' | 'few_stars' | 'mismatch'
 
 export interface FocusQuality {
   verdict: 'good' | 'poor'
@@ -260,6 +262,8 @@ export interface AutofocusRun {
   quality: FocusQuality | null
   exposure_time: number | null
   attempts: FocusAttempt[]
+  check_value: number | null
+  expected_value: number | null
   initial_position: number | null
   error: string | null
   started_at: string

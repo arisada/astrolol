@@ -138,3 +138,9 @@ def fit_r_squared(
     if algo == "hyperbola":
         y = y ** 2
     return _r_squared(y, a * x * x + b * x + c)
+
+
+def fit_minimum(algo: str, a: float, b: float, c: float) -> float:
+    """Sharpness the fit predicts at its optimum."""
+    low = c - b * b / (4.0 * a)
+    return max(0.0, low) ** 0.5 if algo == "hyperbola" else low

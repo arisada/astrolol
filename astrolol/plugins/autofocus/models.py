@@ -35,6 +35,13 @@ class DoubtPolicy(BaseModel):
     on_flat: FocusAction = Field(default="retry", description="The sharpness hardly changes over the sweep.")
     on_noisy: FocusAction = Field(default="retry", description="The samples do not follow a V.")
     on_few_stars: FocusAction = Field(default="retry", description="Too many steps found too few stars.")
+    verify_after_move: bool = Field(
+        default=False,
+        description="Take one more frame at the result and compare its sharpness with the fitted minimum.",
+    )
+    on_mismatch: FocusAction = Field(
+        default="warn", description="The check frame is clearly less sharp than the fit says.",
+    )
     max_retries: int = Field(
         default=2, ge=0, le=5,
         description="Complete new sweeps, with a longer exposure, for a flat, noisy or starless curve.",
@@ -127,8 +134,9 @@ class CurveFit(BaseModel):
 
 
 # What makes a result doubtful (see quality.py): the minimum is not bracketed, the curve is flat,
-# the samples do not follow a V, or too many steps found no stars.
-Cause = Literal["edge", "flat", "noisy", "few_stars"]
+# the samples do not follow a V, too many steps found no stars, or the check frame taken at the
+# result is not as sharp as the curve says.
+Cause = Literal["edge", "flat", "noisy", "few_stars", "mismatch"]
 
 
 class FitMetrics(BaseModel):
@@ -172,6 +180,9 @@ class AutofocusRun(BaseModel):
     exposure_time: float | None = None
     # Sweeps given up on for a doubtful curve, before the one in data_points.
     attempts: list[FocusAttempt] = []
+    # Sharpness measured on the check frame taken at the result (verify_after_move), and what the fit expected.
+    check_value: float | None = None
+    expected_value: float | None = None
     # Where the focuser was before the run touched it (a manual start_position does not change this).
     initial_position: int | None = None
     error: str | None = None

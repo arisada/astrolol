@@ -100,7 +100,8 @@
       "edge": "Le minimum est au bord de la plage mesurée : la position est une estimation.",
       "flat": "La netteté varie à peine sur le balayage : le minimum est difficile à situer.",
       "noisy": "Les mesures ne suivent pas un V net.",
-      "few_stars": "Plusieurs pas ont trouvé trop peu d'étoiles pour mesurer."
+      "few_stars": "Plusieurs pas ont trouvé trop peu d'étoiles pour mesurer.",
+      "mismatch": "L'image de contrôle est moins nette que ne le dit la courbe."
     }
   },
   "doubt": {
@@ -110,7 +111,8 @@
       "edge": "Minimum au bord",
       "flat": "Courbe plate",
       "noisy": "Courbe bruitée",
-      "few_stars": "Trop peu d'étoiles"
+      "few_stars": "Trop peu d'étoiles",
+      "mismatch": "Image de contrôle plus floue que prévu"
     },
     "action": {
       "warn": "garder",
@@ -119,6 +121,8 @@
     },
     "maxRetries": "Nouveaux balayages permis",
     "factor": "Pose d'un nouveau balayage",
-    "maxExposure": "Pose maximale"
+    "maxExposure": "Pose maximale",
+    "verify": "Image de contrôle au résultat",
+    "verifyHint": "Prendre une image de plus au résultat et comparer sa netteté à la courbe"
   }
 }

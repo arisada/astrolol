@@ -73,6 +73,11 @@ The Result also says whether it can be trusted: **Reliable**, or **Doubtful** wi
 - the measurements do not follow a clean V;
 - several steps found too few stars (clouds, or a target near the horizon).
 
+**Check frame at the result** (off by default) takes one more frame at the result and compares its
+sharpness with what the curve predicts, which tests the result and not only the fit. A frame that is
+clearly blurrier, or without stars, is a doubtful result of its own, with the same choices (the
+default is to keep and flag it; *retry* sweeps again around the result).
+
 A doubtful result is still used; the sequencer journal records the verdict.
 
 The [Sequencer](../../sequencer/docs/en.md) can run autofocus before a target, after each filter change,

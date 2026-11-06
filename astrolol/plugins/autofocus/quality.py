@@ -8,6 +8,7 @@ A run is ``poor`` when one of these holds, and ``causes`` says which:
   in, usually because the stars are too faint for the blur to show.
 * ``noisy``: the samples do not follow a V (no valid fit, or a poor R²).
 * ``few_stars``: many steps found too few stars to measure, as with clouds or a low target.
+* ``mismatch``: the check frame taken at the result is less sharp than the fit says it should be.
 
 The limits below are first estimates (no real-sky sweeps were available to tune them on).
 """
@@ -24,6 +25,8 @@ MIN_R_SQUARED = 0.85
 # Share of the steps that must have found stars, and the fewest usable samples.
 MIN_VALID_FRACTION = 0.7
 MIN_VALID_POINTS = 4
+# How much less sharp than the fit's minimum the check frame may be (0.25 = 25 % larger).
+MISMATCH_TOLERANCE = 0.25
 
 
 def usable(data_points: list[FocusDataPoint]) -> list[FocusDataPoint]:
@@ -97,3 +100,10 @@ def assess(data_points: list[FocusDataPoint], fit: CurveFit | None) -> FocusQual
         causes.append("noisy")
 
     return FocusQuality(verdict="poor" if causes else "good", causes=causes, metrics=metrics)
+
+
+def mismatched(measured: float | None, expected: float) -> bool:
+    """True when the check frame is clearly less sharp than the fitted minimum (or found no star)."""
+    if measured is None or measured <= 0:
+        return True
+    return measured > expected * (1.0 + MISMATCH_TOLERANCE)

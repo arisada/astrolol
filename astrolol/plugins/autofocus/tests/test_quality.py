@@ -74,3 +74,24 @@ def test_nothing_measured_is_few_stars_and_poor() -> None:
 
 def test_no_samples_at_all_does_not_crash() -> None:
     assert assess([], None).verdict == "poor"
+
+
+def test_a_check_frame_is_a_mismatch_when_clearly_less_sharp_or_empty() -> None:
+    from astrolol.plugins.autofocus.quality import mismatched
+
+    assert not mismatched(2.2, 2.0)
+    assert not mismatched(1.8, 2.0)
+    assert mismatched(2.6, 2.0)
+    assert mismatched(None, 2.0) and mismatched(0.0, 2.0)
+
+
+def test_the_fitted_minimum_of_a_parabola_and_a_hyperbola() -> None:
+    from astrolol.plugins.autofocus.algorithms import fit_hyperbola, fit_minimum, fit_parabola
+
+    positions = list(range(700, 1101, 50))
+    parabola = [2.0 + 0.0004 * (p - 900) ** 2 for p in positions]
+    a, b, c, _ = fit_parabola(positions, parabola)
+    assert fit_minimum("parabola", a, b, c) == pytest.approx(2.0, abs=0.01)
+    hyper = [(2.0 ** 2 + 0.0004 * (p - 900) ** 2) ** 0.5 for p in positions]
+    a, b, c, _ = fit_hyperbola(positions, hyper)
+    assert fit_minimum("hyperbola", a, b, c) == pytest.approx(2.0, abs=0.01)

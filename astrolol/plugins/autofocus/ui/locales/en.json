@@ -100,7 +100,8 @@
       "edge": "The minimum is at the edge of what was measured, so the position is an estimate.",
       "flat": "The sharpness hardly changes over the sweep: the minimum is hard to locate.",
       "noisy": "The measurements do not follow a clean V.",
-      "few_stars": "Several steps found too few stars to measure."
+      "few_stars": "Several steps found too few stars to measure.",
+      "mismatch": "The check frame is less sharp than the curve says."
     }
   },
   "doubt": {
@@ -110,7 +111,8 @@
       "edge": "Minimum at the edge",
       "flat": "Flat curve",
       "noisy": "Noisy curve",
-      "few_stars": "Too few stars"
+      "few_stars": "Too few stars",
+      "mismatch": "Check frame blurrier than expected"
     },
     "action": {
       "warn": "keep",
@@ -119,6 +121,8 @@
     },
     "maxRetries": "New sweeps allowed",
     "factor": "Exposure of a new sweep",
-    "maxExposure": "Longest exposure"
+    "maxExposure": "Longest exposure",
+    "verify": "Check frame at the result",
+    "verifyHint": "Take one more frame at the result and compare its sharpness with the curve"
   }
 }

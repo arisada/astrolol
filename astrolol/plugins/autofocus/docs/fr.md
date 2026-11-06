@@ -78,6 +78,12 @@ Le Résultat dit aussi s'il est digne de confiance : **Fiable**, ou **Douteux** 
 - les mesures ne suivent pas un V net ;
 - plusieurs pas ont trouvé trop peu d'étoiles (nuages, ou cible proche de l'horizon).
 
+**Image de contrôle au résultat** (désactivée par défaut) prend une image de plus au résultat et
+compare sa netteté à celle que prédit la courbe : cela teste le résultat, pas seulement
+l'ajustement. Une image nettement plus floue, ou sans étoiles, est un résultat douteux en soi, avec
+les mêmes choix (par défaut : garder et signaler ; *réessayer* balaie à nouveau autour du
+résultat).
+
 Un résultat douteux est utilisé quand même ; le journal du séquenceur en garde le verdict.
 
 Le [Séquenceur](../../sequencer/docs/fr.md) peut lancer l'autofocus avant une cible, après

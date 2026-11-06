@@ -476,3 +476,92 @@ async def test_a_sky_without_any_star_is_not_measured_again(rig: SimpleNamespace
 
     assert run.status == "failed" and run.sky_problem is True
     assert run.attempts == [] and rig.camera.n == 7
+
+
+# ── The check frame taken at the result ────────────────────────────────────────────────
+
+def _blurry_check(rig: SimpleNamespace, monkeypatch: pytest.MonkeyPatch, bad_frames: set[int]) -> None:
+    """A clean V around 900, except that the frames numbered in *bad_frames* come out blurry."""
+    async def detect(
+        fits_path: str, metric: str = "fwhm", reference_stars: list[Any] | None = None,
+    ) -> tuple[float, int, list[Any]]:
+        if rig.camera.n in bad_frames:
+            return 6.0, 25, []
+        return 2.0 + 0.0004 * (rig.focuser.position - 900) ** 2, 25, []
+
+    monkeypatch.setattr(engine_mod, "detect_stars", detect)
+
+
+async def test_the_check_frame_is_off_unless_asked_for(rig: SimpleNamespace) -> None:
+    run = await rig.engine.focus("cam", "foc")
+    assert rig.camera.n == 7 and run.check_value is None
+
+
+async def test_a_check_frame_that_agrees_with_the_fit_is_reliable(
+    rig: SimpleNamespace, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _blurry_check(rig, monkeypatch, set())
+    _settings(rig, verify_after_move=True)
+
+    run = await rig.engine.focus("cam", "foc")
+
+    assert rig.camera.n == 8                                # seven steps and the check
+    assert len(run.data_points) == 7                        # the check is not part of the curve
+    assert run.status == "completed" and run.quality.verdict == "good"
+    assert run.check_value == pytest.approx(run.expected_value, rel=0.05)
+
+
+async def test_a_blurry_check_frame_flags_the_result_by_default(
+    rig: SimpleNamespace, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _blurry_check(rig, monkeypatch, {8})
+    _settings(rig, verify_after_move=True)
+
+    run = await rig.engine.focus("cam", "foc")
+
+    assert run.status == "completed" and run.attempts == []
+    assert run.quality.verdict == "poor" and run.quality.causes == ["mismatch"]
+
+
+async def test_a_blurry_check_frame_can_stop_the_run(
+    rig: SimpleNamespace, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _blurry_check(rig, monkeypatch, {8})
+    _settings(rig, verify_after_move=True, on_mismatch="fail")
+
+    run = await rig.engine.focus("cam", "foc")
+
+    assert run.status == "failed" and "check frame" in run.error
+    assert rig.focuser.position == 900
+
+
+async def test_a_blurry_check_frame_can_start_a_new_sweep_around_the_result(
+    rig: SimpleNamespace, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    _blurry_check(rig, monkeypatch, {8})
+    _settings(rig, verify_after_move=True, on_mismatch="retry")
+
+    run = await rig.engine.focus("cam", "foc")
+
+    assert run.status == "completed"
+    assert len(run.attempts) == 1 and run.attempts[0].exposure_time == 1.0
+    assert rig.camera.n == 7 + 1 + 7 + 1                    # sweep, check, new sweep, check
+    assert run.quality.verdict == "good"
+
+
+async def test_a_check_frame_without_stars_counts_as_a_mismatch(
+    rig: SimpleNamespace, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    async def detect(
+        fits_path: str, metric: str = "fwhm", reference_stars: list[Any] | None = None,
+    ) -> tuple[float, int, list[Any]]:
+        if rig.camera.n == 8:
+            return 0.0, 0, []
+        return 2.0 + 0.0004 * (rig.focuser.position - 900) ** 2, 25, []
+
+    monkeypatch.setattr(engine_mod, "detect_stars", detect)
+    _settings(rig, verify_after_move=True)
+
+    run = await rig.engine.focus("cam", "foc")
+
+    assert run.quality.causes == ["mismatch"] and run.check_value is None
