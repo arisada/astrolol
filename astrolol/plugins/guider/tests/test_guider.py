@@ -256,6 +256,44 @@ async def test_guide_steps_are_published() -> None:
     assert all(abs(s.ra_dist) < 5 and abs(s.dec_dist) < 5 for s in steps)
 
 
+@pytest.mark.parametrize("predict", [True, False])
+async def test_guide_steps_say_what_was_predicted(predict: bool) -> None:
+    """Why a correction was the size it was: the drift learnt, the part of the pulse that is
+    prediction, and the calibration rates (A3, to tell prediction from a wrong calibration)."""
+    rig = Rig(drift=(4.0, 1.0))
+    g = make_guider(rig, predict_drift=predict, predict_periodic_error=False)
+    queue = g._bus.subscribe()
+    await g.guide(EASY_SETTLE)
+    await asyncio.sleep(1.0)
+    cal = g.active_calibration
+    await g.stop()
+    steps = []
+    while not queue.empty():
+        e = queue.get_nowait()
+        if getattr(e, "type", "") == "guider.step":
+            steps.append(e)
+    assert all(s.ra_rate == pytest.approx(cal.ra_rate) and s.dec_rate == pytest.approx(cal.dec_rate) for s in steps)
+    assert all(s.pe_period is None for s in steps)
+    if predict:
+        assert any(s.predicted_ra != 0 for s in steps) and any(s.drift_ra != 0 for s in steps)
+    else:
+        assert all(s.predicted_ra == 0 and s.predicted_dec == 0 for s in steps)
+
+
+async def test_guide_steps_are_logged_for_the_debug_scope() -> None:
+    from structlog.testing import capture_logs
+
+    rig = Rig(drift=(4.0, 1.0))
+    g = make_guider(rig)
+    with capture_logs() as logs:
+        await g.guide(EASY_SETTLE)
+        await asyncio.sleep(0.6)
+        await g.stop()
+    steps = [e for e in logs if e["event"] == "guider.step"]
+    assert steps and steps[0]["log_level"] == "debug"
+    assert {"frame", "ra", "dec", "ra_ms", "dec_ms", "drift", "predicted", "rates"} <= steps[0].keys()
+
+
 # --- calibration under trouble, and what it records ---
 
 async def test_calibration_waits_out_smeared_frames() -> None:

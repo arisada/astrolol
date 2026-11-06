@@ -830,6 +830,7 @@ class BuiltinGuider:
             pulses = controller.correct(result.dx, result.dy, frame.timestamp)
             west = sum(ms if d == "W" else -ms for d, ms in pulses if d in "WE")
             north = sum(ms if d == "N" else -ms for d, ms in pulses if d in "NS")
+            step_snr = result.readings[0].star.snr if result.readings[0].star else None
             await self._bus.publish(
                 GuiderStep(
                     frame=frame.seq,
@@ -837,9 +838,22 @@ class BuiltinGuider:
                     dec_dist=dec_px * scale,
                     ra_corr=west,
                     dec_corr=north,
-                    star_snr=result.readings[0].star.snr if result.readings[0].star else None,
+                    star_snr=step_snr,
                     stars_found=result.found,
+                    drift_ra=controller.drift[0],
+                    drift_dec=controller.drift[1],
+                    predicted_ra=controller.predicted[0],
+                    predicted_dec=controller.predicted[1],
+                    pe_period=controller.pe_period,
+                    ra_rate=cal.ra_rate,
+                    dec_rate=cal.dec_rate,
                 )
+            )
+            logger.debug(
+                "guider.step", frame=frame.seq, ra=round(ra_px * scale, 2), dec=round(dec_px * scale, 2),
+                ra_ms=west, dec_ms=north, snr=step_snr, stars=result.found,
+                drift=[round(d, 4) for d in controller.drift], predicted=[round(p) for p in controller.predicted],
+                pe_period=controller.pe_period, rates=[cal.ra_rate, cal.dec_rate],
             )
             if not pulses:
                 continue

@@ -74,6 +74,7 @@ class GuideController:
         self._cycle = 0.0  # seconds between corrections
         self._last: tuple[float, float, float] | None = None  # (time, RA error, Dec error)
         self._sent = (0.0, 0.0)  # West ms, North ms actually sent after the last measurement
+        self.predicted = (0.0, 0.0)  # West ms, North ms of the last correction that were prediction
 
     def reset(self) -> None:
         """Start afresh after a jump of the lock (a dither) or a gap: the drift learnt stays."""
@@ -87,6 +88,11 @@ class GuideController:
     def drift(self) -> list[float]:
         """The steady part of the star's own motion, axis pixels per second (RA, Dec)."""
         return [p.drift for p in self.predictors]
+
+    @property
+    def pe_period(self) -> float | None:
+        """Period of the periodic-error model in use on RA, None while there is none."""
+        return self.predictors[0].active_period
 
     def forget_drift(self) -> None:
         """The axes changed meaning (one was reversed): the motion learnt no longer applies."""
@@ -133,7 +139,7 @@ class GuideController:
         self._learn_overshoot(north, abs(dec_err))
         west = self._axis(west, abs(ra_err), self._prev[0], self.ra)
         north = self._axis(north, abs(dec_err), self._prev[1], self.dec)
-        ff_west, ff_north = self._feed_forward(now)
+        ff_west, ff_north = self.predicted = self._feed_forward(now)
         prev = (west, north)
         west = max(-self.ra.max_pulse_ms, min(self.ra.max_pulse_ms, west + ff_west))
         north = max(-self.dec.max_pulse_ms, min(self.dec.max_pulse_ms, north + ff_north))

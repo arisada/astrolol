@@ -17,3 +17,12 @@ class GuiderStep(BaseEvent):
     dec_corr: float  # positive North, negative South
     star_snr: float | None = None
     stars_found: int = 0
+    # What the controller added to the pulses of its own accord, to find out why a correction
+    # was the size it was.
+    drift_ra: float = 0.0  # learnt steady motion of the star, px/s (RA axis, then Dec)
+    drift_dec: float = 0.0
+    predicted_ra: float = 0.0  # part of the pulse that is prediction (drift, periodic error), ms, + West
+    predicted_dec: float = 0.0  # + North
+    pe_period: float | None = None  # period of the periodic-error model in use, s
+    ra_rate: float = 0.0  # calibration in use: px per ms of pulse
+    dec_rate: float = 0.0

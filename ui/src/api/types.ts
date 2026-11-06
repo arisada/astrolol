@@ -1188,6 +1188,13 @@ export interface GuiderStepEvent extends BaseEvent {
   dec_corr: number
   star_snr: number | null
   stars_found: number
+  drift_ra: number
+  drift_dec: number
+  predicted_ra: number
+  predicted_dec: number
+  pe_period: number | null
+  ra_rate: number
+  dec_rate: number
 }
 
 export interface AutofocusStartedEvent extends BaseEvent {
