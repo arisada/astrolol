@@ -168,6 +168,56 @@ async def test_the_star_is_found_again_after_clouds_and_a_bump(monkeypatch) -> N
     await g.stop()
 
 
+async def test_a_blob_that_does_not_follow_the_mount_is_not_guided_on(monkeypatch) -> None:  # noqa: ANN001
+    """The star is lost (cloud) and a noise blob nearby takes its place. It stays put whatever
+    the mount does, so every correction is the largest allowed: the run must end, not drag the
+    mount away from the target."""
+    from structlog.testing import capture_logs
+
+    monkeypatch.setattr(guider_module, "FULL_SEARCH_AFTER_S", 0.3)
+    rig = Rig(drift=(0.0, 0.0), shape=(240, 320), stars=((150.0, 110.0, 700.0),))
+    g = make_guider(rig, lost_timeout_s=0)
+    with capture_logs() as logs:
+        await g.guide(EASY_SETTLE)
+        sent_before = len(rig.pulses)
+        rig.stars = ()
+        rig.fixed = ((190.0, 110.0, 700.0),)
+        for _ in range(150):
+            await asyncio.sleep(0.1)
+            if not g.status().active:
+                break
+    assert not g.status().active
+    failed = [e for e in logs if e["event"] == "guider.run_failed"]
+    assert failed and "does not follow" in failed[0]["error"]
+    assert len(rig.pulses) - sent_before < 25   # a handful of corrections, not minutes of them
+    await g.stop()
+
+
+async def test_a_walk_back_after_a_bump_is_not_a_runaway(monkeypatch) -> None:  # noqa: ANN001
+    """A large error that does shrink with every correction is guiding, however large."""
+    rig = Rig(drift=(0.0, 0.0), shape=(240, 320),
+              stars=((150.0, 110.0, 700.0), (110.0, 80.0, 500.0), (200.0, 140.0, 450.0)))
+    g = make_guider(rig, lost_timeout_s=0)
+    await g.guide(EASY_SETTLE)
+    rig.offset += (0.0, 25.0)   # 25 px away, still in view
+    await asyncio.sleep(3.0)
+    assert g.status().active
+    assert star_error(rig, g) < 2.0
+    await g.stop()
+
+
+def test_runaway_check_counts_only_corrections_that_should_have_helped() -> None:
+    check = guider_module._RunawayCheck()
+    assert not any(check.check(40.0, 0.0) for _ in range(30))        # nothing sent: not its business
+    check.reset()
+    assert not any(check.check(40.0 - 5 * i, 6.0) for i in range(7))  # closing in
+    check.reset()
+    assert not any(check.check(3.0, 20.0) for _ in range(30))        # small error: guiding
+    check.reset()
+    results = [check.check(40.0, 20.0) for _ in range(guider_module.RUNAWAY_FRAMES + 2)]
+    assert results[-1] and not any(results[:guider_module.RUNAWAY_FRAMES - 1])
+
+
 async def test_guiding_stops_when_the_mount_slews() -> None:
     rig = Rig()
     g = make_guider(rig)

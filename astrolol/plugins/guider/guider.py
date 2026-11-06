@@ -68,6 +68,9 @@ MAX_REVERSALS = 2  # beyond this the calibration is plainly wrong: stop
 PULSE_FAILURES_LOST = 3  # refused pulses in a row: the mount is not being guided
 STREAM_RETRIES = 4  # camera restarts before giving up
 MOUNT_POLL_S = 2.0
+RUNAWAY_PX = 6.0  # an error this large (guide pixels) is not guiding any more
+RUNAWAY_FRAMES = 10  # frames of corrections that do not bring the star closer before giving up
+RUNAWAY_PROGRESS = 0.2  # share of the correction sent that the error must shrink by, at least
 
 
 def window_half(stars: list[Star]) -> int:
@@ -166,6 +169,41 @@ class _JumpCheck:
         self.frames += 1
         self.prev, self.expected, self.suspects = pos, np.zeros(2), []
         return True
+
+
+class _RunawayCheck:
+    """Notices corrections that do not bring the star any closer to its lock.
+
+    What the guider tracks can stop being a star that follows the mount (a hot pixel or noise
+    taken for the star after a loss, a star that is not the one locked on). The error then stays
+    large however much is sent, and every cycle sends the most the pulses allow: the mount is
+    dragged off target. A star far from its lock that gets no closer for several corrections,
+    each of which should have moved it, is not being guided.
+    """
+
+    def __init__(self) -> None:
+        self.best: float | None = None
+        self.frames = 0
+
+    def reset(self) -> None:
+        self.best, self.frames = None, 0
+
+    def check(self, error_px: float, sent_px: float) -> bool:
+        """*error_px*: distance from the lock now; *sent_px*: the move the last correction
+        should have made. True when it is time to stop."""
+        if error_px < RUNAWAY_PX:
+            self.reset()
+            return False
+        if self.best is None:
+            self.best = error_px
+            return False
+        progress = self.best - error_px
+        self.best = min(self.best, error_px)
+        if sent_px >= 1.0 and progress < RUNAWAY_PROGRESS * sent_px:
+            self.frames += 1
+        elif progress >= RUNAWAY_PROGRESS * max(sent_px, 1.0):
+            self.frames = 0
+        return self.frames >= RUNAWAY_FRAMES
 
 
 class _ReversalCheck:
@@ -720,6 +758,7 @@ class BuiltinGuider:
         pulse_failures = 0
         reversals = 0
         reversal = _ReversalCheck()
+        runaway = _RunawayCheck()
         last_axis: tuple[float, float] | None = None  # (RA, Dec) error of the last accepted frame
         sent_axis = np.zeros(2)  # move the pulses since then should have made, per axis (px)
         while True:
@@ -749,6 +788,7 @@ class BuiltinGuider:
                 lost_since = None
                 self._jump.reset()  # where it was before the loss says nothing now
                 last_axis = None
+                runaway.reset()
                 self._controller.reset()
             try:
                 await self._fit_roi(tracker)  # a dither or a star found elsewhere may need the window moved
@@ -774,6 +814,13 @@ class BuiltinGuider:
                         controller = self._controller
                         cal = controller.calibration
                         ra_px, dec_px = cal.axis_error(result.dx, result.dy)
+            if last_axis is not None and not self._paused and runaway.check(
+                math.hypot(ra_px, dec_px), float(np.hypot(*sent_axis))
+            ):
+                raise GuiderError(
+                    "The guide star does not follow the corrections: what is being tracked is probably "
+                    "not the star that was locked on"
+                )
             last_axis, sent_axis = (ra_px, dec_px), np.zeros(2)
             if self._paused:
                 continue

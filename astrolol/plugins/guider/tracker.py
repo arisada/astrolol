@@ -21,6 +21,7 @@ from astrolol.imaging.stars import Star, measure
 ReadingState = Literal["ok", "blurred", "lost", "outlier"]
 
 REF_ADAPT = 0.05  # weight of each good frame in the reference brightness and shape
+MIN_FWHM_RATIO = 0.5  # a star found again is not much sharper than it was: a hot pixel is
 MATCH_PX = 3.0  # two stars further apart than this after a shift are not the same star
 
 
@@ -211,7 +212,7 @@ class StarTracker:
         ratio = star.flux / max(self._ref_flux[i], 1e-6)
         return (
             self._min_flux_ratio <= ratio <= self._max_flux_ratio
-            and star.fwhm <= self._max_fwhm_ratio * max(self._ref_fwhm[i], 1.0)
+            and MIN_FWHM_RATIO * self._ref_fwhm[i] <= star.fwhm <= self._max_fwhm_ratio * max(self._ref_fwhm[i], 1.0)
         )
 
     def reacquire(self, frame: Frame, radius: int = 60, indices: list[int] | None = None) -> int:

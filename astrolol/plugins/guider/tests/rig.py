@@ -36,6 +36,7 @@ class Rig:
         pier_side: str | None = None,
         sky_dec_pulses: bool = False,
         pulse_latency: float = 0.0,
+        fixed: tuple[tuple[float, float, float], ...] = (),
     ) -> None:
         self.time_scale = time_scale
         self.smear_frames = smear_frames_after_pulse  # stars smeared along x for this many frames
@@ -44,6 +45,7 @@ class Rig:
         self._glitch = 0
         self.matrix = np.array(matrix, dtype=float)
         self.stars = stars
+        self.fixed = fixed  # (x, y, amplitude) of blobs that stay put when the mount moves: hot pixels, noise
         self.drift = np.array(drift)
         self.dec_backlash_ms = dec_backlash_ms
         self.shape = shape
@@ -167,7 +169,9 @@ class Rig:
                 if frames > 0:
                     jitter = jitter + (fx, fy)
                     self.flash = (frames - 1, fx, fy)
-                for (x, y), (_, _, amp) in zip(self.star_positions(), self.stars):
+                blobs = [((x, y), amp) for (x, y), (_, _, amp) in zip(self.star_positions(), self.stars)]
+                blobs += [((x, y), amp) for x, y, amp in self.fixed]
+                for (x, y), amp in blobs:
                     # Seeing moves the stars of a small field mostly together.
                     jx, jy = jitter + (self.rng.normal(0, self.seeing_px * 0.5, 2) if self.seeing_px else 0)
                     img += amp * (0.4 if smear else 1.0) * np.exp(
