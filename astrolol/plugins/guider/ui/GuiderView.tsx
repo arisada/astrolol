@@ -64,6 +64,7 @@ export function GuiderView({ poll, onPick }: { poll: boolean; onPick?: (x: numbe
         ))}
       </ul>
       {onPick && <p className="text-[11px] text-slate-500">{t('view.pickHint')}</p>}
+      {view.dark_applied && <p className="text-[11px] text-emerald-300">{t('view.darkApplied')}</p>}
       <FrameInfo view={view} kindLabel={kindLabel} />
     </div>
   )
@@ -89,6 +90,8 @@ function FrameInfo({ view, kindLabel }: { view: api.ViewInfo; kindLabel: Record<
           })}
         </p>
       )}
+      {/* A fixed height: the number of stars changes from frame to frame, and the panel below must stay put. */}
+      <div className="h-36 overflow-y-auto">
       {rows.length > 0 && (
         <table className="w-full font-mono">
           <thead>
@@ -117,6 +120,7 @@ function FrameInfo({ view, kindLabel }: { view: api.ViewInfo; kindLabel: Record<
           </tbody>
         </table>
       )}
+      </div>
     </div>
   )
 }

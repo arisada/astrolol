@@ -262,16 +262,24 @@ export function CalibrationPanel({ report, settings, save, active, onClear }: {
   )
 }
 
+/** Numbers typed as a list ("2, 5"): the valid ones, positive, whole when *whole*. */
+function numbers(text: string, whole: boolean): number[] {
+  return text.split(/[\s,;]+/).filter(Boolean).map(Number)
+    .filter((v) => Number.isFinite(v) && (whole ? Number.isInteger(v) && v >= 0 : v > 0))
+}
+
 export function DarksPanel({ report, busy, active, canCapture, onCapture, onClear }: {
   report: api.GuiderReport | null
   busy: boolean
   active: boolean
   canCapture: boolean
-  onCapture: (count: number) => void
+  onCapture: (count: number, exposures: number[], gains: number[]) => void
   onClear: () => void
 }) {
   const { t } = useTranslation('guider')
   const [count, setCount] = useState(10)
+  const [exposures, setExposures] = useState('')
+  const [gains, setGains] = useState('')
   return (
     <div className="flex flex-col gap-3">
       <p className="text-xs text-slate-500">{t('darks.hint')}</p>
@@ -283,9 +291,17 @@ export function DarksPanel({ report, busy, active, canCapture, onCapture, onClea
       <div className="flex items-center gap-2 flex-wrap">
         <NumberStepper value={count} min={1} max={50} step={1} onChange={setCount} />
         <span className="text-xs text-slate-500">{t('darks.frames')}</span>
-        <Button size="sm" disabled={busy || active || !canCapture} onClick={() => onCapture(count)}>{t('darks.capture')}</Button>
+        <Button size="sm" disabled={busy || active || !canCapture} onClick={() => onCapture(count, numbers(exposures, false), numbers(gains, true))}>{t('darks.capture')}</Button>
         <Button size="sm" variant="ghost" disabled={busy || !report?.darks.length} onClick={onClear}>{t('darks.clear')}</Button>
       </div>
+      <Field label={t('darks.moreExposures')} hint={t('darks.moreHint')}>
+        <Input inputSize="sm" className="w-40" value={exposures} placeholder={t('darks.examplePlaceholder', { values: '2, 5' })}
+          onChange={(e) => setExposures(e.target.value)} />
+      </Field>
+      <Field label={t('darks.moreGains')}>
+        <Input inputSize="sm" className="w-40" value={gains} placeholder={t('darks.examplePlaceholder', { values: '50, 100' })}
+          onChange={(e) => setGains(e.target.value)} />
+      </Field>
       <ul className="text-xs text-slate-400 flex flex-col gap-1">
         {report?.darks.map((d) => (
           <li key={`${d.exposure}-${d.gain}-${d.binning}-${d.region.join('x')}`}>

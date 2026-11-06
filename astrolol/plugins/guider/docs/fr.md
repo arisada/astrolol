@@ -104,6 +104,12 @@ pose et le gain de l'onglet Réglages. La liste montre les darks existants, avec
 pixels chauds, et indique si l'un correspond à la pose et au gain actuels. **Supprimer les
 darks** les efface.
 
+Pour préparer d'autres réglages en une fois, indiquez d'autres poses ou gains dans **Autres
+poses** et **Autres gains** (par exemple `2, 5` et `50, 100`) : un dark est pris pour les réglages
+actuels et pour chaque combinaison. Les darks sont conservés au redémarrage d'astrolol. Quand un
+dark correspond, l'image de la caméra est affichée après lui, sans les pixels chauds, et
+l'indique sous l'image.
+
 ## Quand ça se passe mal
 
 Le guideur tient bon face aux nuages passagers, à une étoile perdue, à une correction refusée, à

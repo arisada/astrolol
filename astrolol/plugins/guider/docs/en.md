@@ -96,6 +96,11 @@ Darks remove hot pixels around the guide star. Cover the telescope, choose the n
 list shows the darks you have, with their hot-pixel count, and whether one matches the current
 exposure and gain. **Delete darks** removes them.
 
+To prepare other nights' settings in one go, list further exposures or gains in **More exposures**
+and **More gains** (for example `2, 5` and `50, 100`): a dark is taken for the current settings and
+for each combination. Darks are kept when astrolol restarts. Once a dark matches, the camera image
+is shown after it, with the hot pixels removed, and says so under the image.
+
 ## When things go wrong
 
 The guider keeps going through passing clouds, a lost star, a refused correction, a camera that

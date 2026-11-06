@@ -561,3 +561,20 @@ async def test_a_camera_that_ignores_windows_is_asked_only_once() -> None:
     await g.stop()
     assert sum(r is not None for r in starts) == 1
     assert len(starts) <= 4  # first frame, the window, back to full frames (and no more)
+
+
+async def test_darks_are_kept_on_disk_from_the_first_one(tmp_path) -> None:  # noqa: ANN001
+    """The library is empty when the first dark is taken: it must still be the one that saves."""
+    from astrolol.imaging.darks import DarkLibrary
+
+    rig = Rig(drift=(0.0, 0.0))
+    folder = tmp_path / "darks"
+    fine = AxisSettings(min_pulse_ms=2)
+    g = BuiltinGuider(
+        EventBus(), GuiderSettings(exposure=0.03), RigDevices(rig), DarkLibrary(folder),  # type: ignore[arg-type]
+        ra=fine, dec=fine,
+    )
+    rig.hidden = True
+    await g.capture_dark(3)
+    assert list(folder.glob("dark_*.npz"))
+    assert len(DarkLibrary(folder)) == 1   # and it is there after a restart

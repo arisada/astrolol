@@ -163,6 +163,7 @@ export interface ViewInfo {
   locks: [number, number][]
   pixel_scale: number | null
   stats: FrameStats | null
+  dark_applied: boolean // the image is shown after its dark
 }
 
 export const frameUrl = (version: number) => `${BASE}/frame.jpg?v=${version}`
@@ -180,7 +181,8 @@ export const pause = () => post<void>('/pause')
 export const resume = () => post<void>('/resume')
 export const dither = (pixels = 3) => post<void>('/dither', { pixels })
 export const clearCalibration = () => request<void>(`${BASE}/calibration`, { method: 'DELETE' })
-export const captureDark = (count: number) => post<DarkInfo>('/darks', { count })
+export const captureDark = (count: number, exposures: number[] = [], gains: number[] = []) =>
+  post<DarkInfo[]>('/darks', { count, exposures, gains })
 export const clearDarks = () => request<void>(`${BASE}/darks`, { method: 'DELETE' })
 export const getSettings = () => request<GuiderSettings>(`${BASE}/settings`)
 export const putSettings = (s: GuiderSettings) =>

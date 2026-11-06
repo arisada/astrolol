@@ -140,13 +140,16 @@ def detect_stars(
     half: int = 8,
     edge: int = 12,
     min_fwhm: float = 1.2,
+    min_snr: float = 5.0,
     max_stars: int = 30,
     saturation: float | None = None,
 ) -> list[Star]:
     """Stars in a full frame, brightest first, in sensor coordinates.
 
     A frame without a matching dark still works: single-pixel spikes are rejected because
-    they are narrower than any star (``min_fwhm``).
+    they are narrower than any star (``min_fwhm``). Peaks of a few ADU are rejected too
+    (``min_snr``): on a dark-subtracted 8-bit frame the noise estimate of the smoothed image
+    is nearly nil, so the threshold above lets quantisation noise through.
     """
     img = darks.prepare(frame) if darks is not None else frame.pixels.astype(np.float32)
     background = float(np.median(img))
@@ -170,8 +173,10 @@ def detect_stars(
             wide = min(int(np.ceil(1.5 * star.fwhm)), 30)
             if edge <= px - wide and px + wide < frame.width and py - wide >= 0 and py + wide < frame.height:
                 star = measure(img, px, py, half=wide, saturation=saturation) or star
-        if star is None or star.fwhm < min_fwhm:
+        if star is None or star.fwhm < min_fwhm or star.snr < min_snr:
             continue
+        if any(np.hypot(o.x - ox - star.x, o.y - oy - star.y) < 2.0 for o in stars):
+            continue  # the same blob again: the peaks of a flat top are all local maxima
         stars.append(star.shifted(ox, oy))
         if len(stars) == max_stars:
             break

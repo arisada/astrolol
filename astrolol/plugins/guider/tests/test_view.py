@@ -46,3 +46,38 @@ def test_stars_stand_out_of_the_quantisation_noise_of_an_8_bit_stream() -> None:
     assert px[40:43, 50:53].mean() > 200  # the bright star is near white
     assert px[10:12, 20:22].mean() > px[sky].mean() + 60  # the faint one clearly above the sky
     assert px[sky].mean() < 40 and np.percentile(px[sky], 99) < 100  # the sky stays dark, with no white specks
+
+
+def _frame(pixels: np.ndarray):  # noqa: ANN202
+    from astrolol.devices.base.streaming import Frame
+
+    return Frame(pixels=pixels, seq=1, timestamp=0.0, exposure=1.0, gain=None, binning=2)
+
+
+def test_the_image_is_shown_after_its_dark() -> None:
+    """With a dark that matches, the hot pixels are gone from the image, and the page says so."""
+    from astrolol.imaging.darks import DarkLibrary, make_dark
+    from astrolol.plugins.guider.view import GuideView
+
+    hot = np.full((60, 80), 56, dtype=np.uint8)
+    hot[10, 10] = 120
+    library = DarkLibrary()
+    library.add(make_dark([_frame(hot.copy()) for _ in range(5)]))
+    view = GuideView(library)
+    view.update(_frame(hot.copy()), [], "preview")
+    info = view.info()
+    assert info.dark_applied and info.stats is not None
+    assert info.stats.brightest < 5   # the hot pixel is healed, and the sky is what is left after its dark
+
+
+def test_without_a_matching_dark_the_image_is_as_it_came() -> None:
+    from astrolol.imaging.darks import DarkLibrary
+    from astrolol.plugins.guider.view import GuideView
+
+    pixels = np.full((60, 80), 56, dtype=np.uint8)
+    pixels[10, 10] = 120
+    view = GuideView(DarkLibrary())
+    view.update(_frame(pixels), [], "preview")
+    info = view.info()
+    assert not info.dark_applied and info.stats is not None and info.stats.brightest == 120
+    assert GuideView().info().dark_applied is False   # no frame yet

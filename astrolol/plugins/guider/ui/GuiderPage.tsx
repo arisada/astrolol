@@ -85,11 +85,11 @@ export function GuiderPage() {
     save({ exposure: exposureMs / 1000 }, { soon: true })
   }, [exposureMs]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const captureDark = (count: number) => {
+  const captureDark = (count: number, exposures: number[], gains: number[]) => {
     setBusy(true)
     setNotice(t('darks.capturing'))
-    api.captureDark(count)
-      .then(() => { setNotice(t('darks.done')); setError(null) })
+    api.captureDark(count, exposures, gains)
+      .then((taken) => { setNotice(t('darks.done', { count: taken.length })); setError(null) })
       .catch((e: Error) => { setNotice(null); setError(e.message) })
       .finally(() => { setBusy(false); refresh() })
   }

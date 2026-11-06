@@ -40,13 +40,15 @@ class FrameStats(BaseModel):
     brightest: float  # brightest pixel, ADU
 
 
-def frame_stats(frame: Frame, period: float | None = None) -> FrameStats:
-    sample = frame.pixels[:: max(1, frame.height // 128), :: max(1, frame.width // 128)].astype(np.float32)
+def frame_stats(frame: Frame, period: float | None = None, pixels: np.ndarray | None = None) -> FrameStats:
+    """The frame's numbers; *pixels* stands in for ``frame.pixels`` (the frame after its dark)."""
+    pixels = frame.pixels if pixels is None else pixels
+    sample = pixels[:: max(1, frame.height // 128), :: max(1, frame.width // 128)].astype(np.float32)
     background = float(np.median(sample))
     noise = float(1.4826 * np.median(np.abs(sample - background)))
     return FrameStats(
         seq=frame.seq, exposure=frame.exposure, period=period or None,
-        background=background, noise=noise, brightest=float(frame.pixels.max()),
+        background=background, noise=noise, brightest=float(pixels.max()),
     )
 
 

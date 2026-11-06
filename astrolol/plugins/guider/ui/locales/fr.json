@@ -139,11 +139,16 @@
     "capture": "Prendre un dark",
     "clear": "Supprimer les darks",
     "capturing": "Prise de darks…",
-    "done": "Dark enregistré.",
+    "done_one": "Dark enregistré.",
+    "done_other": "{{count}} darks enregistrés.",
     "none": "Aucun dark pour l'instant.",
     "entry": "{{exposure}} s, gain {{gain}} — {{frames}} images, {{hot}} pixels chauds",
     "matches": "Un dark correspond à la pose et au gain actuels.",
-    "noMatch": "Aucun dark pour la pose et le gain actuels."
+    "noMatch": "Aucun dark pour la pose et le gain actuels.",
+    "moreExposures": "Autres poses (s)",
+    "moreHint": "Prend aussi un dark pour chacune, et pour chaque gain ci-dessous, en plus des réglages actuels.",
+    "moreGains": "Autres gains",
+    "examplePlaceholder": "p. ex. {{values}}"
   },
   "view": {
     "title": "Caméra de guidage",
@@ -157,7 +162,8 @@
     "kind_lost": "Perdue",
     "pickHint": "Cliquez sur une étoile pour guider dessus.",
     "picked": "Cette étoile sera l'étoile guide.",
-    "autoStar": "Choisir l'étoile pour moi"
+    "autoStar": "Choisir l'étoile pour moi",
+    "darkApplied": "Image affichée après le dark : pixels chauds retirés."
   },
   "target": {
     "title": "Cible",

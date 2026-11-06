@@ -58,11 +58,30 @@ def test_dark_capture_listing_and_clearing(client) -> None:
     client.app.state.builtin_guider._devices.rig.hidden = True  # the scope is covered
     r = client.post("/plugins/guider/darks", json={"count": 3})
     assert r.status_code == 200
-    info = r.json()
+    (info,) = r.json()
     assert info["frames"] == 3 and info["exposure"] == 0.03 and info["hot_pixels"] == 0
     assert len(client.get("/plugins/guider/status").json()["darks"]) == 1
     assert client.delete("/plugins/guider/darks").status_code == 204
     assert client.get("/plugins/guider/status").json()["darks"] == []
+
+
+def test_darks_for_other_exposures_and_gains(client) -> None:
+    """The current settings, and every combination of the extra exposures and gains asked for."""
+    client.app.state.builtin_guider._devices.rig.hidden = True
+    r = client.post("/plugins/guider/darks", json={"count": 2, "exposures": [0.03, 0.05], "gains": [20, 40]})
+    assert r.status_code == 200
+    made = sorted(((d["exposure"], d["gain"]) for d in r.json()), key=lambda m: (m[0], -1 if m[1] is None else m[1]))
+    # 0.03 s is the current exposure, so not twice; gain None is the driver's own
+    assert made == [(0.03, None), (0.03, 20), (0.03, 40), (0.05, None), (0.05, 20), (0.05, 40)]
+    assert len(client.get("/plugins/guider/status").json()["darks"]) == 6
+    rig = client.app.state.builtin_guider._devices.rig
+    assert sorted(set(rig.exposures)) == [0.03, 0.05]   # the camera was really run at each exposure
+
+
+def test_dark_requests_are_checked(client) -> None:
+    assert client.post("/plugins/guider/darks", json={"exposures": [0]}).status_code == 422
+    assert client.post("/plugins/guider/darks", json={"gains": [-1]}).status_code == 422
+    assert client.post("/plugins/guider/darks", json={"exposures": [1] * 7}).status_code == 422
 
 
 def test_guide_then_stop(client) -> None:

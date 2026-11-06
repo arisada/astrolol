@@ -329,3 +329,48 @@ def test_relocate_still_takes_the_only_star_that_looks_like_it() -> None:
     tracker = StarTracker(select_guide_stars(detect_stars(field([(50.0, 40.0, 700.0)])), count=1))
     shift = tracker.relocate(detect_stars(field([(90.0, 20.0, 680.0), (30.0, 100.0, 90.0)], seed=3), edge=3))
     assert shift == pytest.approx((40, -20), abs=0.4)
+
+
+def _eight_bit(stars: list[tuple[float, float, float]], seed: int, hot: int = 600) -> Frame:
+    """A guide camera's 8-bit frame: sky at 56, noise under one ADU, a sprinkling of hot pixels."""
+    rng = np.random.default_rng(seed)
+    img = 56 + rng.normal(0, 0.4, (H, W))
+    spots = np.random.default_rng(7).choice(H * W, hot, replace=False)
+    img.flat[spots] += np.random.default_rng(8).integers(3, 50, hot)
+    ys, xs = np.mgrid[0:H, 0:W]
+    for x, y, amp in stars:
+        img += amp * np.exp(-((xs - x) ** 2 + (ys - y) ** 2) / (2 * 1.3**2))
+    return Frame(pixels=np.clip(np.round(img), 0, 255).astype(np.uint8), seq=1, timestamp=0.0,
+                 exposure=1.0, gain=None, binning=2)
+
+
+def test_a_covered_8_bit_camera_shows_no_stars() -> None:
+    """A dark room is not a star field, with the dark or without it (28 Oct: noise listed as stars)."""
+    library = DarkLibrary()
+    library.add(make_dark([_eight_bit([], seed=100 + i) for i in range(15)]))
+    assert detect_stars(_eight_bit([], seed=1), library) == []
+
+
+def test_an_8_bit_star_is_still_found_after_the_dark() -> None:
+    library = DarkLibrary()
+    library.add(make_dark([_eight_bit([], seed=100 + i) for i in range(15)]))
+    found = detect_stars(_eight_bit([(100.0, 80.0, 60.0)], seed=2), library)
+    assert len(found) == 1 and found[0].x == pytest.approx(100, abs=0.5)
+
+
+def test_a_flat_topped_star_is_listed_once() -> None:
+    """Every pixel of a saturated, flat top is a local maximum: one star, not several."""
+    frame = field([(100.0, 80.0, 4000.0)], sigma=2.5)
+    clipped = Frame(pixels=np.minimum(frame.pixels, 1500), seq=1, timestamp=0.0, exposure=1.0, gain=50, binning=1)
+    found = detect_stars(clipped)
+    assert len(found) == 1
+
+
+def test_a_one_adu_bump_is_not_a_star() -> None:
+    """After the dark the sky of an 8-bit frame is flat to within an ADU, so the noise measured
+    on the smoothed image is nearly nil and 'six sigma' is a fraction of an ADU (SNR 3.3, peak 1)."""
+    pixels = np.full((H, W), 56, dtype=np.uint8)
+    pixels[80:83, 100:103] = 57
+    frame = Frame(pixels=pixels, seq=1, timestamp=0.0, exposure=1.0, gain=None, binning=2)
+    assert detect_stars(frame) == []
+    assert len(detect_stars(frame, min_snr=0.0)) == 1   # it was the SNR floor that kept it out

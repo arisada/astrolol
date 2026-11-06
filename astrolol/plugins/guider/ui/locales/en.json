@@ -139,11 +139,16 @@
     "capture": "Take dark",
     "clear": "Delete darks",
     "capturing": "Taking darks…",
-    "done": "Dark saved.",
+    "done_one": "Dark saved.",
+    "done_other": "{{count}} darks saved.",
     "none": "No darks yet.",
     "entry": "{{exposure}} s, gain {{gain}} — {{frames}} frames, {{hot}} hot pixels",
     "matches": "A dark matches the current exposure and gain.",
-    "noMatch": "No dark for the current exposure and gain."
+    "noMatch": "No dark for the current exposure and gain.",
+    "moreExposures": "More exposures (s)",
+    "moreHint": "Also takes a dark for each, and for each gain below, besides the current settings.",
+    "moreGains": "More gains",
+    "examplePlaceholder": "e.g. {{values}}"
   },
   "view": {
     "title": "Guide camera",
@@ -157,7 +162,8 @@
     "kind_lost": "Lost",
     "pickHint": "Click a star to guide on it.",
     "picked": "This star will be the guide star.",
-    "autoStar": "Choose the star for me"
+    "autoStar": "Choose the star for me",
+    "darkApplied": "Image shown after the dark: hot pixels removed."
   },
   "target": {
     "title": "Target",

@@ -249,7 +249,8 @@ class BuiltinGuider:
         self._bus = bus
         self.settings = settings
         self._devices = devices
-        self.darks = darks or DarkLibrary()
+        # not `darks or ...`: an empty library has no length, and would be thrown away with its folder
+        self.darks = darks if darks is not None else DarkLibrary()
         self._ra, self._dec, self._dec_mode = ra, dec, dec_mode
         self._calibration_file = calibration_file
         self._calibration: Calibration | None = self._load_calibration()
@@ -268,7 +269,7 @@ class BuiltinGuider:
         self._controller: GuideController | None = None
         self._pulse_end = 0.0
         self._capturing_dark = False
-        self.view = GuideView()
+        self.view = GuideView(self.darks)
         self._preview: asyncio.Task[None] | None = None
         # Seconds between frames as observed (drivers do not always honour the exposure we ask
         # for); a frame only shows a pulse if it arrives a full period after the pulse ended.
@@ -544,25 +545,34 @@ class BuiltinGuider:
                 await asyncio.shield(camera.stop_stream())
             self.view.go_idle()
 
-    async def capture_dark(self, count: int = 10) -> Dark:
-        """Stack *count* frames taken with the current exposure and gain into a dark.
+    async def capture_dark(
+        self, count: int = 10, exposure: float | None = None, gain: int | None | Literal["current"] = "current"
+    ) -> Dark:
+        """Stack *count* frames into a dark, with the current exposure and gain unless given.
 
-        The scope must be covered. Frames use the guide settings, because a dark only applies
-        to frames taken with exactly those.
+        The scope must be covered. A dark only applies to frames taken with exactly its
+        exposure, gain and binning, so the guide settings are what it is made with by default;
+        other values make darks for settings the guider is not set to yet.
         """
         if self._running or self._capturing_dark:
             raise GuiderBusy("Stop guiding before taking darks")
         await self.stop_preview()
         camera = self._devices.camera()
+        params = self._stream_params()
+        if exposure is not None:
+            params = params.model_copy(update={"exposure": exposure})
+        if gain != "current":
+            params = params.model_copy(update={"gain": gain})
+        wait = params.exposure * 5 + 15
         self._capturing_dark = True
         self._state = "Capturing dark"
         sub = camera.subscribe_frames()
         try:
             self._restarted_stream()
             since = time.monotonic()
-            await camera.start_stream(self._stream_params())
-            await self._next_frame(sub, since)  # the first frame may predate the stream
-            frames = [await self._next_frame(sub, since) for _ in range(count)]
+            await camera.start_stream(params)
+            await self._next_frame(sub, since, timeout=wait)  # the first frame may predate the stream
+            frames = [await self._next_frame(sub, since, timeout=wait) for _ in range(count)]
         except StreamClosed as exc:
             raise GuiderError(f"The guide camera stream ended: {exc.__cause__ or exc}") from exc
         finally:
@@ -573,8 +583,26 @@ class BuiltinGuider:
             self._state = "Stopped"
         dark = await asyncio.to_thread(make_dark, frames)
         self.darks.add(dark)
-        logger.info("guider.dark_captured", frames=count, hot_pixels=int(dark.hot.sum()))
+        logger.info(
+            "guider.dark_captured", frames=count, exposure=params.exposure, gain=params.gain,
+            hot_pixels=int(dark.hot.sum()),
+        )
         return dark
+
+    async def capture_darks(
+        self, count: int = 10, exposures: list[float] | None = None, gains: list[int] | None = None
+    ) -> list[Dark]:
+        """The dark for the current settings, and one for each combination of the *exposures* and
+        *gains* given besides (a sequence of other guide exposures, a camera at other gains)."""
+        times: list[float | None] = [None, *(e for e in exposures or [] if e != self.settings.exposure)]
+        levels: list[int | None | Literal["current"]] = [
+            "current", *(g for g in gains or [] if g != self.settings.gain)
+        ]
+        return [
+            await self.capture_dark(count, exposure, gain)
+            for exposure in times
+            for gain in levels
+        ]
 
     async def refresh_mount(self, *, max_age: float = 5.0) -> MountState | None:
         """Read the mount when not guiding (a run keeps it up to date itself), for the page."""

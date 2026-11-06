@@ -6,7 +6,7 @@ from typing import Literal
 
 import structlog
 from fastapi import APIRouter, HTTPException, Request, Response
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from astrolol.core.guiding import (
     GuiderError,
@@ -184,17 +184,38 @@ async def clear_calibration(request: Request) -> None:
 
 class DarkBody(BaseModel):
     count: int = Field(default=10, ge=1, le=50)
+    # Besides the current exposure and gain: every combination of these as well.
+    exposures: list[float] = Field(default=[], max_length=6)
+    gains: list[int] = Field(default=[], max_length=6)
+
+    @field_validator("exposures")
+    @classmethod
+    def _positive(cls, values: list[float]) -> list[float]:
+        if any(v <= 0 for v in values):
+            raise ValueError("exposures must be above 0 s")
+        return values
+
+    @field_validator("gains")
+    @classmethod
+    def _not_negative(cls, values: list[int]) -> list[int]:
+        if any(v < 0 for v in values):
+            raise ValueError("gains must not be negative")
+        return values
 
 
-@router.post("/darks", response_model=DarkInfo)
-async def capture_dark(body: DarkBody, request: Request) -> DarkInfo:
-    """Take a dark with the scope covered. Returns when the frames are in."""
+@router.post("/darks", response_model=list[DarkInfo])
+async def capture_dark(body: DarkBody, request: Request) -> list[DarkInfo]:
+    """Take darks with the scope covered: one for the current exposure and gain, and one for
+    each of the other exposures and gains asked for. Returns when the frames are in."""
     g = _guider(request)
     try:
-        dark = await g.capture_dark(body.count)
+        taken = await g.capture_darks(body.count, body.exposures, body.gains)
     except GuiderError as exc:
         raise _conflict(exc) from exc
-    return next(d for d in g.darks.describe() if d.region == dark.region and d.exposure == dark.exposure)
+    return [
+        info for info in g.darks.describe()
+        if any(info.region == d.region and (info.exposure, info.gain, info.binning) == d.settings for d in taken)
+    ]
 
 
 @router.delete("/darks", status_code=204, response_model=None)
