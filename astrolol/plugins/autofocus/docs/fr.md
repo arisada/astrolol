@@ -53,6 +53,17 @@ plus proche de la mise au point.
 **Résultat** l'affiche, avec la meilleure HFD/FWHM et l'écart à la position de départ ; la règle
 montre le départ, l'optimum et la position actuelle.
 
+Le Résultat dit aussi s'il est digne de confiance : **Fiable**, ou **Douteux** avec la raison :
+
+- le minimum est au bord de la plage mesurée (moins de deux bons points d'un côté), la position
+  est donc une estimation ;
+- la netteté varie à peine sur le balayage (les étoiles sont probablement trop faibles pour que le
+  flou se voie) ;
+- les mesures ne suivent pas un V net ;
+- plusieurs pas ont trouvé trop peu d'étoiles (nuages, ou cible proche de l'horizon).
+
+Un résultat douteux est utilisé quand même ; le journal du séquenceur en garde le verdict.
+
 Le [Séquenceur](../../sequencer/docs/fr.md) peut lancer l'autofocus avant une cible, après
 chaque changement de filtre, après un retournement au méridien, toutes les N minutes ou quand la
 température change.

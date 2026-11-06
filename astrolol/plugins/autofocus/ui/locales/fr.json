@@ -91,5 +91,15 @@
     "none": "Aucune mise au point pour l'instant.",
     "step": "Étape {{step}} sur {{total}}",
     "best": "Meilleure {{position}}"
+  },
+  "quality": {
+    "good": "Fiable",
+    "poor": "Douteux",
+    "cause": {
+      "edge": "Le minimum est au bord de la plage mesurée : la position est une estimation.",
+      "flat": "La netteté varie à peine sur le balayage : le minimum est difficile à situer.",
+      "noisy": "Les mesures ne suivent pas un V net.",
+      "few_stars": "Plusieurs pas ont trouvé trop peu d'étoiles pour mesurer."
+    }
   }
 }

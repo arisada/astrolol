@@ -126,3 +126,15 @@ def fit_hyperbola(
         return a, b, c, optimal
     except Exception:
         return None
+
+
+def fit_r_squared(
+    algo: str, a: float, b: float, c: float, positions: list[int], fwhms: list[float],
+) -> float:
+    """R² of a fit returned by ``fit_parabola`` / ``fit_hyperbola`` over the samples it was made from."""
+    import numpy as np
+    x = np.array(positions, dtype=float)
+    y = np.array(fwhms, dtype=float)
+    if algo == "hyperbola":
+        y = y ** 2
+    return _r_squared(y, a * x * x + b * x + c)

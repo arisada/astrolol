@@ -597,6 +597,7 @@ class Steps:
                 stall_kind=StallKind.AUTOFOCUS if getattr(run, "sky_problem", False) else None,
             )
         best = min((dp.fwhm for dp in run.data_points if dp.fwhm > 0), default=None)
+        quality = getattr(run, "quality", None)
         await self._finished(
             task.id,
             "autofocus",
@@ -607,6 +608,8 @@ class Steps:
                 "position": run.optimal_position,
                 "best_fwhm": round(best, 2) if best is not None else None,
                 "samples": len(run.data_points),
+                "quality": quality.verdict if quality else None,
+                "quality_causes": ", ".join(quality.causes) if quality else None,
             },
         )
         return True

@@ -91,5 +91,15 @@
     "none": "No focus run yet.",
     "step": "Step {{step}} of {{total}}",
     "best": "Best {{position}}"
+  },
+  "quality": {
+    "good": "Reliable",
+    "poor": "Doubtful",
+    "cause": {
+      "edge": "The minimum is at the edge of what was measured, so the position is an estimate.",
+      "flat": "The sharpness hardly changes over the sweep: the minimum is hard to locate.",
+      "noisy": "The measurements do not follow a clean V.",
+      "few_stars": "Several steps found too few stars to measure."
+    }
   }
 }

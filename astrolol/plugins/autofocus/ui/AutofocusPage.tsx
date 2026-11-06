@@ -619,6 +619,17 @@ export function AutofocusPage() {
                   </span>
                 )}
               </div>
+              {run.quality && (
+                <div className="flex flex-col gap-0.5">
+                  <StatusPill
+                    variant={run.quality.verdict === 'good' ? 'green' : 'amber'}
+                    status={t(`quality.${run.quality.verdict}`)}
+                  />
+                  {run.quality.causes.map((cause) => (
+                    <p key={cause} className="text-xs text-amber-400">{t(`quality.cause.${cause}`)}</p>
+                  ))}
+                </div>
+              )}
               {bestDataPoint && (
                 <div className="text-xs text-slate-500">
                   {t('result.best', { metric: (run.config.metric ?? 'fwhm').toUpperCase() })} <span className="text-slate-300 font-mono">{bestDataPoint.fwhm.toFixed(2)} px</span>

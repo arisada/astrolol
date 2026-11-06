@@ -153,3 +153,21 @@ async def test_autofocus_without_plugin_or_focuser_is_skipped(tmp_path: Path) ->
     assert any(i.code == "no_autofocus" for i in report.issues)
     assert await _run(rig) == RunOutcome.COMPLETED
     assert any(e.step == "autofocus" for e in rig.of("sequencer.step_skipped"))
+
+
+async def test_autofocus_journal_records_a_doubtful_result(tmp_path: Path) -> None:
+    from types import SimpleNamespace
+
+    rig = _rig(tmp_path)
+    rig.autofocus.results.append(SimpleNamespace(
+        status="completed", error=None, sky_problem=False, optimal_position=1000,
+        data_points=[SimpleNamespace(fwhm=2.5)],
+        quality=SimpleNamespace(verdict="poor", causes=["edge", "few_stars"]),
+    ))
+    await rig.svc.add(
+        make_task(groups=[ExposureGroup(duration=1, count=1)], autofocus_at_start=True)
+    )
+    assert await _run(rig) == RunOutcome.COMPLETED
+    done = [e for e in rig.of("sequencer.step_finished") if e.step == "autofocus"]
+    assert done[0].details["quality"] == "poor"
+    assert done[0].details["quality_causes"] == "edge, few_stars"

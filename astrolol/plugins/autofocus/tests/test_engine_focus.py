@@ -307,3 +307,33 @@ async def test_a_minimum_one_step_inside_the_end_of_a_wide_sweep_is_found(
     assert run.status == "completed", run.error
     assert abs(run.optimal_position - 23300) <= 40
     assert len(run.data_points) > 11
+
+
+async def test_a_completed_run_says_how_far_it_can_be_trusted(
+    rig: SimpleNamespace, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    queue = rig.engine._bus.subscribe()
+    _focus_at(rig, monkeypatch, 900)
+
+    run = await rig.engine.focus("cam", "foc")
+
+    assert run.quality is not None
+    assert (run.quality.verdict, run.quality.causes) == ("good", [])
+    assert run.curve_fit is not None and run.curve_fit.r_squared > 0.9
+    events = []
+    while not queue.empty():
+        events.append(queue.get_nowait())
+    done = [e for e in events if e.type == "autofocus.completed"]
+    assert len(done) == 1 and done[0].quality == "good" and done[0].causes == []
+
+
+async def test_a_minimum_close_to_the_end_of_the_sweep_is_reported_as_an_edge(
+    rig: SimpleNamespace, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    """Sweep 750-1050 with the minimum at 1000: accepted, but only one sample lies beyond it."""
+    _focus_at(rig, monkeypatch, 1000)
+
+    run = await rig.engine.focus("cam", "foc")
+
+    assert run.status == "completed"
+    assert run.quality.verdict == "poor" and run.quality.causes == ["edge"]

@@ -94,6 +94,28 @@ class CurveFit(BaseModel):
     b: float
     c: float
     optimal_position: float
+    r_squared: float | None = None
+
+
+# What makes a result doubtful (see quality.py): the minimum is not bracketed, the curve is flat,
+# the samples do not follow a V, or too many steps found no stars.
+Cause = Literal["edge", "flat", "noisy", "few_stars"]
+
+
+class FitMetrics(BaseModel):
+    """The numbers the verdict rests on."""
+    r_squared: float | None = None
+    spread: float | None = None      # worst / best sharpness among the usable samples
+    below: int = 0                   # usable samples below the optimum
+    above: int = 0                   # usable samples above the optimum
+    valid_points: int = 0
+    sampled_points: int = 0
+
+
+class FocusQuality(BaseModel):
+    verdict: Literal["good", "poor"]
+    causes: list[Cause] = []
+    metrics: FitMetrics = FitMetrics()
 
 
 AutofocusRunStatus = Literal["running", "completed", "failed", "aborted"]
@@ -108,6 +130,8 @@ class AutofocusRun(BaseModel):
     data_points: list[FocusDataPoint] = []
     curve_fit: CurveFit | None = None
     optimal_position: int | None = None
+    # How far the result can be trusted, set when the run completes.
+    quality: FocusQuality | None = None
     # Where the focuser was before the run touched it (a manual start_position does not change this).
     initial_position: int | None = None
     error: str | None = None
@@ -147,6 +171,8 @@ class AutofocusCompletedEvent(BaseEvent):
     type: Literal["autofocus.completed"] = "autofocus.completed"
     run_id: str
     optimal_position: int
+    quality: Literal["good", "poor"] | None = None
+    causes: list[Cause] = []
 
 
 class AutofocusAbortedEvent(BaseEvent):

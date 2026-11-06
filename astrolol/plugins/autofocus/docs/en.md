@@ -50,5 +50,15 @@ At the end, the fitted curve is drawn and the focuser moves to the **Optimal pos
 **Result** shows it, with the best HFD/FWHM and how far it is from the starting position; the
 ruler shows the start, the optimum and the current position.
 
+The Result also says whether it can be trusted: **Reliable**, or **Doubtful** with the reason:
+
+- the minimum is at the edge of what was measured (fewer than two good points on one side of it),
+  so the position is an estimate;
+- the sharpness hardly changes over the sweep (the stars are probably too faint for the blur to show);
+- the measurements do not follow a clean V;
+- several steps found too few stars (clouds, or a target near the horizon).
+
+A doubtful result is still used; the sequencer journal records the verdict.
+
 The [Sequencer](../../sequencer/docs/en.md) can run autofocus before a target, after each filter change,
 after a meridian flip, every so many minutes or when the temperature changes.

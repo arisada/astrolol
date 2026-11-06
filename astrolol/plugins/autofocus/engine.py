@@ -23,7 +23,7 @@ from astrolol.core.events import EventBus
 from astrolol.core.mem_guard import mem_guard
 from astrolol.devices.base.models import ExposureParams
 from astrolol.devices.manager import DeviceManager
-from astrolol.plugins.autofocus.algorithms import fit_hyperbola, fit_parabola
+from astrolol.plugins.autofocus.algorithms import fit_hyperbola, fit_parabola, fit_r_squared
 from astrolol.plugins.autofocus.models import (
     AutofocusAbortedEvent,
     AutofocusCompletedEvent,
@@ -37,6 +37,7 @@ from astrolol.plugins.autofocus.models import (
     FocusDataPoint,
     StarInfo,
 )
+from astrolol.plugins.autofocus.quality import assess, edge_direction
 from astrolol.plugins.autofocus.star_detector import detect_stars
 
 logger = structlog.get_logger()
@@ -94,43 +95,13 @@ def _read_fits_shape(fits_path: str) -> tuple[int, int]:
 _MAX_RECENTRES = 2
 
 
-def _edge_direction(run: AutofocusRun) -> int:
-    """+1 / -1 when the focus is clearly beyond the highest / lowest position swept, else 0.
-
-    That is the case when the fitted optimum itself lies outside the swept range, or when there
-    is no valid fit and the best measured sample has fewer than two samples beyond it on one
-    side: the curve has no arm there to fit, and is still falling towards that end. A best
-    sample well inside with no valid fit is noise or a flat curve, which more sweeps do not help.
-    """
-    valid = [dp for dp in run.data_points if dp.fwhm > 0 and dp.star_count > 0]
-    if len(valid) < 3:
-        return 0
-    positions = [dp.position for dp in run.data_points]
-    lo, hi = min(positions), max(positions)
-    fit = run.curve_fit
-    if fit is not None:
-        if fit.optimal_position > hi:
-            return 1
-        if fit.optimal_position < lo:
-            return -1
-        return 0
-    best = min(valid, key=lambda dp: dp.fwhm).position
-    above = sum(1 for p in positions if p > best)
-    below = sum(1 for p in positions if p < best)
-    if above < 2 and above <= below:
-        return 1
-    if below < 2 and lo > 0:
-        return -1
-    return 0
-
-
 def next_sweep(run: AutofocusRun) -> list[int] | None:
     """Positions of one more sweep when the minimum is beyond the swept range, else None.
 
     Centred half a sweep past the end the measurements point to, on the grid already used, and
     without the positions already measured. Listed from the old end outwards.
     """
-    direction = _edge_direction(run)
+    direction = edge_direction(run.data_points, run.curve_fit)
     if direction == 0:
         return None
     config = run.config
@@ -402,7 +373,7 @@ class AutofocusEngine:
                 # minimum in range). Silently picking the lowest-FWHM sample here
                 # would report success on data that isn't a real focus curve, so
                 # this is treated as a failure and the focuser is restored below.
-                direction = _edge_direction(run)
+                direction = edge_direction(run.data_points, run.curve_fit)
                 if direction != 0:
                     raise RuntimeError(
                         "The best focus is beyond the swept range (the sharpness was still "
@@ -422,12 +393,21 @@ class AutofocusEngine:
 
             run.status = "completed"
             run.completed_at = datetime.now(timezone.utc)
+            run.quality = assess(run.data_points, run.curve_fit)
 
             await self._bus.publish(AutofocusCompletedEvent(
                 run_id=run.id,
                 optimal_position=optimal_position,
+                quality=run.quality.verdict,
+                causes=run.quality.causes,
             ))
-            logger.info("autofocus.completed", optimal_position=optimal_position)
+            logger.info(
+                "autofocus.completed",
+                optimal_position=optimal_position,
+                quality=run.quality.verdict,
+                causes=run.quality.causes,
+                **run.quality.metrics.model_dump(),
+            )
 
         except asyncio.CancelledError:
             run.status = "aborted"
@@ -474,7 +454,10 @@ class AutofocusEngine:
         result = fit_fn([p for p, _ in valid], [f for _, f in valid])
         if result is not None:
             a, b, c, optimal = result
-            run.curve_fit = CurveFit(a=a, b=b, c=c, optimal_position=optimal)
+            r2 = fit_r_squared(
+                run.config.fit_algo, a, b, c, [p for p, _ in valid], [f for _, f in valid],
+            )
+            run.curve_fit = CurveFit(a=a, b=b, c=c, optimal_position=optimal, r_squared=r2)
         else:
             # A fit that was valid on an earlier (smaller) subset of points can
             # stop being valid once more data arrives — e.g. a good-looking early

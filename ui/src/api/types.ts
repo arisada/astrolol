@@ -210,6 +210,22 @@ export interface CurveFit {
   b: number
   c: number
   optimal_position: number
+  r_squared: number | null
+}
+
+export type FocusCause = 'edge' | 'flat' | 'noisy' | 'few_stars'
+
+export interface FocusQuality {
+  verdict: 'good' | 'poor'
+  causes: FocusCause[]
+  metrics: {
+    r_squared: number | null
+    spread: number | null
+    below: number
+    above: number
+    valid_points: number
+    sampled_points: number
+  }
 }
 
 export type AutofocusRunStatus = 'running' | 'completed' | 'failed' | 'aborted'
@@ -223,6 +239,7 @@ export interface AutofocusRun {
   data_points: FocusDataPoint[]
   curve_fit: CurveFit | null
   optimal_position: number | null
+  quality: FocusQuality | null
   initial_position: number | null
   error: string | null
   started_at: string
@@ -1219,6 +1236,8 @@ export interface AutofocusCompletedEvent extends BaseEvent {
   type: 'autofocus.completed'
   run_id: string
   optimal_position: number
+  quality: 'good' | 'poor' | null
+  causes: FocusCause[]
 }
 export interface AutofocusAbortedEvent extends BaseEvent { type: 'autofocus.aborted'; run_id: string }
 export interface AutofocusFailedEvent extends BaseEvent { type: 'autofocus.failed'; run_id: string; reason: string }
