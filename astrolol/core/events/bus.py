@@ -24,12 +24,15 @@ class EventBus:
     the oldest event is dropped to make room, and the drop is counted.
 
     A ring buffer of the last HISTORY_SIZE events is kept so late-connecting
-    or reconnecting clients can replay what they missed.
+    or reconnecting clients can replay what they missed. Snapshot events (see
+    ``BaseEvent.snapshot``) are not in the ring: only the latest of each type is kept,
+    and replayed last.
     """
 
     def __init__(self) -> None:
         self._subscribers: list[asyncio.Queue[BaseEvent]] = []
         self._history: deque[BaseEvent] = deque(maxlen=HISTORY_SIZE)
+        self._snapshots: dict[str, BaseEvent] = {}  # event type -> latest snapshot event
         self._dropped: dict[int, int] = {}  # id(queue) -> events dropped
         self.dropped_total = 0
 
@@ -49,7 +52,10 @@ class EventBus:
 
     async def publish(self, event: BaseEvent) -> None:
         logger.debug("eventbus.publish", event_type=event.type, event_id=event.id)  # type: ignore[attr-defined]
-        self._history.append(event)
+        if event.snapshot:
+            self._snapshots[event.type] = event  # type: ignore[attr-defined]
+        else:
+            self._history.append(event)
         for q in self._subscribers:
             if q.full():
                 q.get_nowait()  # only bounded queues can be full: drop the oldest
@@ -64,8 +70,8 @@ class EventBus:
         return self._dropped.get(id(q), 0)
 
     def get_history(self) -> list[BaseEvent]:
-        """Return a snapshot of the ring buffer, oldest first."""
-        return list(self._history)
+        """The ring buffer, oldest first, then the latest snapshot of each kind."""
+        return [*self._history, *self._snapshots.values()]
 
     @property
     def subscriber_count(self) -> int:

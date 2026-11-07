@@ -2,6 +2,7 @@ import pytest
 from astrolol.core.events import EventBus, DeviceConnected, DeviceStateChanged, LogEvent
 from astrolol.core.events.bus import HISTORY_SIZE
 from astrolol.devices.base.models import DeviceState
+from astrolol.core.events.models import BaseEvent
 
 
 @pytest.mark.asyncio
@@ -171,3 +172,49 @@ async def test_unbounded_subscriber_never_drops():
         await bus.publish(LogEvent(level="info", component="t", message=str(i)))
     assert q.qsize() == 50
     assert bus.dropped_total == 0
+
+
+# ── Snapshot events: only the latest is kept in the history ──────────────────────────
+
+class _State(BaseEvent):
+    snapshot = True
+    type: str = "test.state"
+    n: int = 0
+
+
+@pytest.mark.asyncio
+async def test_history_keeps_only_the_latest_snapshot_of_each_type():
+    bus = EventBus()
+    first = LogEvent(level="info", component="test", message="before")
+    await bus.publish(first)
+    for n in range(500):
+        await bus.publish(_State(n=n))
+    last = LogEvent(level="info", component="test", message="after")
+    await bus.publish(last)
+
+    history = bus.get_history()
+
+    assert [e.id for e in history[:2]] == [first.id, last.id]     # ordinary events keep their order
+    assert [e.n for e in history if e.type == "test.state"] == [499]
+    assert history[-1].n == 499                                    # snapshots are replayed last
+    assert len(history) == 3
+
+
+@pytest.mark.asyncio
+async def test_subscribers_still_receive_every_snapshot():
+    bus = EventBus()
+    q = bus.subscribe()
+    for n in range(3):
+        await bus.publish(_State(n=n))
+    assert [(await q.get()).n for _ in range(3)] == [0, 1, 2]
+
+
+@pytest.mark.asyncio
+async def test_snapshots_do_not_use_up_the_ring():
+    bus = EventBus()
+    for n in range(HISTORY_SIZE * 2):
+        await bus.publish(_State(n=n))
+    logs = [LogEvent(level="info", component="test", message=f"m{i}") for i in range(10)]
+    for e in logs:
+        await bus.publish(e)
+    assert [e.id for e in bus.get_history() if e.type == "log"] == [e.id for e in logs]

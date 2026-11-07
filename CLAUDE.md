@@ -501,6 +501,10 @@ Missing imports and wrong types that reach runtime are harder to debug than a fa
   (not yet built) calls it periodically and transitions device state without crashing the app.
 - **Standard adapters are bundled; the pluggy interface is for extensibility.**
   INDI lives in `astrolol/devices/indi/`. Third-party adapters register via entry points.
+- **Keep events small.** Every event is kept in the history and replayed to each client that
+  reconnects. An event that restates the current state of something (`sequencer.status`) sets
+  `snapshot = True`: the history keeps only the latest. Something large (the sequencer queue) is
+  read over REST when needed, and its event is just a notice with a revision number.
 - **Pydantic models for everything crossing a boundary** (API, events, device status).
   Never pass raw dicts between layers.
 - **No module-level mutable state in plugins.** Store everything on `app.state` so each

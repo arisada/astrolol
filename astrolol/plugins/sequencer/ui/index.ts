@@ -8,7 +8,7 @@ import type { SequencerUiState } from './state'
 import i18n from '@/i18n'
 import { SequencerProgressWidget } from './SequencerWidgets'
 
-const EMPTY: SequencerUiState = { status: null, entries: null }
+const EMPTY: SequencerUiState = { status: null, entries: null, revision: 0 }
 
 // Snapshots replace the whole slice; they are silent (not in the log panel). The
 // fine-grained events are silent too: the backend's "sequencer" log lines already tell
@@ -30,7 +30,7 @@ registerPluginEventHandlers('sequencer', {
   },
   'sequencer.queue_changed': (event: AstrolollEvent, cur: unknown): SequencerUiState => {
     const e = event as Extract<AstrolollEvent, { type: 'sequencer.queue_changed' }>
-    return { ...((cur as SequencerUiState | null) ?? EMPTY), entries: e.entries }
+    return { ...((cur as SequencerUiState | null) ?? EMPTY), revision: e.revision }
   },
 })
 

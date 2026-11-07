@@ -1,5 +1,5 @@
 from datetime import datetime, timezone
-from typing import Literal
+from typing import ClassVar, Literal
 from uuid import uuid4
 
 from pydantic import BaseModel, Field
@@ -53,6 +53,10 @@ NotifySeverity = Literal["info", "warning", "critical"]
 
 
 class BaseEvent(BaseModel):
+    # True for events that restate the current state of something instead of describing what
+    # happened: a client only ever needs the latest one, so the history keeps just that.
+    snapshot: ClassVar[bool] = False
+
     id: str = Field(default_factory=_uid)
     timestamp: datetime = Field(default_factory=_now)
 

@@ -5,11 +5,11 @@ import { activityLabel } from './format'
 
 export function SequencerChip() {
   const { t } = useTranslation('sequencer')
-  const { status, entries } = useSequencer()
+  const { status } = useSequencer()
   if (!status || status.run_state === 'idle') return null
 
-  const current = entries?.find((e) => e.task.id === status.current_task_id)
-  const label = current ? current.task.name || current.task.target.name : t('chip.label')
+  const current = status.current
+  const label = current ? current.name : t('chip.label')
 
   let text: string
   let variant: ChipVariant
@@ -27,11 +27,9 @@ export function SequencerChip() {
       break
     default: {
       const activity = status.activity
-      if (activity === 'exposing' && current && status.lanes[0]?.current_group != null) {
-        const gi = status.lanes[0].current_group
-        const g = current.task.lanes[0].groups[gi]
-        const done = status.lanes[0].groups[gi]?.frames_done ?? 0
-        text = `${g.filter_name ? `${g.filter_name} ` : ''}${done + 1}/${g.count}`
+      if (activity === 'exposing' && current && current.group_count != null && status.lanes[0]?.current_group != null) {
+        const done = status.lanes[0].groups[status.lanes[0].current_group]?.frames_done ?? 0
+        text = `${current.filter_name ? `${current.filter_name} ` : ''}${done + 1}/${current.group_count}`
         variant = 'blue'
       } else {
         text = activity ? activityLabel(activity) : t('chip.running')

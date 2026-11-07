@@ -47,6 +47,7 @@ from astrolol.core.sequencer.models import (
     Activity,
     Actor,
     Boundary,
+    CurrentTask,
     Interruption,
     Lane,
     LaneRuntime,
@@ -213,6 +214,7 @@ class Runner:
             activity=self._activity,
             message=self._message,
             current_task_id=cur.task.id if cur else None,
+            current=_current_task(cur) if cur else None,
             lanes=[lr.model_copy() for lr in cur.runtime.lanes] if cur else [],
             pause_reason=self._pause_reason,
             pending_request=self._request.label if self._request else None,
@@ -996,6 +998,22 @@ def remaining_frames(entry: QueueEntry) -> int:
     lrt = lane_runtime(entry, lane.id)
     return sum(
         max(0, g.count - p.frames_done) for g, p in zip(lane.groups, lrt.groups, strict=True)
+    )
+
+
+def _current_task(entry: QueueEntry) -> CurrentTask:
+    lane = entry.task.lanes[0]
+    lrt = lane_runtime(entry, lane.id)
+    done = [min(p.frames_done, g.count) for g, p in zip(lane.groups, lrt.groups, strict=True)]
+    group = lane.groups[lrt.current_group] if lrt.current_group is not None else None
+    return CurrentTask(
+        name=entry.task.name or entry.task.target.name,
+        frames_done=sum(done),
+        frames_total=sum(g.count for g in lane.groups),
+        seconds_done=sum(d * g.duration for d, g in zip(done, lane.groups, strict=True)),
+        seconds_total=sum(g.count * g.duration for g in lane.groups),
+        filter_name=group.filter_name if group else None,
+        group_count=group.count if group else None,
     )
 
 

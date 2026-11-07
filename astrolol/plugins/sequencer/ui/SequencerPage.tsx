@@ -24,7 +24,7 @@ type Tab = 'queue' | 'journal' | 'settings'
 
 export function SequencerPage() {
   const { t } = useTranslation('sequencer')
-  const { status, entries } = useSequencer()
+  const { status, entries, revision } = useSequencer()
   const wsConnected = useStore((s) => s.wsConnected)
   const [tab, setTab] = useState<Tab>('queue')
   const [editing, setEditing] = useState<SequencerQueueEntry | 'new' | null>(null)
@@ -46,6 +46,15 @@ export function SequencerPage() {
     }
   }, [])
   useEffect(() => { void refresh() }, [refresh, wsConnected])
+
+  // The queue changed (a frame was saved, a task edited…): read it again, once per burst.
+  useEffect(() => {
+    if (revision === 0) return
+    const timer = setTimeout(() => {
+      seq.getQueue().then((q) => patchSequencerState({ entries: q })).catch(() => undefined)
+    }, 250)
+    return () => clearTimeout(timer)
+  }, [revision])
 
   // Pre-flight whenever the queue changes while idle, so problems show before Start.
   const idle = status?.run_state === 'idle'

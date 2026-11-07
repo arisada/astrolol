@@ -2,18 +2,20 @@
 import { useTranslation } from 'react-i18next'
 import { ProgressBar } from '@/components/ui/progress-bar'
 import { StatusPill, type StatusPillVariant } from '@/components/ui/badge'
-import { activityLabel, fmtSeconds, taskName, taskProgress } from './format'
+import { activityLabel, fmtSeconds } from './format'
 import { useSequencer } from './state'
 
 export function SequencerProgressWidget() {
   const { t } = useTranslation('sequencer')
-  const { status, entries } = useSequencer()
+  const { status } = useSequencer()
   if (!status || status.run_state === 'idle') {
     return <p className="text-xs text-slate-500">{t('widget.idle')}</p>
   }
 
-  const current = entries?.find((e) => e.task.id === status.current_task_id)
-  const progress = current ? taskProgress(current) : null
+  const current = status.current
+  const progress = current
+    ? { done: current.frames_done, total: current.frames_total, doneS: current.seconds_done, totalS: current.seconds_total }
+    : null
   const failing = !!status.stall || (status.run_state === 'paused' && !!status.pause_reason && status.pause_reason !== 'user')
   const [text, variant, pulse]: [string, StatusPillVariant, boolean] =
     status.stall ? [t('widget.stalled'), 'red', true]
@@ -25,7 +27,7 @@ export function SequencerProgressWidget() {
   return (
     <div className="flex flex-col gap-2">
       <div className="flex items-baseline justify-between gap-2">
-        <span className="truncate text-sm text-slate-200">{current ? taskName(current) : t('chip.label')}</span>
+        <span className="truncate text-sm text-slate-200">{current ? current.name : t('chip.label')}</span>
         <StatusPill status={text} variant={variant} pulse={pulse} />
       </div>
       {progress && progress.total > 0 && (

@@ -595,11 +595,22 @@ export interface SequencerQueueEntry {
   runtime: SequencerTaskRuntime
 }
 
+export interface SequencerCurrentTask {
+  name: string
+  frames_done: number
+  frames_total: number
+  seconds_done: number
+  seconds_total: number
+  filter_name: string | null
+  group_count: number | null
+}
+
 export interface SequencerStatus {
   run_state: SequencerRunState
   activity: SequencerActivity | null
   message: string | null
   current_task_id: string | null
+  current: SequencerCurrentTask | null
   lanes: SequencerLaneRuntime[]
   pause_reason: string | null
   pending_request: string | null
@@ -1363,7 +1374,7 @@ export interface GuidingSettledEvent extends BaseEvent {
 export interface SequencerStatusEvent extends BaseEvent { type: 'sequencer.status'; status: SequencerStatus }
 export interface SequencerQueueChangedEvent extends BaseEvent {
   type: 'sequencer.queue_changed'
-  entries: SequencerQueueEntry[]
+  revision: number
 }
 export interface SequencerFrameSavedEvent extends BaseEvent {
   type: 'sequencer.frame_saved'

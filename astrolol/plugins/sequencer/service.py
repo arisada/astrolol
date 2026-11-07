@@ -84,6 +84,7 @@ class SequencerServiceImpl:
         self._store = store
         self._entries: list[QueueEntry] = store.load()
         self._changed = asyncio.Event()
+        self._revision = 0
         self._left: dict[str, int] = {}  # task_id → times it left RUNNING (for wait_for_task)
         self.runner = Runner(self)
 
@@ -115,9 +116,8 @@ class SequencerServiceImpl:
     async def commit(self) -> None:
         """Persist the queue and announce it."""
         self._store.save(self._entries)
-        await self.bus.publish(
-            SequencerQueueChanged(entries=[e.model_copy(deep=True) for e in self._entries])
-        )
+        self._revision += 1
+        await self.bus.publish(SequencerQueueChanged(revision=self._revision))
         # Queue edits change status counters (tasks_total, eta) too.
         await self.runner.emit_status()
 

@@ -262,11 +262,24 @@ class QueueEntry(BaseModel):
     runtime: TaskRuntime
 
 
+class CurrentTask(BaseModel):
+    """The task being run, as much of it as a status read-out needs (the chip, the dock)."""
+
+    name: str
+    frames_done: int = 0
+    frames_total: int = 0
+    seconds_done: float = 0.0
+    seconds_total: float = 0.0
+    filter_name: str | None = Field(default=None, description="Filter of the primary lane's current group")
+    group_count: int | None = Field(default=None, description="Frames in the primary lane's current group")
+
+
 class SequencerStatus(BaseModel):
     run_state: RunState = RunState.IDLE
     activity: Activity | None = None
     message: str | None = None
     current_task_id: str | None = None
+    current: CurrentTask | None = None
     lanes: list[LaneRuntime] = []
     pause_reason: str | None = Field(default=None, description="'user' or the error that paused")
     pending_request: str | None = Field(

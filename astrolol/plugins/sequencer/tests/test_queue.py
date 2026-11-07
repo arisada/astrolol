@@ -251,3 +251,39 @@ def test_device_fallback_only_when_unambiguous() -> None:
         resolve_lane_devices(_app(device_manager=dm, active_profile=None), missing).camera_id
         is None
     )
+
+
+async def test_queue_changed_is_a_notice_not_the_queue(rig: Rig) -> None:
+    """The queue is read with GET /queue; the event stays tiny however long the queue is."""
+    for i in range(20):
+        await rig.svc.add(make_task(f"T{i}", groups=[ExposureGroup(duration=1, count=3)]))
+
+    events = rig.of("sequencer.queue_changed")
+
+    revisions = [e.revision for e in events]
+    assert revisions == sorted(set(revisions)) and len(revisions) == 20
+    assert max(len(e.model_dump_json()) for e in events) < 300
+    assert events[0].snapshot is True
+
+
+def test_current_task_summary_for_the_status_readout() -> None:
+    from astrolol.core.sequencer import LaneRuntime, QueueEntry, TaskRuntime
+    from astrolol.core.sequencer.models import GroupProgress
+    from astrolol.plugins.sequencer.runner import _current_task
+
+    task = make_task("M 31", groups=[
+        ExposureGroup(filter_name="L", duration=60, count=10),
+        ExposureGroup(filter_name="R", duration=30, count=4),
+    ])
+    lane = task.lanes[0]
+    runtime = TaskRuntime(task_id=task.id, lanes=[LaneRuntime(
+        lane_id=lane.id, groups=[GroupProgress(frames_done=10), GroupProgress(frames_done=1)],
+        current_group=1,
+    )])
+
+    cur = _current_task(QueueEntry(task=task, runtime=runtime))
+
+    assert cur.name == "M 31"
+    assert (cur.frames_done, cur.frames_total) == (11, 14)
+    assert (cur.seconds_done, cur.seconds_total) == (630.0, 720.0)
+    assert (cur.filter_name, cur.group_count) == ("R", 4)

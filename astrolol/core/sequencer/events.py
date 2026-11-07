@@ -1,7 +1,7 @@
 """Public sequencer events.
 
-``sequencer.status`` and ``sequencer.queue_changed`` are full snapshots: a client never
-has to rebuild state from deltas. The fine-grained events describe what happened; they
+``sequencer.status`` is a full snapshot: a client never has to rebuild state from deltas.
+``sequencer.queue_changed`` only says that the queue changed (with a revision number). The fine-grained events describe what happened; they
 are also what the session journal records.
 """
 
@@ -41,13 +41,20 @@ StepDetails = dict[str, str | float | int | bool | None]
 
 
 class SequencerStatusChanged(BaseEvent):
+    snapshot = True
     type: Literal["sequencer.status"] = "sequencer.status"
     status: SequencerStatus
 
 
 class SequencerQueueChanged(BaseEvent):
+    """The queue changed (tasks added, edited, or progress made); read it with GET /queue.
+
+    Only a revision number: the queue is large and only the sequencer page shows it.
+    """
+
+    snapshot = True
     type: Literal["sequencer.queue_changed"] = "sequencer.queue_changed"
-    entries: list[QueueEntry]
+    revision: int
 
 
 class SequencerSessionStarted(BaseEvent):
