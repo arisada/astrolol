@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input'
 import { ToggleSwitch } from '@/components/ui/toggle-switch'
 import type { SequencerSequenceDocument, SequencerSequenceInfo } from '@/api/types'
 import * as seq from './api'
+import { formatDate } from '@/utils/datetime'
 import { fmtSeconds } from './format'
 
 export function SequencesDialog({ queueSize, hasCompleted, onClose }: {
@@ -144,7 +145,7 @@ export function SequencesDialog({ queueSize, hasCompleted, onClose }: {
                         <div className="text-sm text-slate-100 truncate">{s.name}</div>
                         <div className="text-xs text-slate-500 truncate">
                           {t('sequences.summary', { tasks: t('sequences.tasks', { count: s.tasks }), targets: s.targets.join(', '), time: fmtSeconds(s.exposure_s) })}
-                          {' · '}{t('sequences.savedOn', { date: new Date(s.saved_at).toLocaleDateString(i18n.language) })}
+                          {' · '}{t('sequences.savedOn', { date: formatDate(s.saved_at, i18n.language) })}
                         </div>
                         {s.description && <div className="text-xs text-slate-400 truncate">{s.description}</div>}
                       </div>

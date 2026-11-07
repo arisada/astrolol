@@ -346,7 +346,7 @@ suffixes for plurals and `<tag>…</tag>` + `<Trans>` for inline markup.
 - Non-React code (e.g. the store) uses `i18n.t(key, { ns })` — the result is fixed at call time.
 - Keep copy free of implementation detail (see above) in *both* languages. A translation must not add or drop information.
 - Numbers, RA/Dec and other astronomy formats keep their current notation (decimal point). Dates and
-  times go through `Intl` with the active language.
+  times go through `Intl` with the active language, via `ui/src/utils/datetime.ts` (day first, month as a word, 24-hour clock: never `toLocaleString('en')`, which writes mm/dd/yyyy).
 - `cd ui && npm run lint` (ESLint, `eslint-plugin-i18next` `no-literal-string`) fails on literal text in
   JSX, in core and plugin UI alike. Units, glyphs and the product name are allow-listed in
   `ui/eslint.config.js`; add to that list for new symbols, never silence the rule on real copy.

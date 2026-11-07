@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input'
 import { NumberStepper } from '@/components/ui/number-stepper'
 import { PillGroup } from '@/components/ui/pill-group'
 import { ToggleSwitch } from '@/components/ui/toggle-switch'
+import { formatDateTime } from '@/utils/datetime'
 import type * as api from './api'
 import { CalibrationGraph } from './CalibrationGraph'
 import { summarizeCalibration } from './calibration'
@@ -189,7 +190,7 @@ export function CalibrationPanel({ report, settings, save, active, onClear }: {
   active: boolean
   onClear: () => void
 }) {
-  const { t } = useTranslation('guider')
+  const { t, i18n } = useTranslation('guider')
   const cal = report?.calibration ?? null
   const attempt = report?.calibration_attempt ?? null
   const shown = attempt ?? null
@@ -225,7 +226,7 @@ export function CalibrationPanel({ report, settings, save, active, onClear }: {
               {t('calibration.madeAt', {
                 dec: cal.dec == null ? '—' : `${cal.dec.toFixed(0)}°`,
                 side: cal.pier_side ? t(`pier.${cal.pier_side}`, { defaultValue: cal.pier_side }) : '—',
-                when: cal.created ? new Date(cal.created * 1000).toLocaleString() : '—',
+                when: cal.created ? formatDateTime(cal.created * 1000, i18n.language) : '—',
               })}
             </p>
             {adjusted && (adjusted.ra_x !== cal.ra_x || adjusted.dec_x !== cal.dec_x || adjusted.ra_y !== cal.ra_y || adjusted.dec_y !== cal.dec_y) && (

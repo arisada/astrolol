@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next'
 import { Download } from 'lucide-react'
 import type { SequencerSessionSummary } from '@/api/types'
+import { formatClock, formatDateTime } from '@/utils/datetime'
 import { getSessionRecords, getSessions, sessionExportUrl, type JournalRecord } from './api'
 import { activityLabel, fmtSeconds } from './format'
 
@@ -28,8 +29,8 @@ function groupOf(activity: string) {
   return GROUPS.find((g) => (g.activities as readonly string[]).includes(activity)) ?? GROUPS[GROUPS.length - 1]
 }
 
-const localTime = (iso: string | null, lng: string) => (iso ? new Date(iso).toLocaleString(lng) : '—')
-const clock = (iso: string, lng: string) => new Date(iso).toLocaleTimeString(lng, { hour: '2-digit', minute: '2-digit' })
+const localTime = (iso: string | null, lng: string) => (iso ? formatDateTime(iso, lng) : '—')
+const clock = (iso: string, lng: string) => formatClock(iso, lng)
 
 export function JournalView() {
   const { t, i18n } = useTranslation('sequencer')
@@ -274,7 +275,7 @@ function Timeline({ records, summary }: { records: JournalRecord[]; summary: Seq
         {segments.map((s, i) => (
           <div key={i} className="absolute top-0 h-full border-r-2 border-surface"
             style={{ left: pct(s.t0), width: `${(100 * (s.t1 - s.t0)) / span}%`, background: s.group.color }}
-            title={`${new Date(s.t0).toLocaleTimeString(lng)} – ${new Date(s.t1).toLocaleTimeString(lng)}: ${s.activity === 'paused' ? t('journal.groups.paused') : activityLabel(s.activity as never).toLowerCase()}`} />
+            title={`${formatClock(s.t0, lng, { seconds: true })} – ${formatClock(s.t1, lng, { seconds: true })}: ${s.activity === 'paused' ? t('journal.groups.paused') : activityLabel(s.activity as never).toLowerCase()}`} />
         ))}
       </div>
       <div className="flex justify-between text-[11px] text-slate-500 mt-1 font-mono">
