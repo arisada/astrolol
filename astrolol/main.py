@@ -12,7 +12,7 @@ from astrolol.config.logging_setup import setup_logging, event_bus_forwarder
 
 # Configure logging as early as possible so every module sees the right setup
 setup_logging(_boot_settings.log_file)
-from fastapi import FastAPI, Request, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, Request, WebSocket
 from pydantic import BaseModel
 from fastapi.exception_handlers import http_exception_handler as _default_http_exc_handler
 from fastapi.exceptions import HTTPException
@@ -43,7 +43,7 @@ from astrolol.app import (
     setup_plugins,
 )
 from astrolol.core.events import EventBus
-from astrolol.core.events.bus import CLIENT_QUEUE_SIZE
+from astrolol.api.events_ws import serve_events
 from astrolol.core.plugin_api import LogScope, PluginContext
 from astrolol.devices.bluetooth.backend import BlueZBackend
 from astrolol.devices.bluetooth.manager import BluetoothManager
@@ -383,18 +383,7 @@ def create_app() -> FastAPI:
 
     @app.websocket("/ws/events")
     async def events_ws(websocket: WebSocket) -> None:
-        await websocket.accept()
-        q = event_bus.subscribe(maxsize=CLIENT_QUEUE_SIZE)
-        logger.info("ws.client_connected", subscribers=event_bus.subscriber_count)
-        try:
-            while True:
-                event = await q.get()
-                await websocket.send_text(event.model_dump_json())
-        except WebSocketDisconnect:
-            pass
-        finally:
-            event_bus.unsubscribe(q)
-            logger.info("ws.client_disconnected", subscribers=event_bus.subscriber_count)
+        await serve_events(websocket, event_bus)
 
     return app
 

@@ -59,6 +59,10 @@ class EventBus:
                     logger.warning("eventbus.subscriber_slow", dropped=n)
             q.put_nowait(event)
 
+    def dropped_for(self, q: asyncio.Queue[BaseEvent]) -> int:
+        """Events dropped so far from this subscriber's full queue."""
+        return self._dropped.get(id(q), 0)
+
     def get_history(self) -> list[BaseEvent]:
         """Return a snapshot of the ring buffer, oldest first."""
         return list(self._history)
