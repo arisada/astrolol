@@ -6,6 +6,7 @@ import { LogPanel } from '@/components/ui/log-panel'
 import { Input } from '@/components/ui/input'
 import { ToggleSwitch } from '@/components/ui/toggle-switch'
 import * as sim from './api'
+import { GuiderActiveBanner } from '@/components/GuiderActiveBanner'
 import { Page } from '@/components/Page'
 
 const FIELD_KEYS: Record<string, string> = {
@@ -61,6 +62,7 @@ export function GuideSimPage() {
   return (
     <div className="flex flex-col h-full">
       <Page width="medium" className="flex flex-col gap-6">
+          <GuiderActiveBanner pluginId="guide_simulator" />
           <div>
             <h1 className="text-lg font-semibold text-slate-100">{t('title')}</h1>
             <p className="text-xs text-slate-500 mt-1">

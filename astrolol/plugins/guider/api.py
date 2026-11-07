@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Literal
 
 import structlog
-from fastapi import APIRouter, HTTPException, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel, Field, field_validator
 
 from astrolol.core.guiding import (
@@ -14,6 +14,7 @@ from astrolol.core.guiding import (
     GuidingHealth,
     GuidingStats,
     SettleParams,
+    require_active_guider,
 )
 from astrolol.plugins.guider.calibration import Calibration
 from astrolol.imaging.darks import DarkInfo
@@ -23,6 +24,9 @@ from astrolol.plugins.guider.view import ViewInfo
 
 logger = structlog.get_logger()
 router = APIRouter(prefix="/plugins/guider", tags=["guider"])
+
+# Actions are refused while another guiding plugin is the active one.
+_ACTIVE = Depends(require_active_guider("guider"))
 
 
 def _guider(request: Request) -> BuiltinGuider:
@@ -95,7 +99,7 @@ async def get_frame(request: Request, v: int | None = None) -> Response:
     return Response(content=data, media_type="image/jpeg", headers={"Cache-Control": "no-store"})
 
 
-@router.post("/preview", status_code=204, response_model=None)
+@router.post("/preview", dependencies=[_ACTIVE], status_code=204, response_model=None)
 async def start_preview(request: Request) -> None:
     """Show the guide camera (and the stars it would guide on) without guiding."""
     try:
@@ -114,7 +118,7 @@ class StarPick(BaseModel):
     y: float
 
 
-@router.post("/star", status_code=204, response_model=None)
+@router.post("/star", dependencies=[_ACTIVE], status_code=204, response_model=None)
 async def select_star(body: StarPick, request: Request) -> None:
     """Guide on the star nearest to (x, y) in the preview."""
     g = _guider(request)
@@ -135,7 +139,7 @@ class GuideBody(BaseModel):
     recalibrate: bool = False
 
 
-@router.post("/guide", status_code=204, response_model=None)
+@router.post("/guide", dependencies=[_ACTIVE], status_code=204, response_model=None)
 async def guide(request: Request, body: GuideBody | None = None) -> None:
     """Start guiding. Returns at once; progress arrives as guiding events."""
     body = body or GuideBody()
@@ -151,12 +155,12 @@ async def stop(request: Request) -> None:
     await _guider(request).stop()
 
 
-@router.post("/pause", status_code=204, response_model=None)
+@router.post("/pause", dependencies=[_ACTIVE], status_code=204, response_model=None)
 async def pause(request: Request) -> None:
     await _guider(request).pause()
 
 
-@router.post("/resume", status_code=204, response_model=None)
+@router.post("/resume", dependencies=[_ACTIVE], status_code=204, response_model=None)
 async def resume(request: Request) -> None:
     await _guider(request).resume()
 
@@ -167,7 +171,7 @@ class DitherBody(BaseModel):
     settle: SettleParams = SettleParams()
 
 
-@router.post("/dither", status_code=204, response_model=None)
+@router.post("/dither", dependencies=[_ACTIVE], status_code=204, response_model=None)
 async def dither(body: DitherBody, request: Request) -> None:
     """Dither and wait for the guider to settle."""
     try:
@@ -203,7 +207,7 @@ class DarkBody(BaseModel):
         return values
 
 
-@router.post("/darks", response_model=list[DarkInfo])
+@router.post("/darks", dependencies=[_ACTIVE], response_model=list[DarkInfo])
 async def capture_dark(body: DarkBody, request: Request) -> list[DarkInfo]:
     """Take darks with the scope covered: one for the current exposure and gain, and one for
     each of the other exposures and gains asked for. Returns when the frames are in."""

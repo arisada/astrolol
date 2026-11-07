@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 import structlog
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 from pydantic import BaseModel, Field
 
 from astrolol.core.guiding import (
+    require_active_guider,
     GuiderError,
     GuiderStatus,
     GuidingHealth,
@@ -18,6 +19,9 @@ from astrolol.plugins.guide_simulator.simulator import GuideSimulator, SimFaults
 
 logger = structlog.get_logger()
 router = APIRouter(prefix="/plugins/guide_simulator", tags=["guide_simulator"])
+
+# Actions are refused while another guiding plugin is the active one.
+_ACTIVE = Depends(require_active_guider("guide_simulator"))
 
 
 def _sim(request: Request) -> GuideSimulator:
@@ -43,7 +47,7 @@ async def get_status(request: Request) -> SimReport:
     )
 
 
-@router.post("/connect", status_code=204, response_model=None)
+@router.post("/connect", dependencies=[_ACTIVE], status_code=204, response_model=None)
 async def connect(request: Request) -> None:
     _sim(request).connect()
 
@@ -53,7 +57,7 @@ async def disconnect(request: Request) -> None:
     await _sim(request).disconnect()
 
 
-@router.post("/guide", status_code=204, response_model=None)
+@router.post("/guide", dependencies=[_ACTIVE], status_code=204, response_model=None)
 async def guide(request: Request, settle: SettleParams | None = None) -> None:
     """Start guiding; returns immediately (settling continues in the background)."""
     try:
@@ -73,7 +77,7 @@ class DitherBody(BaseModel):
     settle: SettleParams = SettleParams()
 
 
-@router.post("/dither", status_code=204, response_model=None)
+@router.post("/dither", dependencies=[_ACTIVE], status_code=204, response_model=None)
 async def dither(body: DitherBody, request: Request) -> None:
     """Dither and wait for settle."""
     try:

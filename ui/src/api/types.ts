@@ -111,10 +111,17 @@ export interface DockWidgetEntry {
   collapsed: boolean
 }
 
+/** The enabled guiding plugins and the one in use (GET /guiding/active). */
+export interface ActiveGuider {
+  active: string | null
+  available: string[]
+}
+
 export interface UserSettings {
   save_dir_template: string
   save_filename_template: string
   enabled_plugins: string[]
+  active_guider?: string | null
   indi_local_upload: boolean
   indi_server?: IndiServerChoice
   low_memory_mode: boolean
@@ -1365,6 +1372,11 @@ export interface GuidingStateChangedEvent extends BaseEvent {
   guiding: boolean
   reason: string | null
 }
+export interface GuidingActiveChangedEvent extends BaseEvent {
+  type: 'guiding.active_changed'
+  active: string | null
+  available: string[]
+}
 export interface GuidingSettledEvent extends BaseEvent {
   type: 'guiding.settled'
   guider: string
@@ -1538,7 +1550,7 @@ export type AstrolollEvent =
   | PolarAlignWizardStartedEvent | PolarAlignPointStartedEvent | PolarAlignPointSolvedEvent
   | PolarAlignFitCompletedEvent | PolarAlignErrorUpdatedEvent
   | PolarAlignWizardCompletedEvent | PolarAlignWizardFailedEvent | PolarAlignWizardCancelledEvent
-  | GuidingStateChangedEvent | GuidingSettledEvent
+  | GuidingStateChangedEvent | GuidingSettledEvent | GuidingActiveChangedEvent
   | SequencerStatusEvent | SequencerQueueChangedEvent | SequencerFrameSavedEvent
   | SequencerTaskFinishedEvent | SequencerStepFailedEvent
   | ViewerIndexChangedEvent | ViewerRescanStartedEvent | ViewerRescanProgressEvent | ViewerRescanCompletedEvent

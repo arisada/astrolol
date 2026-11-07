@@ -48,7 +48,7 @@ class GuiderPlugin:
         )
         self._guider, self._app = guider, app
         app.state.builtin_guider = guider
-        register_guider(app, guider)
+        register_guider(app, guider, "guider")
         app.include_router(router)
         logger.info("guider.plugin_setup", guide_output=cfg.guide_output)
 

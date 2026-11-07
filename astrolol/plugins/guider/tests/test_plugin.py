@@ -30,8 +30,11 @@ async def test_guiding_without_a_camera_chosen_fails_clearly() -> None:
     await plugin.shutdown()
 
 
-async def test_second_guider_is_refused() -> None:
+async def test_a_second_guiding_plugin_does_not_break_setup() -> None:
+    """Both can be enabled; PHD2 stays the best real guider only until the built-in one is there."""
+    from astrolol.core.guiding import active_guider_id, guiders
+
     app = FastAPI()
     get_plugin().setup(app, ctx())
-    with pytest.raises(RuntimeError, match="already registered"):
-        get_plugin().setup(app, ctx())
+    get_plugin().setup(app, ctx())          # the same plugin again just replaces its entry
+    assert active_guider_id(app) == "guider" and list(guiders(app)) == ["guider"]

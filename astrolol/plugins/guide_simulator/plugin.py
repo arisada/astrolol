@@ -40,7 +40,7 @@ class GuideSimulatorPlugin:
     def setup(self, app: FastAPI, ctx: PluginContext) -> None:
         cfg = ctx.get_plugin_settings("guide_simulator", GuideSimSettings)
         self._sim = GuideSimulator(ctx.event_bus, cfg)
-        register_guider(app, self._sim)
+        register_guider(app, self._sim, "guide_simulator")
         self._app = app
         app.state.guide_simulator = self._sim
         app.include_router(router)

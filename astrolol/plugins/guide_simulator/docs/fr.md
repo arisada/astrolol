@@ -2,7 +2,7 @@
 
 *Module : Simulateur de guidage.* Un guideur sans matériel. Il remplace PHD2 ou le guideur
 intégré, pour essayer le [Séquenceur](../../sequencer/docs/fr.md) ou le dithering depuis votre
-bureau, et répéter une nuit nuageuse. Ne l'activez pas en même temps qu'un autre guideur.
+bureau, et répéter une nuit nuageuse. Quand un autre guideur est activé aussi, le simulateur n'est utilisé que si vous le choisissez : voir [Quel guideur est utilisé](../../phd2/docs/fr.md#quel-guideur-est-utilisé).
 
 ## Utilisation
 

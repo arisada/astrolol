@@ -71,6 +71,7 @@ class FakePhd2Client:
 def client() -> TestClient:
     app = FastAPI()
     app.state.phd2_client = FakePhd2Client()
+    app.state.active_guider_id = "phd2"      # what register_guider does for the guider in use
     app.include_router(router)
     return TestClient(app)
 
@@ -122,6 +123,7 @@ def test_connect_reads_saved_settings(fake: FakePhd2Client) -> None:
 
     app = FastAPI()
     app.state.phd2_client = fake
+    app.state.active_guider_id = "phd2"
 
     store = MagicMock()
     store.get_user_settings.return_value = UserSettings(
@@ -265,3 +267,16 @@ def test_plugin_manifest() -> None:
     assert plugin.manifest.id == "phd2"
     assert plugin.manifest.name == "PHD2 Guiding"
     assert plugin.manifest.version == "0.1.0"
+
+
+def test_actions_are_refused_while_another_guider_is_the_active_one(client) -> None:  # noqa: ANN001
+    client.app.state.active_guider_id = "guider"
+
+    for path in ("/connect", "/guide", "/dither", "/pause", "/resume"):
+        r = client.post(f"/plugins/phd2{path}", json={})
+        assert r.status_code == 409, path
+        assert "guider is" in r.json()["detail"]
+
+    assert client.post("/plugins/phd2/stop").status_code == 204        # stopping is always allowed
+    assert client.get("/plugins/phd2/status").status_code == 200       # and reading
+    assert client.app.state.phd2_client.calls == [("stop_capture", {})]

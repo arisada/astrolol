@@ -12,6 +12,7 @@ import type { Phd2Settings } from '@/api/types'
 import * as phd2Api from './api'
 import type { Phd2PluginState } from './api'
 import { DEFAULT_PHD2_STATE } from './api'
+import { GuiderActiveBanner } from '@/components/GuiderActiveBanner'
 import { Page } from '@/components/Page'
 
 // ── Graph options ──────────────────────────────────────────────────────────────
@@ -164,6 +165,7 @@ export function Phd2Page() {
   return (
     <div className="flex flex-col h-full">
     <Page width="medium" className="flex flex-col gap-4">
+      <GuiderActiveBanner pluginId="phd2" />
 
       {/* Header */}
       <div className="flex items-center justify-between">

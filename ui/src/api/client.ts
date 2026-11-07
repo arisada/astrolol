@@ -31,6 +31,7 @@ import type {
   SetPropertyRequest,
   TrackingMode,
   UserSettings,
+  ActiveGuider,
 } from './types'
 
 import { useAuth } from '@/auth'
@@ -223,6 +224,12 @@ export const api = {
       request<IndiDeviceMessage[]>(`/indi/messages/${encodeURIComponent(deviceName)}`),
     setDebugLevel: (level: number) =>
       request<void>('/indi/debug', { method: 'POST', body: JSON.stringify({ level }) }),
+  },
+
+  guiding: {
+    active: () => request<ActiveGuider>('/guiding/active'),
+    choose: (guider: string) =>
+      request<ActiveGuider>('/guiding/active', { method: 'PUT', body: JSON.stringify({ guider }) }),
   },
 
   settings: {

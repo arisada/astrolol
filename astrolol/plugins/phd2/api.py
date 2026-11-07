@@ -1,7 +1,8 @@
 """FastAPI router for PHD2 guiding control."""
 import structlog
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request
 
+from astrolol.core.guiding import require_active_guider
 from astrolol.plugins.phd2.client import Phd2Client
 from astrolol.plugins.phd2.models import (
     DebugRequest,
@@ -15,12 +16,15 @@ from astrolol.plugins.phd2.settings import Phd2Settings
 logger = structlog.get_logger()
 router = APIRouter(prefix="/plugins/phd2", tags=["phd2"])
 
+# Actions are refused while another guiding plugin is the active one.
+_ACTIVE = Depends(require_active_guider("phd2"))
+
 
 def _client(request: Request) -> Phd2Client:
     return request.app.state.phd2_client
 
 
-@router.post("/connect", status_code=204, response_model=None)
+@router.post("/connect", dependencies=[_ACTIVE], status_code=204, response_model=None)
 async def connect(request: Request) -> None:
     """Start (or restart) the PHD2 connection loop using the current saved settings."""
     try:
@@ -62,7 +66,7 @@ async def get_health(request: Request, window_s: float = 60.0) -> GuidingHealthR
     )
 
 
-@router.post("/guide", status_code=204, response_model=None)
+@router.post("/guide", dependencies=[_ACTIVE], status_code=204, response_model=None)
 async def guide(body: GuideRequest, request: Request) -> None:
     """Start PHD2 guiding (calibrate if needed, then guide)."""
     try:
@@ -97,7 +101,7 @@ async def stop(request: Request) -> None:
         raise HTTPException(status_code=502, detail=f"PHD2: {exc}") from exc
 
 
-@router.post("/dither", status_code=204, response_model=None)
+@router.post("/dither", dependencies=[_ACTIVE], status_code=204, response_model=None)
 async def dither(body: DitherRequest, request: Request) -> None:
     """Dither the guide star and wait for settle."""
     try:
@@ -119,7 +123,7 @@ async def dither(body: DitherRequest, request: Request) -> None:
         raise HTTPException(status_code=502, detail=f"PHD2: {exc}") from exc
 
 
-@router.post("/pause", status_code=204, response_model=None)
+@router.post("/pause", dependencies=[_ACTIVE], status_code=204, response_model=None)
 async def pause(request: Request) -> None:
     """Pause PHD2 guiding output (keeps looping, no corrections sent)."""
     try:
@@ -132,7 +136,7 @@ async def pause(request: Request) -> None:
         raise HTTPException(status_code=502, detail=f"PHD2: {exc}") from exc
 
 
-@router.post("/resume", status_code=204, response_model=None)
+@router.post("/resume", dependencies=[_ACTIVE], status_code=204, response_model=None)
 async def resume(request: Request) -> None:
     """Resume PHD2 guiding output after a pause."""
     try:

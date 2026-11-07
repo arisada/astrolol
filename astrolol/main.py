@@ -25,6 +25,7 @@ from astrolol.api.devices import router as devices_router
 from astrolol.api.filter_wheel import router as filter_wheel_router
 from astrolol.api.flat_panel import router as flat_panel_router
 from astrolol.api.focuser import router as focuser_router
+from astrolol.api.guiding import router as guiding_router
 from astrolol.api.imager import router as imager_router
 from astrolol.api.indi import router as indi_router
 from astrolol.api.inventory import router as inventory_router
@@ -228,6 +229,7 @@ def create_app() -> FastAPI:
     app.include_router(imager_router)
     app.include_router(mount_router)
     app.include_router(focuser_router)
+    app.include_router(guiding_router)
     app.include_router(filter_wheel_router)
     app.include_router(flat_panel_router)
     app.include_router(indi_router)

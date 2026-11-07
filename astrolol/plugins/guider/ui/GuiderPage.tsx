@@ -16,6 +16,7 @@ import { niceRange } from '@/utils/guiding'
 import * as api from './api'
 import { GuiderView } from './GuiderView'
 import { CalibrationPanel, DarksPanel, SetupPanel, Stat, TuningPanel, fmt, type Save } from './GuiderPanels'
+import { GuiderActiveBanner } from '@/components/GuiderActiveBanner'
 import { Page } from '@/components/Page'
 
 const RANGE_OPTIONS = ['auto', 2, 4, 8, 16] as const
@@ -121,6 +122,7 @@ export function GuiderPage() {
   return (
     <div className="flex flex-col h-full">
       <Page width="wide" className="flex flex-col gap-5">
+          <GuiderActiveBanner pluginId="guider" />
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <h1 className="text-lg font-semibold text-slate-100">{t('title')}</h1>

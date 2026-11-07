@@ -83,8 +83,9 @@ maintenant** : les changements prennent effet après un redémarrage (*Redémarr
 pour prendre effet*).
 
 Certains modules en entraînent d'autres : *Cible* a besoin du catalogue d'objets, l'*Assistant
-de flats* du *Séquenceur*. Ne choisissez qu'un seul guideur : *Guideur intégré*, *Guidage
-PHD2* ou *Simulateur de guidage*.
+de flats* du *Séquenceur*. Plusieurs guideurs peuvent être activés (*Guideur intégré*, *Guidage
+PHD2*, *Simulateur de guidage*) ; un seul est utilisé à la fois, voir
+[Quel guideur est utilisé](../../astrolol/plugins/phd2/docs/fr.md#quel-guideur-est-utilisé).
 
 ## Serveur
 

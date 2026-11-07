@@ -187,5 +187,10 @@
     "indi": "INDI",
     "indigo": "INDIGO",
     "title": "Driven by {{source}}"
+  },
+  "guiderActive": {
+    "inactive": "{{active}} is the guider in use. {{name}} cannot act until you choose it.",
+    "use": "Use {{name}}",
+    "failed": "Could not change the guider"
   }
 }

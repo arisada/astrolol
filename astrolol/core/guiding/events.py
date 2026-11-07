@@ -21,3 +21,11 @@ class GuidingSettled(BaseEvent):
     guider: str
     after: Literal["guide", "dither"]
     error: str | None = None  # None = settled
+
+
+class ActiveGuiderChanged(BaseEvent):
+    """Another guiding plugin became the active one (or the only one left went away)."""
+
+    type: Literal["guiding.active_changed"] = "guiding.active_changed"
+    active: str | None
+    available: list[str]

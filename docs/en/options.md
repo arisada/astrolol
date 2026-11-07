@@ -79,8 +79,9 @@ Settings), with a description. Tick or untick, then click **Restart now**: chang
 after a restart (*Restart required to take effect*).
 
 Some plugins bring others along: *Target* needs the object catalogue, the *Flat Wizard* needs
-the *Sequencer*. Choose only one guider: *Built-in Guider*, *PHD2 Guiding* or
-*Guide Simulator*.
+the *Sequencer*. Several guiders can be enabled (*Built-in Guider*, *PHD2 Guiding*,
+*Guide Simulator*); only one is used at a time, see
+[Which guider is used](../../astrolol/plugins/phd2/docs/en.md#which-guider-is-used).
 
 ## Server
 

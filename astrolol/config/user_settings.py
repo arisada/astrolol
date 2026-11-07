@@ -59,6 +59,7 @@ class UserSettings(BaseModel):
     language: str = "en"                      # UI language (BCP-47 code, e.g. "en", "fr")
     theme: str = Field(default="midnight", pattern=r"^[a-z0-9_-]{1,32}$")  # UI palette id (ui/scripts/gen-themes.mjs)
     dock: DockSettings = Field(default_factory=DockSettings)  # widgets pinned to the UI dock
+    active_guider: str | None = None          # plugin id of the guider in use when several are enabled
     plugin_settings: dict[str, dict] = {}     # opaque per-plugin settings, keyed by plugin id
     imager_settings: dict[str, dict] = {}     # per-device imager settings, keyed by device_id
     camera_gains: dict[str, int] = {}         # last gain each camera exposed with, keyed by device_id

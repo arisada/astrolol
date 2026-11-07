@@ -7,8 +7,9 @@
 
 *Module : Guideur intégré.* Garde une étoile au même endroit d'une caméra de guidage pendant que
 vous photographiez, en envoyant de petites corrections à la monture. Il n'a besoin d'aucun autre
-programme. Ne l'activez pas en même temps que le [Guidage PHD2](../../phd2/docs/fr.md) ou le
-[Simulateur de guidage](../../guide_simulator/docs/fr.md).
+programme. Si le [Guidage PHD2](../../phd2/docs/fr.md) ou le
+[Simulateur de guidage](../../guide_simulator/docs/fr.md) est activé aussi, un seul guideur est utilisé
+à la fois : voir [Quel guideur est utilisé](../../phd2/docs/fr.md#quel-guideur-est-utilisé).
 
 ![Guideur](guider.png)
 

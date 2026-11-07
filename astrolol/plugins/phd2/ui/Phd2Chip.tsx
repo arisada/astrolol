@@ -1,4 +1,5 @@
 import { useTranslation } from 'react-i18next'
+import { useIsInactiveGuider } from '@/hooks/useActiveGuider'
 import { useStore } from '@/store'
 import { Chip } from '@/components/ui/badge'
 import type { Phd2PluginState } from './api'
@@ -6,7 +7,8 @@ import type { Phd2PluginState } from './api'
 export function Phd2Chip() {
   const { t } = useTranslation('phd2')
   const phd2 = useStore((s) => (s.pluginStates['phd2'] as Phd2PluginState | null | undefined)?.status)
-  if (!phd2?.connected) return null
+  const inactive = useIsInactiveGuider('phd2')
+  if (inactive || !phd2?.connected) return null
 
   const state = phd2.state ?? ''
   const rms = phd2.rms_total

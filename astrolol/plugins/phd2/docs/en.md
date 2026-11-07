@@ -1,9 +1,9 @@
 # PHD2 Guiding
 
 *Plugin: PHD2 Guiding.* Lets astrolol use [PHD2](https://openphdguiding.org/) as its guider:
-shows its state and guide graph, starts and stops guiding, and dithers between frames. Do not
-enable it together with the [Built-in Guider](../../guider/docs/en.md) or the
-[Guide Simulator](../../guide_simulator/docs/en.md).
+shows its state and guide graph, starts and stops guiding, and dithers between frames. If the
+[Built-in Guider](../../guider/docs/en.md) or the [Guide Simulator](../../guide_simulator/docs/en.md)
+is enabled too, only one of them is used at a time: see [Which guider is used](#which-guider-is-used).
 
 PHD2 runs as a separate program, on the telescope computer or another machine. In PHD2, turn on
 **Tools → Enable Server**. PHD2 connects to the guide camera and the mount itself; with an
@@ -28,3 +28,14 @@ traffic with PHD2 for troubleshooting).
 
 Automatic dithering between frames is set on the [Imaging](../../../../docs/en/imaging.md) page (while looping)
 or in the [Sequencer](../../sequencer/docs/en.md).
+
+## Which guider is used
+
+The [Built-in Guider](../../guider/docs/en.md), PHD2 Guiding and the
+[Guide Simulator](../../guide_simulator/docs/en.md) can all be enabled, but only one is used by the
+[Sequencer](../../sequencer/docs/en.md) and for dithering. It is the one you chose; until you choose, the
+Built-in Guider, then PHD2, then the simulator.
+
+The pages of the others stay open so you can set them up, but they show a banner naming the guider
+in use and refuse to start anything. Click **Use PHD2 Guiding** (or the name of that guider) in the banner to
+switch. Switching is refused while the current guider is guiding: stop it first.

@@ -77,3 +77,19 @@ def test_settings_roundtrip() -> None:
         s = client.get("/plugins/guide_simulator/settings").json()
         s["rms_arcsec"] = 1.7
         assert client.put("/plugins/guide_simulator/settings", json=s).json()["rms_arcsec"] == 1.7
+
+
+def test_actions_are_refused_while_a_real_guider_is_the_active_one() -> None:
+    from astrolol.core.guiding import register_guider
+
+    app = _app()
+
+    class Real:
+        name = "builtin"
+
+    register_guider(app, Real(), "guider")  # type: ignore[arg-type]
+    assert app.state.active_guider_id == "guider"       # a real guider beats the simulator
+    with TestClient(app) as client:
+        for path in ("/connect", "/guide", "/dither"):
+            assert client.post(f"/plugins/guide_simulator{path}", json={}).status_code == 409, path
+        assert client.get("/plugins/guide_simulator/status").status_code == 200

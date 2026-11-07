@@ -22,6 +22,7 @@ def client():
         EventBus(), GuiderSettings(exposure=0.03, calibration_steps=5), RigDevices(Rig()), ra=fine, dec=fine
     )
     app.state.builtin_guider = guider
+    app.state.active_guider_id = "guider"      # what register_guider does for the guider in use
     app.include_router(router)
     with TestClient(app) as c:
         yield c
@@ -177,3 +178,18 @@ def test_settings_carry_the_tuning(client) -> None:
     g = client.app.state.builtin_guider
     assert g.settings.ra_aggressiveness == 0.5 and g.settings.dec_mode == "north"
     assert client.put("/plugins/guider/settings", json=s | {"ra_aggressiveness": 2}).status_code == 422
+
+
+def test_actions_are_refused_while_another_guider_is_the_active_one(client) -> None:
+    client.app.state.active_guider_id = "phd2"
+
+    for method, path in (
+        ("post", "/preview"), ("post", "/star"), ("post", "/guide"), ("post", "/dither"),
+        ("post", "/pause"), ("post", "/resume"), ("post", "/darks"),
+    ):
+        r = getattr(client, method)(f"/plugins/guider{path}", json={})
+        assert r.status_code == 409, path
+        assert "phd2 is" in r.json()["detail"]
+
+    assert client.delete("/plugins/guider/preview").status_code == 204   # cleaning up is allowed
+    assert client.post("/plugins/guider/stop").status_code == 204

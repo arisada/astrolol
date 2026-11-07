@@ -50,7 +50,7 @@ class Phd2Plugin:
         # The core guider interface (sequencer, imager loop dithering) goes through PHD2
         self._guider = Phd2Guider(self._client)
         self._app = app
-        register_guider(app, self._guider)
+        register_guider(app, self._guider, "phd2")
 
         app.include_router(router)
         logger.info("phd2.plugin_setup", host=cfg.host, port=cfg.port)
