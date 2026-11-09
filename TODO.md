@@ -283,6 +283,14 @@ named sequences (server library) and task file download/upload.
 - **Lanes — later** — a secondary-lane error currently stops every lane (in-flight frames
   discarded); a per-lane error policy could let the other cameras carry on. The efficiency
   estimate ignores download time (real runs usually do a little better than shown).
+- **Lanes: let a secondary frame overrun the dither by a tolerance** (2026-11-09, undecided) —
+  equal exposures (both cameras 600 s) can't run in parallel with `dither_every` 1: the secondary
+  needs `duration + margin <= next dither` and never fits, so people use a shorter secondary
+  (500 s vs 600 s, about 83 % efficiency). The dither can't hit a secondary frame anyway
+  (`mount_operation` waits for idle secondaries), so a setting "start a secondary frame if it
+  overruns the dither by at most N s" would cost the primary roughly 10–20 s of waiting per frame
+  and give the secondary about 100 %. It would also let the wizard accept equal durations
+  (`can_start` in `estimate_lanes()`). Needs tests, the setting in en/fr, and the lanes docs.
 - **A secondary lane whose duration is close to the primary's genuinely can't reach full
   efficiency, and the preflight is right to say so** — `estimate_lanes()` in
   `astrolol/plugins/sequencer/lanes.py` requires `duration + margin_s <= interval` for a secondary
