@@ -173,6 +173,34 @@ async def test_lock_stars_freezes_the_reference_population_after_the_first_step(
     assert all(c == step1_stars for c in calls[1:])  # frozen for every later step
 
 
+async def test_lock_stars_measures_the_centre_first_and_keeps_the_strongest_stars(
+    rig: SimpleNamespace, monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    from astrolol.plugins.autofocus.models import AutofocusConfig
+
+    calls: list[list[Any] | None] = []
+    stars = [{"x": float(i), "y": float(i), "fwhm": 2.5} for i in range(50)]
+
+    async def fake_detect(
+        fits_path: str, metric: str = "fwhm", reference_stars: list[Any] | None = None,
+    ) -> tuple[float, int, list[Any]]:
+        calls.append(reference_stars)
+        fwhm = 2.0 + ((rig.focuser.position - BEST) / 100) ** 2
+        return fwhm, len(stars), stars
+
+    monkeypatch.setattr(engine_mod, "detect_stars", fake_detect)
+    start = rig.focuser.position
+    config = AutofocusConfig(
+        camera_id="cam", focuser_id="foc",
+        step_size=50, num_steps=3, exposure_time=1.0, lock_stars=True,
+    )
+    await rig.engine.start(config)
+    await rig.engine._task
+
+    assert rig.focuser.moves[0] == start  # the reference frame is taken at the centre
+    assert calls[1] == stars[:30]  # only the strongest are kept
+
+
 async def test_focus_while_running_is_refused(rig: SimpleNamespace) -> None:
     rig.focuser.gate = asyncio.Event()
     first = asyncio.create_task(rig.engine.focus("cam", "foc"))

@@ -21,7 +21,7 @@ camera in the profile.
 | Step size | Focuser steps between two positions. |
 | Steps each side | Positions on each side of the start; the total is shown. |
 | Start position | Centre of the sweep. Empty = the current position; **Use current position** fills it in. |
-| Track the same stars | Measure the stars found on the first frame at every step, instead of a fresh set each time. Steadier results in a field with few stars. |
+| Track the same stars | The sweep starts at its centre (the current focus position) and the brightest stars of that frame are measured at every step, instead of a fresh set each time. Steadier results in a field with few stars, and with faint narrowband images where noise can pass for stars. Start from a position close to focus. |
 
 A good sweep goes from clearly out of focus on one side to clearly out of focus on the other.
 If the curve looks flat, increase the step size; if the stars disappear at the ends, reduce it.

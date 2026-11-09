@@ -22,7 +22,7 @@ le profil.
 | Taille du pas | Pas du focuser entre deux positions. |
 | Pas de chaque côté | Positions de chaque côté du départ ; le total est affiché. |
 | Position de départ | Centre du balayage. Vide = la position actuelle ; **Utiliser la position actuelle** la remplit. |
-| Suivre les mêmes étoiles | Mesurer à chaque pas les étoiles trouvées sur la première pose, plutôt qu'un nouvel ensemble à chaque fois. Résultats plus stables dans un champ pauvre en étoiles. |
+| Suivre les mêmes étoiles | Le balayage commence par son centre (la position de mise au point actuelle) et les étoiles les plus brillantes de cette pose sont mesurées à chaque pas, plutôt qu'un nouvel ensemble à chaque fois. Résultats plus stables dans un champ pauvre en étoiles, ou avec des images faibles en bande étroite où le bruit peut passer pour des étoiles. Partir d'une position proche de la mise au point. |
 
 Un bon balayage va de nettement flou d'un côté à nettement flou de l'autre. Si la courbe paraît
 plate, augmentez la taille du pas ; si les étoiles disparaissent aux extrémités, réduisez-la.

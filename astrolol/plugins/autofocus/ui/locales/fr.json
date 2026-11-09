@@ -47,7 +47,7 @@
     "currentPosPlaceholder": "position actuelle",
     "useCurrent": "Utiliser la position actuelle",
     "track": "Suivre les mêmes étoiles",
-    "trackHint": "Privilégier les étoiles trouvées sur la première pose plutôt qu'un nouvel ensemble à chaque pas",
+    "trackHint": "Mesurer à chaque pas les étoiles les plus brillantes de la pose à la position actuelle, plutôt qu'un nouvel ensemble à chaque fois. Utile avec des étoiles faibles (bande étroite)",
     "trackLabel": "Suivre les mêmes étoiles pendant le balayage"
   },
   "exposure": {

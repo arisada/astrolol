@@ -96,6 +96,7 @@ def _read_fits_shape(fits_path: str) -> tuple[int, int]:
 # moved a lot, e.g. after a filter change): each one is centred past the end where the
 # measurements were still improving, and its points join those already measured.
 _MAX_RECENTRES = 2
+_MAX_REFERENCE_STARS = 30  # strongest stars of the reference frame kept by lock_stars; the faint tail is mostly noise
 
 
 def _action(config: AutofocusConfig, cause: str) -> str:
@@ -126,6 +127,14 @@ def next_sweep(run: AutofocusRun) -> list[int] | None:
     if not wanted:
         return None
     return sorted(wanted, key=lambda p: (p - end) * direction)
+
+
+def _centre_first(sweep: list[int]) -> list[int]:
+    """*sweep* with its middle position first, the others keeping their order."""
+    if len(sweep) < 3:
+        return list(sweep)
+    mid = len(sweep) // 2
+    return [sweep[mid], *sweep[:mid], *sweep[mid + 1:]]
 
 
 class AutofocusEngine:
@@ -259,13 +268,15 @@ class AutofocusEngine:
                     binning=config.binning,
                     frame_type="light",
                 )
-                # When lock_stars is set, frozen after the first step that detects any
-                # stars, and reused as the preferred population for every later step —
+                # When lock_stars is set, the sweep starts at its centre (the best guess at
+                # focus, where the real stars are brightest and noise is least likely to pass
+                # for stars); the strongest stars of the first step that detects any are frozen
+                # and reused as the preferred population for every later step —
                 # a step where none of these stars can be matched reports no stars.
                 self._reference_stars = None
 
                 for pass_no in range(1 + _MAX_RECENTRES):
-                    for position in sweep:
+                    for position in (_centre_first(sweep) if config.lock_stars and pass_no == 0 else sweep):
                         await self._measure_step(run, camera, focuser, params, exposure, position, preview_dir)
 
                     self._refit_curve(run)
@@ -414,7 +425,7 @@ class AutofocusEngine:
             )
 
         if config.lock_stars and self._reference_stars is None and raw_stars:
-            self._reference_stars = raw_stars
+            self._reference_stars = raw_stars[:_MAX_REFERENCE_STARS]
 
         run.latest_stars = [StarInfo(x=s["x"], y=s["y"], fwhm=s["fwhm"]) for s in raw_stars]
 

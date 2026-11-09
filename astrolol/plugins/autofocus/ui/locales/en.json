@@ -47,7 +47,7 @@
     "currentPosPlaceholder": "current position",
     "useCurrent": "Use current position",
     "track": "Track the same stars",
-    "trackHint": "Prefer the stars found on the first exposure over a fresh set each step",
+    "trackHint": "Measure the brightest stars of the exposure at the current position at every step, instead of a fresh set each time. Helps with faint stars (narrowband)",
     "trackLabel": "Track the same stars across the sweep"
   },
   "exposure": {
