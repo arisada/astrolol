@@ -192,5 +192,9 @@
     "inactive": "{{active}} is the guider in use. {{name}} cannot act until you choose it.",
     "use": "Use {{name}}",
     "failed": "Could not change the guider"
+  },
+  "fold": {
+    "collapse": "Fold this section",
+    "expand": "Unfold this section"
   }
 }

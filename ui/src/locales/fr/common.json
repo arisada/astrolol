@@ -192,5 +192,9 @@
     "inactive": "{{active}} est le guideur utilisé. {{name}} ne peut rien faire tant que vous ne l'avez pas choisi.",
     "use": "Utiliser {{name}}",
     "failed": "Impossible de changer de guideur"
+  },
+  "fold": {
+    "collapse": "Replier cette section",
+    "expand": "Déplier cette section"
   }
 }

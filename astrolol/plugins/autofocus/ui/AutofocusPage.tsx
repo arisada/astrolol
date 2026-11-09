@@ -32,7 +32,7 @@ import type {
 
 const AUTOFOCUS_EXPOSURE_STEPS = [0.5, 1, 1.5, 2, 3, 4, 5, 6, 8, 10, 12, 15, 20, 30]
 
-const STEP_SIZE_PROGRESSION = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000, 2000, 5000, 10000]
+const STEP_SIZE_PROGRESSION = [1, 2, 3, 5, 7, 10, 15, 20, 25, 30, 40, 50, 60, 75, 100, 125, 150, 200, 300, 500, 1000, 2000, 5000, 10000]
 
 // ── Preview image panel ───────────────────────────────────────────────────────
 // Star circles are burned into the JPEG server-side after detection,
@@ -345,7 +345,7 @@ export function AutofocusPage() {
       <CollapsibleSidebar>
 
         {/* Camera */}
-        <SidebarSection title={t('camera.title')}>
+        <SidebarSection title={t('camera.title')} foldId="autofocus.camera">
           {cameras.length === 0 ? (
             <span className="text-xs text-slate-600">{t('camera.none')}</span>
           ) : cameras.length === 1 ? (
@@ -359,7 +359,7 @@ export function AutofocusPage() {
         </SidebarSection>
 
         {/* Focuser */}
-        <SidebarSection title={t('focuser.title')}>
+        <SidebarSection title={t('focuser.title')} foldId="autofocus.focuser">
           {focuserCandidates.length === 0 ? (
             <span className="text-xs text-slate-600">{t('focuser.none')}</span>
           ) : focuserCandidates.length === 1 ? (
@@ -373,7 +373,7 @@ export function AutofocusPage() {
         </SidebarSection>
 
         {/* V-curve configuration */}
-        <SidebarSection title={t('vcurve.title')}>
+        <SidebarSection title={t('vcurve.title')} foldId="autofocus.vcurve">
           <div className="flex flex-col gap-3">
 
             {/* Metric selector */}
@@ -461,7 +461,7 @@ export function AutofocusPage() {
         </SidebarSection>
 
         {/* Exposure */}
-        <SidebarSection title={t('exposure.title')}>
+        <SidebarSection title={t('exposure.title')} foldId="autofocus.exposure">
           <div className="flex flex-col gap-3">
             <div className="flex flex-col gap-1">
               <label className="text-xs text-slate-400">{t('exposure.duration')}</label>
@@ -511,7 +511,7 @@ export function AutofocusPage() {
         </SidebarSection>
 
         {/* A doubtful result */}
-        <SidebarSection title={t('doubt.title')}>
+        <SidebarSection title={t('doubt.title')} foldId="autofocus.doubt">
           <div className="flex flex-col gap-3">
             <p className="text-[10px] text-slate-600">{t('doubt.hint')}</p>
             {DOUBT_CAUSES.map((cause) => {
