@@ -1,10 +1,15 @@
 """Plate-solving plugin settings."""
+from typing import Literal
+
 from pydantic import BaseModel
 
 
 class PlatesolveSettings(BaseModel):
-    # The ASTAP program and its star database are start-up settings (astap_program,
-    # astap_database): what runs on the machine is not set from the UI.
+    # Which solver runs. Each program and its star data are start-up settings
+    # (astap_program / astap_database, asterion_program / asterion_catalog_dir).
+    engine: Literal["astap", "asterion"] = "astap"
+    # When the chosen solver finds nothing, try the other one before giving up.
+    fallback: bool = True
     astap_search_radius: float = 30.0
     astap_tolerance: float = 0.007
     pixel_size_um: float | None = None

@@ -12,7 +12,7 @@ class SolveRequest(BaseModel):
     ra_hint: float | None = Field(default=None, description="RA hint in degrees (J2000)")
     dec_hint: float | None = Field(default=None, description="Dec hint in degrees (J2000)")
     radius: float = Field(default=30.0, gt=0, description="Search radius in degrees")
-    tolerance: float | None = Field(default=None, gt=0, description="Star-match tolerance (None = astap default 0.007)")
+    tolerance: float | None = Field(default=None, gt=0, description="Star-match tolerance (None = the solver default); only ASTAP uses it")
     fov: float | None = Field(default=None, gt=0, description="Field width in degrees (None = auto)")
 
 
@@ -30,6 +30,7 @@ class SolveResult(BaseModel):
         "tells whether the image is mirrored.",
     )
     duration_ms: int = 0
+    solver: str = Field(default="", description="The solver that found this solution (astap, asterion)")
 
 
 SolveJobStatus = Literal["pending", "exposing", "solving", "completed", "failed", "cancelled"]

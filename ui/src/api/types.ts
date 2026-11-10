@@ -160,6 +160,8 @@ export interface Phd2Settings {
 }
 
 export interface PlatesolveSettings {
+  engine: 'astap' | 'asterion'
+  fallback: boolean
   astap_search_radius: number
   astap_tolerance: number
   pixel_size_um: number | null
@@ -1362,6 +1364,7 @@ export interface PlatesolveCompletedEvent extends BaseEvent {
   field_w: number
   field_h: number
   duration_ms: number
+  solver?: string
 }
 export interface PlatesolveFailedEvent extends BaseEvent { type: 'platesolve.failed'; solve_id: string; reason: string }
 export interface PlatesolveCancelledEvent extends BaseEvent { type: 'platesolve.cancelled'; solve_id: string }

@@ -22,6 +22,7 @@ class PlatesolveCompleted(BaseEvent):
     field_w: float      # degrees
     field_h: float      # degrees
     duration_ms: int
+    solver: str = ""
 
 
 class PlatesolveFailed(BaseEvent):

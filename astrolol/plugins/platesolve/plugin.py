@@ -8,6 +8,7 @@ from astrolol.config.settings import settings
 from astrolol.core.auth import AclRule, Level
 from astrolol.core.plugin_api import LogScope, PluginContext, PluginManifest
 from astrolol.plugins.platesolve.api import router
+from astrolol.plugins.platesolve.backends import AsterionSolver, AstapSolver
 from astrolol.plugins.platesolve.solver import SolveManager
 
 logger = structlog.get_logger()
@@ -18,13 +19,14 @@ class PlatesolvePlugin:
         id="platesolve",
         name="Plate Solving",
         version="0.1.0",
-        description="Astrometric plate solving via ASTAP",
+        description="Astrometric plate solving, with ASTAP or Asterion",
         nav_order=20,
         log_scopes=[LogScope(key="platesolve", label="Plate Solving", logger="astrolol.plugins.platesolve")],
         hot_reloadable=True,
         acl_rules=[
             AclRule("/plugins/platesolve/settings", Level.ADMIN, ("PUT",)),
             AclRule("/plugins/platesolve/install_db", Level.ADMIN),
+            AclRule("/plugins/platesolve/install_catalog", Level.ADMIN),
         ],
     )
 
@@ -36,6 +38,10 @@ class PlatesolvePlugin:
             event_bus=ctx.event_bus,
             astap_bin=settings.astap_program,
             astap_db_path=str(settings.astap_database),
+            solvers=[
+                AstapSolver(settings.astap_program, str(settings.astap_database)),
+                AsterionSolver(settings.asterion_program, str(settings.asterion_catalog_dir)),
+            ],
         )
         self._manager.attach_app(app)
         app.state.solve_manager = self._manager

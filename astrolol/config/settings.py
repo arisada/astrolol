@@ -67,6 +67,9 @@ class Settings(BaseSettings):
     # The ASTAP plate solver (platesolve plugin) and its star database.
     astap_program: str = "astap_cli"            # name on PATH, or a full path
     astap_database: Path = Path("/opt/astap")
+    # The Asterion plate solver (platesolve plugin) and its star catalogs.
+    asterion_program: str = "asterion"          # name on PATH, or a full path
+    asterion_catalog_dir: Path = _in_data_dir("asterion")
 
     # Extra browser origins allowed to call the API (e.g. a UI served from another
     # host). The server's own origin is always allowed. JSON list in the env var:

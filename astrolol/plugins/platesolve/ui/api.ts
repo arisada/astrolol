@@ -16,7 +16,11 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
+export type SolverName = 'astap' | 'asterion'
+
 export interface PlatesolveSettings {
+  engine: SolverName
+  fallback: boolean
   astap_search_radius: number
   astap_tolerance: number
   pixel_size_um: number | null
@@ -42,6 +46,15 @@ export interface SolveResult {
   field_w: number
   field_h: number
   duration_ms: number
+  solver?: string
+}
+
+export interface SolverStatus {
+  name: SolverName
+  program: string        // from the start-up configuration
+  program_found: boolean
+  data_path: string      // star database (ASTAP) or catalog folder (Asterion)
+  data_installed: boolean
 }
 
 export interface DbStatus {
@@ -90,6 +103,11 @@ export const dbStatus = () => request<DbStatus>('/plugins/platesolve/db_status')
 
 export const installDb = () =>
   request<{ status: string }>('/plugins/platesolve/install_db', { method: 'POST' })
+
+export const solvers = () => request<SolverStatus[]>('/plugins/platesolve/solvers')
+
+export const installCatalog = () =>
+  request<{ status: string }>('/plugins/platesolve/install_catalog', { method: 'POST' })
 
 export const getSettings = () => request<PlatesolveSettings>('/plugins/platesolve/settings')
 

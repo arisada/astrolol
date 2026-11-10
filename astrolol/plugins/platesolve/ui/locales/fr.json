@@ -2,7 +2,7 @@
   "label": "Résolution astrométrique",
   "manifest": {
     "name": "Résolution astrométrique",
-    "description": "Résolution astrométrique via ASTAP"
+    "description": "Résolution astrométrique, avec ASTAP ou Asterion"
   },
   "chip": {
     "label": "Résolution",
@@ -33,21 +33,30 @@
   "cancel": "Annuler",
   "settings": {
     "title": "Réglages",
-    "bin": "Exécutable ASTAP",
-    "db": "Chemin de la base d'étoiles",
+    "bin": "Programme",
+    "db": "Données d'étoiles",
     "fromConfig": "Défini dans le fichier de configuration de démarrage d'astrolol.",
     "radius": "Rayon de recherche (°)",
     "tolerance": "Tolérance",
     "pixel": "Taille de pixel (µm, facultatif)",
     "pixelPlaceholder": "ex. 3.76",
     "save": "Enregistrer",
-    "saving": "Enregistrement…"
+    "saving": "Enregistrement…",
+    "engine": "Solveur",
+    "fallback": "Essayer l'autre solveur quand celui-ci ne trouve rien",
+    "engines": {
+      "astap": "ASTAP",
+      "asterion": "Asterion"
+    }
   },
   "db": {
-    "missing": "Base d'étoiles introuvable",
+    "missing": "Données d'étoiles introuvables",
     "empty": "Le dossier <code>{{path}}</code> est vide ou absent.",
     "install": "Installer d05",
-    "installing": "Installation…"
+    "installing": "Installation…",
+    "programMissing": "Solveur non installé",
+    "noProgram": "<code>{{program}}</code> n'est pas installé sur cette machine.",
+    "installCatalog": "Installer le catalogue"
   },
   "viewer": {
     "alt": "Dernière pose",

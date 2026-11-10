@@ -2,7 +2,7 @@
   "label": "Plate Solving",
   "manifest": {
     "name": "Plate Solving",
-    "description": "Astrometric plate solving via ASTAP"
+    "description": "Astrometric plate solving, with ASTAP or Asterion"
   },
   "chip": {
     "label": "Plate Solve",
@@ -33,21 +33,30 @@
   "cancel": "Cancel",
   "settings": {
     "title": "Settings",
-    "bin": "ASTAP binary",
-    "db": "Star database path",
+    "bin": "Program",
+    "db": "Star data",
     "fromConfig": "Set in astrolol's start-up configuration file.",
     "radius": "Search radius (°)",
     "tolerance": "Tolerance",
     "pixel": "Pixel size (µm, optional)",
     "pixelPlaceholder": "e.g. 3.76",
     "save": "Save",
-    "saving": "Saving…"
+    "saving": "Saving…",
+    "engine": "Solver",
+    "fallback": "Try the other solver when this one finds nothing",
+    "engines": {
+      "astap": "ASTAP",
+      "asterion": "Asterion"
+    }
   },
   "db": {
-    "missing": "Star database not found",
+    "missing": "Star data not found",
     "empty": "Directory <code>{{path}}</code> is empty or missing.",
     "install": "Install d05",
-    "installing": "Installing…"
+    "installing": "Installing…",
+    "programMissing": "Solver not installed",
+    "noProgram": "<code>{{program}}</code> is not installed on this machine.",
+    "installCatalog": "Install catalog"
   },
   "viewer": {
     "alt": "Latest exposure",

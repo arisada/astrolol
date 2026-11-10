@@ -11,10 +11,11 @@ import { SidebarSection } from '@/components/ui/card'
 import { DurationStepper } from '@/components/ui/duration-stepper'
 import { StatusPill } from '@/components/ui/badge'
 import { PillGroup } from '@/components/ui/pill-group'
+import { ToggleSwitch } from '@/components/ui/toggle-switch'
 import type { StatusPillVariant } from '@/components/ui/badge'
 import * as plateSolveApi from './api'
 import { ResultPanel } from './ResultPanel'
-import type { DbStatus, PlatesolveSettings, SolveJob, SolveResult, PlateSolvePluginState } from './api'
+import type { PlatesolveSettings, SolveJob, SolveResult, SolverName, SolverStatus, PlateSolvePluginState } from './api'
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -22,7 +23,11 @@ type AfterSolve = 'nothing' | 'sync' | 'sync_slew'
 
 // ── Platesolve settings defaults ──────────────────────────────────────────────
 
+const SOLVERS: readonly SolverName[] = ['astap', 'asterion']
+
 const DEFAULT_PLATESOLVE_SETTINGS: PlatesolveSettings = {
+  engine: 'astap',
+  fallback: true,
   astap_search_radius: 30.0,
   astap_tolerance: 0.007,
   pixel_size_um: null,
@@ -64,6 +69,7 @@ function JobRow({ job, onCancel }: { job: SolveJob; onCancel: (id: string) => vo
           <div className="text-xs font-mono text-slate-500 mt-0.5">
             {fmtRA(job.result.ra / 15)} {fmtDec(job.result.dec)}
             {' · '}{(job.result.duration_ms / 1000).toFixed(1)}s
+            {job.result.solver ? ` · ${job.result.solver}` : ''}
           </div>
         )}
         {job.status === 'failed' && (
@@ -113,10 +119,10 @@ function NumericInput({ value, onChange, placeholder, allowNull }: {
   )
 }
 
-function SettingsPanel({ settings, onChange, dbStatus }: {
+function SettingsPanel({ settings, onChange, solver }: {
   settings: PlatesolveSettings
   onChange: (s: PlatesolveSettings) => void
-  dbStatus: DbStatus | null
+  solver: SolverStatus | null
 }) {
   const { t } = useTranslation('platesolve')
   const [saving, setSaving] = useState(false)
@@ -131,12 +137,25 @@ function SettingsPanel({ settings, onChange, dbStatus }: {
   return (
     <div className="border-b border-surface-border p-4 flex flex-col gap-3">
       <h3 className="font-medium text-slate-500 label-caps">{t('settings.title')}</h3>
-      {dbStatus && (
+      <PillGroup
+        options={SOLVERS}
+        value={local.engine}
+        onChange={(engine) => setLocal({ ...local, engine })}
+        label={t('settings.engine')}
+        formatLabel={(e) => t(`settings.engines.${e}`)}
+        stretch
+      />
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-xs text-slate-400">{t('settings.fallback')}</span>
+        <ToggleSwitch checked={local.fallback} onChange={() => setLocal({ ...local, fallback: !local.fallback })}
+          label={t('settings.fallback')} />
+      </div>
+      {solver && (
         <div className="flex flex-col gap-1">
           <span className="text-xs text-slate-400">{t('settings.bin')}</span>
-          <code className="text-xs text-slate-300 break-all">{dbStatus.program}</code>
+          <code className="text-xs text-slate-300 break-all">{solver.program}</code>
           <span className="text-xs text-slate-400 mt-1">{t('settings.db')}</span>
-          <code className="text-xs text-slate-300 break-all">{dbStatus.db_path}</code>
+          <code className="text-xs text-slate-300 break-all">{solver.data_path}</code>
           <p className="text-xs text-slate-500">{t('settings.fromConfig')}</p>
         </div>
       )}
@@ -145,11 +164,13 @@ function SettingsPanel({ settings, onChange, dbStatus }: {
         <NumericInput value={local.astap_search_radius}
           onChange={(v) => setLocal({ ...local, astap_search_radius: v ?? 30 })} />
       </div>
-      <div className="flex flex-col gap-1">
-        <span className="text-xs text-slate-400">{t('settings.tolerance')}</span>
-        <NumericInput value={local.astap_tolerance}
-          onChange={(v) => setLocal({ ...local, astap_tolerance: v ?? 0.007 })} />
-      </div>
+      {(local.engine === 'astap' || local.fallback) && (
+        <div className="flex flex-col gap-1">
+          <span className="text-xs text-slate-400">{t('settings.tolerance')}</span>
+          <NumericInput value={local.astap_tolerance}
+            onChange={(v) => setLocal({ ...local, astap_tolerance: v ?? 0.007 })} />
+        </div>
+      )}
       <div className="flex flex-col gap-1">
         <span className="text-xs text-slate-400">{t('settings.pixel')}</span>
         <NumericInput value={local.pixel_size_um} allowNull
@@ -165,8 +186,8 @@ function SettingsPanel({ settings, onChange, dbStatus }: {
 
 // ── DB warning banner ──────────────────────────────────────────────────────────
 
-function DbWarningBanner({ dbPath, onInstall, installing }: {
-  dbPath: string
+function DbWarningBanner({ solver, onInstall, installing }: {
+  solver: SolverStatus
   onInstall: () => void
   installing: boolean
 }) {
@@ -175,21 +196,27 @@ function DbWarningBanner({ dbPath, onInstall, installing }: {
     <div className="mx-4 mb-3 flex items-start gap-3 rounded-lg border border-surface-border border-l-2 border-l-yellow-400 bg-surface-raised px-3 py-2">
       <AlertTriangle size={14} className="text-yellow-500 shrink-0 mt-0.5" />
       <div className="flex-1 min-w-0">
-        <p className="text-xs text-yellow-300 font-medium">{t('db.missing')}</p>
+        <p className="text-xs text-yellow-300 font-medium">
+          {solver.program_found ? t('db.missing') : t('db.programMissing')}
+        </p>
         <p className="text-xs text-yellow-600 mt-0.5 break-all">
-          <Trans t={t} i18nKey="db.empty" values={{ path: dbPath }} components={{ code: <code className="font-mono" /> }} />
+          {solver.program_found
+            ? <Trans t={t} i18nKey="db.empty" values={{ path: solver.data_path }} components={{ code: <code className="font-mono" /> }} />
+            : <Trans t={t} i18nKey="db.noProgram" values={{ program: solver.program }} components={{ code: <code className="font-mono" /> }} />}
         </p>
       </div>
-      <Button
-        size="sm"
-        variant="outline"
-        onClick={onInstall}
-        disabled={installing}
-        className="shrink-0 border-yellow-600/50 text-yellow-400 hover:bg-yellow-500/10"
-      >
-        <Download size={12} className="mr-1" />
-        {installing ? t('db.installing') : t('db.install')}
-      </Button>
+      {solver.program_found && (
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={onInstall}
+          disabled={installing}
+          className="shrink-0 border-yellow-600/50 text-yellow-400 hover:bg-yellow-500/10"
+        >
+          <Download size={12} className="mr-1" />
+          {installing ? t('db.installing') : t(solver.name === 'asterion' ? 'db.installCatalog' : 'db.install')}
+        </Button>
+      )}
     </div>
   )
 }
@@ -249,7 +276,8 @@ export function PlatesolvePage() {
     })
   }, [])
   const [showSettings, setShowSettings]  = useState(false)
-  const [dbStatus, setDbStatus]          = useState<DbStatus | null>(null)
+  const [solverList, setSolverList]    = useState<SolverStatus[]>([])
+  const activeSolver = solverList.find((x) => x.name === (settings?.engine ?? DEFAULT_PLATESOLVE_SETTINGS.engine)) ?? null
   const [installing, setInstalling]      = useState(false)
 
   const [error, setError]                 = useState<string | null>(null)
@@ -285,7 +313,7 @@ export function PlatesolvePage() {
       }
     }).catch(console.error)
 
-    plateSolveApi.dbStatus().then(setDbStatus).catch(console.error)
+    plateSolveApi.solvers().then(setSolverList).catch(console.error)
   }, [])  // eslint-disable-line react-hooks/exhaustive-deps
 
   // React to solve completion via WebSocket-driven store updates
@@ -363,9 +391,10 @@ export function PlatesolvePage() {
   const handleInstallDb = async () => {
     setInstalling(true)
     try {
-      await plateSolveApi.installDb()
+      if (activeSolver?.name === 'asterion') await plateSolveApi.installCatalog()
+      else await plateSolveApi.installDb()
       setTimeout(() => {
-        plateSolveApi.dbStatus().then(setDbStatus).catch(console.error)
+        plateSolveApi.solvers().then(setSolverList).catch(console.error)
         setInstalling(false)
       }, 3000)
     } catch (e) {
@@ -407,14 +436,14 @@ export function PlatesolvePage() {
 
         {/* Settings panel */}
         {showSettings && settings && (
-          <SettingsPanel settings={settings} onChange={setSettings} dbStatus={dbStatus} />
+          <SettingsPanel settings={settings} onChange={setSettings} solver={activeSolver} />
         )}
 
         {/* DB warning */}
-        {dbStatus && !dbStatus.installed && (
+        {activeSolver && (!activeSolver.data_installed || !activeSolver.program_found) && (
           <div className="p-4 pb-0">
             <DbWarningBanner
-              dbPath={dbStatus.db_path}
+              solver={activeSolver}
               onInstall={handleInstallDb}
               installing={installing}
             />

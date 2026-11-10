@@ -8,6 +8,7 @@ reports progress through ``log`` and raises on failure. Cancellation is an
 from __future__ import annotations
 
 import asyncio
+import json
 import math
 import shutil
 import tempfile
@@ -185,3 +186,88 @@ class AstapSolver:
                 raise RuntimeError(f"Plate solve failed: {stderr or f'exit code {returncode}'}")
 
             return await asyncio.to_thread(parse_wcs, str(tmp_fits))
+
+
+# ---------------------------------------------------------------------------
+# Asterion
+# ---------------------------------------------------------------------------
+
+class AsterionSolver:
+    """The Asterion plate solver (``asterion``). It reads the image where it is and prints the
+    solution as JSON, so nothing is copied or rewritten."""
+
+    name = "asterion"
+
+    def __init__(self, program: str = "asterion", catalog_dir: str | None = None) -> None:
+        self.program = program
+        self.catalog_dir = catalog_dir
+
+    # The catalog the page installs: small enough for a Pi, for fields wider than 0.7°.
+    DEFAULT_CATALOG = "tycho2"
+
+    def catalogs_installed(self) -> bool:
+        return bool(self.catalog_dir) and any(Path(self.catalog_dir).glob("*.astx"))
+
+    def download_command(self, catalog: str = DEFAULT_CATALOG) -> list[str]:
+        cmd = [self.program]
+        if self.catalog_dir:
+            cmd += ["--catalog-dir", self.catalog_dir]
+        return cmd + ["--download-catalog", catalog]
+
+    def command(self, req: SolveRequest) -> list[str]:
+        cmd = [self.program, "--json"]
+        if self.catalog_dir:
+            cmd += ["--catalog-dir", self.catalog_dir]
+        # Position hints only mean something as a pair; without them the search is blind.
+        if req.ra_hint is not None and req.dec_hint is not None:
+            cmd += ["--ra", str(req.ra_hint), "--dec", str(req.dec_hint), "--radius", str(req.radius)]
+        if req.fov is not None:
+            cmd += ["--fov", str(req.fov)]
+        # req.tolerance is ASTAP's match tolerance; Asterion verifies matches statistically.
+        return cmd + [req.fits_path]
+
+    async def solve(self, req: SolveRequest, *, job_id: str, log: LogFn) -> SolveResult:
+        cmd = self.command(req)
+        logger.info("platesolve.running", solve_id=job_id, solver=self.name, cmd=" ".join(cmd))
+
+        if not shutil.which(self.program):
+            raise RuntimeError(f"'{self.program}' not found — install the Asterion solver")
+
+        returncode, stdout, stderr = await run_streaming(cmd, None)
+        result = self.parse_output(returncode, stdout, stderr)
+        await log(
+            f"solved with Asterion: {result.ra:.4f} {result.dec:+.4f}, "
+            f"{result.pixel_scale:.2f}\"/px"
+        )
+        return result
+
+    @staticmethod
+    def parse_output(returncode: int, stdout: str, stderr: str) -> SolveResult:
+        """Turn the program's output into a result, or raise RuntimeError saying why not."""
+        try:
+            data = json.loads(stdout)
+        except ValueError:
+            # Errors that are not about one image (no catalog, bad option) are plain text.
+            detail = (stderr or stdout).strip() or f"exit code {returncode}"
+            raise RuntimeError(f"Plate solve failed: {detail}") from None
+        if isinstance(data, list):
+            if not data:  # the image could not be read; the reason is on stderr
+                raise RuntimeError(f"Plate solve failed: {stderr.strip() or 'the image could not be read'}")
+            data = data[0]
+        if not data.get("solved"):
+            stars = data.get("stars")
+            detail = f"no solution found ({stars} stars detected)" if stars is not None else "no solution found"
+            raise RuntimeError(f"Plate solve failed: {detail}")
+
+        wcs = data["wcs"]
+        cd = (wcs["CD1_1"], wcs["CD1_2"], wcs["CD2_1"], wcs["CD2_2"])
+        pixel_scale_deg, rotation = _scale_and_rotation(cd)
+        return SolveResult(
+            ra=round(float(data["ra"]), 6),
+            dec=round(float(data["dec"]), 6),
+            rotation=round(rotation, 2),
+            pixel_scale=round(pixel_scale_deg * 3600, 4),
+            field_w=round(float(data["fieldWidth"]), 4),
+            field_h=round(float(data["fieldHeight"]), 4),
+            cd=cd,
+        )

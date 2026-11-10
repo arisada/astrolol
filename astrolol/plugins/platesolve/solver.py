@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import contextlib
 import time
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from typing import Any
@@ -24,6 +25,7 @@ from astrolol.plugins.platesolve.backends import AstapSolver, Solver, parse_wcs
 from astrolol.plugins.platesolve.centering import CenterRequest, CenterResult, CenterRun, Centerer
 from astrolol.plugins.platesolve.enrich import enrich_request
 from astrolol.plugins.platesolve.models import SolveJob, SolveRequest, SolveResult
+from astrolol.plugins.platesolve.settings import PlatesolveSettings
 
 logger = structlog.get_logger()
 
@@ -76,17 +78,24 @@ class SolveManager:
         event_bus: EventBus,
         astap_bin: str = "astap_cli",
         astap_db_path: str = "/opt/astap",
-        solver: Solver | None = None,
+        solvers: Sequence[Solver] | None = None,
     ) -> None:
         self._event_bus = event_bus
         # Kept for the ASTAP database endpoints; the solver does the work.
         self._astap_bin = astap_bin
         self._astap_db_path = astap_db_path
-        self._solver: Solver = solver or AstapSolver(astap_bin, astap_db_path)
+        # By name; the user setting `engine` picks one per solve.
+        self._solvers: dict[str, Solver] = {
+            s.name: s for s in (solvers or [AstapSolver(astap_bin, astap_db_path)])
+        }
         self._jobs: dict[str, _Job] = {}
         self._app: Any = None
         self._center_run: CenterRun | None = None
         self._center_task: asyncio.Task[None] | None = None
+
+    @property
+    def solvers(self) -> dict[str, Solver]:
+        return self._solvers
 
     def attach_app(self, app: Any) -> None:
         """Give the manager access to app.state (mount, imager, profile) for centering."""
@@ -331,15 +340,39 @@ class SolveManager:
         finally:
             self._prune()
 
+    def _solver_order(self) -> list[Solver]:
+        """The solvers to try, in order: the chosen engine, then (if enabled) the others."""
+        settings = PlatesolveSettings()
+        if self._app is not None:
+            try:
+                raw = self._app.state.profile_store.get_user_settings().plugin_settings.get("platesolve", {})
+                settings = PlatesolveSettings(**raw)
+            except Exception as exc:
+                logger.warning("platesolve.settings_unreadable", reason=str(exc))
+        solvers = list(self._solvers.values())
+        primary = self._solvers.get(settings.engine, solvers[0])
+        return [primary] + [s for s in solvers if s is not primary and settings.fallback]
+
     async def _solve(self, req: SolveRequest, job_id: str) -> SolveResult:
-        """Run the solver backend on the image, streaming its output to the log."""
+        """Run the chosen solver on the image, streaming its output to the log. When it finds
+        nothing the other solver gets a go (setting `fallback`); the first error is the one reported."""
         async def log(text: str) -> None:
             await self._event_bus.publish(
                 LogEvent(level="info", component="platesolve", message=text)
             )
 
+        first_error: RuntimeError | None = None
         async with mem_guard():
-            return await self._solver.solve(req, job_id=job_id, log=log)
+            for solver in self._solver_order():
+                try:
+                    result = await solver.solve(req, job_id=job_id, log=log)
+                except RuntimeError as exc:
+                    first_error = first_error or exc
+                    logger.warning("platesolve.solver_failed", solve_id=job_id, solver=solver.name, error=str(exc))
+                    continue
+                return result.model_copy(update={"solver": solver.name})
+        assert first_error is not None
+        raise first_error
 
     def _prune(self) -> None:
         """Remove oldest terminal jobs when the store grows beyond _MAX_JOBS."""

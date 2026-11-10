@@ -126,6 +126,11 @@ on the `PATH`.
 sudo apt-get install astap-cli gsc
 ```
 
+**Optional: Asterion plate solver** (much faster than ASTAP, and a newer program): unpack the
+release for your machine (Linux x86-64 or ARM64, one self-contained executable) from
+<https://github.com/asterion-solver/asterion/releases>, put `asterion` on the `PATH`, then choose it
+in the Plate Solving settings, where **Install catalog** downloads its star catalog.
+
 **Optional: Bluetooth serial devices** (`bluetooth_serial` plugin):
 ```bash
 sudo apt-get install bluez bluez-tools
@@ -192,6 +197,7 @@ images_dir = "/mnt/usb/raw"         # raw camera files. Default: <data_dir>/imag
 # extra_drivers = ["indi_my_driver"]  # drivers missing from the INDI/INDIGO driver lists
 # indigo_server_path = "/opt/indigo/bin/indigo_server"
 # astap_program = "astap_cli"       # and astap_database = "/opt/astap"
+# asterion_program = "asterion"     # and asterion_catalog_dir (default: <data_dir>/asterion)
 ```
 
 The full list is `Settings` in [`astrolol/config/settings.py`](astrolol/config/settings.py). A

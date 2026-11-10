@@ -674,7 +674,8 @@ astrolol/plugins/
 │                       # Sharpless/Hipparcos + common names), SIMBAD fallback, solar system
 ├── phd2/               # PHD2 autoguider client — implements core.guiding.Guider, guide
 │                       # graph, auto-dither, health check
-├── platesolve/         # ASTAP-backed astrometric solving + solve-sync-reslew loop
+├── platesolve/         # astrometric solving + solve-sync-reslew loop. backends.py: the Solver protocol with
+│                       # AstapSolver and AsterionSolver (the `engine` setting picks one, `fallback` tries the other)
 ├── sequencer/          # Task-queue imaging sequencer — ordered exposure plans with slew/
 │                       # center/guide/dither/meridian-flip, resumable, multi-camera lanes,
 │                       # session journal, named/saved sequences. Largest plugin.
