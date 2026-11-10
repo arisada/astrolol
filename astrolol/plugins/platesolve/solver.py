@@ -1,15 +1,11 @@
-"""Plate-solving manager — runs astap_cli subprocesses, one asyncio.Task per job."""
+"""Plate-solving manager — one asyncio.Task per job, the actual solving done by a Solver backend."""
 from __future__ import annotations
 
 import asyncio
 import contextlib
-import math
-import shutil
-import tempfile
 import time
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
@@ -24,6 +20,7 @@ from astrolol.plugins.platesolve.events import (
     PlatesolveStarted,
 )
 from astrolol.core.events.models import LogEvent
+from astrolol.plugins.platesolve.backends import AstapSolver, Solver, parse_wcs
 from astrolol.plugins.platesolve.centering import CenterRequest, CenterResult, CenterRun, Centerer
 from astrolol.plugins.platesolve.enrich import enrich_request
 from astrolol.plugins.platesolve.models import SolveJob, SolveRequest, SolveResult
@@ -64,51 +61,7 @@ class _Job:
         )
 
 
-# ---------------------------------------------------------------------------
-# WCS parser (blocking — run via asyncio.to_thread)
-# ---------------------------------------------------------------------------
-
-def _parse_wcs(fits_path: str) -> SolveResult:
-    """Read the WCS solution written by astap_cli -update from a FITS header."""
-    import astropy.io.fits as afits
-
-    with afits.open(fits_path) as hdul:
-        h = hdul[0].header
-
-        if "CRVAL1" not in h or "CRVAL2" not in h:
-            raise RuntimeError("astap_cli returned success but WCS keywords are missing")
-
-        ra = float(h["CRVAL1"])
-        dec = float(h["CRVAL2"])
-
-        cd: tuple[float, float, float, float] | None = None
-        if "CD1_1" in h:
-            cd1_1 = float(h["CD1_1"])
-            cd1_2 = float(h.get("CD1_2", 0))
-            cd2_1 = float(h.get("CD2_1", 0))
-            pixel_scale_deg = math.sqrt(cd1_1 ** 2 + cd2_1 ** 2)
-            rotation = math.degrees(math.atan2(-cd1_2, cd1_1)) % 360
-            cd2_2 = float(h.get("CD2_2", 0))
-            cd = (cd1_1, cd1_2, cd2_1, cd2_2)
-        else:
-            pixel_scale_deg = abs(float(h.get("CDELT1", 0)))
-            rotation = float(h.get("CROTA2", 0))
-
-        pixel_scale = pixel_scale_deg * 3600  # arcsec/pixel
-        naxis1 = int(h.get("NAXIS1", 0))
-        naxis2 = int(h.get("NAXIS2", 0))
-        field_w = naxis1 * pixel_scale_deg
-        field_h = naxis2 * pixel_scale_deg
-
-        return SolveResult(
-            ra=round(ra, 6),
-            dec=round(dec, 6),
-            rotation=round(rotation, 2),
-            pixel_scale=round(pixel_scale, 4),
-            field_w=round(field_w, 4),
-            field_h=round(field_h, 4),
-            cd=cd,
-        )
+_parse_wcs = parse_wcs  # historical name, used by tests
 
 
 # ---------------------------------------------------------------------------
@@ -116,17 +69,20 @@ def _parse_wcs(fits_path: str) -> SolveResult:
 # ---------------------------------------------------------------------------
 
 class SolveManager:
-    """Manages concurrent plate-solve jobs, each running astap_cli in a subprocess."""
+    """Manages concurrent plate-solve jobs, each solved by the configured Solver backend."""
 
     def __init__(
         self,
         event_bus: EventBus,
         astap_bin: str = "astap_cli",
         astap_db_path: str = "/opt/astap",
+        solver: Solver | None = None,
     ) -> None:
         self._event_bus = event_bus
+        # Kept for the ASTAP database endpoints; the solver does the work.
         self._astap_bin = astap_bin
         self._astap_db_path = astap_db_path
+        self._solver: Solver = solver or AstapSolver(astap_bin, astap_db_path)
         self._jobs: dict[str, _Job] = {}
         self._app: Any = None
         self._center_run: CenterRun | None = None
@@ -376,82 +332,14 @@ class SolveManager:
             self._prune()
 
     async def _solve(self, req: SolveRequest, job_id: str) -> SolveResult:
-        """Copy the FITS to a temp dir, run astap_cli, stream progress, parse WCS."""
-        async with mem_guard():
-            return await self._solve_inner(req, job_id)
-
-    async def _solve_inner(self, req: SolveRequest, job_id: str) -> SolveResult:
-        """Inner solve — called under the mem_guard context."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            tmp_fits = Path(tmpdir) / "solve.fits"
-            await asyncio.to_thread(shutil.copy2, req.fits_path, str(tmp_fits))
-
-            cmd = [
-                self._astap_bin,
-                "-f", str(tmp_fits),
-                "-z", "0",        # auto-downsample for speed
-                "-r", str(req.radius),
-                "-d", self._astap_db_path,
-                "-update",
-            ]
-            if req.ra_hint is not None:
-                cmd += ["-ra", str(req.ra_hint / 15.0)]    # degrees → hours
-            if req.dec_hint is not None:
-                cmd += ["-spd", str(90.0 + req.dec_hint)]  # dec → south-pole distance
-            if req.tolerance is not None:
-                cmd += ["-t", str(req.tolerance)]
-            if req.fov is not None:
-                cmd += ["-fov", str(req.fov)]
-
-            logger.info("platesolve.running", solve_id=job_id, cmd=" ".join(cmd))
-
-            if not shutil.which(self._astap_bin):
-                raise RuntimeError(
-                    f"'{self._astap_bin}' not found — install the astap-cli package"
-                )
-
-            proc = await asyncio.create_subprocess_exec(
-                *cmd,
-                stdout=asyncio.subprocess.PIPE,
-                stderr=asyncio.subprocess.PIPE,
+        """Run the solver backend on the image, streaming its output to the log."""
+        async def log(text: str) -> None:
+            await self._event_bus.publish(
+                LogEvent(level="info", component="platesolve", message=text)
             )
 
-            stderr_chunks: list[bytes] = []
-
-            async def _drain_stderr() -> None:
-                while True:
-                    chunk = await proc.stderr.read(4096)  # type: ignore[union-attr]
-                    if not chunk:
-                        break
-                    stderr_chunks.append(chunk)
-
-            stderr_task = asyncio.create_task(_drain_stderr())
-            try:
-                while True:
-                    line = await proc.stdout.readline()  # type: ignore[union-attr]
-                    if not line:
-                        break
-                    text = line.decode("utf-8", errors="replace").rstrip()
-                    if text:
-                        await self._event_bus.publish(
-                            LogEvent(level="info", component="platesolve", message=text)
-                        )
-                await stderr_task
-                await proc.wait()
-            except asyncio.CancelledError:
-                try:
-                    proc.kill()
-                    await proc.wait()
-                except Exception:
-                    pass
-                raise
-
-            if proc.returncode != 0:
-                stderr_text = b"".join(stderr_chunks).decode("utf-8", errors="replace").strip()
-                detail = stderr_text or f"exit code {proc.returncode}"
-                raise RuntimeError(f"Plate solve failed: {detail}")
-
-            return await asyncio.to_thread(_parse_wcs, str(tmp_fits))
+        async with mem_guard():
+            return await self._solver.solve(req, job_id=job_id, log=log)
 
     def _prune(self) -> None:
         """Remove oldest terminal jobs when the store grows beyond _MAX_JOBS."""
