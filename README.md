@@ -129,7 +129,12 @@ sudo apt-get install astap-cli gsc
 **Optional: Asterion plate solver** (much faster than ASTAP, and a newer program): unpack the
 release for your machine (Linux x86-64 or ARM64, one self-contained executable) from
 <https://github.com/asterion-solver/asterion/releases>, put `asterion` on the `PATH`, then choose it
-in the Plate Solving settings, where **Install catalog** downloads its star catalog.
+in the Plate Solving settings, where **Install catalog** downloads its star catalog. To compare
+it with ASTAP on your own frames (speed, solve rate, agreement):
+
+```bash
+python3 -m astrolol.plugins.platesolve.benchmark ~/astrolol_pictures --modes hinted,blind --repeat 3
+```
 
 **Optional: Bluetooth serial devices** (`bluetooth_serial` plugin):
 ```bash

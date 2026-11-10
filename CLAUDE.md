@@ -446,6 +446,11 @@ Plugin scopes are collected at startup and exposed via `GET /admin/log_scopes`;
   `libdns_sd.so.1` against the system libavahi-client, drop it and `dns_sd.h` into INDIGO's
   `build/lib` and `build/include` after `make init`, `make all`, then symlink
   `build/bin/indigo_server` into `~/.local/bin`.
+  The platesolve plugin's `tests/test_asterion_real.py` runs against the real Asterion solver and is
+  skipped without `asterion` on the PATH (or `ASTROLOL_ASTERION`) and an installed catalog
+  (`ASTROLOL_ASTERION_CATALOGS`, default `<data_dir>/asterion`); the release is one native executable,
+  and `asterion --download-catalog tycho2` installs the catalog. `python3 -m astrolol.plugins.platesolve.benchmark`
+  compares it with ASTAP on real frames (solve rate, timing, agreement; blind and hinted, stress variants).
   The alpaca plugin's tests (`astrolol/plugins/alpaca/tests/`) run against ASCOM's OmniSim and are
   skipped without `ascom.alpaca.simulators` on the PATH (or `ASTROLOL_ALPACA_SIM`; not in the
   Docker image): unpack the self-contained Linux release (v0.4.0) and link the binary into
@@ -675,7 +680,8 @@ astrolol/plugins/
 ├── phd2/               # PHD2 autoguider client — implements core.guiding.Guider, guide
 │                       # graph, auto-dither, health check
 ├── platesolve/         # astrometric solving + solve-sync-reslew loop. backends.py: the Solver protocol with
-│                       # AstapSolver and AsterionSolver (the `engine` setting picks one, `fallback` tries the other)
+│                       # AstapSolver and AsterionSolver (the `engine` setting picks one, `fallback` tries the other);
+│                       # benchmark.py compares them on real frames (python3 -m ...platesolve.benchmark)
 ├── sequencer/          # Task-queue imaging sequencer — ordered exposure plans with slew/
 │                       # center/guide/dither/meridian-flip, resumable, multi-camera lanes,
 │                       # session journal, named/saved sequences. Largest plugin.
