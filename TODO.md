@@ -20,6 +20,13 @@ Items designed for but not yet built. Ordered roughly by priority.
   **Fix: enable "Reverse Dec output after meridian flip" in PHD2's own Advanced Settings →
   Guiding tab.** This is a one-time PHD2-side setting, not an astrolol code change — nothing
   here needs patching.
+- **Warn about USB over-current and under-voltage** (2026-11-10) — on a humid night the Pi 5's USB
+  power limit tripped at 07:00 (about 330 `clear tt -71` errors on a camera hub, then over-current
+  on all four root ports), every device dropped, and one camera never came back; nothing in astrolol
+  said why. The system plugin already reads `/plugins/system/usb` and `/throttled`: watch the kernel
+  log (`journalctl -k`, not `dmesg`, whose ring buffer the storm overflows) for `over-current` and
+  `-71` bursts and the throttle flags (under-voltage has occurred / is now), raise a warning with
+  the device that vanished, and show it in the sequencer's stall reasons.
 - **Reconnecting a device after a USB glitch doesn't show up for freshly opened clients** —
   observed after a USB disconnect/reconnect mid-session: the already-open window keeps
   showing the mount (stale, pre-refresh state), but a *new* browser window/tab never shows
