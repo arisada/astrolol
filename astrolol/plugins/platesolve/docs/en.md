@@ -26,6 +26,32 @@ established one. Open the settings (gear at the top of the panel):
 The image scale comes from the telescope's focal length and the camera's pixel size in the
 [inventory](../../../../docs/en/equipment.md#inventory), so fill those in.
 
+## Using Asterion
+
+1. Install the program: download the Linux release from <https://github.com/asterion-solver>,
+   unpack it and put the `asterion` file in a folder on the `PATH` (for example
+   `~/.local/bin`). If it lives elsewhere, set `asterion_program` in
+   `/etc/astrolol/astrolol.toml`.
+2. Open the settings and choose **Asterion** as **Solver**. If the star data is missing, a banner
+   offers **Install catalog**: it downloads the Tycho-2 catalogue (about 300 MB, with progress in
+   the log). It suits fields wider than 0.7°; a narrower field needs one of the larger catalogues
+   (1.5 GB and more), installed with `asterion --download-catalog` in a terminal.
+3. Solve as usual. Asterion needs no position: if the mount's position is unknown or far off, it
+   still finds the field, so the search radius matters little.
+
+Leave **Try the other solver when this one finds nothing** on to keep ASTAP as a safety net; the
+**Recent solves** list tells which program found each solution.
+
+To compare the two on your own frames (solve rate, time, agreement), run this in a terminal on
+the telescope computer:
+
+```
+python3 -m astrolol.plugins.platesolve.benchmark /path/to/frames --repeat 3
+```
+
+It solves every FITS file with both programs, with and without the position hint, and prints a
+table; `--help` lists the options (stress variants such as a cropped or noisier frame, JSON output).
+
 ## Solving
 
 1. **Camera**: the camera to take the frame with.

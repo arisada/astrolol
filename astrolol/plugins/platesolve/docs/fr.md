@@ -27,6 +27,34 @@ dentée en haut du panneau) :
 L'échantillonnage vient de la focale du télescope et de la taille de pixel de la caméra dans
 l'[inventaire](../../../../docs/fr/equipment.md#inventaire) : renseignez-les.
 
+## Utiliser Asterion
+
+1. Installez le programme : téléchargez la version Linux sur <https://github.com/asterion-solver>,
+   décompressez-la et placez le fichier `asterion` dans un dossier du `PATH` (par exemple
+   `~/.local/bin`). S'il est ailleurs, renseignez `asterion_program` dans
+   `/etc/astrolol/astrolol.toml`.
+2. Ouvrez les réglages et choisissez **Asterion** comme **Solveur**. Si les données d'étoiles
+   manquent, un bandeau propose **Installer le catalogue** : il télécharge le catalogue Tycho-2
+   (environ 300 Mo, avec la progression dans le journal). Il convient aux champs de plus de 0,7° ;
+   un champ plus étroit demande un des catalogues plus gros (1,5 Go et plus), installé avec
+   `asterion --download-catalog` dans un terminal.
+3. Résolvez comme d'habitude. Asterion n'a pas besoin de position : si celle de la monture est
+   inconnue ou très fausse, il trouve quand même le champ, le rayon de recherche compte donc peu.
+
+Laissez activé **Essayer l'autre solveur quand celui-ci ne trouve rien** pour garder ASTAP en
+secours ; la liste **Résolutions récentes** indique quel programme a trouvé chaque solution.
+
+Pour comparer les deux sur vos propres images (taux de réussite, durée, accord), lancez dans un
+terminal de l'ordinateur du télescope :
+
+```
+python3 -m astrolol.plugins.platesolve.benchmark /chemin/vers/images --repeat 3
+```
+
+Chaque fichier FITS est résolu avec les deux programmes, avec et sans la position indiquée, et un
+tableau s'affiche ; `--help` liste les options (variantes de test comme une image recadrée ou plus
+bruitée, sortie JSON).
+
 ## Résoudre
 
 1. **Caméra** : la caméra qui prend l'image.
