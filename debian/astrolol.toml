@@ -28,5 +28,5 @@ data_dir = "/var/lib/astrolol"
 # Programs astrolol runs.
 #indigo_server_path = "indigo_server"
 #astap_program = "astap_cli"
-#asterion_program = "asterion"    # catalogs: asterion_catalog_dir, default <data_dir>/asterion
+#asterion_program = "asterion"    # only used without the asterion Python package; catalogs: asterion_catalog_dir, default <data_dir>/asterion
 #astap_database = "/opt/astap"

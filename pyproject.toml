@@ -34,6 +34,8 @@ dependencies = [
 astrolol = "astrolol.main:run"
 
 [project.optional-dependencies]
+# The Asterion plate solver as a Python package (the platesolve plugin falls back to its program).
+asterion = ["asterion-solver>=0.4.2"]
 dev = [
     "pytest>=8.0",
     "pytest-asyncio>=0.24",

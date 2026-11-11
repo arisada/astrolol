@@ -51,7 +51,7 @@ def test_solvers_reports_program_and_data(tmp_path) -> None:
 
 
 def test_install_catalog_needs_the_program() -> None:
-    client, _ = _client([AsterionSolver("__no_such_asterion__", "/nonexistent")])
+    client, _ = _client([AsterionSolver("__no_such_asterion__", "/nonexistent", library=False)])
     r = client.post("/plugins/platesolve/install_catalog")
     assert r.status_code == 409 and "not found" in r.json()["detail"]
 
@@ -74,7 +74,7 @@ async def test_install_catalog_runs_the_download_and_reports(tmp_path) -> None:
     program.write_text('#!/bin/sh\necho "Downloading $4"\nmkdir -p "$2"\ntouch "$2/tycho2.astx"\n')
     program.chmod(program.stat().st_mode | stat.S_IEXEC)
     cats = tmp_path / "cats"
-    solver = AsterionSolver(str(program), str(cats))
+    solver = AsterionSolver(str(program), str(cats), library=False)
     bus = _Bus()
     await _do_install_catalog(bus, solver)
     assert solver.catalogs_installed()
@@ -90,6 +90,6 @@ async def test_install_catalog_failure_is_logged(tmp_path) -> None:
     program.write_text("#!/bin/sh\necho no network >&2\nexit 3\n")
     program.chmod(program.stat().st_mode | stat.S_IEXEC)
     bus = _Bus()
-    await _do_install_catalog(bus, AsterionSolver(str(program), str(tmp_path / "c")))
+    await _do_install_catalog(bus, AsterionSolver(str(program), str(tmp_path / "c"), library=False))
     assert any("Download failed: no network" in m for m in bus.messages)
     await asyncio.sleep(0)

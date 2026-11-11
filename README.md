@@ -126,10 +126,11 @@ on the `PATH`.
 sudo apt-get install astap-cli gsc
 ```
 
-**Optional: Asterion plate solver** (much faster than ASTAP, and a newer program): unpack the
-release for your machine (Linux x86-64 or ARM64, one self-contained executable) from
-<https://github.com/asterion-solver/asterion/releases>, put `asterion` on the `PATH`, then choose it
-in the Plate Solving settings, where **Install catalog** downloads its star catalog. To compare
+**Optional: Asterion plate solver** (much faster than ASTAP, and a newer program):
+`pip install asterion-solver` (or `pip install "astrolol[asterion]"`) in the Python environment astrolol
+runs in, then choose it in the Plate Solving settings, where **Install catalog** downloads its star
+catalog. Without the package, astrolol runs the `asterion` program if it is on the `PATH` (one
+self-contained executable, from <https://github.com/asterion-solver/asterion/releases>). To compare
 it with ASTAP on your own frames (speed, solve rate, agreement):
 
 ```bash

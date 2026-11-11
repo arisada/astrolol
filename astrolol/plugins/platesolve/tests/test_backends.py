@@ -130,7 +130,7 @@ def test_asterion_plain_text_errors_are_passed_on() -> None:
 @pytest.mark.asyncio
 async def test_asterion_missing_program() -> None:
     with pytest.raises(RuntimeError, match="not found"):
-        await AsterionSolver("__no_such_asterion__").solve(SolveRequest(fits_path="a.fits"), job_id="x", log=_noop)
+        await AsterionSolver("__no_such_asterion__", library=False).solve(SolveRequest(fits_path="a.fits"), job_id="x", log=_noop)
 
 
 async def _noop(_: str) -> None:

@@ -1,6 +1,8 @@
 """Plate-solving plugin for astrolol."""
 from __future__ import annotations
 
+import asyncio
+
 import structlog
 from fastapi import FastAPI
 
@@ -64,6 +66,9 @@ class PlatesolvePlugin:
             if job.task is not None and not job.task.done():
                 job.task.cancel()
         await self._manager.cancel_center()
+        for solver in self._manager.solvers.values():
+            if isinstance(solver, AsterionSolver):
+                await asyncio.to_thread(solver.close)
 
 
 def get_plugin() -> PlatesolvePlugin:

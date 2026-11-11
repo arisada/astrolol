@@ -368,6 +368,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--astap-db", default=str(settings.astap_database))
     ap.add_argument("--asterion", default=settings.asterion_program)
     ap.add_argument("--asterion-catalogs", default=str(settings.asterion_catalog_dir))
+    ap.add_argument("--asterion-cli", action="store_true",
+                    help="run the asterion program even when its Python package is installed")
     args = ap.parse_args(argv)
 
     try:
@@ -378,7 +380,7 @@ def main(argv: list[str] | None = None) -> int:
         ap.error("no FITS images found")
     available = {
         "astap": AstapSolver(args.astap, args.astap_db),
-        "asterion": AsterionSolver(args.asterion, args.asterion_catalogs),
+        "asterion": AsterionSolver(args.asterion, args.asterion_catalogs, library=not args.asterion_cli),
     }
     solvers = [available[name] for name in args.solvers]
 

@@ -17,7 +17,7 @@ established one. Open the settings (gear at the top of the panel):
 |---|---|
 | Solver | Which program solves. **ASTAP** is the default. |
 | Try the other solver when this one finds nothing | A second chance with the other program before the solve is reported as failed. |
-| Program | The program of the chosen solver, shown here. Set in the configuration file `/etc/astrolol/astrolol.toml` (`astap_program`, `asterion_program`). |
+| Program | The program of the chosen solver, shown here. Set in the configuration file `/etc/astrolol/astrolol.toml` (`astap_program`, `asterion_program`; Asterion's is only used when its Python package is not installed). |
 | Star data | The folder holding the star database (ASTAP: `astap_database`) or catalogs (Asterion: `asterion_catalog_dir`), shown here. If it is missing, **Install d05** (ASTAP) or **Install catalog** (Asterion) downloads it; either suits most setups. The Asterion catalog suits fields wider than 0.7°. |
 | Search radius (°) | How far from the mount's position to search. Larger is slower but tolerates a worse pointing. |
 | Tolerance | How strictly star patterns must match (ASTAP only). |
@@ -28,10 +28,12 @@ The image scale comes from the telescope's focal length and the camera's pixel s
 
 ## Using Asterion
 
-1. Install the program: download the Linux release from <https://github.com/asterion-solver>,
-   unpack it and put the `asterion` file in a folder on the `PATH` (for example
-   `~/.local/bin`). If it lives elsewhere, set `asterion_program` in
-   `/etc/astrolol/astrolol.toml`.
+1. Install it: `pip install asterion-solver` in the Python environment astrolol runs in, then
+   restart astrolol. Without the package, astrolol runs the `asterion` program instead: download
+   the Linux release from <https://github.com/asterion-solver>, unpack it and put the `asterion`
+   file in a folder on the `PATH` (for example `~/.local/bin`). If it lives elsewhere, set
+   `asterion_program` in `/etc/astrolol/astrolol.toml`. The package is the better choice: it
+   keeps the catalogs in memory between solves, so each solve is faster.
 2. Open the settings and choose **Asterion** as **Solver**. If the star data is missing, a banner
    offers **Install catalog**: it downloads the Tycho-2 catalogue (about 300 MB, with progress in
    the log). It suits fields wider than 0.7°; a narrower field needs one of the larger catalogues

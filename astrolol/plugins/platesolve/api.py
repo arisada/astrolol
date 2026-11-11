@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field
 
 from astrolol.config.settings import OutsideStorage, storage_path
 from astrolol.core.events.models import LogEvent
-from astrolol.plugins.platesolve.backends import AsterionSolver, AstapSolver, run_streaming
+from astrolol.plugins.platesolve.backends import AsterionSolver, AstapSolver
 from astrolol.plugins.platesolve.centering import CenterRequest, CenterRun
 from astrolol.plugins.platesolve.enrich import compute_fov, enrich_request
 from astrolol.plugins.platesolve.models import SolveJob, SolveRequest
@@ -171,7 +171,7 @@ async def solvers(request: Request) -> list[SolverStatus]:
             ))
         elif isinstance(solver, AsterionSolver):
             out.append(SolverStatus(
-                name=solver.name, program=solver.program, program_found=shutil.which(solver.program) is not None,
+                name=solver.name, program=solver.program, program_found=solver.available(),
                 data_path=solver.catalog_dir or "", data_installed=solver.catalogs_installed(),
             ))
     return out
@@ -184,7 +184,7 @@ async def install_catalog(request: Request) -> dict:
     solver = _manager(request).solvers.get("asterion")
     if not isinstance(solver, AsterionSolver):
         raise HTTPException(status_code=404, detail="The Asterion solver is not available")
-    if not shutil.which(solver.program):
+    if not solver.available():
         raise HTTPException(status_code=409, detail=f"'{solver.program}' not found — install the Asterion solver")
     event_bus = request.app.state.event_bus
     asyncio.create_task(_do_install_catalog(event_bus, solver), name="platesolve_install_catalog")
@@ -195,18 +195,13 @@ async def _do_install_catalog(event_bus, solver: AsterionSolver) -> None:  # typ
     async def log(msg: str, level: str = "info") -> None:
         await event_bus.publish(LogEvent(level=level, component="platesolve", message=msg))
 
-    if solver.catalog_dir:
-        Path(solver.catalog_dir).mkdir(parents=True, exist_ok=True)
     await log(f"Downloading the {solver.DEFAULT_CATALOG} star catalog…")
     try:
-        code, _, stderr = await run_streaming(solver.download_command(), log)
-    except OSError as exc:
-        await log(f"Cannot run {solver.program}: {exc}", level="error")
+        await solver.install_catalog(log)
+    except (OSError, RuntimeError) as exc:
+        await log(f"Download failed: {exc}", level="error")
         return
-    if code == 0:
-        await log("Star catalog installed successfully!")
-    else:
-        await log(f"Download failed: {stderr or f'exit code {code}'}", level="error")
+    await log("Star catalog installed successfully!")
 
 
 class DbStatus(BaseModel):

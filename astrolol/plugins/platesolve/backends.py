@@ -12,6 +12,7 @@ import json
 import math
 import shutil
 import tempfile
+import threading
 from collections.abc import Awaitable, Callable
 from pathlib import Path
 from typing import Protocol, runtime_checkable
@@ -192,18 +193,58 @@ class AstapSolver:
 # Asterion
 # ---------------------------------------------------------------------------
 
+def _asterion_module():
+    """The ``asterion`` Python package (pip install asterion-solver), or None."""
+    try:
+        import asterion
+    except ImportError:
+        return None
+    return asterion
+
+
+def _load_pixels(fits_path: str):
+    """The image of a FITS file as the gray levels Asterion reads (blocking)."""
+    import astropy.io.fits as afits
+    import numpy as np
+
+    with afits.open(fits_path) as hdul:
+        data = next((h.data for h in hdul if h.data is not None), None)
+    if data is None:
+        raise RuntimeError("the image could not be read: the FITS file has no pixels")
+    if data.ndim == 3:  # a colour image: the sum of its channels, as the command line tool does
+        data = data.sum(axis=0, dtype=np.float32)
+    if data.ndim != 2:
+        raise RuntimeError(f"the image could not be read: {data.ndim} dimensions")
+    # FITS is big-endian; the library wants native order and 8/16-bit integers or 32-bit floats.
+    if data.dtype.kind == "u" and data.dtype.itemsize <= 2:
+        return data.astype(f"=u{data.dtype.itemsize}", copy=False)
+    return data.astype(np.float32, copy=False)
+
+
 class AsterionSolver:
-    """The Asterion plate solver (``asterion``). It reads the image where it is and prints the
-    solution as JSON, so nothing is copied or rewritten."""
+    """The Asterion plate solver. It uses the ``asterion`` Python package when it is installed:
+    the solver then stays in memory with its catalogs open between solves. Otherwise it runs the
+    ``asterion`` program, which reads the image where it is and prints the solution as JSON."""
 
     name = "asterion"
 
-    def __init__(self, program: str = "asterion", catalog_dir: str | None = None) -> None:
+    def __init__(self, program: str = "asterion", catalog_dir: str | None = None, *, library: bool = True) -> None:
         self.program = program
         self.catalog_dir = catalog_dir
+        self._library = library
+        self._open: object | None = None   # the library's Solver, opened by the first solve
+        self._lock = threading.Lock()
 
     # The catalog the page installs: small enough for a Pi, for fields wider than 0.7°.
     DEFAULT_CATALOG = "tycho2"
+
+    @property
+    def uses_library(self) -> bool:
+        return self._library and _asterion_module() is not None
+
+    def available(self) -> bool:
+        """Whether something can solve: the Python package, or the program on the PATH."""
+        return self.uses_library or shutil.which(self.program) is not None
 
     def catalogs_installed(self) -> bool:
         return bool(self.catalog_dir) and any(Path(self.catalog_dir).glob("*.astx"))
@@ -226,23 +267,88 @@ class AsterionSolver:
         # req.tolerance is ASTAP's match tolerance; Asterion verifies matches statistically.
         return cmd + [req.fits_path]
 
+    def options(self, req: SolveRequest) -> dict[str, float]:
+        """The same hints as ``command``, as options of the library's ``solve``."""
+        opts: dict[str, float] = {}
+        if req.ra_hint is not None and req.dec_hint is not None:
+            opts.update(ra=req.ra_hint, dec=req.dec_hint, radius=req.radius)
+        if req.fov is not None:
+            opts["fov"] = req.fov
+        return opts
+
+    def close(self) -> None:
+        """Release the catalogs held in memory; the next solve opens them again."""
+        with self._lock:
+            solver, self._open = self._open, None
+        if solver is not None:
+            solver.close()  # type: ignore[attr-defined]
+
+    def _library_solver(self, asterion):
+        with self._lock:
+            if self._open is None:
+                self._open = asterion.Solver(self.catalog_dir)
+            return self._open
+
+    def _solve_with_library(self, asterion, req: SolveRequest) -> SolveResult:
+        """Blocking: run via asyncio.to_thread. A solve takes milliseconds, so one that is cancelled
+        is left to finish rather than interrupted."""
+        pixels = _load_pixels(req.fits_path)
+        try:
+            result = self._library_solver(asterion).solve(pixels, **self.options(req))
+        except (asterion.AsterionError, ValueError) as exc:
+            raise RuntimeError(f"Plate solve failed: {exc}") from None
+        return self.result_from_data(json.loads(result.json))
+
     async def solve(self, req: SolveRequest, *, job_id: str, log: LogFn) -> SolveResult:
-        cmd = self.command(req)
-        logger.info("platesolve.running", solve_id=job_id, solver=self.name, cmd=" ".join(cmd))
-
-        if not shutil.which(self.program):
-            raise RuntimeError(f"'{self.program}' not found — install the Asterion solver")
-
-        returncode, stdout, stderr = await run_streaming(cmd, None)
-        result = self.parse_output(returncode, stdout, stderr)
+        asterion = _asterion_module() if self._library else None
+        if asterion is not None:
+            logger.info("platesolve.running", solve_id=job_id, solver=self.name, via="library")
+            result = await asyncio.to_thread(self._solve_with_library, asterion, req)
+        else:
+            cmd = self.command(req)
+            logger.info("platesolve.running", solve_id=job_id, solver=self.name, cmd=" ".join(cmd))
+            if not shutil.which(self.program):
+                raise RuntimeError(f"'{self.program}' not found — install the Asterion solver")
+            returncode, stdout, stderr = await run_streaming(cmd, None)
+            result = self.parse_output(returncode, stdout, stderr)
         await log(
             f"solved with Asterion: {result.ra:.4f} {result.dec:+.4f}, "
             f"{result.pixel_scale:.2f}\"/px"
         )
         return result
 
-    @staticmethod
-    def parse_output(returncode: int, stdout: str, stderr: str) -> SolveResult:
+    async def install_catalog(self, log: LogFn) -> None:
+        """Download the default catalog, reporting progress through ``log``. Raises RuntimeError."""
+        if self.catalog_dir:
+            Path(self.catalog_dir).mkdir(parents=True, exist_ok=True)
+        asterion = _asterion_module() if self._library else None
+        if asterion is None:
+            code, _, stderr = await run_streaming(self.download_command(), log)
+            if code != 0:
+                raise RuntimeError(stderr or f"exit code {code}")
+            return
+
+        loop = asyncio.get_running_loop()
+        last: list[object] = [None]
+
+        def progress(p) -> None:  # runs on the installing thread
+            # One line per step, then one per 10 % of it.
+            mark = (p.step, int((p.fraction or 0) * 10))
+            text = p.message or p.step
+            if text and (p.event in ("detail", "info") or mark != last[0]):
+                last[0] = mark
+                suffix = f" {round(p.fraction * 100)}%" if p.event == "progress" and p.fraction is not None else ""
+                asyncio.run_coroutine_threadsafe(log(f"{text}{suffix}"), loop)
+
+        # The library asks for its solver to be closed before it installs the catalog again.
+        await asyncio.to_thread(self.close)
+        try:
+            await asyncio.to_thread(asterion.install_catalog, self.DEFAULT_CATALOG, self.catalog_dir, progress)
+        except asterion.AsterionError as exc:
+            raise RuntimeError(str(exc)) from None
+
+    @classmethod
+    def parse_output(cls, returncode: int, stdout: str, stderr: str) -> SolveResult:
         """Turn the program's output into a result, or raise RuntimeError saying why not."""
         try:
             data = json.loads(stdout)
@@ -254,6 +360,11 @@ class AsterionSolver:
             if not data:  # the image could not be read; the reason is on stderr
                 raise RuntimeError(f"Plate solve failed: {stderr.strip() or 'the image could not be read'}")
             data = data[0]
+        return cls.result_from_data(data)
+
+    @staticmethod
+    def result_from_data(data: dict) -> SolveResult:
+        """A result from Asterion's JSON for one image (the program's and the library's are the same)."""
         if not data.get("solved"):
             stars = data.get("stars")
             detail = f"no solution found ({stars} stars detected)" if stars is not None else "no solution found"

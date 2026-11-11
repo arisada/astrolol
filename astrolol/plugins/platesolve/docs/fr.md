@@ -18,7 +18,7 @@ dentée en haut du panneau) :
 |---|---|
 | Solveur | Le programme qui résout. **ASTAP** par défaut. |
 | Essayer l'autre solveur quand celui-ci ne trouve rien | Une seconde chance avec l'autre programme avant de déclarer l'échec. |
-| Programme | Le programme du solveur choisi, affiché ici. Se règle dans le fichier de configuration `/etc/astrolol/astrolol.toml` (`astap_program`, `asterion_program`). |
+| Programme | Le programme du solveur choisi, affiché ici. Se règle dans le fichier de configuration `/etc/astrolol/astrolol.toml` (`astap_program`, `asterion_program` ; celui d'Asterion ne sert que sans son paquet Python). |
 | Données d'étoiles | Le dossier de la base d'étoiles (ASTAP : `astap_database`) ou des catalogues (Asterion : `asterion_catalog_dir`), affiché ici. S'il manque, **Installer d05** (ASTAP) ou **Installer le catalogue** (Asterion) le télécharge ; l'un comme l'autre convient à la plupart des setups. Le catalogue d'Asterion convient aux champs de plus de 0,7°. |
 | Rayon de recherche (°) | Jusqu'où chercher autour de la position de la monture. Plus grand, c'est plus lent mais tolère un pointage moins bon. |
 | Tolérance | La rigueur avec laquelle les motifs d'étoiles doivent correspondre (ASTAP seulement). |
@@ -29,10 +29,12 @@ l'[inventaire](../../../../docs/fr/equipment.md#inventaire) : renseignez-les.
 
 ## Utiliser Asterion
 
-1. Installez le programme : téléchargez la version Linux sur <https://github.com/asterion-solver>,
-   décompressez-la et placez le fichier `asterion` dans un dossier du `PATH` (par exemple
-   `~/.local/bin`). S'il est ailleurs, renseignez `asterion_program` dans
-   `/etc/astrolol/astrolol.toml`.
+1. Installez-le : `pip install asterion-solver` dans l'environnement Python d'astrolol, puis
+   redémarrez astrolol. Sans le paquet, astrolol lance le programme `asterion` : téléchargez la
+   version Linux sur <https://github.com/asterion-solver>, décompressez-la et placez le fichier
+   `asterion` dans un dossier du `PATH` (par exemple `~/.local/bin`). S'il est ailleurs,
+   renseignez `asterion_program` dans `/etc/astrolol/astrolol.toml`. Le paquet est préférable :
+   il garde les catalogues en mémoire entre deux résolutions, donc chaque résolution est plus rapide.
 2. Ouvrez les réglages et choisissez **Asterion** comme **Solveur**. Si les données d'étoiles
    manquent, un bandeau propose **Installer le catalogue** : il télécharge le catalogue Tycho-2
    (environ 300 Mo, avec la progression dans le journal). Il convient aux champs de plus de 0,7° ;
