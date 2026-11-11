@@ -4,6 +4,31 @@ Items designed for but not yet built. Ordered roughly by priority.
 
 ## Known bugs
 
+### Open since the October–November 2026 observing nights
+
+(Listed 2026-11-11; the other items of that bug list are fixed.)
+
+- **A9 — per-frame star analysis is off** (it used up too much RAM). Plan to decide on: an on-demand
+  check of a chosen frame, an event for a viewer-side pass, and an optional drift check in the
+  sequencer. Undecided.
+- **A3 — guiding problem, cause unknown.** Needs a night of data with the Guider verbosity on.
+- **A4 — Dec calibration and backlash** (see also "Dec backlash from guiding history" below).
+- **A restart loses state:** the cooler comes back off and the guider calibration is gone.
+- **Focuser temperature reads 0.0.**
+- **The queue file is rewritten at every frame** (the queue event is now only a notice; the file save
+  is the remaining per-frame cost).
+- **A 1 ms bias frame takes about 6 s** on the Pi (download, FITS save and preview are the
+  suspects). Not measured.
+- **Decision: restore the last-used gain after a restart?** Gain should always be explicit for
+  callers; the restore only matters for those that omit it.
+- **Decision: a safe `CCD_TEMP_RAMP` default.** Pinning covers it, but a fresh install starts at 0,
+  which can damage a CCD.
+- **Check that other INDI properties persist across restarts** (filter wheel, focuser speed). Never
+  finished.
+- **Autofocus on faint narrowband frames:** the star detection level is a fixed 6σ. "Track the same
+  stars" now takes its reference at the sweep centre; a higher level for faint frames is the next
+  lever if noise still passes for stars.
+
 - **INDI items connected from the tree are untested on real indiserver** — the mapping
   (`indi_<kind>` + `{device_name, executable}`) matches what the wizard sends and the INDI
   adapters load the driver themselves, but only non-INDI items were verified end to end.
