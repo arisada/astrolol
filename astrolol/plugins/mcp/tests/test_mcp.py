@@ -4,6 +4,7 @@ from __future__ import annotations
 import base64
 import io
 import json
+import time
 
 from fastapi.testclient import TestClient
 
@@ -156,6 +157,31 @@ def test_expose_returns_result_stats_and_a_shrunk_preview(mcp: Mcp) -> None:
     assert image["type"] == "image" and image["mimeType"] == "image/jpeg"
     from PIL import Image
     assert max(Image.open(io.BytesIO(base64.b64decode(image["data"]))).size) == 400
+
+
+def test_a_long_exposure_outlasts_the_wait_and_goes_on(mcp: Mcp, app) -> None:
+    result = mcp.call("camera_expose", device_id="camera_sim", duration_s=2.5, timeout_s=1)
+    assert not result["isError"], mcp.text(result)
+    reply = json.loads(mcp.text(result))
+    assert reply["result"] == "timeout" and "camera_status" in reply["note"]
+    assert app.state.finished_exposures == 0
+    time.sleep(2.5)
+    assert app.state.finished_exposures == 1  # not cancelled with the call
+
+
+def test_expose_without_wait_returns_at_once(mcp: Mcp, app) -> None:
+    result = mcp.call("camera_expose", device_id="camera_sim", duration_s=2.5, wait=False)
+    assert json.loads(mcp.text(result))["result"] == "exposing"
+    time.sleep(2.5)
+    assert app.state.finished_exposures == 1
+
+
+def test_a_wait_without_timeout_ends_before_a_client_gives_up() -> None:
+    from astrolol.plugins.mcp.tools import MAX_WAIT_S, _timeout
+
+    assert _timeout({}, 300) == MAX_WAIT_S < 60
+    assert _timeout({}, 20) == 20
+    assert _timeout({"timeout_s": 600}, 300) == 600
 
 
 def test_expose_without_preview_has_no_image(mcp: Mcp) -> None:

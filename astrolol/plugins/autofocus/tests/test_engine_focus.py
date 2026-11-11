@@ -201,6 +201,18 @@ async def test_lock_stars_measures_the_centre_first_and_keeps_the_strongest_star
     assert calls[1] == stars[:30]  # only the strongest are kept
 
 
+async def test_samples_are_filed_under_the_position_the_focuser_reached(rig: SimpleNamespace) -> None:
+    """A focuser that stops 6 steps short of each target: the curve uses where it really was."""
+    real_move = rig.focuser.move_to
+
+    async def short_move(position: int) -> None:
+        await real_move(position - 6)
+
+    rig.focuser.move_to = short_move
+    run = await rig.engine.focus("cam", "foc")
+    assert [dp.position for dp in run.data_points][:3] == [744, 794, 844]
+
+
 async def test_focus_while_running_is_refused(rig: SimpleNamespace) -> None:
     rig.focuser.gate = asyncio.Event()
     first = asyncio.create_task(rig.engine.focus("cam", "foc"))

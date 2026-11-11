@@ -12,7 +12,7 @@ from astrolol.config.logging_setup import setup_logging, event_bus_forwarder
 
 # Configure logging as early as possible so every module sees the right setup
 setup_logging(_boot_settings.log_file)
-from fastapi import FastAPI, Request, WebSocket
+from fastapi import FastAPI, Query, Request, WebSocket
 from pydantic import BaseModel
 from fastapi.exception_handlers import http_exception_handler as _default_http_exc_handler
 from fastapi.exceptions import HTTPException
@@ -375,10 +375,19 @@ def create_app() -> FastAPI:
         return new_ps[plugin_id]
 
     @app.get("/events/history")
-    async def events_history(request: Request) -> list[dict]:
+    async def events_history(
+        request: Request,
+        limit: int | None = Query(None, ge=1, description="Only the newest this many events"),
+        type_prefix: str | None = Query(None, description="Only events whose type starts with this"),
+    ) -> list[dict]:
         """Return the ring buffer of recent events for reconnecting clients."""
         bus: EventBus = request.app.state.event_bus
-        return [e.model_dump(mode="json") for e in bus.get_history()]
+        events = bus.get_history()
+        if type_prefix:
+            events = [e for e in events if e.type.startswith(type_prefix)]
+        if limit is not None:
+            events = events[-limit:]
+        return [e.model_dump(mode="json") for e in events]
 
     # Serve built UI — must be last so API routes take priority
     mount_ui(app)

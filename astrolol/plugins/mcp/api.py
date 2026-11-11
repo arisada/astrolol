@@ -1,6 +1,7 @@
 """MCP endpoint (streamable HTTP, JSON responses) and the pages the UI shows about it."""
 from __future__ import annotations
 
+import asyncio
 import json
 from pathlib import Path
 from typing import Any
@@ -38,6 +39,26 @@ def _json(payload: Any, status: int = 200) -> Response:
     return Response(json.dumps(payload), status_code=status, media_type="application/json")
 
 
+async def _release(request: Request, api: ApiClient, background: list[asyncio.Task[Any]]) -> None:
+    """Close the API client once the work a tool left running (an exposure) is over."""
+    pending = [t for t in background if not t.done()]
+    if not pending:
+        await api.aclose()
+        return
+
+    async def close_after() -> None:
+        await asyncio.gather(*pending, return_exceptions=True)
+        await api.aclose()
+
+    # Held on app.state so the task is not collected while it runs.
+    tasks: set[asyncio.Task[Any]] | None = getattr(request.app.state, "mcp_background", None)
+    if tasks is None:
+        tasks = request.app.state.mcp_background = set()
+    task = asyncio.create_task(close_after())
+    tasks.add(task)
+    task.add_done_callback(tasks.discard)
+
+
 async def _rpc(request: Request) -> Response:
     raw = await request.body()
     if len(raw) > MAX_BODY:
@@ -56,7 +77,7 @@ async def _rpc(request: Request) -> Response:
             return _json(replies) if replies else Response(status_code=202)
         reply = await handle_message(body, REGISTRY, ctx, version)
     finally:
-        await api.aclose()
+        await _release(request, api, ctx.background)
     return _json(reply) if reply is not None else Response(status_code=202)
 
 

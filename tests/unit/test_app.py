@@ -56,3 +56,26 @@ async def test_events_history_returns_published_events():
     assert response.status_code == 200
     history = response.json()
     assert any(e["id"] == event.id for e in history)
+
+
+@pytest.mark.asyncio
+async def test_events_history_honours_limit_and_type_prefix():
+    from astrolol.core.events.models import LogEvent
+
+    app = create_app()
+    bus = app.state.event_bus
+    for i in range(5):
+        await bus.publish(LogEvent(level="info", component="test", message=f"m{i}"))
+
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as client:
+        everything = (await client.get("/events/history")).json()
+        last_two = (await client.get("/events/history", params={"limit": 2})).json()
+        logs = (await client.get("/events/history", params={"type_prefix": "log", "limit": 3})).json()
+        none = (await client.get("/events/history", params={"type_prefix": "nothing.like.this"})).json()
+        bad = await client.get("/events/history", params={"limit": 0})
+
+    assert last_two == everything[-2:]
+    assert len(logs) == 3 and all(e["type"] == "log" for e in logs)
+    assert logs == [e for e in everything if e["type"] == "log"][-3:]
+    assert none == []
+    assert bad.status_code == 422

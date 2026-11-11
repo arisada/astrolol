@@ -58,7 +58,7 @@ La liste en bas de la page montre chaque outil et s'il est en lecture seule. En 
 - **Tout arrêter :** un seul appel arrête la monture, la caméra, le focuseur, le guidage et le séquenceur.
 
 Les outils d'une fonction n'apparaissent que si son module est activé. Les pointages, le parcage et la
-mise au point attendent leur fin, l'assistant n'a donc pas à redemander sans cesse.
+mise au point attendent leur fin, l'assistant n'a donc pas à redemander sans cesse. Une attente s'arrête après 45 secondes sauf demande contraire, car beaucoup d'assistants abandonnent un appel au bout d'une minute environ : une longue pose ou une mise au point continue alors et la réponse indique qu'elle est toujours en cours.
 
 ## À savoir
 

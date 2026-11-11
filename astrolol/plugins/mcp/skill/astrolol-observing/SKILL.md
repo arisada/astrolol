@@ -47,7 +47,7 @@ connected, `list_profiles` then `activate_profile` connects the rig.
 - Don't `mount_sync` unless you have a verified position (a successful `platesolve_here`). A wrong sync ruins the pointing model.
 - Never start the sequencer without a clean `sequencer_preflight`. Tell the user what will run unattended.
 - If something looks wrong (unexpected motion, errors piling up, weather), call `emergency_stop`, then explain.
-- A slew, park or autofocus that returns `"result": "timeout"` is **not finished**: check `get_overview` or `mount_status`, don't assume.
+- A slew, park, exposure or autofocus that returns `"result": "timeout"` is **not finished** (waits end after 45 s by default, the work goes on): check `get_overview` or `mount_status`, don't assume.
 - Ask the user before long or irreversible actions (starting a night's sequence, removing queue tasks, recalibrating the guider).
 - Park the mount at the end of every session unless told otherwise.
 

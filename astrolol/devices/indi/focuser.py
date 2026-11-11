@@ -19,6 +19,7 @@ from astrolol.devices.indi.indigo import setup_simulator_focuser
 logger = structlog.get_logger()
 
 _MOVE_TIMEOUT = 60.0        # maximum time for any move
+_MAX_CORRECTIONS = 1        # extra moves asked for when a focuser stops short of its target
 
 
 class IndiFocuser:
@@ -89,14 +90,34 @@ class IndiFocuser:
         """Move focuser to absolute position and wait until done."""
         self._state = DeviceState.BUSY
         try:
+            await self._move_exactly(position)
+        finally:
+            self._state = DeviceState.CONNECTED
+
+    async def _move_exactly(self, position: int) -> None:
+        """Move, then ask again if the focuser stopped short of the target (a few steps of play).
+
+        Some focusers report a finished move a few steps before the target. A move that is still
+        short afterwards is logged, not an error: callers read the real position afterwards.
+        """
+        for attempt in range(1 + _MAX_CORRECTIONS):
             await self._client.set_number(
                 self._device_name,
                 "ABS_FOCUS_POSITION",
                 {"FOCUS_ABSOLUTE_POSITION": float(position)},
             )
             await self._wait_move_done()
-        finally:
-            self._state = DeviceState.CONNECTED
+            try:
+                actual = int(await self._client.get_number(
+                    self._device_name, "ABS_FOCUS_POSITION", "FOCUS_ABSOLUTE_POSITION"
+                ))
+            except Exception:
+                return
+            if actual == position:
+                return
+        logger.warning(
+            "indi.focuser_short_of_target", device=self._device_name, target=position, position=actual,
+        )
 
     async def move_by(self, steps: int) -> None:
         """Move focuser by relative steps (positive = outward, negative = inward).
@@ -109,13 +130,7 @@ class IndiFocuser:
             current = await self._client.get_number(
                 self._device_name, "ABS_FOCUS_POSITION", "FOCUS_ABSOLUTE_POSITION"
             )
-            target = max(0, int(current) + steps)
-            await self._client.set_number(
-                self._device_name,
-                "ABS_FOCUS_POSITION",
-                {"FOCUS_ABSOLUTE_POSITION": float(target)},
-            )
-            await self._wait_move_done()
+            await self._move_exactly(max(0, int(current) + steps))
         finally:
             self._state = DeviceState.CONNECTED
 

@@ -398,6 +398,11 @@ class AutofocusEngine:
             position=position,
         )
         await asyncio.wait_for(focuser.move_to(position), timeout=_MOVE_TIMEOUT)
+        # A focuser can stop a few steps short: the sample belongs to where it really is.
+        reached = (await focuser.get_status()).position
+        if reached is not None and reached != position:
+            logger.info("autofocus.position_off_target", step=run.current_step, target=position, position=reached)
+            position = reached
 
         # 2. Expose
         logger.info(

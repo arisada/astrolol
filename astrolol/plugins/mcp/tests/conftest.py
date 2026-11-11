@@ -49,6 +49,7 @@ def make_app(*, enabled: set[str] | None = None, secure: bool = False) -> FastAP
     app.state.enabled_plugin_ids = {"mcp"} | (enabled or set())
     app.state.calls = []  # (method, path) of every stub call
     app.state.slew_outcome = "completed"
+    app.state.finished_exposures = 0
 
     plugin = McpPlugin()
     app.state.acl.add_plugin(*plugin.manifest.acl_rules)
@@ -128,6 +129,9 @@ def make_app(*, enabled: set[str] | None = None, secure: bool = False) -> FastAP
         body = await request.json()
         if body["duration"] > 600:
             raise HTTPException(status_code=409, detail="Camera busy")
+        if body["duration"] == 2.5:  # a "long" exposure: takes 2 s to answer
+            await asyncio.sleep(2)
+            request.app.state.finished_exposures += 1
         return {"device_id": dev, "fits_path": "/data/a.fits", "preview_path": "/x.jpg", "duration": body["duration"],
                 "width": 4000, "height": 3000}
 

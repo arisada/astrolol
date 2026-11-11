@@ -55,7 +55,7 @@ The list at the bottom of the page shows every tool and whether it only reads. I
 - **Stop everything:** one call halts the mount, camera, focuser, guiding and sequencer.
 
 Tools for a feature appear only when that feature's plugin is on. Slews, parking and autofocus wait
-until they finish, so the assistant does not have to keep asking.
+until they finish, so the assistant does not have to keep asking. A wait ends after 45 seconds unless the assistant asks for longer, because many assistants give up on a call after about a minute: a long exposure or autofocus then carries on and the answer says it is still running.
 
 ## Good to know
 

@@ -63,6 +63,9 @@ should fetch this, then subscribe to `/ws/events`, and de-duplicate on `id` (see
 overlap between what history returns and what the socket then delivers is expected, not
 a bug.
 
+Optional query parameters: `limit` (only the newest *n* events) and `type_prefix` (only event
+types starting with it, applied before `limit`).
+
 ### mDNS discovery (`astrolol/plugins/mdns/`, optional)
 
 When enabled, the server advertises itself via mDNS as

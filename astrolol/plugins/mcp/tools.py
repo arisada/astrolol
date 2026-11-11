@@ -12,7 +12,7 @@ import io
 import json
 from collections.abc import Awaitable, Callable, Iterator
 from contextlib import contextmanager
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from typing import Any
 
@@ -33,6 +33,9 @@ class ToolContext:
     app: FastAPI
     api: ApiClient
     event_bus: Any = None
+    # Work that goes on after the call has answered (a long exposure); the endpoint closes the
+    # API client once these are done.
+    background: list[asyncio.Task[Any]] = field(default_factory=list)
 
     def plugin_enabled(self, plugin_id: str) -> bool:
         return plugin_id in getattr(self.app.state, "enabled_plugin_ids", set())
@@ -187,11 +190,18 @@ def O(desc: str) -> dict[str, Any]:  # noqa: E743
 
 DEVICE = S("Device id from list_devices / get_overview, e.g. mount_eqmod_telescope")
 WAIT = B("Return only when the operation has finished (or timeout_s passed)", True)
-TIMEOUT = N("Longest wait in seconds", default=300)
+# Many MCP clients give up on a call after about 60 s, whatever the server does. A wait that is
+# not given a timeout_s therefore ends well before that: the result says "timeout" and the
+# operation carries on.
+MAX_WAIT_S = 45.0
+TIMEOUT = N(f"Longest wait in seconds (default {MAX_WAIT_S:g}: many MCP clients give up on a call after about 60 s; "
+            "the operation carries on and the result says it is still running)", default=MAX_WAIT_S)
 
 
 def _timeout(args: dict[str, Any], default: float) -> float:
-    return max(1.0, min(float(args.get("timeout_s") or default), 3600.0))
+    if args.get("timeout_s"):
+        return max(1.0, min(float(args["timeout_s"]), 3600.0))
+    return min(default, MAX_WAIT_S)
 
 
 def _drop(args: dict[str, Any], *keys: str) -> dict[str, Any]:
@@ -303,8 +313,9 @@ async def list_devices(ctx: ToolContext, args: dict[str, Any]) -> Any:
        "limit": I("How many to return", default=30, minimum=1, maximum=200)},
       read_only=True)
 async def get_events(ctx: ToolContext, args: dict[str, Any]) -> Any:
-    events = await ctx.api.get("/events/history")
     prefix = args.get("type_prefix")
+    # Enough to still have the asked number left once the noisy types are dropped below.
+    events = await ctx.api.get("/events/history", params={"type_prefix": prefix, "limit": 1000})
     if prefix:
         events = [e for e in events if str(e.get("type", "")).startswith(prefix)]
     events = [e for e in events if e.get("type") not in {"focuser.position_updated", "mount.coords_updated"}]
@@ -523,21 +534,33 @@ async def _preview_block(ctx: ToolContext, dev: str, max_px: int) -> dict[str, A
 
 @tool("camera_expose",
       "Take one exposure, wait for it, and return its file path, size, statistics and a stretched preview image. "
-      "The preview is a quick look, not the saved data.",
+      "The preview is a quick look, not the saved data. An exposure that outlasts the wait (default 45 s) goes on "
+      "and the result says so: follow it with camera_status, then camera_preview.",
       {"device_id": DEVICE, "duration_s": N("Exposure time in seconds", exclusiveMinimum=0),
        "gain": I("Gain; omit to keep the camera's current gain"), "binning": I("Binning", default=1, minimum=1, maximum=4),
        "frame_type": S("light, dark, flat or bias", enum=["light", "dark", "flat", "bias"], default="light"),
        "save": B("Save the FITS file (false = look only)", True),
        "object_name": S("Object name for the FITS header; default the mount target"),
        "include_preview": B("Attach a preview image", True),
-       "preview_max_px": I("Longest side of the preview", default=900, minimum=200, maximum=2000)},
+       "preview_max_px": I("Longest side of the preview", default=900, minimum=200, maximum=2000),
+       "wait": WAIT, "timeout_s": TIMEOUT},
       ("device_id", "duration_s"))
 async def camera_expose(ctx: ToolContext, args: dict[str, Any]) -> Any:
     dev = safe_id(args["device_id"])
     body = _drop({"duration": args["duration_s"], "gain": args.get("gain"), "binning": args.get("binning"),
                   "frame_type": args.get("frame_type"), "save": args.get("save"),
                   "object_name": args.get("object_name")})
-    result = await ctx.api.post(f"/imager/{dev}/expose", body, timeout=float(args["duration_s"]) + 180)
+    # The request runs as a task of its own so that giving up the wait leaves the exposure going.
+    exposing = asyncio.create_task(ctx.api.post(f"/imager/{dev}/expose", body, timeout=float(args["duration_s"]) + 180))
+    ctx.background.append(exposing)
+    if not args.get("wait", True):
+        return {"result": "exposing", "duration": args["duration_s"],
+                "note": "The exposure goes on; follow it with camera_status, then camera_preview"}
+    await asyncio.wait({exposing}, timeout=_timeout(args, float(args["duration_s"]) + 30))
+    if not exposing.done():
+        return {"result": "timeout", "duration": args["duration_s"],
+                "note": "Still exposing; follow it with camera_status, then camera_preview"}
+    result = exposing.result()
     stats = await ctx.api.call("GET", f"/imager/{dev}/stats", ok_missing=True)
     out: dict[str, Any] = {"result": {k: result.get(k) for k in ("fits_path", "duration", "width", "height")}}
     if stats.status == 200:
@@ -596,7 +619,7 @@ async def focuser_status(ctx: ToolContext, args: dict[str, Any]) -> Any:
 @tool("focuser_move",
       "Move the focuser to an absolute position, or by a number of steps (positive = out), and wait.",
       {"device_id": DEVICE, "position": I("Absolute target position"),
-       "steps": I("Relative move; positive = out, negative = in"), "wait": WAIT, "timeout_s": N("Longest wait", default=120)},
+       "steps": I("Relative move; positive = out, negative = in"), "wait": WAIT, "timeout_s": N("Longest wait in seconds (default 45; the operation carries on after that)", default=MAX_WAIT_S)},
       ("device_id",))
 async def focuser_move(ctx: ToolContext, args: dict[str, Any]) -> Any:
     dev = safe_id(args["device_id"])
@@ -645,7 +668,7 @@ async def filter_wheel_select(ctx: ToolContext, args: dict[str, Any]) -> Any:
        "binning": I("Binning", default=1), "gain": I("Gain"), "filter_slot": I("Filter slot to select first"),
        "filter_wheel_id": S("Filter wheel device id when there are several"),
        "metric": S("hfd or fwhm", enum=["hfd", "fwhm"]),
-       "wait": WAIT, "timeout_s": N("Longest wait", default=900)},
+       "wait": WAIT, "timeout_s": N("Longest wait in seconds (default 45; the operation carries on after that)", default=MAX_WAIT_S)},
       ("camera_id", "focuser_id"), plugins=("autofocus",))
 async def autofocus_start(ctx: ToolContext, args: dict[str, Any]) -> Any:
     cfg = _drop(args, "wait", "timeout_s", "exposure_s")
@@ -695,7 +718,7 @@ async def autofocus_abort(ctx: ToolContext, args: dict[str, Any]) -> Any:
        "name": S("Target name"), "tolerance_arcsec": N("Accept when this close", default=60),
        "max_attempts": I("Solve attempts", default=5), "exposure_s": N("Solve exposure, seconds", default=5),
        "binning": I("Binning", default=2), "gain": I("Gain"),
-       "slew_first": B("Slew before the first solve", True), "wait": WAIT, "timeout_s": N("Longest wait", default=600)},
+       "slew_first": B("Slew before the first solve", True), "wait": WAIT, "timeout_s": N("Longest wait in seconds (default 45; the operation carries on after that)", default=MAX_WAIT_S)},
       ("mount_id", "camera_id", "ra_deg", "dec_deg"), destructive=True, plugins=("platesolve",))
 async def platesolve_center(ctx: ToolContext, args: dict[str, Any]) -> Any:
     body = _drop(args, "wait", "timeout_s", "ra_deg", "dec_deg", "exposure_s")
@@ -734,7 +757,7 @@ async def platesolve_cancel_center(ctx: ToolContext, args: dict[str, Any]) -> An
       "Take an exposure and plate-solve it: where is the telescope really pointing? Returns RA/Dec in degrees, "
       "field rotation and pixel scale. Does not move or sync anything.",
       {"camera_id": S("Camera device id"), "exposure_s": N("Exposure, seconds", default=5),
-       "binning": I("Binning", default=2), "gain": I("Gain"), "timeout_s": N("Longest wait", default=180)},
+       "binning": I("Binning", default=2), "gain": I("Gain"), "timeout_s": N("Longest wait in seconds", default=180)},
       ("camera_id",), plugins=("platesolve",))
 async def platesolve_here(ctx: ToolContext, args: dict[str, Any]) -> Any:
     body = _drop({"device_id": safe_id(args["camera_id"]), "duration": args.get("exposure_s") or 5,
@@ -743,7 +766,7 @@ async def platesolve_here(ctx: ToolContext, args: dict[str, Any]) -> Any:
     job_id = safe_id(job["id"])
     job, done = await _poll(lambda: ctx.api.get(f"/plugins/platesolve/{job_id}/status"),
                             lambda j: j.get("status") in {"completed", "failed", "cancelled"},
-                            _timeout(args, 180), 1.5)
+                            max(1.0, min(float(args.get("timeout_s") or 180), 3600.0)), 1.5)
     if not done:
         await _safe(ctx.api.delete(f"/plugins/platesolve/{job_id}/cancel"))
         raise ToolError("The solve did not finish in time")
