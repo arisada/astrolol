@@ -38,6 +38,13 @@ longest one your guiding allows. The change applies the next time the camera sta
 
 Set the guider's own exposure to the same value, so its dark frames match.
 
+## Colour cameras
+
+When the stacked camera connects it takes one very short picture with the real camera, so
+the stacks carry its colour pattern, pixel size and name like any of its own images. The camera
+must be idle for this: if the guider is already streaming, it is done before the next exposure.
+Binned stacks have no colour pattern.
+
 ## While it runs
 
 The **Camera stream** box shows whether the camera is streaming, how many frames it has

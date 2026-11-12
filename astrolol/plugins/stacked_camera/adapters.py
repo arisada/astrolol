@@ -34,7 +34,13 @@ from astrolol.devices.base.streaming import (
 from astrolol.plugins.stacked_camera.accumulator import SumAccumulator
 from astrolol.plugins.stacked_camera.events import StackProgress
 from astrolol.plugins.stacked_camera.fits import StackInfo, write_stack_fits
-from astrolol.plugins.stacked_camera.hub import Lease, SourceHub, StackSink, SubParams
+from astrolol.plugins.stacked_camera.hub import (
+    TOO_FAST_RATIO,
+    Lease,
+    SourceHub,
+    StackSink,
+    SubParams,
+)
 from astrolol.plugins.stacked_camera.hubs import HubRegistry
 
 logger = structlog.get_logger()
@@ -48,6 +54,9 @@ FAST_KEY = "stacked_camera_fast"
 LATENCY_ALLOWANCE = 0.3
 # How long to wait for the next sub, beyond its own exposure, before giving up on the camera.
 FRAME_WAIT_EXTRA = 30.0
+# From this sub length on, a frame arriving sooner than half a sub after the previous one cannot
+# be a sub of that length (below it, arrival-time jitter is too large to tell).
+PACE_CHECK_FROM = 0.5
 
 
 class _VirtualCamera:
@@ -64,6 +73,13 @@ class _VirtualCamera:
 
     async def connect(self) -> None:
         self._source()  # refuses with a clear reason when the real camera is not connected
+        await self._learn_source()
+
+    async def _learn_source(self) -> None:
+        try:
+            await self._hubs.probe(self._source_id)
+        except Exception as exc:  # the cards are a nicety, never a reason to refuse a camera
+            logger.warning("stacked_camera.probe_error", error=str(exc))
 
     async def disconnect(self) -> None:
         pass
@@ -136,6 +152,7 @@ class StackedCamera(_VirtualCamera):
         return sub_exposure, math.ceil(duration / sub_exposure - 1e-9)
 
     async def _expose(self, params: ExposureParams, abort: asyncio.Event) -> Image:
+        await self._learn_source()  # no-op once known; retries if the stream was busy at connect
         hub = await self._hubs.hub(self._source_id)
         sub_exposure, total = self.plan(params.duration, self._hubs.sub_exposure())
         current = hub.params
@@ -150,12 +167,25 @@ class StackedCamera(_VirtualCamera):
         device_id = self._device_id()
         accumulator = SumAccumulator()
         requested = time.monotonic()
+        previous: float | None = None  # when the last frame arrived
         first_start: datetime | None = None
         try:
             await self._progress(device_id, True, accumulator, total, sub_exposure)
             while accumulator.count < total:
                 frame = await self._next_frame(sink, abort, sub_exposure)
-                if not self._counts(frame, requested, wanted):
+                if hub.stats.too_fast:
+                    raise RuntimeError(
+                        "The camera sends frames far faster than the exposure asked for, so a "
+                        "stack of them would carry the wrong exposure time. Try again; if it keeps "
+                        "happening, this camera's stream does not honour its exposure"
+                    )
+                too_soon = (
+                    previous is not None
+                    and frame.exposure >= PACE_CHECK_FROM
+                    and frame.timestamp - previous < TOO_FAST_RATIO * frame.exposure
+                )
+                previous = frame.timestamp
+                if too_soon or not self._counts(frame, requested, wanted):
                     continue
                 if first_start is None:
                     began = frame.timestamp - frame.exposure
@@ -227,6 +257,7 @@ class StackedCamera(_VirtualCamera):
             temperature=None if status is None else status.temperature,
             dropped=dropped,
             full_scale=accumulator.full_scale,
+            extra=self._camera_cards(wanted.binning),
         )
         self._counter += 1
         directory = self._images_dir or _default_images_dir()
@@ -243,6 +274,10 @@ class StackedCamera(_VirtualCamera):
             exposure_duration=accumulator.exposure,
             gain=wanted.gain,
         )
+
+    def _camera_cards(self, binning: int) -> dict[str, tuple[object, str]]:
+        cards = self._hubs.cards(self._source_id)
+        return {} if cards is None else cards.for_binning(binning)
 
     def _device_id(self) -> str:
         return self._hubs.device_id_of(self) or self._source_id
@@ -290,6 +325,7 @@ class FastCamera(_VirtualCamera):
 
     async def connect(self) -> None:
         source = self._source()
+        await self._learn_source()
         if isinstance(source, IPulseGuider):
             # An ST4 output on the real camera guides through this one too. Set per instance
             # so a camera without one does not claim to pulse guide.

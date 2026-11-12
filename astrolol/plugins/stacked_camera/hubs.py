@@ -8,6 +8,7 @@ from typing import Any
 import structlog
 
 from astrolol.plugins.stacked_camera.hub import SourceHub, SubParams
+from astrolol.plugins.stacked_camera.probe import CameraCards, probe_camera
 
 logger = structlog.get_logger()
 
@@ -35,6 +36,7 @@ class HubRegistry:
         self.sub_exposure = sub_exposure
         self._virtual_keys = virtual_adapter_keys
         self._hubs: dict[str, tuple[object, SourceHub]] = {}
+        self._cards: dict[str, tuple[object, CameraCards | None]] = {}
 
     def camera(self, source_id: str) -> Any:
         """The connected real camera *source_id*; ``SourceNotConnected`` if there is none."""
@@ -60,6 +62,25 @@ class HubRegistry:
         hub = SourceHub(camera, SubParams(exposure=self.sub_exposure()))
         self._hubs[source_id] = (camera, hub)
         return hub
+
+    async def probe(self, source_id: str) -> None:
+        """Learn the camera's cards once per camera instance, while its stream is idle.
+
+        Does nothing when already known, or when a stream is running (the camera cannot expose
+        then); a later call tries again.
+        """
+        camera = self.camera(source_id)
+        held = self._cards.get(source_id)
+        if held is not None and held[0] is camera:
+            return
+        hub = self.existing(source_id)
+        if hub is not None and (hub.running or hub.leases):
+            return
+        self._cards[source_id] = (camera, await probe_camera(camera))
+
+    def cards(self, source_id: str) -> CameraCards | None:
+        held = self._cards.get(source_id)
+        return None if held is None else held[1]
 
     def real_cameras(self) -> list[str]:
         """Device ids of the connected cameras a virtual camera can be built on."""

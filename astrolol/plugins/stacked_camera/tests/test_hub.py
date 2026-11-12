@@ -352,3 +352,39 @@ async def test_works_over_a_camera_without_a_native_stream(tmp_path: Path) -> No
     assert not hub.running
     # Frames do not pile up on disk; only the exposure cut short by the stop may leave a file.
     assert len(list(tmp_path.glob("*.fits"))) <= 1
+
+
+# --- A camera that ignores the exposure it was asked for ---
+
+
+async def test_frames_much_faster_than_their_exposure_are_flagged(
+    hub: SourceHub, camera: FakeStreamer
+) -> None:
+    lease = await hub.acquire()
+    for i in range(8):  # labelled 2 s, arriving every 0.05 s
+        camera.emit(exposure=2.0, timestamp=i * 0.05)
+        await settle()
+    assert hub.stats.too_fast
+    await lease.release()
+
+
+async def test_frames_at_the_pace_of_their_exposure_are_not_flagged(
+    hub: SourceHub, camera: FakeStreamer
+) -> None:
+    lease = await hub.acquire()
+    for _ in range(12):
+        camera.emit()  # the fake stamps each one an exposure after the last
+        await settle()
+    assert not hub.stats.too_fast
+    await lease.release()
+
+
+async def test_a_restarted_stream_forgets_the_flag(hub: SourceHub, camera: FakeStreamer) -> None:
+    lease = await hub.acquire()
+    for i in range(8):
+        camera.emit(exposure=2.0, timestamp=i * 0.05)
+        await settle()
+    await lease.release()
+    lease = await hub.acquire()
+    assert not hub.stats.too_fast
+    await lease.release()

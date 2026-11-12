@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import statistics
 from collections import deque
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -28,6 +29,10 @@ from astrolol.devices.base.streaming import (
 from astrolol.imaging.streaming import LoopingExposureStream, streaming_camera
 
 logger = structlog.get_logger()
+
+# Frames closer together than this share of their exposure cannot be exposures of that length.
+TOO_FAST_RATIO = 0.5
+TOO_FAST_WINDOW = 5
 
 DEFAULT_SINK_DEPTH = 8
 
@@ -49,6 +54,10 @@ class HubStats:
     frames: int  # frames received from the camera since the stream started
     source_dropped: int  # frames the camera produced that the hub did not get in time
     duty: float | None  # share of wall time the sensor was exposing; None until 2 frames
+    # Frames keep arriving much faster than their exposure: the camera ignores the exposure
+    # it was asked for (some drivers only read it when the stream starts), so a frame's
+    # length is not what its label says and adding them up would give the wrong exposure time.
+    too_fast: bool = False
 
 
 class StackSink:
@@ -58,9 +67,7 @@ class StackSink:
     new frames are refused and counted in ``dropped``.
     """
 
-    def __init__(
-        self, depth: int, on_close: Callable[[StackSink], None] | None = None
-    ) -> None:
+    def __init__(self, depth: int, on_close: Callable[[StackSink], None] | None = None) -> None:
         self._depth = depth
         self._frames: deque[Frame] = deque()
         self._wake = asyncio.Event()
@@ -132,6 +139,8 @@ class SourceHub:
         self._source: FrameSubscription | None = None
         self._pump_task: asyncio.Task[None] | None = None
         self._error: BaseException | None = None
+        self._gaps: deque[float] = deque(maxlen=TOO_FAST_WINDOW)  # gap / exposure, recent frames
+        self._too_fast = False
         self._reset_stats()
 
     # --- State ---
@@ -158,7 +167,7 @@ class SourceHub:
         duty = None
         if self._frames_seen >= 2 and self._last_ts > self._first_ts:
             duty = min(1.0, self._exposed_after_first / (self._last_ts - self._first_ts))
-        return HubStats(self._frames_seen, self._source_dropped, duty)
+        return HubStats(self._frames_seen, self._source_dropped, duty, self._too_fast)
 
     # --- Consumers ---
 
@@ -218,6 +227,8 @@ class SourceHub:
         self._exposed_after_first = 0.0  # exposure of every frame but the first
         self._first_ts = 0.0
         self._last_ts = 0.0
+        self._gaps.clear()
+        self._too_fast = False
 
     async def _start(self) -> None:
         self._error = None
@@ -275,6 +286,21 @@ class SourceHub:
             self._first_ts = frame.timestamp
         else:
             self._exposed_after_first += frame.exposure
+        gap = frame.timestamp - self._last_ts
+        if self._frames_seen > 0:
+            self._gaps.append(gap / frame.exposure)
         self._frames_seen += 1
         self._last_ts = frame.timestamp
+        if (
+            len(self._gaps) == self._gaps.maxlen
+            and not self._too_fast
+            and max(self._gaps) < TOO_FAST_RATIO
+        ):
+            interval = round(statistics.median(self._gaps) * frame.exposure, 3)
+            logger.warning(
+                "stacked_camera.stream_too_fast",
+                exposure=frame.exposure,
+                interval=interval,
+            )
+            self._too_fast = True
         self._source_dropped = source.dropped

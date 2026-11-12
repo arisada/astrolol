@@ -15,6 +15,7 @@ from astrolol.devices.base.streaming import (
     StreamParams,
     StreamRoi,
 )
+from astrolol.plugins.stacked_camera import adapters
 from astrolol.plugins.stacked_camera.adapters import FAST_KEY, STACKED_KEY
 from astrolol.plugins.stacked_camera.events import StackProgress
 from astrolol.plugins.stacked_camera.tests.rig import (
@@ -414,3 +415,37 @@ async def test_the_hub_follows_the_real_camera_when_it_is_connected_again(rig: R
     await fast.start_stream(StreamParams(exposure=SUB))
     assert second.streaming and not first.streaming
     await fast.stop_stream()
+
+
+async def test_a_stream_that_is_too_fast_fails_the_stack(rig: Rig) -> None:
+    source = await rig.source()
+    stacked = await rig.stacked()
+    stacked._images_dir = rig.tmp_path
+    task = asyncio.ensure_future(stacked.expose(ExposureParams(duration=SUB * 40)))
+    await started(source)
+    with pytest.raises(RuntimeError, match="faster than the exposure"):
+        for _ in range(400):
+            await asyncio.sleep(SUB / 10)
+            source.emit(value=7)
+            if task.done():
+                break
+        await task
+    assert list(rig.tmp_path.glob("stacked_*.fits")) == []
+
+
+async def test_frames_arriving_too_soon_after_each_other_are_not_added(
+    rig: Rig, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    monkeypatch.setattr(adapters, "PACE_CHECK_FROM", 0.0)
+    source = await rig.source()
+    stacked = await rig.stacked()
+    stacked._images_dir = rig.tmp_path
+    task = asyncio.ensure_future(stacked.expose(ExposureParams(duration=SUB * 2)))
+    await started(source)
+    source.emit(value=1, age=0.0)  # the first has nothing before it to be too close to
+    await asyncio.sleep(0.005)
+    source.emit(value=1)  # a tenth of a sub later: not a sub
+    await asyncio.sleep(SUB)
+    source.emit(value=1)
+    image = await asyncio.wait_for(task, 5)
+    assert astropy_fits.getheader(image.fits_path)["NSUBS"] == 2

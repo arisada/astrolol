@@ -269,6 +269,9 @@ class IndiCamera:
             client.set_number(dev, "CCD_BINNING", {"HOR_BIN": float(params.binning), "VER_BIN": float(params.binning)}),
         )
         await self._best_effort("encoder", client.set_switch(dev, "CCD_STREAM_ENCODER", ["RAW"]))
+        # Full sensor depth (where the driver offers the choice): 8 bits clips stars and is no
+        # use for adding frames up.
+        await self._best_effort("depth", client.set_switch(dev, "STREAM_FULL_DEPTH", ["FULL_DEPTH_16BIT"]))
         if params.roi is not None:
             r = params.roi
             frame = {"X": float(r.x), "Y": float(r.y), "WIDTH": float(r.width), "HEIGHT": float(r.height)}

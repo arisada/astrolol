@@ -41,6 +41,13 @@ guidage permet. Le changement s'applique au prochain démarrage du flux de la ca
 
 Réglez la pose du guideur sur la même valeur, pour que ses images de dark correspondent.
 
+## Caméras couleur
+
+À sa connexion, la caméra empilée prend une toute petite photo avec la vraie caméra : les
+empilements portent ainsi sa matrice colorée, la taille de ses pixels et son nom, comme ses
+propres images. La caméra doit être au repos pour cela : si le guideur diffuse déjà, c'est fait
+avant la pose suivante. Les empilements en binning n'ont pas de matrice colorée.
+
 ## Pendant l'utilisation
 
 Le cadre **Flux de la caméra** indique si la caméra diffuse des images, combien elle en a

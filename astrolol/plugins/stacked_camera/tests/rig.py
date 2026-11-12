@@ -5,6 +5,7 @@ import asyncio
 import time
 from pathlib import Path
 
+import astropy.io.fits as astropy_fits
 import numpy as np
 from fastapi import FastAPI
 
@@ -39,6 +40,10 @@ class SourceCamera:
         self.cooler: tuple[bool, float | None] | None = None
         self.alive = True
         self._seq = 0
+        # Cards a probe exposure's FITS carries; None = the camera cannot expose when asked.
+        self.probe_header: dict[str, object] | None = None
+        self.probe_dir: Path | None = None
+        self.exposures: list[float] = []
 
     async def connect(self) -> None:
         pass
@@ -47,7 +52,17 @@ class SourceCamera:
         pass
 
     async def expose(self, params: ExposureParams) -> Image:
-        raise AssertionError("the virtual cameras never expose the real one")
+        # Only the probe may expose the real camera, and never while it streams.
+        assert not self.streaming, "exposed while streaming"
+        self.exposures.append(params.duration)
+        if self.probe_header is None or self.probe_dir is None:
+            raise RuntimeError("this camera does not expose")
+        path = self.probe_dir / f"probe_{len(self.exposures)}.fits"
+        hdu = astropy_fits.PrimaryHDU(np.zeros((4, 6), dtype=np.uint16))
+        for key, value in self.probe_header.items():
+            hdu.header[key] = value
+        hdu.writeto(path)
+        return Image(fits_path=str(path), width=6, height=4, exposure_duration=params.duration)
 
     async def abort(self) -> None:
         pass
