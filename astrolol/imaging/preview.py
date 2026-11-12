@@ -128,7 +128,9 @@ def _bayer_pattern(header: fits.Header) -> str | None:
     return "".join(pattern[((py + yoff) % 2) * 2 + (px + xoff) % 2] for py in (0, 1) for px in (0, 1))
 
 
-def _adu_max(raw: np.ndarray, bzero: float, bscale: float) -> float | None:
+def _adu_max(
+    raw: np.ndarray, bzero: float, bscale: float, saturate: float | None = None
+) -> float | None:
     """Full-scale value of the *physical* (BZERO/BSCALE-applied) data type.
 
     Mirrors what astropy's scaled read would yield: on-disk int16 + BZERO=32768 is
@@ -136,9 +138,15 @@ def _adu_max(raw: np.ndarray, bzero: float, bscale: float) -> float | None:
     like N.I.N.A. uses to judge clipping. Returns None when the physical data is
     not integer-valued (float FITS, or a non-unit BSCALE); the caller then falls
     back to the data's own max, since there is no fixed full-scale value.
+
+    Integers of 32 bits or more say nothing about the sensor (their range is billions), so the
+    file's own ``SATURATE`` card gives the full scale there when it has one (a sum of
+    sub-exposures: every sub at its maximum).
     """
     if not np.issubdtype(raw.dtype, np.integer) or bscale != 1 or bzero != int(bzero):
         return None
+    if raw.dtype.itemsize >= 4 and saturate is not None and saturate > 0:
+        return float(saturate)
     return float(np.iinfo(raw.dtype).max) + bzero
 
 
@@ -207,7 +215,10 @@ def load_preview_base(fits_path: Path, max_dim: int = _PREVIEW_MAX_DIM) -> Previ
             for start in range(0, height, rows_per_strip):
                 yield start, _physical(raw[start:start + rows_per_strip], bzero, bscale, work_dtype)
 
-        adu_max = _adu_max(raw, bzero, bscale)
+        saturate = hdu.header.get("SATURATE")  # type: ignore[union-attr]
+        adu_max = _adu_max(
+            raw, bzero, bscale, float(saturate) if isinstance(saturate, int | float) else None
+        )
         fixed_scale = adu_max is not None
         if adu_max is None:
             # No fixed full scale — needs the data's own max before the histogram

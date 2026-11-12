@@ -1375,6 +1375,15 @@ export interface GuidingStateChangedEvent extends BaseEvent {
   guiding: boolean
   reason: string | null
 }
+export interface StackedCameraProgressEvent extends BaseEvent {
+  type: 'stacked_camera.progress'
+  device_id: string
+  active: boolean
+  subs_done: number
+  subs_total: number
+  exposure_done: number
+  exposure_total: number
+}
 export interface GuidingActiveChangedEvent extends BaseEvent {
   type: 'guiding.active_changed'
   active: string | null
@@ -1554,6 +1563,7 @@ export type AstrolollEvent =
   | PolarAlignFitCompletedEvent | PolarAlignErrorUpdatedEvent
   | PolarAlignWizardCompletedEvent | PolarAlignWizardFailedEvent | PolarAlignWizardCancelledEvent
   | GuidingStateChangedEvent | GuidingSettledEvent | GuidingActiveChangedEvent
+  | StackedCameraProgressEvent
   | SequencerStatusEvent | SequencerQueueChangedEvent | SequencerFrameSavedEvent
   | SequencerTaskFinishedEvent | SequencerStepFailedEvent
   | ViewerIndexChangedEvent | ViewerRescanStartedEvent | ViewerRescanProgressEvent | ViewerRescanCompletedEvent

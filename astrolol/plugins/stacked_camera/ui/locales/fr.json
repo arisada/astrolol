@@ -1,0 +1,37 @@
+{
+  "label": "Caméra empilée",
+  "manifest": {
+    "name": "Caméra empilée",
+    "description": "Guider et poser longtemps avec la même caméra : le guideur reçoit une image toutes les quelques secondes pendant que la pose se construit à partir de ces mêmes images."
+  },
+  "title": "Caméra empilée",
+  "intro": "Utilisez une seule caméra pour guider et photographier en même temps. Le guideur reçoit une image courte toutes les quelques secondes, et les poses longues sont construites à partir de ces mêmes images.",
+  "chip": {
+    "label": "Empilement",
+    "progress": "{{done}}/{{total}} s"
+  },
+  "cameras": {
+    "title": "Caméras",
+    "none": "Connectez d'abord une caméra dans Matériel.",
+    "notInUse": "Non utilisée",
+    "inUse": "Prise de vue : {{stacked}}, guidage : {{fast}}",
+    "attach": "Utiliser pour guider et photographier",
+    "detach": "Ne plus utiliser"
+  },
+  "settings": {
+    "title": "Images courtes",
+    "subExposure": "Durée d'une image courte",
+    "hint": "Une pose est un nombre entier d'images courtes : elle est arrondie au supérieur. Des images plus courtes guident plus vite ; des images plus longues ajoutent moins de bruit."
+  },
+  "status": {
+    "title": "Flux de la caméra",
+    "none": "La caméra ne diffuse pas d'images.",
+    "state": "État",
+    "running": "En marche",
+    "idle": "Arrêté",
+    "failed": "En échec",
+    "frames": "Images",
+    "lost": "Images perdues",
+    "duty": "Capteur en pose"
+  }
+}

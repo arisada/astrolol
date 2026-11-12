@@ -509,3 +509,52 @@ def test_mono_frames_have_no_channel_stats(tmp_path: Path) -> None:
     base = load_preview_base(_write_uint16_fits(tmp_path / "m.fits", _sky(shape=(64, 64))))
     assert not base.is_color
     assert auto_stretch_stats(base)["channels"] is None
+
+
+def _write_int32_fits(path: Path, data: np.ndarray, saturate: int | None = None) -> Path:
+    hdu = fits.PrimaryHDU(data.astype(np.int32))
+    if saturate is not None:
+        hdu.header["SATURATE"] = saturate
+    hdu.writeto(path, overwrite=True)
+    return path
+
+
+def test_wide_integers_take_their_full_scale_from_the_saturate_card(tmp_path: Path) -> None:
+    """A sum of sub-exposures is stored in 32 bits: its sensor full scale is not 2**31."""
+    data = np.full((64, 64), 20 * 500, dtype=np.int32)
+    fits_path = _write_int32_fits(tmp_path / "sum.fits", data, saturate=20 * 65535)
+    stats = fits_to_jpeg(fits_path, tmp_path / "sum.jpg")
+    assert stats["hist_max"] == 20 * 65535.0
+
+
+def test_wide_integers_saturate_at_the_saturate_card(tmp_path: Path) -> None:
+    full = 20 * 65535
+    data = np.full((64, 64), 20 * 500, dtype=np.int32)
+    data[:8, :] = full  # an eighth of the frame at full scale
+    fits_path = _write_int32_fits(tmp_path / "sum.fits", data, saturate=full)
+    stats = fits_to_jpeg(fits_path, tmp_path / "sum.jpg")
+    assert stats["saturated_pct"] == 12.5
+    assert stats["histogram"][-1] > 0
+
+
+def test_wide_integers_without_the_card_keep_the_type_range(tmp_path: Path) -> None:
+    data = np.full((64, 64), 1000, dtype=np.int32)
+    fits_path = _write_int32_fits(tmp_path / "wide.fits", data)
+    assert fits_to_jpeg(fits_path, tmp_path / "wide.jpg")["hist_max"] == float(2**31 - 1)
+
+
+def test_the_saturate_card_does_not_change_16_bit_frames(tmp_path: Path) -> None:
+    """Only wide integers need it: for a 16-bit camera the data type already says the scale."""
+    hdu = fits.PrimaryHDU(np.full((64, 64), 500, dtype=np.uint16))
+    hdu.header["SATURATE"] = 4095
+    fits_path = tmp_path / "cam.fits"
+    hdu.writeto(fits_path, overwrite=True)
+    assert fits_to_jpeg(fits_path, tmp_path / "cam.jpg")["hist_max"] == 65535.0
+
+
+def test_a_non_numeric_saturate_card_is_ignored(tmp_path: Path) -> None:
+    hdu = fits.PrimaryHDU(np.full((64, 64), 1000, dtype=np.int32))
+    hdu.header["SATURATE"] = "unknown"
+    fits_path = tmp_path / "wide.fits"
+    hdu.writeto(fits_path, overwrite=True)
+    assert fits_to_jpeg(fits_path, tmp_path / "wide.jpg")["hist_max"] == float(2**31 - 1)

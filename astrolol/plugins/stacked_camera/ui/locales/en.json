@@ -1,0 +1,37 @@
+{
+  "label": "Stacked camera",
+  "manifest": {
+    "name": "Stacked camera",
+    "description": "Guide and take long exposures with the same camera: the guider gets a frame every few seconds while the exposure builds up from the same frames."
+  },
+  "title": "Stacked camera",
+  "intro": "Use one camera for guiding and imaging at once. The guider gets a short frame every few seconds, and long exposures are built from those same frames.",
+  "chip": {
+    "label": "Stack",
+    "progress": "{{done}}/{{total}} s"
+  },
+  "cameras": {
+    "title": "Cameras",
+    "none": "Connect a camera in Equipment first.",
+    "notInUse": "Not in use",
+    "inUse": "Imaging as {{stacked}}, guiding as {{fast}}",
+    "attach": "Use for guiding and imaging",
+    "detach": "Stop using"
+  },
+  "settings": {
+    "title": "Short frames",
+    "subExposure": "Short frame length",
+    "hint": "An exposure is a whole number of short frames, so it is rounded up. Shorter frames guide faster; longer ones add less noise."
+  },
+  "status": {
+    "title": "Camera stream",
+    "none": "The camera is not streaming.",
+    "state": "State",
+    "running": "Running",
+    "idle": "Idle",
+    "failed": "Failed",
+    "frames": "Frames",
+    "lost": "Lost frames",
+    "duty": "Sensor exposing"
+  }
+}
